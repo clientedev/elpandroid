@@ -18,8 +18,6 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showServerConfig, setShowServerConfig] = useState(false);
-  const [serverUrl, setServerUrl] = useState(apiClient.getBaseUrl());
 
   async function handleLogin() {
     if (!username.trim() || !password) {
@@ -39,16 +37,6 @@ export const LoginScreen: React.FC = () => {
       setErrorMessage(err.message || 'Erro inesperado.');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleSaveServerUrl() {
-    try {
-      await apiClient.setBaseUrl(serverUrl);
-      setShowServerConfig(false);
-      Alert.alert('Sucesso', 'Endereço da API atualizado para:\n' + serverUrl);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível salvar o endereço da API.');
     }
   }
 
@@ -147,33 +135,13 @@ export const LoginScreen: React.FC = () => {
             )}
           </TouchableOpacity>
 
-          {/* Server Config Toggle */}
-          <TouchableOpacity 
-            style={styles.configToggle} 
-            onPress={() => setShowServerConfig(!showServerConfig)}
-          >
-            <Ionicons name="server-outline" size={16} color={Colors.textSecondary} />
-            <Text style={styles.configToggleText}>
-              {showServerConfig ? 'Ocultar Configuração do Servidor' : 'Configurar Servidor Backend / Railway'}
+          {/* Server Info (Fixed) */}
+          <View style={styles.fixedServerBox}>
+            <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
+            <Text style={styles.fixedServerText}>
+              Servidor Oficial: elpandroid-production.up.railway.app
             </Text>
-          </TouchableOpacity>
-
-          {showServerConfig && (
-            <View style={styles.serverBox}>
-              <Text style={styles.serverLabel}>URL da API (Railway / Local):</Text>
-              <TextInput
-                style={styles.serverInput}
-                value={serverUrl}
-                onChangeText={setServerUrl}
-                placeholder="http://10.0.2.2:5000"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity style={styles.serverSaveBtn} onPress={handleSaveServerUrl}>
-                <Text style={styles.serverSaveBtnText}>Salvar Endereço</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          </View>
         </View>
 
         {/* Footer info */}
@@ -344,54 +312,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  configToggle: {
+  fixedServerBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 20,
-    paddingVertical: 6,
-  },
-  configToggleText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: '500',
-  },
-  serverBox: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#F1F5F9',
+    marginTop: 18,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F8FAFC',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  serverLabel: {
+  fixedServerText: {
     fontSize: 11,
-    fontWeight: '600',
     color: Colors.textSecondary,
-    marginBottom: 4,
-  },
-  serverInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: Colors.borderDark,
-    borderRadius: 6,
-    height: 38,
-    paddingHorizontal: 10,
-    fontSize: 13,
-    color: Colors.text,
-  },
-  serverSaveBtn: {
-    backgroundColor: Colors.secondary,
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  serverSaveBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   footer: {
     marginTop: 24,

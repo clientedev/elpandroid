@@ -20,7 +20,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const { user, logout } = useAuth();
   const { isOnline, syncState, pendingCount, triggerSync } = useNetwork();
 
-  const [apiUrl, setApiUrl] = useState(apiClient.getBaseUrl());
   const [stats, setStats] = useState({
     projetos: 0,
     visitas: 0,
@@ -48,15 +47,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       });
     } catch (e) {
       console.warn('Erro ao carregar diagnósticos:', e);
-    }
-  }
-
-  async function handleSaveApiUrl() {
-    try {
-      await apiClient.setBaseUrl(apiUrl);
-      Alert.alert('Sucesso', 'Endereço da API atualizado para:\n' + apiUrl);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível salvar.');
     }
   }
 
@@ -121,7 +111,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
         </View>
 
-        {/* Railway Backend Connection */}
+        {/* Railway Backend Connection (Fixed & Unconfigurable) */}
         <View style={styles.card}>
           <View style={styles.cardTitleRow}>
             <Ionicons name="server-outline" size={20} color={Colors.primary} />
@@ -129,26 +119,12 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
 
           <Text style={styles.desc}>
-            Informe a URL do serviço backend hospedado no Railway ou servidor de rede local:
+            Serviço backend oficial de produção configurado para sincronização e relatórios:
           </Text>
 
-          <TextInput
-            style={styles.input}
-            value={apiUrl}
-            onChangeText={setApiUrl}
-            placeholder="http://10.0.2.2:5000"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => setApiUrl(DEFAULT_API_URL)}>
-              <Text style={styles.secondaryBtnText}>Padrão</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleSaveApiUrl}>
-              <Text style={styles.primaryBtnText}>Salvar Endereço</Text>
-            </TouchableOpacity>
+          <View style={styles.fixedUrlBox}>
+            <Ionicons name="shield-checkmark" size={18} color={Colors.success} />
+            <Text style={styles.fixedUrlText}>{DEFAULT_API_URL}</Text>
           </View>
         </View>
 
@@ -423,5 +399,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+  },
+  fixedUrlBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  fixedUrlText: {
+    fontSize: 13,
+    color: Colors.text,
+    fontWeight: '600',
+    flex: 1,
   },
 });
