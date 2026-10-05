@@ -23,6 +23,14 @@ from models import (
     VisitaParticipante, TipoObra, CategoriaObra, Notificacao, GoogleDriveToken,
     RelatorioExpress, FotoRelatorioExpress, Lembrete
 )
+import pytz
+BRAZIL_TZ = pytz.timezone('America/Sao_Paulo')
+
+def now_brt():
+    """Retorna datetime no fuso de Brasília (naive para DB)"""
+    return datetime.now(BRAZIL_TZ).replace(tzinfo=None)
+
+brazil_now = now_brt
 
 # ==========================================================================================
 # UTILITY HELPERS
