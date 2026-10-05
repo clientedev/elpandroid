@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
 import { apiClient } from '../services/api';
@@ -43,32 +43,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isOnline = Boolean(net.isConnected && net.isInternetReachable !== false);
 
       if (isOnline) {
-        // Attempt Railway API login
-        const res = await apiClient.axios.post('/login', {
+        // Attempt Railway API login (/api/login first)
+        let res = await apiClient.axios.post('/api/login', {
           username: username.trim(),
           password: password,
           remember_me: true
-        }).catch(err => {
-          // If 401 or network error
-          return err.response;
-        });
+        }).catch(err => err.response);
+
+        if (!res || res.status !== 200) {
+          res = await apiClient.axios.post('/login', {
+            username: username.trim(),
+            password: password,
+            remember_me: true
+          }).catch(err => err.response);
+        }
 
         if (res && (res.status === 200 || res.status === 302)) {
           // Check if response contains user data or query /api/current-user
           let userData: User;
-          try {
-            const userRes = await apiClient.axios.get('/api/current-user');
-            userData = userRes.data;
-          } catch {
-            userData = {
-              id: 1,
-              username: username.trim(),
-              email: `${username.trim()}@obraflow.com`,
-              is_master: true,
-              is_aprovador_express: true,
-              cargo: 'Engenheiro Responsável',
-              ativo: true
-            };
+          if (res.data && res.data.user) {
+            userData = res.data.user;
+          } else {
+            try {
+              const userRes = await apiClient.axios.get('/api/current-user');
+              userData = userRes.data;
+            } catch {
+              userData = {
+                id: 1,
+                username: username.trim(),
+                email: `${username.trim()}@obraflow.com`,
+                is_master: true,
+                is_aprovador_express: true,
+                cargo: 'Engenheiro Responsável',
+                ativo: true
+              };
+            }
           }
 
           setUser(userData);

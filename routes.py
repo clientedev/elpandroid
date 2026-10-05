@@ -12183,17 +12183,27 @@ def api_update_technical_info(projeto_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
 # ==========================================================================================
-# ELP Mobile App Updates & APK Download
+# ELP Mobile App Updates, Synchronization & APK Download
 # ==========================================================================================
+_SERVER_BOOT_TIME = now_brt().strftime('%Y%m%d%H%M%S')
+
 @app.route('/api/app-version', methods=['GET'])
 def get_app_version_info():
-    """Retorna versao mais recente do aplicativo ELP e link do APK"""
+    """Retorna versao mais recente do aplicativo ELP e dados de deploy para sincronizacao"""
+    deploy_id = (
+        os.environ.get('RAILWAY_DEPLOYMENT_ID') or 
+        os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
+        _SERVER_BOOT_TIME
+    )
     return jsonify({
-        'version': '1.0.0',
+        'version': '1.0.1',
         'appName': 'ELP',
-        'notes': 'Versao de producao com sincronizacao Railway.',
-        'downloadUrl': '/download/ELP.apk'
+        'deployId': deploy_id,
+        'buildTime': _SERVER_BOOT_TIME,
+        'notes': 'Versao de producao sincronizada com Railway.',
+        'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
 @app.route('/download/ELP.apk', methods=['GET'])
@@ -12209,3 +12219,118 @@ def download_official_apk():
             mimetype='application/vnd.android.package-archive'
         )
     return jsonify({'error': 'Arquivo ELP.apk nao encontrado no servidor'}), 404
+
+@app.route('/api/login', methods=['POST'])
+@csrf.exempt
+def api_mobile_login():
+    """Endpoint de autenticacao JSON para o aplicativo mobile ELP"""
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        username = (data.get('username') or '').strip()
+        password = data.get('password') or ''
+
+        if not username or not password:
+            return jsonify({'success': False, 'message': 'Informe usuario e senha.'}), 400
+
+        user = User.query.filter_by(username=username).first()
+        if user and user.ativo and check_password_hash(user.password_hash, password):
+            login_user(user, remember=True)
+            return jsonify({
+                'success': True,
+                'message': 'Autenticado com sucesso.',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'nome_completo': getattr(user, 'nome_completo', user.username),
+                    'cargo': getattr(user, 'cargo', 'Engenheiro / Fiscal de Obras'),
+                    'is_master': getattr(user, 'is_master', False),
+                    'is_aprovador_express': getattr(user, 'is_aprovador_express', False),
+                    'ativo': user.ativo
+                }
+            }), 200
+
+        return jsonify({'success': False, 'message': 'Usuario ou senha incorretos.'}), 401
+    except Exception as e:
+        current_app.logger.error(f'Erro em /api/login: {e}')
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/projetos', methods=['GET'])
+def api_get_projetos_list():
+    """Retorna lista de projetos para sincronizacao mobile"""
+    try:
+        projetos = Projeto.query.filter_by(status='Ativo').all()
+        result = []
+        for p in projetos:
+            result.append({
+                'id': p.id,
+                'numero': p.numero,
+                'nome': p.nome,
+                'descricao': p.descricao or '',
+                'endereco': p.endereco or '',
+                'latitude': p.latitude,
+                'longitude': p.longitude,
+                'tipo_obra': p.tipo_obra,
+                'construtora': p.construtora,
+                'nome_funcionario': p.nome_funcionario,
+                'responsavel_id': p.responsavel_id,
+                'email_principal': p.email_principal,
+                'data_inicio': p.data_inicio.isoformat() if p.data_inicio else None,
+                'data_previsao_fim': p.data_previsao_fim.isoformat() if p.data_previsao_fim else None,
+                'status': p.status,
+                'numeracao_inicial': getattr(p, 'numeracao_inicial', 1),
+                'created_at': p.created_at.isoformat() if p.created_at else None,
+            })
+        return jsonify(result), 200
+    except Exception as e:
+        current_app.logger.error(f'Erro ao listar projetos na API: {e}')
+        return jsonify([]), 200
+
+@app.route('/api/relatorios', methods=['GET'])
+def api_get_relatorios_list():
+    """Retorna lista de relatorios para sincronizacao mobile"""
+    try:
+        relatorios = Relatorio.query.order_by(Relatorio.data_visita.desc()).limit(100).all()
+        result = []
+        for r in relatorios:
+            result.append({
+                'id': r.id,
+                'numero': r.numero,
+                'projeto_id': r.projeto_id,
+                'data_visita': r.data_visita.isoformat() if r.data_visita else None,
+                'status': r.status,
+                'descricao': getattr(r, 'descricao', None),
+                'observacoes_gerais': getattr(r, 'observacoes_gerais', None),
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+            })
+        return jsonify(result), 200
+    except Exception as e:
+        current_app.logger.error(f'Erro ao listar relatorios na API: {e}')
+        return jsonify([]), 200
+
+@app.route('/api/sync/status', methods=['GET'])
+def api_sync_status():
+    """Retorna estado geral do servidor para sincronizacao com o app"""
+    try:
+        projetos_count = Projeto.query.filter_by(status='Ativo').count()
+        relatorios_count = Relatorio.query.count()
+        visitas_count = Visita.query.count()
+        deploy_id = (
+            os.environ.get('RAILWAY_DEPLOYMENT_ID') or 
+            os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
+            _SERVER_BOOT_TIME
+        )
+        return jsonify({
+            'success': True,
+            'server': 'Railway ELP Backend',
+            'status': 'online',
+            'deployId': deploy_id,
+            'buildTime': _SERVER_BOOT_TIME,
+            'counts': {
+                'projetos': projetos_count,
+                'relatorios': relatorios_count,
+                'visitas': visitas_count
+            }
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

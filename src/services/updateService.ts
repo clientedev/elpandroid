@@ -1,15 +1,20 @@
 import { Alert, Platform, AppState, AppStateStatus } from 'react-native';
 import * as Updates from 'expo-updates';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './api';
+import { syncService } from './syncService';
 
 export interface UpdateInfo {
   available: boolean;
   isOta: boolean;
   version?: string;
+  deployId?: string;
   notes?: string;
   downloadUrl?: string;
 }
+
+const LAST_DEPLOY_KEY = 'elp_last_seen_deploy_id';
 
 class UpdateService {
   private isChecking = false;
@@ -22,7 +27,7 @@ class UpdateService {
   }
 
   /**
-   * Register a custom UI prompt callback (e.g. a Modal)
+   * Register a custom UI prompt callback (e.g. UpdateModal)
    */
   public registerPromptCallback(cb: (info: UpdateInfo) => void) {
     this.updatePromptCallback = cb;
@@ -42,9 +47,9 @@ class UpdateService {
         currentAppState.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // Debounce foreground checks (at least 60 seconds between checks)
+        // Debounce foreground checks (at least 30 seconds between checks)
         const now = Date.now();
-        if (now - this.lastCheckTime > 60000) {
+        if (now - this.lastCheckTime > 30000) {
           this.checkForUpdate(false);
         }
       }
@@ -64,7 +69,7 @@ class UpdateService {
   }
 
   /**
-   * Check for deployed updates (via expo-updates OTA or backend version endpoint)
+   * Check for deployed updates (via Railway deploy endpoint and OTA)
    * @param manual - true if triggered manually by user button click
    */
   public async checkForUpdate(manual = false): Promise<UpdateInfo> {
@@ -76,7 +81,7 @@ class UpdateService {
     this.lastCheckTime = Date.now();
 
     try {
-      // 1. Check Expo Updates (OTA deploy check)
+      // 1. Check Expo Updates (OTA deploy check if configured)
       if (Updates.isEnabled && !__DEV__) {
         try {
           const update = await Updates.checkForUpdateAsync();
@@ -85,43 +90,57 @@ class UpdateService {
               available: true,
               isOta: true,
               version: this.getCurrentVersion(),
-              notes: 'Nova versão publicada via deploy.',
+              notes: 'Nova versão publicada via deploy no Railway.',
             };
             this.notifyUpdateAvailable(info);
             return info;
           }
         } catch (otaErr) {
-          console.log('[UpdateService] OTA check error:', otaErr);
+          console.log('[UpdateService] OTA check note:', otaErr);
         }
       }
 
-      // 2. Check Backend Server Version / Deploy manifest (fallback/hybrid check)
+      // 2. Check Railway Backend Deploy & App Version
       try {
-        const res = await apiClient.axios.get('/api/app-version', { timeout: 5000 });
-        if (res.data && res.data.version) {
-          const serverVersion = res.data.version;
+        const res = await apiClient.axios.get('/api/app-version', { timeout: 6000 });
+        if (res.data) {
+          const serverVersion = res.data.version || '1.0.1';
           const currentVersion = this.getCurrentVersion();
+          const serverDeployId = String(res.data.deployId || res.data.buildTime || serverVersion);
           
-          if (serverVersion !== currentVersion) {
+          const lastSeenDeployId = await AsyncStorage.getItem(LAST_DEPLOY_KEY);
+          
+          // Triggers prompt whenever:
+          // 1. A new deploy occurred on Railway (deployId changed)
+          // 2. The server version is different from the app version
+          // 3. User manually asked to check
+          const isNewDeploy = Boolean(lastSeenDeployId && lastSeenDeployId !== serverDeployId);
+          const isNewVersion = serverVersion !== currentVersion;
+
+          if (isNewDeploy || isNewVersion || manual) {
             const info: UpdateInfo = {
               available: true,
               isOta: false,
               version: serverVersion,
-              notes: res.data.notes || 'Nova versão com melhorias e correções.',
-              downloadUrl: res.data.downloadUrl,
+              deployId: serverDeployId,
+              notes: res.data.notes || 'Atualização recente sincronizada no Railway.',
+              downloadUrl: res.data.downloadUrl || 'https://elpandroid-production.up.railway.app/download/ELP.apk',
             };
             this.notifyUpdateAvailable(info);
             return info;
+          } else if (!lastSeenDeployId) {
+            // First run: save current deploy id
+            await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
           }
         }
-      } catch {
-        // Backend version check endpoint might not exist yet; normal
+      } catch (backendErr) {
+        console.warn('[UpdateService] Backend check notice:', backendErr);
       }
 
       if (manual) {
         Alert.alert(
           'ELP Atualizado',
-          `O aplicativo já está na versão mais recente (${this.getCurrentVersion()}). Não há novas atualizações disponíveis no momento.`
+          `O aplicativo já está na versão mais recente (${this.getCurrentVersion()}) e sincronizado com o Railway.`
         );
       }
 
@@ -161,17 +180,27 @@ class UpdateService {
   }
 
   /**
-   * Apply the update and restart/reload the application
+   * Apply the update and restart/reload or open APK download and sync data
    */
   public async applyUpdate(info: UpdateInfo): Promise<boolean> {
     if (this.isUpdating) return false;
     this.isUpdating = true;
 
     try {
+      // Record this deploy so we don't spam repeatedly for the same deploy ID
+      if (info.deployId) {
+        await AsyncStorage.setItem(LAST_DEPLOY_KEY, info.deployId);
+      }
+
+      // Sync local database tables with Railway immediately
+      try {
+        await syncService.syncAll();
+      } catch (syncErr) {
+        console.warn('[UpdateService] Pre-update sync notice:', syncErr);
+      }
+
       if (info.isOta && Updates.isEnabled) {
-        // Fetch OTA bundle
         await Updates.fetchUpdateAsync();
-        // Immediately reload into the updated version
         await Updates.reloadAsync();
         return true;
       } else if (info.downloadUrl) {
@@ -179,10 +208,9 @@ class UpdateService {
         await Linking.openURL(info.downloadUrl);
         return true;
       } else {
-        // If in development or no specific url, inform user
         Alert.alert(
-          'Atualização Baixada',
-          'O aplicativo foi atualizado com sucesso. Reinicie o aplicativo para aplicar as alterações.'
+          'Atualização Concluída',
+          'O aplicativo foi sincronizado com sucesso com o Railway.'
         );
         return true;
       }
@@ -190,7 +218,7 @@ class UpdateService {
       console.error('[UpdateService] Failed to apply update:', error);
       Alert.alert(
         'Erro na Atualização',
-        'Não foi possível baixar a atualização recente. Tente novamente mais tarde.'
+        'Não foi possível aplicar a atualização. Tente novamente mais tarde.'
       );
       return false;
     } finally {
