@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert 
 } from 'react-native';
@@ -17,6 +17,11 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [lembretes, setLembretes] = useState<Lembrete[]>([]);
+  const [technicalAccordionOpen, setTechnicalAccordionOpen] = useState(false);
+
+  const isReportCreationBlocked = Boolean(
+    projeto?.status && ['Não Iniciado', 'Concluído', 'Pausado', 'Cancelado'].includes(projeto.status)
+  );
 
   useEffect(() => {
     loadDetails();
@@ -142,56 +147,96 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               </View>
             </View>
 
-            {/* Technical Specifications */}
+            {/* Technical Specifications Accordion */}
             <View style={styles.infoCard}>
-              <Text style={styles.cardSectionTitle}>Especificações Técnicas da Fachada</Text>
-
-              <View style={styles.specBox}>
-                <Text style={styles.specLabel}>Elementos Construtivos de Base:</Text>
-                <Text style={styles.specContent}>{projeto.elementos_construtivos_base || 'Não especificado'}</Text>
-              </View>
-
-              <View style={styles.specBox}>
-                <Text style={styles.specLabel}>Chapisco Colante / Alvenaria:</Text>
-                <Text style={styles.specContent}>
-                  {projeto.especificacao_chapisco_colante || projeto.especificacao_chapisco_alvenaria || 'Padrão conforme memorial'}
-                </Text>
-              </View>
-
-              <View style={styles.specBox}>
-                <Text style={styles.specLabel}>Argamassa de Emboço / Reboco:</Text>
-                <Text style={styles.specContent}>{projeto.especificacao_argamassa_emboco || 'Não especificado'}</Text>
-              </View>
-
-              <View style={styles.specBox}>
-                <Text style={styles.specLabel}>Acabamento de Peitoris e Muretas:</Text>
-                <Text style={styles.specContent}>
-                  {projeto.acabamento_peitoris || projeto.acabamento_muretas || 'Não especificado'}
-                </Text>
-              </View>
-
-              <View style={styles.specBox}>
-                <Text style={styles.specLabel}>Definição de Frisos & Cor:</Text>
-                <Text style={styles.specContent}>{projeto.definicao_frisos_cor || 'Conforme projeto executivo'}</Text>
-              </View>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.actionRow}>
               <TouchableOpacity 
-                style={[styles.btnAction, { backgroundColor: Colors.primary }]}
-                onPress={() => navigation.navigate('ReportFormScreen', { preSelectedProjectId: projeto.id })}
+                style={styles.accordionHeader}
+                onPress={() => setTechnicalAccordionOpen(!technicalAccordionOpen)}
               >
-                <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.btnActionText}>Novo Relatório</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="construct-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.cardSectionTitle}>Especificações Técnicas da Fachada</Text>
+                </View>
+                <Ionicons 
+                  name={technicalAccordionOpen ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color={Colors.textSecondary} 
+                />
               </TouchableOpacity>
 
+              {technicalAccordionOpen && (
+                <View style={styles.accordionBody}>
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>Elementos Construtivos de Base:</Text>
+                    <Text style={styles.specContent}>{projeto.elementos_construtivos_base || 'Não especificado'}</Text>
+                  </View>
+
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>Chapisco Colante / Alvenaria:</Text>
+                    <Text style={styles.specContent}>
+                      {projeto.especificacao_chapisco_colante || projeto.especificacao_chapisco_alvenaria || 'Padrão conforme memorial'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>Argamassa de Emboço / Reboco:</Text>
+                    <Text style={styles.specContent}>{projeto.especificacao_argamassa_emboco || 'Não especificado'}</Text>
+                  </View>
+
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>Acabamento de Peitoris e Muretas:</Text>
+                    <Text style={styles.specContent}>
+                      {projeto.acabamento_peitoris || projeto.acabamento_muretas || 'Não especificado'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.specBox}>
+                    <Text style={styles.specLabel}>Definição de Frisos & Caimentos:</Text>
+                    <Text style={styles.specContent}>{projeto.definicao_frisos_cor || 'Conforme projeto executivo'}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Status-based Report Creation Check (Item 3.2) */}
+            {isReportCreationBlocked ? (
+              <View style={styles.blockedStatusBox}>
+                <Ionicons name="alert-circle-outline" size={20} color="#D97706" />
+                <Text style={styles.blockedStatusText}>
+                  Criação de novos relatórios desabilitada: esta obra está com status "{projeto.status}".
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Action Buttons: Left: Agendar Visita / Right: Novo Relatório */}
+            <View style={styles.actionRow}>
               <TouchableOpacity 
                 style={[styles.btnAction, { backgroundColor: '#7C3AED' }]}
                 onPress={() => navigation.navigate('VisitFormScreen', { preSelectedProjectId: projeto.id })}
               >
                 <Ionicons name="calendar-outline" size={18} color="#FFFFFF" />
                 <Text style={styles.btnActionText}>Agendar Visita</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[
+                  styles.btnAction, 
+                  { backgroundColor: isReportCreationBlocked ? '#94A3B8' : Colors.primary }
+                ]}
+                onPress={() => {
+                  if (isReportCreationBlocked) {
+                    Alert.alert(
+                      'Ação Bloqueada', 
+                      `Não é possível criar relatórios para obras com status "${projeto.status}".`
+                    );
+                    return;
+                  }
+                  navigation.navigate('ReportFormScreen', { preSelectedProjectId: projeto.id });
+                }}
+                disabled={isReportCreationBlocked}
+              >
+                <Ionicons name="document-text-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.btnActionText}>Novo Relatório</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -445,5 +490,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textMuted,
     marginTop: 8,
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  accordionBody: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 8,
+  },
+  blockedStatusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFBEB',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: 14,
+  },
+  blockedStatusText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#92400E',
+    fontWeight: '600',
   },
 });

@@ -10051,9 +10051,104 @@ def api_legendas_options():
     """Suporte para requisições OPTIONS (CORS preflight)"""
     response = jsonify({'success': True})
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return response
+
+@app.route('/api/legendas', methods=['POST'])
+@csrf.exempt
+def api_legendas_create():
+    """Cria nova legenda pré-definida via app mobile ou ajustes"""
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        texto = (data.get('texto') or '').strip()
+        if not texto:
+            return jsonify({'success': False, 'error': 'Texto da legenda é obrigatório'}), 400
+
+        categoria = (data.get('categoria') or 'Geral').strip()
+        user = _resolve_mobile_user(data)
+        criador_id = user.id if user else 1
+
+        legenda = LegendaPredefinida(
+            texto=texto,
+            categoria=categoria,
+            ativo=True,
+            criado_por=criador_id
+        )
+        db.session.add(legenda)
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'id': legenda.id,
+            'texto': legenda.texto,
+            'categoria': legenda.categoria,
+            'ativo': legenda.ativo
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/legendas/<int:legenda_id>', methods=['DELETE', 'POST'])
+@csrf.exempt
+def api_legendas_delete(legenda_id):
+    """Exclui legenda pré-definida"""
+    try:
+        legenda = LegendaPredefinida.query.get(legenda_id)
+        if not legenda:
+            return jsonify({'success': False, 'error': 'Legenda não encontrada'}), 404
+        db.session.delete(legenda)
+        db.session.commit()
+        return jsonify({'success': True, 'id': legenda_id}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/forgot-password', methods=['POST'])
+@csrf.exempt
+def api_forgot_password():
+    """Solicita recuperação de senha por e-mail"""
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        email_or_username = (data.get('email') or data.get('username') or '').strip().lower()
+        if not email_or_username:
+            return jsonify({'success': False, 'error': 'Informe seu e-mail ou nome de usuário'}), 400
+
+        user = User.query.filter(
+            (db.func.lower(User.email) == email_or_username) | 
+            (db.func.lower(User.username) == email_or_username)
+        ).first()
+
+        if not user:
+            # Não revelar existência por segurança
+            return jsonify({
+                'success': True, 
+                'message': 'Se o usuário/e-mail estiver cadastrado, as instruções serão enviadas.'
+            }), 200
+
+        # Gerar token temporário
+        import secrets
+        from datetime import timedelta
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = brazil_now() + timedelta(hours=2)
+        db.session.commit()
+
+        # Enviar e-mail caso serviço esteja disponível
+        try:
+            from email_service import send_email
+            reset_link = f"{request.host_url.rstrip('/')}/reset-password/{token}"
+            corpo = f"""Olá {user.nome_completo},\n\nRecebemos uma solicitação de redefinição de senha para sua conta no Aplicativo ELP.\n\nAcesse o link abaixo para criar uma nova senha:\n{reset_link}\n\nEste link expira em 2 horas.\nSe você não solicitou, por favor desconsidere este e-mail."""
+            send_email(user.email, "Recuperação de Senha - Sistema ELP", corpo)
+        except Exception as mail_err:
+            current_app.logger.warning(f"Erro ao disparar email de recuperação: {mail_err}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Instruções enviadas para o e-mail cadastrado ({user.email[:3]}***@***).'
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # /api/relatorios is handled canonically by api_relatorios_collection below (with CSRF exempt & DB save)
 
@@ -12552,18 +12647,68 @@ def api_relatorios_collection():
 
             # Processar fotos em lote se enviadas no payload
             fotos_list = data.get('fotos') or []
-            if isinstance(fotos_list, list):
+            if isinstance(fotos_list, list) and len(fotos_list) > 0:
+                import base64
+                import hashlib
+                import uuid
+                import json
+
+                # Limpar fotos anteriores do relatório se já existiam para evitar duplicatas em re-sync
+                if existing:
+                    FotoRelatorio.query.filter_by(relatorio_id=relatorio.id).delete()
+
+                upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
+                os.makedirs(upload_dir, exist_ok=True)
+
                 for idx, f_data in enumerate(fotos_list):
+                    anotacoes_raw = f_data.get('anotacoes_dados')
+                    anotacoes_obj = None
+                    if anotacoes_raw:
+                        if isinstance(anotacoes_raw, str):
+                            try:
+                                anotacoes_obj = json.loads(anotacoes_raw)
+                            except Exception:
+                                anotacoes_obj = anotacoes_raw
+                        else:
+                            anotacoes_obj = anotacoes_raw
+
                     foto = FotoRelatorio(
                         relatorio_id=relatorio.id,
                         titulo=f_data.get('titulo') or f"Foto {idx+1}",
-                        legenda=f_data.get('legenda'),
+                        legenda=f_data.get('legenda') or '',
                         descricao=f_data.get('descricao') or '',
                         tipo_servico=f_data.get('tipo_servico'),
-                        local=f_data.get('local'),
-                        url=f_data.get('url') or f_data.get('uri'),
-                        ordem=f_data.get('ordem', idx)
+                        local=f_data.get('local') or '',
+                        ordem=f_data.get('ordem', idx),
+                        anotacoes_dados=anotacoes_obj
                     )
+
+                    # Processar dados base64 da foto se fornecidos
+                    b64_str = f_data.get('base64') or ''
+                    if b64_str:
+                        if ',' in b64_str:
+                            b64_str = b64_str.split(',', 1)[1]
+                        try:
+                            img_bytes = base64.b64decode(b64_str)
+                            foto.imagem = img_bytes
+                            foto.imagem_hash = hashlib.sha256(img_bytes).hexdigest()
+                            foto.imagem_size = len(img_bytes)
+                            foto.content_type = 'image/jpeg'
+
+                            # Salvar arquivo na pasta uploads para disponibilizar rota estática
+                            fname = f"rel_{relatorio.id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+                            fpath = os.path.join(upload_dir, fname)
+                            with open(fpath, 'wb') as f_out:
+                                f_out.write(img_bytes)
+
+                            foto.filename = fname
+                            foto.url = f"/uploads/{fname}"
+                        except Exception as b64_err:
+                            current_app.logger.warning(f"Erro ao processar imagem base64 foto {idx}: {b64_err}")
+                            foto.url = f_data.get('url') or f_data.get('uri') or ''
+                    else:
+                        foto.url = f_data.get('url') or f_data.get('uri') or ''
+
                     db.session.add(foto)
 
             db.session.commit()

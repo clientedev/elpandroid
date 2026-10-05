@@ -390,6 +390,21 @@ export async function getLocalLegendas(categoria?: string): Promise<LegendaPrede
   return await db.getAllAsync<LegendaPredefinida>(query, params);
 }
 
+export async function saveLocalLegenda(legenda: { id?: number; categoria: string; texto: string; ordem?: number }): Promise<number> {
+  const db = await getDatabase();
+  const id = legenda.id || Date.now();
+  await db.runAsync(
+    'INSERT OR REPLACE INTO legendas_predefinidas (id, categoria, texto, ordem) VALUES (?, ?, ?, ?)',
+    [id, legenda.categoria, legenda.texto, legenda.ordem || 0]
+  );
+  return id;
+}
+
+export async function deleteLocalLegenda(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM legendas_predefinidas WHERE id = ?', [id]);
+}
+
 // ================= SYNC QUEUE =================
 export async function addToSyncQueue(
   entityType: string,

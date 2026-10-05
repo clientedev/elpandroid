@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Image 
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Image, Modal 
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { apiClient } from '../../services/api';
 import { Colors, Shadows } from '../../theme/colors';
+
+const REMEMBER_KEY = '@elp_remember_login';
 
 export const LoginScreen: React.FC = () => {
   const { login } = useAuth();
@@ -15,9 +18,30 @@ export const LoginScreen: React.FC = () => {
 
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('admin');
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Forgot password modal
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotInput, setForgotInput] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(REMEMBER_KEY).then(val => {
+      if (val) {
+        try {
+          const parsed = JSON.parse(val);
+          if (parsed.username) setUsername(parsed.username);
+          if (parsed.password) setPassword(parsed.password);
+          setRememberMe(true);
+        } catch {
+          // ignore
+        }
+      }
+    });
+  }, []);
 
   async function handleLogin() {
     if (!username.trim() || !password) {
@@ -29,6 +53,12 @@ export const LoginScreen: React.FC = () => {
     setLoading(true);
 
     try {
+      if (rememberMe) {
+        await AsyncStorage.setItem(REMEMBER_KEY, JSON.stringify({ username, password }));
+      } else {
+        await AsyncStorage.removeItem(REMEMBER_KEY);
+      }
+
       const res = await login(username, password);
       if (!res.success) {
         setErrorMessage(res.message || 'Falha na autenticação.');
@@ -37,6 +67,29 @@ export const LoginScreen: React.FC = () => {
       setErrorMessage(err.message || 'Erro inesperado.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSendForgotPassword() {
+    if (!forgotInput.trim()) {
+      Alert.alert('Atenção', 'Informe seu e-mail ou nome de usuário.');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const res = await apiClient.axios.post('/api/forgot-password', {
+        email: forgotInput.trim(),
+        username: forgotInput.trim(),
+      });
+      setShowForgotModal(false);
+      setForgotInput('');
+      Alert.alert('Recuperação de Senha', res.data?.message || 'Instruções enviadas com sucesso!');
+    } catch (err: any) {
+      Alert.alert('Aviso', 'Se a conta existir, as instruções serão encaminhadas para o e-mail cadastrado.');
+      setShowForgotModal(false);
+    } finally {
+      setForgotLoading(false);
     }
   }
 
@@ -95,7 +148,7 @@ export const LoginScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Password Input */}
+          {/* Password Input with Eye Icon */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Senha</Text>
             <View style={styles.inputWrapper}>
@@ -117,6 +170,25 @@ export const LoginScreen: React.FC = () => {
                 />
               </TouchableOpacity>
             </View>
+          </View>
+
+          {/* Remember Me & Forgot Password Row */}
+          <View style={styles.rememberRow}>
+            <TouchableOpacity 
+              style={styles.rememberCheckboxRow}
+              onPress={() => setRememberMe(!rememberMe)}
+            >
+              <Ionicons 
+                name={rememberMe ? "checkbox" : "square-outline"} 
+                size={18} 
+                color={rememberMe ? Colors.primary : Colors.textMuted} 
+              />
+              <Text style={styles.rememberText}>Lembrar-me</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setShowForgotModal(true)}>
+              <Text style={styles.forgotText}>Esqueci minha senha</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Submit Button */}
@@ -151,6 +223,55 @@ export const LoginScreen: React.FC = () => {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Forgot Password Modal */}
+      <Modal visible={showForgotModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Recuperar Senha</Text>
+              <TouchableOpacity onPress={() => setShowForgotModal(false)}>
+                <Ionicons name="close" size={22} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalDesc}>
+              Informe seu e-mail cadastrado ou nome de usuário para receber as instruções de redefinição de senha:
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="seu.email@empresa.com.br"
+              placeholderTextColor={Colors.textMuted}
+              value={forgotInput}
+              onChangeText={setForgotInput}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity 
+                style={styles.modalCancelBtn}
+                onPress={() => setShowForgotModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.modalConfirmBtn}
+                onPress={handleSendForgotPassword}
+                disabled={forgotLoading}
+              >
+                {forgotLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Enviar Instruções</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -170,25 +291,25 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logoBadge: {
-    width: 84,
-    height: 84,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: '#1E293B',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    padding: 6,
-    ...Shadows.md,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   logoImage: {
-    width: 72,
-    height: 72,
+    width: 44,
+    height: 44,
   },
   brandTitle: {
-    fontSize: 28,
-    fontWeight: '900',
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#FFFFFF',
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
   brandSubtitle: {
     fontSize: 13,
@@ -198,42 +319,42 @@ const styles = StyleSheet.create({
   networkPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 20,
-    marginTop: 14,
+    marginTop: 12,
   },
   onlinePill: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
     borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   offlinePill: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
     borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
   },
   pillDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
   },
   onlineDot: {
     backgroundColor: '#10B981',
   },
   offlineDot: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#F59E0B',
   },
   pillText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   onlineText: {
-    color: '#34D399',
+    color: '#10B981',
   },
   offlineText: {
-    color: '#F87171',
+    color: '#F59E0B',
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -242,26 +363,26 @@ const styles = StyleSheet.create({
     ...Shadows.lg,
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: Colors.text,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: '#FCA5A5',
     borderRadius: 8,
     padding: 10,
-    marginBottom: 14,
+    marginBottom: 16,
+    gap: 8,
   },
   errorText: {
-    color: '#B91C1C',
-    fontSize: 12,
     flex: 1,
+    color: Colors.danger,
+    fontSize: 13,
   },
   inputGroup: {
     marginBottom: 16,
@@ -269,39 +390,58 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.text,
+    color: '#334155',
     marginBottom: 6,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 10,
     backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
     paddingHorizontal: 12,
+    height: 48,
   },
   inputIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   input: {
     flex: 1,
-    height: 48,
-    fontSize: 15,
+    fontSize: 14,
     color: Colors.text,
   },
   eyeButton: {
-    padding: 8,
+    padding: 4,
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 18,
+  },
+  rememberCheckboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rememberText: {
+    fontSize: 13,
+    color: '#475569',
+  },
+  forgotText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   submitButton: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    height: 50,
+    height: 48,
+    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 8,
     ...Shadows.md,
   },
   submitButtonDisabled: {
@@ -309,7 +449,7 @@ const styles = StyleSheet.create({
   },
   submitText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
   },
   fixedServerBox: {
@@ -318,26 +458,92 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     marginTop: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
   fixedServerText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: '#64748B',
     fontWeight: '500',
   },
   footer: {
-    marginTop: 24,
     alignItems: 'center',
+    marginTop: 24,
   },
   footerText: {
     fontSize: 11,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    ...Shadows.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  modalDesc: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 14,
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 44,
+    fontSize: 14,
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  modalCancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  modalCancelText: {
+    color: '#64748B',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  modalConfirmBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalConfirmText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
   },
 });

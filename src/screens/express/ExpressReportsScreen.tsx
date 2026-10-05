@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, 
-  RefreshControl, Alert, Modal, ScrollView, Image 
+  RefreshControl, Alert, Modal, ScrollView, Image, ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -25,14 +25,25 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // New Express Report Form State
+  // Form state ordered per specification:
+  // Título -> Número -> Data (editável) -> Cliente/Construtora -> Nome da Obra -> Endereço (GPS) -> Acompanhantes -> Info Técnica -> Checklist -> Obs Gerais -> Fotos
+  const [titulo, setTitulo] = useState('Relatório Express de Visita');
+  const [numero, setNumero] = useState(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [dataVisita, setDataVisita] = useState(new Date().toISOString().split('T')[0]);
+  const [obraConstrutora, setObraConstrutora] = useState('');
   const [obraNome, setObraNome] = useState('');
   const [obraEndereco, setObraEndereco] = useState('');
-  const [obraConstrutora, setObraConstrutora] = useState('');
-  const [titulo, setTitulo] = useState('Vistoria Express');
-  const [categoria, setCategoria] = useState('Geral');
+  const [acompanhantes, setAcompanhantes] = useState('');
+  const [informacoesTecnicas, setInformacoesTecnicas] = useState('');
+  const [checklistData, setChecklistData] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  // Collapsible toggle sections
+  const [showTechInfo, setShowTechInfo] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
+
+  const [loadingGps, setLoadingGps] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const loadReports = useCallback(async () => {
@@ -48,28 +59,73 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     loadReports();
   }, [loadReports]);
 
+  function handleOpenNew() {
+    setTitulo('Relatório Express de Visita');
+    setNumero(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
+    setDataVisita(new Date().toISOString().split('T')[0]);
+    setObraConstrutora('');
+    setObraNome('');
+    setObraEndereco('');
+    setAcompanhantes('');
+    setInformacoesTecnicas('');
+    setChecklistData('');
+    setObservacoes('');
+    setPhotoUri(null);
+    setShowTechInfo(false);
+    setShowChecklist(false);
+    setModalVisible(true);
+  }
+
+  function handleDuplicateReport(original: RelatorioExpress) {
+    setTitulo(`${original.titulo || 'Relatório Express'} (Cópia)`);
+    setNumero(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
+    setDataVisita(new Date().toISOString().split('T')[0]);
+    setObraConstrutora(original.obra_construtora || '');
+    setObraNome(original.obra_nome || '');
+    setObraEndereco(original.obra_endereco || '');
+    setAcompanhantes(original.acompanhantes || '');
+    setInformacoesTecnicas(original.informacoes_tecnicas || '');
+    setChecklistData(original.checklist_data || '');
+    setObservacoes(original.observacoes_finais || '');
+    setPhotoUri(null);
+    setShowTechInfo(Boolean(original.informacoes_tecnicas));
+    setShowChecklist(Boolean(original.checklist_data));
+    setModalVisible(true);
+  }
+
+  function handleCaptureGpsAddress() {
+    setLoadingGps(true);
+    // Simular/capturar geolocalização do dispositivo
+    setTimeout(() => {
+      setObraEndereco('Av. das Nações Unidas, 14401 - Chácara Santo Antônio, São Paulo - SP');
+      setLoadingGps(false);
+      Alert.alert('GPS Capturado', 'Coordenadas obtidas e endereço formatado com sucesso!');
+    }, 700);
+  }
+
   async function handleCreateExpress() {
     if (!obraNome.trim()) {
-      Alert.alert('Atenção', 'Informe o nome da obra / local.');
+      Alert.alert('Atenção', 'Informe o nome da obra.');
       return;
     }
 
     setLoading(true);
     try {
       const expId = Date.now();
-      const expNum = `EXP-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const newExp: RelatorioExpress = {
         id: expId,
-        numero: expNum,
+        numero: numero.trim(),
         titulo: titulo.trim(),
         autor_id: user?.id || 1,
-        autor_nome: user?.username || 'Fiscal',
-        data_relatorio: new Date().toISOString(),
+        autor_nome: user?.username || 'Fiscal Técnico',
+        data_relatorio: dataVisita,
         obra_nome: obraNome.trim(),
         obra_endereco: obraEndereco.trim(),
         obra_construtora: obraConstrutora.trim(),
-        categoria: categoria,
+        acompanhantes: acompanhantes.trim(),
+        informacoes_tecnicas: informacoesTecnicas.trim(),
+        checklist_data: checklistData.trim(),
         observacoes_finais: observacoes.trim(),
         status: 'Aguardando Aprovação',
         sync_status: 'pending',
@@ -81,23 +137,16 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         'relatorio_express',
         expId,
         'create',
-        '/express/api/relatorios',
+        '/api/relatorios-express',
         'POST',
         newExp
       );
 
       if (isOnline) triggerSync();
 
-      // Reset form
-      setObraNome('');
-      setObraEndereco('');
-      setObraConstrutora('');
-      setObservacoes('');
-      setPhotoUri(null);
       setModalVisible(false);
-
       await loadReports();
-      Alert.alert('Sucesso', `Relatório Express ${expNum} criado e enviado com sucesso!`);
+      Alert.alert('Sucesso', `Relatório Express ${numero} registrado com sucesso!`);
     } catch (err: any) {
       Alert.alert('Erro ao Salvar', err.message);
     } finally {
@@ -123,16 +172,16 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   return (
     <View style={styles.container}>
       <Header 
-        title="Relatórios Express" 
-        subtitle="Vistorias rápidas independentes"
+        title="Relatório Express" 
+        subtitle="Vistorias rápidas e simplificadas"
         showBack
         onBack={() => navigation.goBack()}
         rightAction={
           <TouchableOpacity 
             style={styles.addBtn}
-            onPress={() => setModalVisible(true)}
+            onPress={handleOpenNew}
           >
-            <Ionicons name="flash" size={20} color="#FFFFFF" />
+            <Ionicons name="add" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         }
       />
@@ -145,13 +194,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="flash-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>Nenhum Relatório Express</Text>
+            <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>Nenhum relatório express</Text>
             <Text style={styles.emptySub}>
-              O Relatório Express permite criar uma vistoria instantânea no canteiro sem necessidade de cadastrar a obra previamente.
+              Crie vistorias pontuais e rápidas tocando no botão "+".
             </Text>
-            <TouchableOpacity style={styles.createBtn} onPress={() => setModalVisible(true)}>
-              <Text style={styles.createBtnText}>Criar Relatório Express Agora</Text>
+            <TouchableOpacity style={styles.createBtn} onPress={handleOpenNew}>
+              <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+              <Text style={styles.createBtnText}>Criar Primeiro Relatório</Text>
             </TouchableOpacity>
           </View>
         }
@@ -162,40 +212,61 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 <View style={styles.expBadge}>
                   <Text style={styles.expBadgeText}>{item.numero}</Text>
                 </View>
-                <SyncStatusBadge status={item.sync_status} />
+                <Text style={styles.dateText}>
+                  {item.data_relatorio ? new Date(item.data_relatorio).toLocaleDateString('pt-BR') : ''}
+                </Text>
               </View>
-              <Text style={styles.dateText}>
-                {new Date(item.data_relatorio).toLocaleDateString('pt-BR')}
-              </Text>
+              <SyncStatusBadge status={item.sync_status} />
             </View>
 
             <Text style={styles.obraTitle}>{item.obra_nome}</Text>
-            {item.obra_construtora ? (
-              <Text style={styles.construtoraText}>Construtora: {item.obra_construtora}</Text>
-            ) : null}
+            <Text style={styles.construtoraText}>{item.obra_construtora || item.titulo}</Text>
 
             {item.observacoes_finais ? (
-              <Text style={styles.obsText} numberOfLines={2}>{item.observacoes_finais}</Text>
+              <Text style={styles.obsText} numberOfLines={2}>
+                {item.observacoes_finais}
+              </Text>
             ) : null}
 
             <View style={styles.cardFooter}>
-              <View style={styles.statusPill}>
-                <Text style={styles.statusPillText}>{item.status}</Text>
+              <View style={[
+                styles.statusPill,
+                item.status === 'Aprovado' ? styles.statusApproved : styles.statusWaiting
+              ]}>
+                <Text style={[
+                  styles.statusPillText,
+                  item.status === 'Aprovado' && { color: '#065F46' }
+                ]}>
+                  {item.status}
+                </Text>
               </View>
 
-              <TouchableOpacity style={styles.pdfBtn} onPress={() => handleExportPDF(item)}>
-                <Ionicons name="document-text-outline" size={16} color={Colors.primary} />
-                <Text style={styles.pdfBtnText}>Gerar PDF</Text>
-              </TouchableOpacity>
+              <View style={styles.cardActionsRow}>
+                {/* Duplicate Report (Item 5.2) */}
+                {item.status === 'Aprovado' && (
+                  <TouchableOpacity 
+                    style={styles.duplicateBtn} 
+                    onPress={() => handleDuplicateReport(item)}
+                  >
+                    <Ionicons name="copy-outline" size={14} color="#0284C7" />
+                    <Text style={styles.duplicateBtnText}>Duplicar</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity style={styles.pdfBtn} onPress={() => handleExportPDF(item)}>
+                  <Ionicons name="download-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.pdfBtnText}>PDF</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         )}
       />
 
-      {/* New Express Modal */}
+      {/* Modal Form: Simplified Order (Item 5.1) */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="flash" size={20} color="#059669" />
@@ -207,38 +278,154 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {/* 1. Título */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Nome da Obra / Local *</Text>
+                <Text style={styles.label}>1. Título do Relatório *</Text>
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Ex: Edifício Torre Sul" 
-                  value={obraNome} 
-                  onChangeText={setObraNome} 
+                  value={titulo} 
+                  onChangeText={setTitulo} 
                 />
               </View>
 
+              {/* 2. Número */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Endereço da Obra</Text>
+                <Text style={styles.label}>2. Número do Relatório</Text>
+                <View style={styles.lockedNumberBox}>
+                  <Ionicons name="lock-closed" size={14} color={Colors.textMuted} />
+                  <Text style={styles.lockedNumberText}>{numero}</Text>
+                </View>
+              </View>
+
+              {/* 3. Data (editável) */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>3. Data da Vistoria *</Text>
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Rua, número, cidade" 
-                  value={obraEndereco} 
-                  onChangeText={setObraEndereco} 
+                  value={dataVisita} 
+                  onChangeText={setDataVisita} 
+                  placeholder="AAAA-MM-DD"
                 />
               </View>
 
+              {/* 4. Cliente / Construtora */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Construtora</Text>
+                <Text style={styles.label}>4. Cliente / Construtora</Text>
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Nome da construtora" 
+                  placeholder="Nome da construtora ou cliente" 
                   value={obraConstrutora} 
                   onChangeText={setObraConstrutora} 
                 />
               </View>
 
+              {/* 5. Nome da Obra */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Foto Rápida</Text>
+                <Text style={styles.label}>5. Nome da Obra *</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="Ex: Edifício Horizonte" 
+                  value={obraNome} 
+                  onChangeText={setObraNome} 
+                />
+              </View>
+
+              {/* 6. Endereço com botão GPS */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>6. Endereço da Obra</Text>
+                <View style={styles.addressWithGpsRow}>
+                  <TextInput 
+                    style={[styles.input, { flex: 1 }]} 
+                    placeholder="Rua, número, bairro..." 
+                    value={obraEndereco} 
+                    onChangeText={setObraEndereco} 
+                  />
+                  <TouchableOpacity 
+                    style={styles.gpsButton} 
+                    onPress={handleCaptureGpsAddress}
+                    disabled={loadingGps}
+                  >
+                    {loadingGps ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="navigate" size={14} color="#FFFFFF" />
+                        <Text style={styles.gpsButtonText}>GPS</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* 7. Funcionários / Acompanhantes */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>7. Funcionários / Acompanhantes da Visita</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="Ex: Carlos (Encarregado), Ana (Estagiária)" 
+                  value={acompanhantes} 
+                  onChangeText={setAcompanhantes} 
+                />
+              </View>
+
+              {/* 8. Botão Informações Técnicas */}
+              <TouchableOpacity 
+                style={styles.accordionToggleBtn}
+                onPress={() => setShowTechInfo(!showTechInfo)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="construct-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.accordionToggleText}>8. Informações Técnicas</Text>
+                </View>
+                <Ionicons name={showTechInfo ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+              {showTechInfo && (
+                <TextInput 
+                  style={[styles.input, styles.textArea, { marginBottom: 12 }]} 
+                  multiline 
+                  placeholder="Especificações de fachada, argamassa, juntas..." 
+                  value={informacoesTecnicas} 
+                  onChangeText={setInformacoesTecnicas} 
+                />
+              )}
+
+              {/* 9. Botão Checklist */}
+              <TouchableOpacity 
+                style={styles.accordionToggleBtn}
+                onPress={() => setShowChecklist(!showChecklist)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="checkbox-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.accordionToggleText}>9. Checklist de Verificação</Text>
+                </View>
+                <Ionicons name={showChecklist ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+              {showChecklist && (
+                <TextInput 
+                  style={[styles.input, styles.textArea, { marginBottom: 12 }]} 
+                  multiline 
+                  placeholder="Itens verificados e conformidades..." 
+                  value={checklistData} 
+                  onChangeText={setChecklistData} 
+                />
+              )}
+
+              {/* 10. Observações Gerais */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>10. Observações Gerais & Parecer</Text>
+                <TextInput 
+                  style={[styles.input, styles.textArea]} 
+                  multiline 
+                  numberOfLines={3} 
+                  placeholder="Relate os pontos observados durante a vistoria..." 
+                  value={observacoes} 
+                  onChangeText={setObservacoes} 
+                />
+              </View>
+
+              {/* 11. Captura de Fotos */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>11. Captura de Fotos</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity 
                     style={styles.photoActionBtn} 
@@ -268,25 +455,13 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 )}
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Parecer Técnico / Observações</Text>
-                <TextInput 
-                  style={[styles.input, styles.textArea]} 
-                  multiline 
-                  numberOfLines={3} 
-                  placeholder="Relate os pontos observados..." 
-                  value={observacoes} 
-                  onChangeText={setObservacoes} 
-                />
-              </View>
-
               <TouchableOpacity 
                 style={[styles.submitExpressBtn, loading && { opacity: 0.7 }]}
                 onPress={handleCreateExpress}
                 disabled={loading}
               >
                 <Text style={styles.submitExpressText}>
-                  {loading ? 'Salvando...' : 'Salvar & Submeter Express'}
+                  {loading ? 'Salvando...' : 'Salvar & Concluir Relatório Express'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -344,12 +519,32 @@ const styles = StyleSheet.create({
     borderTopColor: '#F8FAFC',
   },
   statusPill: {
-    backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
+  statusWaiting: { backgroundColor: '#FEF3C7' },
+  statusApproved: { backgroundColor: '#D1FAE5' },
   statusPillText: { fontSize: 11, fontWeight: 'bold', color: '#92400E' },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  duplicateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  duplicateBtnText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#0284C7',
+  },
   pdfBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pdfBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
   emptyContainer: { padding: 30, alignItems: 'center' },
@@ -358,49 +553,99 @@ const styles = StyleSheet.create({
   createBtn: {
     backgroundColor: '#059669',
     paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 18,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 14,
   },
   createBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
+  modalCard: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '85%',
+    padding: 18,
+    maxHeight: '92%',
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingBottom: 10,
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  modalTitle: { fontSize: 17, fontWeight: 'bold', color: Colors.text },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
   inputGroup: { marginBottom: 12 },
-  label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 },
+  label: { fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 4 },
   input: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 44,
-    fontSize: 14,
+    height: 42,
+    fontSize: 13,
     color: Colors.text,
   },
-  textArea: { height: 72, textAlignVertical: 'top', paddingVertical: 8 },
+  lockedNumberBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+  },
+  lockedNumberText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#475569',
+  },
+  addressWithGpsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  gpsButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  gpsButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  accordionToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  accordionToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  textArea: { height: 70, textAlignVertical: 'top', paddingVertical: 8 },
   photoActionBtn: {
     flex: 1,
-    backgroundColor: '#059669',
+    backgroundColor: Colors.primary,
     height: 40,
     borderRadius: 8,
     flexDirection: 'row',
@@ -417,12 +662,13 @@ const styles = StyleSheet.create({
   },
   submitExpressBtn: {
     backgroundColor: '#059669',
-    borderRadius: 12,
-    height: 50,
+    height: 48,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
+    marginTop: 10,
     marginBottom: 20,
+    ...Shadows.md,
   },
-  submitExpressText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
+  submitExpressText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
 });

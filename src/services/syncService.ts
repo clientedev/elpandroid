@@ -1,5 +1,6 @@
 import { AppState, AppStateStatus } from 'react-native';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
+import * as FileSystem from 'expo-file-system';
 import { apiClient } from './api';
 import { 
   getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
@@ -135,12 +136,33 @@ class SyncService {
           await updateSyncQueueItem(item.id, 'processing');
           let payload = JSON.parse(item.payload || '{}');
 
-          // Enrich report payload with local photos if available
+          // Enrich report payload with local photos and convert them to base64 if needed
           if (item.entity_type === 'relatorio') {
             try {
               const fotos = await getLocalFotos(item.entity_id);
               if (fotos && fotos.length > 0) {
-                payload.fotos = fotos;
+                const enrichedFotos = await Promise.all(
+                  fotos.map(async (f) => {
+                    let base64Data = f.base64;
+                    if (!base64Data && f.uri_local) {
+                      try {
+                        const fileInfo = await FileSystem.getInfoAsync(f.uri_local);
+                        if (fileInfo.exists) {
+                          base64Data = await FileSystem.readAsStringAsync(f.uri_local, {
+                            encoding: FileSystem.EncodingType.Base64,
+                          });
+                        }
+                      } catch (readErr) {
+                        console.warn('[SyncService] Could not convert photo to base64:', readErr);
+                      }
+                    }
+                    return {
+                      ...f,
+                      base64: base64Data,
+                    };
+                  })
+                );
+                payload.fotos = enrichedFotos;
               }
             } catch (fotoErr) {
               console.warn('[SyncService] Could not attach photos:', fotoErr);

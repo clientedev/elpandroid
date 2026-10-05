@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  Modal, TextInput, RefreshControl, Alert 
+  Modal, TextInput, RefreshControl, Alert, ScrollView 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -20,6 +20,7 @@ export const ContactsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
   const [nome, setNome] = useState('');
   const [empresa, setEmpresa] = useState('');
+  const [cargo, setCargo] = useState('Engenheiro/a');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
   const [loading, setLoading] = useState(false);
@@ -50,6 +51,7 @@ export const ContactsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         id: contactId,
         nome: nome.trim(),
         empresa: empresa.trim(),
+        cargo: cargo.trim(),
         email: email.trim(),
         telefone: telefone.trim(),
         sync_status: 'pending',
@@ -70,6 +72,7 @@ export const ContactsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
       setNome('');
       setEmpresa('');
+      setCargo('Engenheiro/a');
       setEmail('');
       setTelefone('');
       setModalVisible(false);
@@ -169,13 +172,33 @@ export const ContactsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             </View>
 
             <View style={styles.inputGroup}>
+              <Text style={styles.label}>Função / Cargo</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row', marginBottom: 6 }}>
+                {['Engenheiro/a', 'Arquiteto/a', 'Mestre de Obras', 'Encarregado/a', 'Estagiário/a', 'Fiscal', 'Diretor/a'].map(c => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[
+                      { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, backgroundColor: '#F1F5F9', marginRight: 6, borderWidth: 1, borderColor: Colors.border },
+                      cargo === c && { backgroundColor: Colors.primary, borderColor: Colors.primary }
+                    ]}
+                    onPress={() => setCargo(c)}
+                  >
+                    <Text style={[{ fontSize: 12, color: Colors.textSecondary }, cargo === c && { color: '#FFFFFF', fontWeight: 'bold' }]}>
+                      {c}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.inputGroup}>
               <Text style={styles.label}>Telefone / WhatsApp</Text>
               <TextInput style={styles.input} keyboardType="phone-pad" placeholder="(11) 99999-9999" value={telefone} onChangeText={setTelefone} />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>E-mail</Text>
-              <TextInput style={styles.input} keyboardType="email-address" autoCapitalize="none" placeholder="carlos@exemplo.com" value={email} onChangeText={setEmail} />
+              <Text style={styles.label}>E-mail (Opcional)</Text>
+              <TextInput style={styles.input} keyboardType="email-address" autoCapitalize="none" placeholder="carlos@exemplo.com (opcional)" value={email} onChangeText={setEmail} />
             </View>
 
             <TouchableOpacity 

@@ -1,20 +1,39 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, 
-  Image, Alert, Modal, FlatList 
+  Image, Alert, Modal, FlatList, ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
+import { PhotoEditorModal, PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
-  getLocalProjetos, saveLocalRelatorio, saveLocalFoto, 
-  addToSyncQueue, getLocalLegendas 
+  getLocalProjetos, saveLocalRelatorio, saveLocalFoto, deleteLocalFoto,
+  addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
+  closeLocalLembrete 
 } from '../../database/db';
 import { takePhoto, pickImage } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida } from '../../types';
+import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+
+interface ChecklistItemState {
+  id: number;
+  item: string;
+  checked: boolean;
+  observacao: string;
+}
+
+const DEFAULT_CHECKLIST: ChecklistItemState[] = [
+  { id: 1, item: 'Chapisco colante e regularização da base estrutural', checked: false, observacao: '' },
+  { id: 2, item: 'Aplicação de tela metálica / fibra de reforço e ancoragem', checked: false, observacao: '' },
+  { id: 3, item: 'Aplicação e tempo de cura da argamassa de emboço', checked: false, observacao: '' },
+  { id: 4, item: 'Assentamento de revestimentos cerâmicos / pastilhas de fachada', checked: false, observacao: '' },
+  { id: 5, item: 'Selamento de juntas de dilatação, frisos e caimentos', checked: false, observacao: '' },
+  { id: 6, item: 'Verificação de peitoris, pingadeiras, muretas e impermeabilização', checked: false, observacao: '' },
+  { id: 7, item: 'Limpeza e desincrustação final da fachada', checked: false, observacao: '' },
+];
 
 export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ route, navigation }) => {
   const { user } = useAuth();
@@ -24,12 +43,23 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(preSelectedProjectId || null);
+  const [reportNumber, setReportNumber] = useState(`REL-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`);
   const [titulo, setTitulo] = useState('Relatório de Vistoria Técnica');
   const [categoria, setCategoria] = useState('Geral');
   const [local, setLocal] = useState('Fachada Principal');
   const [descricao, setDescricao] = useState('');
   const [observacoesFinais, setObservacoesFinais] = useState('');
   const [fotos, setFotos] = useState<FotoRelatorio[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
+
+  // Reminders
+  const [lembretes, setLembretes] = useState<Lembrete[]>([]);
+  const [novoLembreteTexto, setNovoLembreteTexto] = useState('');
+  const [showNovoLembreteInput, setShowNovoLembreteInput] = useState(false);
+
+  // Photo Editor Modal
+  const [editingPhotoIndex, setEditingPhotoIndex] = useState<number | null>(null);
+  const [showEditorModal, setShowEditorModal] = useState(false);
 
   // Legend picker modal
   const [legendas, setLegendas] = useState<LegendaPredefinida[]>([]);
@@ -48,6 +78,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     getLocalLegendas().then(l => setLegendas(l));
   }, [preSelectedProjectId]);
 
+  useEffect(() => {
+    if (selectedProjectId) {
+      getLocalLembretes(selectedProjectId, true).then(l => setLembretes(l));
+    }
+  }, [selectedProjectId]);
+
   async function handleAddPhotoCamera() {
     const uri = await takePhoto();
     if (uri) {
@@ -58,9 +94,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         ordem: fotos.length,
         legenda: '',
         local: local,
+        anotacoes_dados: '',
         sync_status: 'pending',
       };
-      setFotos([...fotos, newFoto]);
+      setFotos(prev => [...prev, newFoto]);
     }
   }
 
@@ -74,9 +111,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         ordem: fotos.length,
         legenda: '',
         local: local,
+        anotacoes_dados: '',
         sync_status: 'pending',
       };
-      setFotos([...fotos, newFoto]);
+      setFotos(prev => [...prev, newFoto]);
     }
   }
 
@@ -89,9 +127,62 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     setShowLegendModal(false);
   }
 
-  function handleRemovePhoto(index: number) {
+  async function handleRemovePhoto(index: number) {
+    const target = fotos[index];
+    if (target?.id) {
+      await deleteLocalFoto(target.id).catch(() => null);
+    }
     const updated = fotos.filter((_, i) => i !== index);
     setFotos(updated);
+  }
+
+  function handleSavePhotoAnnotations(json: string) {
+    if (editingPhotoIndex !== null) {
+      const updated = [...fotos];
+      updated[editingPhotoIndex].anotacoes_dados = json;
+      setFotos(updated);
+    }
+  }
+
+  async function handleCloseReminder(lembreteId: number) {
+    await closeLocalLembrete(lembreteId, user?.username || 'Responsável');
+    if (selectedProjectId) {
+      const updated = await getLocalLembretes(selectedProjectId, true);
+      setLembretes(updated);
+    }
+  }
+
+  async function handleAddReminder() {
+    if (!novoLembreteTexto.trim() || !selectedProjectId) return;
+    const selectedProj = projetos.find(p => p.id === selectedProjectId);
+    const newLemb: Lembrete = {
+      id: Date.now(),
+      projeto_id: selectedProjectId,
+      projeto_nome: selectedProj?.nome || '',
+      texto: novoLembreteTexto.trim(),
+      fechado: false,
+      criado_em: new Date().toISOString(),
+      criado_por_nome: user?.username || 'Responsável',
+      sync_status: 'pending',
+    };
+    await saveLocalLembrete(newLemb, 'pending');
+    await addToSyncQueue('lembrete', newLemb.id, 'create', '/api/lembretes', 'POST', newLemb);
+    setNovoLembreteTexto('');
+    setShowNovoLembreteInput(false);
+    const updated = await getLocalLembretes(selectedProjectId, true);
+    setLembretes(updated);
+  }
+
+  function toggleChecklistItem(index: number) {
+    const updated = [...checklist];
+    updated[index].checked = !updated[index].checked;
+    setChecklist(updated);
+  }
+
+  function updateChecklistObservacao(index: number, text: string) {
+    const updated = [...checklist];
+    updated[index].observacao = text;
+    setChecklist(updated);
   }
 
   async function handleSaveReport(status: 'em_andamento' | 'Aguardando Aprovação' = 'em_andamento') {
@@ -104,11 +195,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     try {
       const selectedProj = projetos.find(p => p.id === selectedProjectId);
       const reportId = Date.now();
-      const reportNum = `REL-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
 
       const relData: Relatorio = {
         id: reportId,
-        numero: reportNum,
+        numero: reportNumber,
         titulo: titulo.trim(),
         projeto_id: selectedProjectId,
         projeto_nome: selectedProj?.nome || 'Obra',
@@ -118,6 +208,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         data_relatorio: new Date().toISOString(),
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
+        checklist_data: JSON.stringify(checklist),
         categoria: categoria,
         local: local,
         status: status,
@@ -152,9 +243,18 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       Alert.alert(
         'Sucesso!', 
         status === 'Aguardando Aprovação' 
-          ? 'Relatório salvo e enviado para aprovação!' 
-          : 'Relatório salvo com sucesso no aplicativo!',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
+          ? 'Relatório finalizado e enviado para aprovação!' 
+          : 'Relatório salvo com sucesso no dispositivo!',
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            if (preSelectedProjectId) {
+              navigation.navigate('ProjectDetailScreen', { projectId: preSelectedProjectId });
+            } else {
+              navigation.goBack();
+            }
+          } 
+        }]
       );
     } catch (err: any) {
       Alert.alert('Erro ao Salvar', err.message);
@@ -165,15 +265,29 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   return (
     <View style={styles.container}>
-      <Header title="Novo Relatório Técnico" showBack onBack={() => navigation.goBack()} />
+      <Header 
+        title="Novo Relatório de Obra" 
+        subtitle={reportNumber}
+        showBack 
+        onBack={() => navigation.goBack()} 
+      />
       <OfflineBanner />
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Section 1: Obra */}
+        {/* Section 1: Basic Info */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>1. Identificação da Obra</Text>
 
-          <Text style={styles.label}>Obra / Projeto *</Text>
+          {/* Number Locked */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Número do Relatório (Sequencial Travado)</Text>
+            <View style={styles.lockedNumberBox}>
+              <Ionicons name="lock-closed" size={16} color={Colors.textMuted} />
+              <Text style={styles.lockedNumberText}>{reportNumber}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.label}>Obra Correspondente *</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
             {projetos.map(p => (
               <TouchableOpacity
@@ -205,10 +319,98 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           </View>
         </View>
 
-        {/* Section 2: Photos */}
+        {/* Section 2: Active Reminders */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.sectionTitle}>2. Lembretes da Visita Anterior</Text>
+            <TouchableOpacity 
+              style={styles.addReminderBtn}
+              onPress={() => setShowNovoLembreteInput(!showNovoLembreteInput)}
+            >
+              <Ionicons name={showNovoLembreteInput ? "close" : "add"} size={16} color={Colors.primary} />
+              <Text style={styles.addReminderText}>{showNovoLembreteInput ? "Cancelar" : "+ Lembrete"}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {showNovoLembreteInput && (
+            <View style={styles.newReminderBox}>
+              <TextInput
+                style={styles.newReminderInput}
+                placeholder="Ex: Verificar reaperto de ancoragens..."
+                value={novoLembreteTexto}
+                onChangeText={setNovoLembreteTexto}
+              />
+              <TouchableOpacity style={styles.saveReminderBtn} onPress={handleAddReminder}>
+                <Text style={styles.saveReminderText}>Salvar Lembrete</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {lembretes.length === 0 ? (
+            <Text style={styles.emptyRemindersText}>Nenhum lembrete pendente para esta obra.</Text>
+          ) : (
+            lembretes.map(lem => (
+              <View key={lem.id} style={styles.reminderCard}>
+                <Ionicons name="notifications-outline" size={18} color="#F59E0B" />
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.reminderText}>{lem.texto}</Text>
+                  <Text style={styles.reminderDate}>
+                    Criado em: {new Date(lem.criado_em).toLocaleDateString('pt-BR')}
+                  </Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.closeReminderBtn}
+                  onPress={() => handleCloseReminder(lem.id)}
+                >
+                  <Text style={styles.closeReminderText}>Fechar</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Section 3: Checklist with Individual Observations */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>3. Checklist de Verificação em Campo</Text>
+          <Text style={styles.subHintText}>
+            Marque os itens inspecionados e adicione observações individuais quando necessário:
+          </Text>
+
+          {checklist.map((item, idx) => (
+            <View key={item.id} style={styles.checkItemContainer}>
+              <TouchableOpacity 
+                style={styles.checkItemRow}
+                onPress={() => toggleChecklistItem(idx)}
+              >
+                <Ionicons 
+                  name={item.checked ? "checkbox" : "square-outline"} 
+                  size={22} 
+                  color={item.checked ? Colors.primary : Colors.textMuted} 
+                />
+                <Text style={[styles.checkItemText, item.checked && styles.checkItemTextActive]}>
+                  {item.item}
+                </Text>
+              </TouchableOpacity>
+
+              {item.checked && (
+                <View style={styles.obsBox}>
+                  <TextInput
+                    style={styles.obsInput}
+                    placeholder="Adicionar observação específica deste item..."
+                    value={item.observacao}
+                    onChangeText={txt => updateChecklistObservacao(idx, txt)}
+                    multiline
+                  />
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+
+        {/* Section 4: Photos with Editor (Arrows, Shapes, Text) */}
         <View style={styles.card}>
           <View style={styles.photoHeaderRow}>
-            <Text style={styles.sectionTitle}>2. Fotos do Canteiro ({fotos.length})</Text>
+            <Text style={styles.sectionTitle}>4. Fotos do Canteiro ({fotos.length})</Text>
           </View>
 
           <View style={styles.photoButtonsRow}>
@@ -225,7 +427,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
           {fotos.map((item, index) => (
             <View key={item.id} style={styles.photoCard}>
-              <Image source={{ uri: item.uri_local }} style={styles.thumb} />
+              <View style={styles.thumbWrapper}>
+                <Image source={{ uri: item.uri_local }} style={styles.thumb} />
+                <PhotoAnnotationOverlay annotationsJson={item.anotacoes_dados} />
+              </View>
+
               <View style={styles.photoInfo}>
                 <View style={styles.photoTopRow}>
                   <Text style={styles.photoNum}>Foto #{index + 1}</Text>
@@ -245,24 +451,37 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                   }}
                 />
 
-                <TouchableOpacity 
-                  style={styles.predefBtn}
-                  onPress={() => {
-                    setSelectedPhotoIndex(index);
-                    setShowLegendModal(true);
-                  }}
-                >
-                  <Ionicons name="list-outline" size={14} color={Colors.primary} />
-                  <Text style={styles.predefText}>Escolher Legenda Padrão</Text>
-                </TouchableOpacity>
+                <View style={styles.photoActionRow}>
+                  <TouchableOpacity 
+                    style={styles.editShapesBtn}
+                    onPress={() => {
+                      setEditingPhotoIndex(index);
+                      setShowEditorModal(true);
+                    }}
+                  >
+                    <Ionicons name="brush-outline" size={14} color="#7C3AED" />
+                    <Text style={styles.editShapesText}>Editar (Setas / Formas)</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.predefBtn}
+                    onPress={() => {
+                      setSelectedPhotoIndex(index);
+                      setShowLegendModal(true);
+                    }}
+                  >
+                    <Ionicons name="list-outline" size={14} color={Colors.primary} />
+                    <Text style={styles.predefText}>Legenda Padrão</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           ))}
         </View>
 
-        {/* Section 3: Technical Observations */}
+        {/* Section 5: Technical Observations */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>3. Descrição & Parecer Técnico</Text>
+          <Text style={styles.sectionTitle}>5. Descrição & Parecer Técnico</Text>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Descrição dos Serviços Verificados</Text>
@@ -289,27 +508,47 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           </View>
         </View>
 
-        {/* Submit Buttons */}
-        <TouchableOpacity 
-          style={[styles.btn, styles.submitBtn, loading && styles.btnDisabled]} 
-          onPress={() => handleSaveReport('Aguardando Aprovação')}
-          disabled={loading}
-        >
-          <Ionicons name="paper-plane" size={20} color="#FFFFFF" />
-          <Text style={styles.btnText}>Enviar para Aprovação</Text>
-        </TouchableOpacity>
+        {/* Standardized Action Buttons: Submission on Left, Draft/Save on Right */}
+        <View style={styles.bottomButtonsRow}>
+          <TouchableOpacity 
+            style={[styles.btnActionSubmit, loading && styles.btnDisabled]} 
+            onPress={() => handleSaveReport('Aguardando Aprovação')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
+                <Text style={styles.btnActionSubmitText}>Enviar para Aprovação</Text>
+              </>
+            )}
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.btn, styles.draftBtn, loading && styles.btnDisabled]} 
-          onPress={() => handleSaveReport('em_andamento')}
-          disabled={loading}
-        >
-          <Ionicons name="save-outline" size={20} color={Colors.text} />
-          <Text style={[styles.btnText, { color: Colors.text }]}>Salvar Rascunho no Celular</Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.btnActionDraft, loading && styles.btnDisabled]} 
+            onPress={() => handleSaveReport('em_andamento')}
+            disabled={loading}
+          >
+            <Ionicons name="save-outline" size={18} color={Colors.text} />
+            <Text style={styles.btnActionDraftText}>Salvar Rascunho</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Photo Editor Modal */}
+      <PhotoEditorModal
+        visible={showEditorModal}
+        photoUri={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? (fotos[editingPhotoIndex].uri_local || null) : null}
+        initialAnnotations={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? fotos[editingPhotoIndex].anotacoes_dados : undefined}
+        onClose={() => {
+          setShowEditorModal(false);
+          setEditingPhotoIndex(null);
+        }}
+        onSave={handleSavePhotoAnnotations}
+      />
 
       {/* Legendas Modal */}
       <Modal visible={showLegendModal} animationType="slide" transparent>
@@ -356,7 +595,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     ...Shadows.sm,
   },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 12 },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 10 },
+  subHintText: { fontSize: 12, color: Colors.textSecondary, marginBottom: 12 },
   chipScroll: { flexDirection: 'row', marginBottom: 14 },
   chip: {
     backgroundColor: '#F1F5F9',
@@ -373,6 +619,22 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 12 },
   row: { flexDirection: 'row', gap: 10 },
   label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 },
+  lockedNumberBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 40,
+  },
+  lockedNumberText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#475569',
+  },
   input: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
@@ -384,6 +646,121 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   textArea: { height: 80, textAlignVertical: 'top', paddingVertical: 8 },
+  addReminderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  addReminderText: {
+    color: Colors.primary,
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  newReminderBox: {
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 10,
+  },
+  newReminderInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    height: 38,
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  saveReminderBtn: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  saveReminderText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  emptyRemindersText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+  reminderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: 8,
+  },
+  reminderText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#92400E',
+  },
+  reminderDate: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 2,
+  },
+  closeReminderBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D97706',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  closeReminderText: {
+    color: '#D97706',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  checkItemContainer: {
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 8,
+  },
+  checkItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkItemText: {
+    fontSize: 13,
+    color: '#334155',
+    flex: 1,
+  },
+  checkItemTextActive: {
+    fontWeight: '600',
+    color: Colors.primary,
+  },
+  obsBox: {
+    marginTop: 6,
+    marginLeft: 30,
+  },
+  obsInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12,
+    color: Colors.text,
+  },
   photoHeaderRow: { marginBottom: 10 },
   photoButtonsRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   cameraBtn: {
@@ -398,7 +775,7 @@ const styles = StyleSheet.create({
   },
   galleryBtn: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#64748B',
     height: 44,
     borderRadius: 8,
     flexDirection: 'row',
@@ -406,21 +783,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
   },
-  photoBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
+  photoBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
   photoCard: {
     flexDirection: 'row',
     backgroundColor: '#F8FAFC',
     borderRadius: 10,
     padding: 10,
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    gap: 10,
   },
-  thumb: { width: 90, height: 90, borderRadius: 8, backgroundColor: '#E2E8F0' },
-  photoInfo: { flex: 1 },
+  thumbWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#000000',
+  },
+  thumb: { width: '100%', height: '100%', borderRadius: 8 },
+  photoInfo: { flex: 1, marginLeft: 12 },
   photoTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  photoNum: { fontSize: 12, fontWeight: 'bold', color: Colors.primary },
+  photoNum: { fontSize: 13, fontWeight: 'bold', color: Colors.text },
   legendaInput: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -429,34 +813,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     height: 36,
     fontSize: 12,
-    color: Colors.text,
+    marginBottom: 6,
   },
-  predefBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  photoActionRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  editShapesBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.25)',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
+  editShapesText: { fontSize: 11, color: '#7C3AED', fontWeight: '600' },
+  predefBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.25)',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
   predefText: { fontSize: 11, color: Colors.primary, fontWeight: '600' },
-  btn: {
-    height: 52,
-    borderRadius: 12,
+  bottomButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  btnActionSubmit: {
+    flex: 1.2,
+    backgroundColor: Colors.primary,
+    height: 48,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 10,
-    ...Shadows.sm,
+    ...Shadows.md,
   },
-  submitBtn: { backgroundColor: Colors.primary },
-  draftBtn: { backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: Colors.border },
-  btnDisabled: { opacity: 0.7 },
-  btnText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
+  btnActionSubmitText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  btnActionDraft: {
+    flex: 1,
+    backgroundColor: '#E2E8F0',
+    height: 48,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  btnActionDraftText: {
+    color: Colors.text,
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  btnDisabled: { opacity: 0.6 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
+    padding: 16,
     maxHeight: '80%',
   },
   modalHeader: {
@@ -464,24 +900,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingBottom: 10,
   },
-  modalTitle: { fontSize: 17, fontWeight: 'bold', color: Colors.text },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text },
   legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   legendCategoryBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 4,
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 10,
   },
-  legendCategoryText: { fontSize: 10, fontWeight: 'bold', color: Colors.primary },
-  legendItemText: { fontSize: 13, color: Colors.text },
+  legendCategoryText: { fontSize: 11, color: '#0369A1', fontWeight: 'bold' },
+  legendItemText: { fontSize: 14, color: Colors.text, flex: 1 },
 });

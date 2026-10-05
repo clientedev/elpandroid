@@ -1,55 +1,110 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl 
+  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, TextInput 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
-import { getLocalVisitas } from '../../database/db';
-import { Visita } from '../../types';
+import { getLocalVisitas, getLocalRelatorios, saveLocalVisita, addToSyncQueue } from '../../database/db';
+import { Visita, Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+
+// Team fixed colors per specification (Item 8.1):
+// Leopoldo: Azul (#1E88E5), Mateus: Verde (#43A047), Isadora: Amarelo (#FDD835), Luciana: Laranja (#FB8C00)
+const TEAM_COLORS: { [key: string]: { bg: string; text: string } } = {
+  'leopoldo': { bg: '#1E88E5', text: '#FFFFFF' },
+  'mateus': { bg: '#43A047', text: '#FFFFFF' },
+  'isadora': { bg: '#FDD835', text: '#713F12' },
+  'luciana': { bg: '#FB8C00', text: '#FFFFFF' },
+};
+
+function getTeamTheme(name?: string) {
+  if (!name) return { bg: '#2563EB', text: '#FFFFFF' };
+  const clean = name.trim().toLowerCase();
+  for (const [key, theme] of Object.entries(TEAM_COLORS)) {
+    if (clean.includes(key)) return theme;
+  }
+  return { bg: '#2563EB', text: '#FFFFFF' };
+}
 
 export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [filteredVisitas, setFilteredVisitas] = useState<Visita[]>([]);
   const [selectedFilter, setSelectedFilter] = useState('Todas');
+  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadVisitas = useCallback(async () => {
+  const applyFilters = useCallback((data: Visita[], filter: string, search: string) => {
+    let list = data;
+    if (filter !== 'Todas') {
+      list = list.filter(v => v.status === filter);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(v => 
+        (v.projeto_nome && v.projeto_nome.toLowerCase().includes(q)) ||
+        (v.projeto_outros && v.projeto_outros.toLowerCase().includes(q)) ||
+        (v.observacoes && v.observacoes.toLowerCase().includes(q)) ||
+        (v.endereco_gps && v.endereco_gps.toLowerCase().includes(q)) ||
+        (v.responsavel_nome && v.responsavel_nome.toLowerCase().includes(q))
+      );
+    }
+    setFilteredVisitas(list);
+  }, []);
+
+  const loadVisitasAndAutoCheck = useCallback(async () => {
     try {
       const data = await getLocalVisitas();
+      const rels = await getLocalRelatorios();
+
+      // Auto-baixa da visita para 'Realizada' se houver relatório concluído no mesmo dia (Item 8.2)
+      for (const v of data) {
+        if (v.status === 'Agendada' && v.projeto_id) {
+          const vDateStr = v.data_inicio.split('T')[0];
+          const hasMatchingReport = rels.some(r => 
+            r.projeto_id === v.projeto_id && 
+            r.data_relatorio && 
+            r.data_relatorio.startsWith(vDateStr) &&
+            r.status !== 'Rejeitado'
+          );
+          if (hasMatchingReport) {
+            v.status = 'Realizada';
+            v.data_realizada = new Date().toISOString();
+            await saveLocalVisita(v, 'pending');
+            await addToSyncQueue('visita', v.id, 'update', `/api/visits/${v.id}`, 'PUT', v);
+          }
+        }
+      }
+
       setVisitas(data);
-      filterVisitas(data, selectedFilter);
+      applyFilters(data, selectedFilter, searchQuery);
     } catch (e) {
       console.warn('Erro ao carregar visitas:', e);
     }
-  }, [selectedFilter]);
+  }, [selectedFilter, searchQuery, applyFilters]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      loadVisitas();
+      loadVisitasAndAutoCheck();
     });
-    loadVisitas();
+    loadVisitasAndAutoCheck();
     return unsubscribe;
-  }, [navigation, loadVisitas]);
-
-  function filterVisitas(data: Visita[], filter: string) {
-    if (filter === 'Todas') {
-      setFilteredVisitas(data);
-    } else {
-      setFilteredVisitas(data.filter(v => v.status === filter));
-    }
-  }
+  }, [navigation, loadVisitasAndAutoCheck]);
 
   const handleFilter = (filter: string) => {
     setSelectedFilter(filter);
-    filterVisitas(visitas, filter);
+    applyFilters(visitas, filter, searchQuery);
+  };
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    applyFilters(visitas, selectedFilter, text);
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadVisitas();
+    await loadVisitasAndAutoCheck();
     setRefreshing(false);
   };
 
@@ -57,7 +112,7 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     <View style={styles.container}>
       <Header 
         title="Agenda de Visitas" 
-        subtitle={`${filteredVisitas.length} visitas registradas`}
+        subtitle={`${filteredVisitas.length} visitas na equipe`}
         rightAction={
           <TouchableOpacity 
             style={styles.addBtn}
@@ -68,6 +123,22 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         }
       />
       <OfflineBanner />
+
+      {/* Substring Search Bar (Item 8.2) */}
+      <View style={styles.searchBox}>
+        <Ionicons name="search-outline" size={18} color={Colors.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Buscar por obra, endereço, responsável..."
+          value={searchQuery}
+          onChangeText={handleSearch}
+        />
+        {searchQuery ? (
+          <TouchableOpacity onPress={() => handleSearch('')}>
+            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       {/* Filter Tabs */}
       <View style={styles.filterRow}>
@@ -92,14 +163,17 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>Nenhuma visita agendada</Text>
-            <Text style={styles.emptySub}>Toque no botão + para agendar uma visita técnica ou compromisso.</Text>
+            <Text style={styles.emptyTitle}>Nenhuma visita encontrada</Text>
+            <Text style={styles.emptySub}>
+              {searchQuery ? 'Nenhum resultado para a busca.' : 'Toque no botão + para agendar uma visita técnica.'}
+            </Text>
           </View>
         }
         renderItem={({ item }) => {
           const dateObj = new Date(item.data_inicio);
           const dateStr = dateObj.toLocaleDateString('pt-BR');
           const timeStr = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const teamTheme = getTeamTheme(item.responsavel_nome);
 
           return (
             <TouchableOpacity 
@@ -107,45 +181,76 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
               activeOpacity={0.7}
               onPress={() => navigation.navigate('VisitDetailScreen', { visitId: item.id })}
             >
-              <View style={styles.cardHeader}>
-                <View style={styles.badgeRow}>
-                  <View style={styles.numBadge}>
-                    <Text style={styles.numText}>{item.numero}</Text>
-                  </View>
-                  {item.is_pessoal && (
-                    <View style={styles.pessoalBadge}>
-                      <Text style={styles.pessoalText}>Pessoal</Text>
+              {/* Member Color Stripe (Item 8.1) */}
+              <View style={[styles.colorStripe, { backgroundColor: teamTheme.bg }]} />
+
+              <View style={{ flex: 1, padding: 14 }}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.badgeRow}>
+                    <View style={styles.numBadge}>
+                      <Text style={styles.numText}>{item.numero}</Text>
                     </View>
-                  )}
+                    
+                    {/* Team Member Badge */}
+                    <View style={[styles.memberBadge, { backgroundColor: teamTheme.bg }]}>
+                      <Text style={[styles.memberBadgeText, { color: teamTheme.text }]}>
+                        {item.responsavel_nome || 'Equipe'}
+                      </Text>
+                    </View>
+
+                    {item.is_pessoal ? (
+                      <View style={styles.pessoalBadge}>
+                        <Text style={styles.pessoalText}>Pessoal</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <SyncStatusBadge status={item.sync_status} />
                 </View>
-                <SyncStatusBadge status={item.sync_status} />
-              </View>
 
-              <Text style={styles.cardTitle}>{item.projeto_nome || item.projeto_outros || 'Visita Técnica'}</Text>
-
-              <View style={styles.dateRow}>
-                <Ionicons name="time-outline" size={15} color={Colors.primary} />
-                <Text style={styles.dateText}>{dateStr} às {timeStr}</Text>
-              </View>
-
-              {item.observacoes ? (
-                <Text style={styles.notesText} numberOfLines={2}>
-                  {item.observacoes}
+                <Text style={styles.cardTitle}>
+                  {item.projeto_nome || item.projeto_outros || 'Visita Técnica'}
                 </Text>
-              ) : null}
 
-              <View style={styles.cardFooter}>
-                <View style={[
-                  styles.statusTag, 
-                  item.status === 'Realizada' ? styles.statusRealizada : 
-                  item.status === 'Agendada' ? styles.statusAgendada : styles.statusCancelada
-                ]}>
-                  <Text style={styles.statusTagText}>{item.status}</Text>
+                <View style={styles.dateRow}>
+                  <Ionicons name="time-outline" size={15} color={Colors.primary} />
+                  <Text style={styles.dateText}>{dateStr} às {timeStr}</Text>
                 </View>
 
-                <View style={styles.authorRow}>
-                  <Ionicons name="person-outline" size={13} color={Colors.textSecondary} />
-                  <Text style={styles.authorText}>{item.responsavel_nome || 'Responsável'}</Text>
+                {item.endereco_gps ? (
+                  <View style={styles.addressRow}>
+                    <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
+                    <Text style={styles.addressText} numberOfLines={1}>{item.endereco_gps}</Text>
+                  </View>
+                ) : null}
+
+                {item.observacoes ? (
+                  <Text style={styles.notesText} numberOfLines={2}>
+                    {item.observacoes}
+                  </Text>
+                ) : null}
+
+                <View style={styles.cardFooter}>
+                  <View style={[
+                    styles.statusTag, 
+                    item.status === 'Realizada' ? styles.statusRealizada : 
+                    item.status === 'Agendada' ? styles.statusAgendada : styles.statusCancelada
+                  ]}>
+                    <Text style={styles.statusTagText}>{item.status}</Text>
+                  </View>
+
+                  {/* Realizar Visita Action Button (Item 8.2) */}
+                  {item.projeto_id ? (
+                    <TouchableOpacity 
+                      style={styles.realizarVisitaBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        navigation.navigate('ProjectDetailScreen', { projectId: item.projeto_id });
+                      }}
+                    >
+                      <Ionicons name="enter-outline" size={14} color={Colors.primary} />
+                      <Text style={styles.realizarVisitaText}>Realizar Visita</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
             </TouchableOpacity>
@@ -168,25 +273,40 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 8,
     ...Shadows.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.text,
   },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     gap: 8,
   },
   filterChip: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: 16,
+    backgroundColor: '#E2E8F0',
   },
   filterChipActive: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
   },
   filterText: {
     fontSize: 12,
@@ -201,19 +321,23 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   card: {
+    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
+    overflow: 'hidden',
     ...Shadows.sm,
+  },
+  colorStripe: {
+    width: 6,
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   badgeRow: {
     flexDirection: 'row',
@@ -221,55 +345,75 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   numBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
     borderRadius: 6,
   },
   numText: {
-    color: Colors.primary,
+    fontSize: 11,
     fontWeight: 'bold',
-    fontSize: 12,
+    color: '#475569',
+  },
+  memberBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  memberBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   pessoalBadge: {
-    backgroundColor: '#F3E8FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
   },
   pessoalText: {
-    color: '#7C3AED',
-    fontWeight: '600',
     fontSize: 11,
+    fontWeight: 'bold',
+    color: '#6D28D9',
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: Colors.text,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
+    gap: 4,
+    marginBottom: 4,
   },
   dateText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12,
     color: Colors.primary,
+    fontWeight: '600',
+  },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  addressText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    flex: 1,
   },
   notesText: {
     fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 10,
+    color: '#475569',
+    marginBottom: 8,
     lineHeight: 16,
   },
   cardFooter: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
+    alignItems: 'center',
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#F8FAFC',
   },
@@ -278,42 +422,42 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 6,
   },
-  statusAgendada: {
-    backgroundColor: '#FEF3C7',
-  },
-  statusRealizada: {
-    backgroundColor: '#D1FAE5',
-  },
-  statusCancelada: {
-    backgroundColor: '#FEE2E2',
-  },
+  statusAgendada: { backgroundColor: '#E0F2FE' },
+  statusRealizada: { backgroundColor: '#DCFCE7' },
+  statusCancelada: { backgroundColor: '#FEE2E2' },
   statusTagText: {
     fontSize: 11,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: Colors.text,
   },
-  authorRow: {
+  realizarVisitaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.2)',
   },
-  authorText: {
+  realizarVisitaText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    fontWeight: 'bold',
+    color: Colors.primary,
   },
   emptyContainer: {
-    padding: 40,
+    padding: 32,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     color: Colors.text,
-    marginTop: 12,
+    marginTop: 10,
   },
   emptySub: {
-    fontSize: 13,
+    fontSize: 12,
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 4,

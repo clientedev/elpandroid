@@ -1,4 +1,4 @@
-﻿export interface User {
+export interface User {
   id: number;
   username: string;
   email: string;
@@ -118,6 +118,7 @@ export interface FotoRelatorio {
   local?: string;
   ordem: number;
   anotacoes_dados?: string;
+  base64?: string;
   sync_status?: 'synced' | 'pending' | 'error';
 }
 
@@ -182,6 +183,7 @@ export interface Reembolso {
 export interface Contato {
   id: number;
   nome: string;
+  cargo?: string;
   email?: string;
   telefone?: string;
   empresa?: string;
