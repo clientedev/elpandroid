@@ -1,7 +1,7 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert 
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Image 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
@@ -61,9 +61,13 @@ export const LoginScreen: React.FC = () => {
         {/* Header Logo */}
         <View style={styles.header}>
           <View style={styles.logoBadge}>
-            <Ionicons name="construct" size={40} color="#FFFFFF" />
+            <Image 
+              source={require('../../../assets/logo.png')} 
+              style={styles.logoImage} 
+              resizeMode="contain" 
+            />
           </View>
-          <Text style={styles.brandTitle}>OBRAFLOW</Text>
+          <Text style={styles.brandTitle}>ELP</Text>
           <Text style={styles.brandSubtitle}>Sistema Integrado de Gestão de Obras</Text>
 
           {/* Network Pill */}
@@ -198,14 +202,19 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   logoBadge: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: '#2563EB',
+    width: 84,
+    height: 84,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
+    padding: 6,
     ...Shadows.md,
+  },
+  logoImage: {
+    width: 72,
+    height: 72,
   },
   brandTitle: {
     fontSize: 28,

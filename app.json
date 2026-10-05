@@ -1,13 +1,20 @@
-﻿{
+{
   "expo": {
-    "name": "ObraFlow",
-    "slug": "obraflow-android",
+    "name": "ELP",
+    "slug": "elp-android",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "backgroundColor": "#1E293B"
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     },
     "ios": {
       "supportsTablet": true
@@ -16,7 +23,7 @@
       "package": "com.obraflow.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#1E293B",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png"
       },
       "permissions": [
@@ -33,7 +40,8 @@
     "plugins": [
       "expo-sqlite",
       "expo-sharing",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-updates"
     ]
   }
 }

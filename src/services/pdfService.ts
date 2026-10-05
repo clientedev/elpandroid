@@ -1,4 +1,4 @@
-﻿import * as Print from 'expo-print';
+import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Relatorio, FotoRelatorio, RelatorioExpress } from '../types';
 
@@ -146,7 +146,7 @@ export async function generateReportPDF(
     <body>
       <div class="header">
         <div>
-          <div class="header-title">OBRAFLOW - RELATÓRIO TÉCNICO</div>
+          <div class="header-title">ELP - RELATÓRIO TÉCNICO</div>
           <div style="font-size: 14px; font-weight: 600; color: #334155; margin-top: 4px;">
             ${relatorio.titulo} (${numero})
           </div>
@@ -178,7 +178,7 @@ export async function generateReportPDF(
       ${photosHtml}
 
       <div class="footer">
-        Documento gerado pelo ObraFlow Android - Sistema de Gestão Técnica de Obras
+        Documento gerado pelo ELP Android - Sistema de Gestão Técnica de Obras
       </div>
     </body>
     </html>

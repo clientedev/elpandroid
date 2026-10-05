@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
   RefreshControl, FlatList 
@@ -118,7 +118,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   return (
     <View style={styles.container}>
       <Header 
-        title="ObraFlow" 
+        title="ELP" 
         subtitle={`Olá, ${user?.username || 'Engenheiro'}`}
         rightAction={
           <TouchableOpacity 

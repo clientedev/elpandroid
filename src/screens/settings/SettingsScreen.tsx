@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, 
-  Alert, ActivityIndicator 
+  Alert, ActivityIndicator, Image 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -9,6 +9,7 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { apiClient, DEFAULT_API_URL } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
+import { updateService } from '../../services/updateService';
 import { 
   getLocalProjetos, getLocalVisitas, getLocalRelatorios, 
   getPendingSyncQueue, clearCompletedSyncQueue 
@@ -27,6 +28,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     queue: 0,
   });
   const [loadingSync, setLoadingSync] = useState(false);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
 
   useEffect(() => {
     loadDiagnostics();
@@ -68,6 +70,15 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       Alert.alert('Erro na Sincronização', err.message);
     } finally {
       setLoadingSync(false);
+    }
+  }
+
+  async function handleCheckUpdates() {
+    setCheckingUpdates(true);
+    try {
+      await updateService.checkForUpdate(true);
+    } finally {
+      setCheckingUpdates(false);
     }
   }
 
@@ -209,6 +220,45 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
         </View>
 
+        {/* Updates Card */}
+        <View style={styles.card}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="cloud-download-outline" size={20} color={Colors.primary} />
+            <Text style={styles.cardTitle}>Atualizações & Versão</Text>
+          </View>
+
+          <View style={styles.appInfoRow}>
+            <Image 
+              source={require('../../../assets/logo.png')} 
+              style={styles.settingsLogo} 
+              resizeMode="contain" 
+            />
+            <View style={{ marginLeft: 12 }}>
+              <Text style={styles.appNameText}>ELP Android</Text>
+              <Text style={styles.appVersionText}>Versão Atual: v{updateService.getCurrentVersion()}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.desc}>
+            Verifica se há atualizações recentes publicadas via deploy para o aplicativo.
+          </Text>
+
+          <TouchableOpacity 
+            style={styles.checkUpdateBtn} 
+            onPress={handleCheckUpdates}
+            disabled={checkingUpdates}
+          >
+            {checkingUpdates ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="refresh" size={18} color="#FFFFFF" />
+                <Text style={styles.checkUpdateBtnText}>Verificar Atualizações Recentes</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={Colors.danger} />
@@ -334,4 +384,44 @@ const styles = StyleSheet.create({
     height: 50,
   },
   logoutText: { fontSize: 15, fontWeight: 'bold', color: Colors.danger },
+  appInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  settingsLogo: {
+    width: 48,
+    height: 32,
+  },
+  appNameText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  appVersionText: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  checkUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    height: 46,
+    marginTop: 6,
+    ...Shadows.sm,
+  },
+  checkUpdateBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 });
