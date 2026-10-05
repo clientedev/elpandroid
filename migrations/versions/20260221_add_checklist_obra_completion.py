@@ -44,14 +44,22 @@ def upgrade():
         op.execute(text(
             "ALTER TABLE checklist_obra ADD COLUMN concluido_relatorio_id INTEGER"
         ))
-        # Add FK separately (only if column was just created)
+        # Add FK separately if constraint does not already exist
         op.execute(text(
             """
-            ALTER TABLE checklist_obra
-            ADD CONSTRAINT fk_checklist_obra_relatorio
-            FOREIGN KEY (concluido_relatorio_id)
-            REFERENCES relatorios(id)
-            ON DELETE SET NULL
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.table_constraints
+                    WHERE constraint_name = 'fk_checklist_obra_relatorio'
+                ) THEN
+                    ALTER TABLE checklist_obra
+                    ADD CONSTRAINT fk_checklist_obra_relatorio
+                    FOREIGN KEY (concluido_relatorio_id)
+                    REFERENCES relatorios(id)
+                    ON DELETE SET NULL;
+                END IF;
+            END $$;
             """
         ))
 

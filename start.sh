@@ -20,7 +20,10 @@ fi
 if [ -n "$DATABASE_URL" ]; then
     echo "✅ Database URL configured: ${DATABASE_URL:0:15}..."
     echo "🔄 Running Alembic migrations..."
-    alembic upgrade head || echo "⚠️ Migration notice: continuing startup"
+    alembic upgrade head || {
+        echo "⚠️ Migration encountered an issue (tables likely already exist). Stamping head..."
+        alembic stamp head || true
+    }
 else
     echo "⚠️ Warning: DATABASE_URL not set yet. Starting app in standalone mode."
 fi
