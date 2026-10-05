@@ -1,6 +1,6 @@
 {
   "name": "elp-android",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "main": "index.ts",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -15,6 +15,7 @@
     "expo-constants": "~57.0.20",
     "expo-file-system": "~57.0.7",
     "expo-image-picker": "~57.0.20",
+    "expo-media-library": "~57.0.5",
     "expo-print": "~57.0.2",
     "expo-secure-store": "~57.0.4",
     "expo-sharing": "~57.0.22",
@@ -31,7 +32,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "postinstall": "python3 -m pip install -r requirements.txt 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true",
+    "postinstall": "node -e \"try{require('child_process').execSync('pip install -r requirements.txt',{stdio:'ignore'})}catch(e){}\"",
     "start": "node -e \"if(process.env.RAILWAY_ENVIRONMENT||process.env.PORT||process.platform==='linux'){require('child_process').spawn('bash',['start.sh'],{stdio:'inherit'})}else{require('child_process').spawn('npx',['expo','start'],{stdio:'inherit',shell:true})}\"",
     "expo": "expo start",
     "android": "expo run:android",

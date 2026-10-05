@@ -1,13 +1,166 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, StyleSheet, Modal, TouchableOpacity, Image, 
-  TextInput, Dimensions, Alert, ScrollView, ActivityIndicator 
+  TextInput, Dimensions, Alert, ScrollView, ActivityIndicator,
+  PanResponder 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CANVAS_SIZE = Math.min(SCREEN_WIDTH - 24, 380);
+
+interface DraggableItemProps {
+  item: AnnotationItem;
+  isSelected: boolean;
+  canvasSize: number;
+  onSelect: () => void;
+  onMove: (x: number, y: number) => void;
+  onResize: (size: number) => void;
+}
+
+const DraggableAnnotationItem: React.FC<DraggableItemProps> = ({
+  item,
+  isSelected,
+  canvasSize,
+  onSelect,
+  onMove,
+  onResize,
+}) => {
+  const [currentPos, setCurrentPos] = useState({ x: item.x, y: item.y });
+  const [currentSize, setCurrentSize] = useState(item.size || 50);
+
+  useEffect(() => {
+    setCurrentPos({ x: item.x, y: item.y });
+    setCurrentSize(item.size || 50);
+  }, [item.x, item.y, item.size]);
+
+  // Arraste do elemento com o dedo pela tela
+  const panMove = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        onSelect();
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const dxPct = (gestureState.dx / canvasSize) * 100;
+        const dyPct = (gestureState.dy / canvasSize) * 100;
+        const newX = Math.max(5, Math.min(95, item.x + dxPct));
+        const newY = Math.max(5, Math.min(95, item.y + dyPct));
+        setCurrentPos({ x: newX, y: newY });
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const dxPct = (gestureState.dx / canvasSize) * 100;
+        const dyPct = (gestureState.dy / canvasSize) * 100;
+        const finalX = Math.max(5, Math.min(95, item.x + dxPct));
+        const finalY = Math.max(5, Math.min(95, item.y + dyPct));
+        onMove(finalX, finalY);
+      },
+    })
+  ).current;
+
+  // Redimensionamento do elemento com o dedo através da alça táctil
+  const panResize = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        onSelect();
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const delta = (gestureState.dx + gestureState.dy) * 0.65;
+        const newSize = Math.max(22, Math.min(180, (item.size || 50) + delta));
+        setCurrentSize(newSize);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const delta = (gestureState.dx + gestureState.dy) * 0.65;
+        const finalSize = Math.max(22, Math.min(180, (item.size || 50) + delta));
+        onResize(finalSize);
+      },
+    })
+  ).current;
+
+  const size = currentSize;
+  const rotation = item.rotation || 0;
+
+  return (
+    <View
+      {...panMove.panHandlers}
+      style={[
+        styles.annotationWrapper,
+        {
+          left: `${currentPos.x}%`,
+          top: `${currentPos.y}%`,
+          transform: [{ translateX: -size / 2 }, { translateY: -size / 2 }],
+        },
+        isSelected && styles.annotationSelectedWrapper,
+      ]}
+    >
+      {item.type === 'arrow' && (
+        <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: `${rotation}deg` }] }}>
+          <Ionicons name="arrow-forward" size={size * 0.9} color={item.color} />
+        </View>
+      )}
+
+      {item.type === 'rect' && (
+        <View
+          style={[
+            styles.rectShape,
+            {
+              borderColor: item.color,
+              width: size * 1.3,
+              height: size * 0.8,
+              borderWidth: Math.max(2.5, size * 0.05),
+              transform: [{ rotate: `${rotation}deg` }],
+            },
+          ]}
+        />
+      )}
+
+      {item.type === 'circle' && (
+        <View
+          style={[
+            styles.circleShape,
+            {
+              borderColor: item.color,
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderWidth: Math.max(2.5, size * 0.05),
+            },
+          ]}
+        />
+      )}
+
+      {item.type === 'text' && (
+        <View style={[styles.textBadge, { backgroundColor: item.color, paddingHorizontal: Math.max(6, size * 0.15), paddingVertical: Math.max(3, size * 0.08) }]}>
+          <Text style={[styles.badgeText, { color: item.color === '#FFFFFF' ? '#000000' : '#FFFFFF', fontSize: Math.max(10, size * 0.35) }]}>
+            {item.text}
+          </Text>
+        </View>
+      )}
+
+      {/* Indicadores de seleção e Alça Táctil de Redimensionamento com o Dedo */}
+      {isSelected && (
+        <View style={styles.selectionBorder} pointerEvents="box-none">
+          <View style={[styles.handleDot, styles.dotTL]} />
+          <View style={[styles.handleDot, styles.dotTR]} />
+          <View style={[styles.handleDot, styles.dotBL]} />
+
+          {/* Alça táctil de redimensionamento */}
+          <View 
+            {...panResize.panHandlers} 
+            style={[styles.resizeHandle, styles.dotBR]}
+          >
+            <Ionicons name="expand" size={13} color="#FFFFFF" />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
+
 
 export interface AnnotationItem {
   id: string;
@@ -325,83 +478,23 @@ export const PhotoEditorModal: React.FC<PhotoEditorModalProps> = ({
                 </View>
               )}
 
-              {/* Render Annotations */}
-              {annotations.map(item => {
-                const isSelected = item.id === selectedId;
-                const size = item.size || 50;
-                const rotation = item.rotation || 0;
+              {/* Render Annotations com arraste táctil e alça de dimensionamento com o dedo */}
+              {annotations.map(item => (
+                <DraggableAnnotationItem
+                  key={item.id}
+                  item={item}
+                  isSelected={item.id === selectedId}
+                  canvasSize={CANVAS_SIZE}
+                  onSelect={() => setSelectedId(item.id)}
+                  onMove={(newX, newY) => {
+                    setAnnotations(prev => prev.map(a => a.id === item.id ? { ...a, x: newX, y: newY } : a));
+                  }}
+                  onResize={(newSize) => {
+                    setAnnotations(prev => prev.map(a => a.id === item.id ? { ...a, size: newSize } : a));
+                  }}
+                />
+              ))}
 
-                return (
-                  <TouchableOpacity 
-                    key={item.id} 
-                    activeOpacity={0.8}
-                    onPress={() => setSelectedId(item.id)}
-                    style={[
-                      styles.annotationWrapper, 
-                      { 
-                        left: `${item.x}%`, 
-                        top: `${item.y}%`,
-                        transform: [{ translateX: -size / 2 }, { translateY: -size / 2 }],
-                      },
-                      isSelected && styles.annotationSelectedWrapper
-                    ]}
-                  >
-                    {item.type === 'arrow' && (
-                      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: `${rotation}deg` }] }}>
-                        <Ionicons name="arrow-forward" size={size * 0.9} color={item.color} />
-                      </View>
-                    )}
-
-                    {item.type === 'rect' && (
-                      <View 
-                        style={[
-                          styles.rectShape, 
-                          { 
-                            borderColor: item.color, 
-                            width: size * 1.3, 
-                            height: size * 0.8,
-                            borderWidth: Math.max(2.5, size * 0.05),
-                            transform: [{ rotate: `${rotation}deg` }]
-                          }
-                        ]} 
-                      />
-                    )}
-
-                    {item.type === 'circle' && (
-                      <View 
-                        style={[
-                          styles.circleShape, 
-                          { 
-                            borderColor: item.color, 
-                            width: size, 
-                            height: size,
-                            borderRadius: size / 2,
-                            borderWidth: Math.max(2.5, size * 0.05),
-                          }
-                        ]} 
-                      />
-                    )}
-
-                    {item.type === 'text' && (
-                      <View style={[styles.textBadge, { backgroundColor: item.color }]}>
-                        <Text style={[styles.badgeText, { color: item.color === '#FFFFFF' ? '#000000' : '#FFFFFF' }]}>
-                          {item.text}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Selection indicators */}
-                    {isSelected && (
-                      <View style={styles.selectionBorder}>
-                        <View style={[styles.handleDot, styles.dotTL]} />
-                        <View style={[styles.handleDot, styles.dotTR]} />
-                        <View style={[styles.handleDot, styles.dotBL]} />
-                        <View style={[styles.handleDot, styles.dotBR]} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
             </TouchableOpacity>
 
             {/* Quick Canvas Actions (Undo / Clear) */}
@@ -840,6 +933,25 @@ const styles = StyleSheet.create({
   dotTR: { top: -4, right: -4 },
   dotBL: { bottom: -4, left: -4 },
   dotBR: { bottom: -4, right: -4 },
+  resizeHandle: {
+    position: 'absolute',
+    bottom: -12,
+    right: -12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#0284C7',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 3,
+    zIndex: 99,
+  },
+
   rectShape: {
     borderWidth: 3,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',

@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 export interface CapturedPhoto {
   uri: string;
@@ -11,9 +12,10 @@ const docDir = (FileSystem as any).documentDirectory || '';
 const ROOT_DIR_NAME = 'ELP RELATORIOS';
 
 /**
- * Caminhos públicos no Android onde o usuário consegue ver pelo "Meus Arquivos" ou "Galeria"
+ * Caminhos públicos no Android onde o usuário consegue ver pelo "Meus Arquivos" ou "Gerenciador de Arquivos"
  */
 const PUBLIC_ANDROID_DIRS = [
+  'file:///storage/emulated/0/DCIM/',
   'file:///storage/emulated/0/Pictures/',
   'file:///storage/emulated/0/Documents/',
   'file:///sdcard/Pictures/',
@@ -21,6 +23,7 @@ const PUBLIC_ANDROID_DIRS = [
 
 /**
  * Garante a criação da pasta principal 'ELP RELATORIOS' e a subpasta com o nome da respectiva Obra
+ * no armazenamento permanente do aplicativo.
  */
 export async function ensureObraDirectory(projectName?: string): Promise<string> {
   if (!docDir) return '';
@@ -34,7 +37,7 @@ export async function ensureObraDirectory(projectName?: string): Promise<string>
       await (FileSystem as any).makeDirectoryAsync(rootDir, { intermediates: true });
     }
   } catch (e) {
-    console.warn(`Erro ao criar pasta raiz ${ROOT_DIR_NAME}:`, e);
+    console.warn(`[imageService] Erro ao criar pasta raiz ${ROOT_DIR_NAME}:`, e);
   }
 
   // Sanitizar nome do projeto para evitar caracteres inválidos no sistema de arquivos
@@ -49,10 +52,75 @@ export async function ensureObraDirectory(projectName?: string): Promise<string>
       await (FileSystem as any).makeDirectoryAsync(obraDir, { intermediates: true });
     }
   } catch (e) {
-    console.warn(`Erro ao criar pasta da obra ${safeProject}:`, e);
+    console.warn(`[imageService] Erro ao criar pasta da obra ${safeProject}:`, e);
   }
 
   return obraDir;
+}
+
+/**
+ * Salva a foto diretamente na Galeria Nativa do dispositivo (Álbum / MediaStore),
+ * criando os Álbuns na Galeria do celular:
+ * 1) Álbum específico da Obra: 'ELP - <Nome da Obra>'
+ * 2) Álbum geral: 'ELP RELATORIOS'
+ * Isto garante que ao abrir a Galeria nativa (Samsung, Motorola, Xiaomi, etc.),
+ * as fotos aparecem organizadas na aba de Álbuns em suas respectivas pastas.
+ */
+export async function savePhotoToDeviceGallery(
+  photoUri: string,
+  projectName?: string
+): Promise<any> {
+  if (Platform.OS === 'web' || !photoUri) return null;
+
+  try {
+    // Solicita permissão para acessar e salvar na galeria do dispositivo
+    const permissions = await MediaLibrary.requestPermissionsAsync();
+    if (permissions.status !== 'granted') {
+      console.warn('[imageService] Permissão para salvar na galeria não concedida pelo usuário.');
+      return null;
+    }
+
+    // 1. Cria o asset no MediaStore do Android / Galeria Nativa
+    const asset = await MediaLibrary.createAssetAsync(photoUri);
+    if (!asset) return null;
+
+    const safeProject = (projectName || 'Obra Geral')
+      .replace(/[\/\\?%*:|"<>]/g, '_')
+      .trim() || 'Obra Geral';
+
+    const obraAlbumName = safeProject !== 'Obra Geral' ? `ELP - ${safeProject}` : 'ELP RELATORIOS';
+
+    // 2. Adiciona ao álbum da Obra na Galeria
+    try {
+      let obraAlbum = await MediaLibrary.getAlbumAsync(obraAlbumName);
+      if (!obraAlbum) {
+        obraAlbum = await MediaLibrary.createAlbumAsync(obraAlbumName, asset, false);
+      } else {
+        await MediaLibrary.addAssetsToAlbumAsync([asset], obraAlbum, false);
+      }
+    } catch (albumErr) {
+      console.warn(`[imageService] Erro ao vincular foto ao álbum ${obraAlbumName}:`, albumErr);
+    }
+
+    // 3. Garante também presença no álbum principal 'ELP RELATORIOS'
+    if (obraAlbumName !== 'ELP RELATORIOS') {
+      try {
+        let generalAlbum = await MediaLibrary.getAlbumAsync('ELP RELATORIOS');
+        if (!generalAlbum) {
+          await MediaLibrary.createAlbumAsync('ELP RELATORIOS', asset, false);
+        } else {
+          await MediaLibrary.addAssetsToAlbumAsync([asset], generalAlbum, false);
+        }
+      } catch (genErr) {
+        console.warn('[imageService] Erro ao vincular foto ao álbum geral ELP RELATORIOS:', genErr);
+      }
+    }
+
+    return asset;
+  } catch (err) {
+    console.error('[imageService] Erro ao salvar foto no álbum da galeria:', err);
+    return null;
+  }
 }
 
 /**
@@ -82,7 +150,7 @@ export async function mirrorToPublicFolder(sourceUri: string, projectName?: stri
       // Se copiou com sucesso em um dos diretórios públicos, conclui
       break;
     } catch (e) {
-      // Ignora silenciosamente e tenta o próximo caminho
+      // Tenta o próximo diretório público
     }
   }
 }
@@ -139,8 +207,15 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
             from: asset.uri,
             to: permanentUri,
           });
-          // Espelha para a pasta pública acessível pelo app Meus Arquivos / Galeria do celular
+
+          // 1. Salva imediatamente no Álbum da Galeria Nativa do Dispositivo (com pasta da obra)
+          savePhotoToDeviceGallery(permanentUri, projectName).catch(galleryErr => {
+            console.warn('[imageService] Erro em segundo plano ao salvar na galeria:', galleryErr);
+          });
+
+          // 2. Espelha para as pastas públicas do sistema de arquivos
           mirrorToPublicFolder(permanentUri, projectName, filename).catch(() => {});
+
           return {
             uri: permanentUri,
             base64: asset.base64 || undefined,
@@ -149,6 +224,9 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
           console.warn('Fallback para cache uri:', copyErr);
         }
       }
+
+      // Se não conseguiu salvar no diretório permanente, tenta salvar o original na galeria
+      savePhotoToDeviceGallery(asset.uri, projectName).catch(() => {});
 
       return {
         uri: asset.uri,
@@ -192,8 +270,11 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
             from: asset.uri,
             to: permanentUri,
           });
-          // Espelha para a pasta pública acessível pelo app Meus Arquivos / Galeria do celular
+
+          // Salva no Álbum da Galeria se for nova foto importada para a obra
+          savePhotoToDeviceGallery(permanentUri, projectName).catch(() => {});
           mirrorToPublicFolder(permanentUri, projectName, filename).catch(() => {});
+
           return {
             uri: permanentUri,
             base64: asset.base64 || undefined,

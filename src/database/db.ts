@@ -240,7 +240,14 @@ export async function updateLocalRelatorioStatus(
   );
 }
 
+export async function deleteLocalRelatorio(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM fotos_relatorio WHERE relatorio_id = ?', [id]);
+  await db.runAsync('DELETE FROM relatorios WHERE id = ?', [id]);
+}
+
 // ================= FOTOS =================
+
 export async function getLocalFotos(relatorioId: number): Promise<FotoRelatorio[]> {
   const db = await getDatabase();
   return await db.getAllAsync<FotoRelatorio>(

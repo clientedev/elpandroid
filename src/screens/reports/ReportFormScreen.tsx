@@ -15,6 +15,8 @@ import {
 import { takePhoto, pickImage } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
+import { apiClient } from '../../services/api';
+
 import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
@@ -73,6 +75,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const initializedDraftRef = React.useRef(false);
 
   useEffect(() => {
     getLocalProjetos().then(p => {
@@ -83,6 +86,83 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     });
     getLocalLegendas().then(l => setLegendas(l));
   }, [preSelectedProjectId, initialReportId]);
+
+  // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
+  // Se estiver ONLINE, o número oficial é reservado e atribuído pelo servidor na hora!
+  useEffect(() => {
+    if (!initialReportId && selectedProjectId && !initializedDraftRef.current) {
+      initializedDraftRef.current = true;
+      initImmediateDraft(selectedProjectId);
+    }
+  }, [selectedProjectId, initialReportId]);
+
+  async function initImmediateDraft(projId: number) {
+    try {
+      const selectedProj = projetos.find(p => p.id === projId);
+      const draftId = currentReportId;
+      const initialUuid = reportUuid;
+      const creationDate = new Date().toISOString();
+
+      let assignedNumero = 'Pendente Sincronização';
+      let syncStatus: 'synced' | 'pending' = 'pending';
+
+      // 1. Se estiver ONLINE ao começar, já busca o número oficial no servidor
+      if (isOnline) {
+        try {
+          const res = await apiClient.axios.post('/api/relatorios', {
+            uuid: initialUuid,
+            uuid_local: initialUuid,
+            projeto_id: projId,
+            titulo: titulo || 'Relatório de Vistoria Técnica',
+            status: 'em_andamento',
+            data_criacao_local: creationDate,
+          }, { timeout: 7000 });
+
+          if (res?.data?.numero) {
+            assignedNumero = res.data.numero;
+            syncStatus = 'synced';
+            setReportNumber(assignedNumero);
+          }
+        } catch (netErr) {
+          console.warn('[ReportForm] Criação online indisponível, iniciando rascunho offline:', netErr);
+        }
+      }
+
+      // 2. Salva o rascunho imediatamente no SQLite local
+      const draftObj: Relatorio = {
+        id: draftId,
+        uuid: initialUuid,
+        uuid_local: initialUuid,
+        numero: assignedNumero,
+        titulo: titulo || 'Relatório de Vistoria Técnica',
+        projeto_id: projId,
+        projeto_nome: selectedProj?.nome || 'Obra',
+        visita_id: preSelectedVisitId || null,
+        autor_id: user?.id || 1,
+        autor_nome: user?.username || 'Responsável',
+        data_relatorio: creationDate,
+        data_criacao_local: creationDate,
+        descricao: '',
+        observacoes_finais: '',
+        checklist_data: JSON.stringify(checklist),
+        categoria: categoria,
+        local: local,
+        status: 'em_andamento',
+        sync_status: syncStatus,
+      };
+
+      await saveLocalRelatorio(draftObj, syncStatus);
+
+      if (syncStatus === 'pending') {
+        await addToSyncQueue('relatorio', draftId, 'create', '/api/relatorios', 'POST', draftObj);
+      }
+
+      const d = new Date();
+      setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (e) {
+      console.warn('Erro ao inicializar rascunho imediato:', e);
+    }
+  }
 
   // Load existing draft if editing
   useEffect(() => {
@@ -655,10 +735,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           </View>
         </View>
 
-        {/* Standardized Action Buttons: Submission on Left, Draft/Save on Right */}
+        {/* Botão de Ação: Enviar para Aprovação */}
         <View style={styles.bottomButtonsRow}>
           <TouchableOpacity 
-            style={[styles.btnActionSubmit, loading && styles.btnDisabled]} 
+            style={[styles.btnActionSubmit, { flex: 1, height: 50, borderRadius: 10 }, loading && styles.btnDisabled]} 
             onPress={() => handleSaveReport('Aguardando Aprovação')}
             disabled={loading}
           >
@@ -666,21 +746,21 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <>
-                <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
-                <Text style={styles.btnActionSubmitText}>Enviar para Aprovação</Text>
+                <Ionicons name="paper-plane" size={20} color="#FFFFFF" />
+                <Text style={[styles.btnActionSubmitText, { fontSize: 15, fontWeight: '700' }]}>
+                  Finalizar e Enviar para Aprovação
+                </Text>
               </>
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={[styles.btnActionDraft, loading && styles.btnDisabled]} 
-            onPress={() => handleSaveReport('em_andamento')}
-            disabled={loading}
-          >
-            <Ionicons name="save-outline" size={18} color={Colors.text} />
-            <Text style={styles.btnActionDraftText}>Salvar Rascunho</Text>
-          </TouchableOpacity>
         </View>
+
+        <View style={{ alignItems: 'center', marginTop: 10, paddingHorizontal: 16 }}>
+          <Text style={{ fontSize: 12, color: Colors.textMuted, textAlign: 'center' }}>
+            ✓ Rascunho salvo continuamente no dispositivo. Você pode retornar à tela anterior a qualquer momento sem perder seus dados.
+          </Text>
+        </View>
+
 
         <View style={{ height: 40 }} />
       </ScrollView>

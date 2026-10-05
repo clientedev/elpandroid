@@ -2,7 +2,7 @@
   "expo": {
     "name": "ELP",
     "slug": "elp-android",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.obraflow.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png"
@@ -30,6 +30,8 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "INTERNET",
@@ -41,7 +43,14 @@
       "expo-sqlite",
       "expo-sharing",
       "expo-secure-store",
-      "expo-updates"
+      "expo-updates",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Permitir que o ELP salve as fotos das vistorias e relatórios no álbum da sua galeria.",
+          "savePhotosPermission": "Permitir que o ELP salve as fotos das vistorias e relatórios no álbum da sua galeria."
+        }
+      ]
     ]
   }
 }

@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.6',
-        'versionCode': 7,
+        'version': '1.0.7',
+        'versionCode': 8,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.6: Numeração sequencial atômica de relatórios (REL-XXXX) emitida com exclusividade pelo servidor sem risco de duplicação entre múltiplos usuários offline; idempotência e auditoria completa por UUID imutável; barra de abas inferior elevada para não sobrepor botões nativos do celular; sincronização contínua automática sem necessidade de clique; espelhamento de fotos em pastas públicas do celular (Pictures/ELP RELATORIOS); matriz de acesso RBAC revisada.',
+        'notes': 'Atualização 1.0.7: Salvamento automático de fotos na Galeria nativa do dispositivo com criação de álbuns dedicados por Obra ("ELP - Nome da Obra") e álbum geral ("ELP RELATORIOS"); criação instantânea de rascunho ao iniciar relatório (sem botão manual); atribuição imediata do número oficial (REL-XXXX) quando online; exibição de "Pendente Sincronização" exclusivamente quando offline; exclusão restrita a usuários Master e Administradores; editor de fotos com setas, formas e textos arrastáveis e dimensionáveis com o dedo; dashboard personalizável com modo de edição para reordenar blocos livremente.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12879,14 +12879,35 @@ def api_serve_foto_binary(foto_id):
         current_app.logger.error(f"Erro ao servir foto API: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/relatorios/<int:relatorio_id>', methods=['GET', 'PUT', 'POST'])
+@app.route('/api/relatorios/<int:relatorio_id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
 @csrf.exempt
 def api_relatorio_detail_sync(relatorio_id):
-    """Atualizacao e consulta de relatorio existente via API mobile"""
+    """Atualizacao, exclusao e consulta de relatorio existente via API mobile (exclusao restrita a Master/Admin)"""
     try:
         relatorio = Relatorio.query.get(relatorio_id)
         if not relatorio:
-            return jsonify({'success': False, 'error': 'Relatório nao encontrado'}), 404
+            return jsonify({'success': False, 'error': 'Relatório não encontrado'}), 404
+
+        if request.method == 'DELETE':
+            data = request.get_json(silent=True) or request.form or {}
+            user = _resolve_mobile_user(data)
+            # Regra estrita: apenas Master ou Admin (que possui autoridade máxima) pode excluir
+            is_master = bool(
+                (user and (getattr(user, 'is_master', False) or user.username.lower() == 'admin')) or
+                (current_user.is_authenticated and (getattr(current_user, 'is_master', False) or current_user.username.lower() == 'admin'))
+            )
+            if not is_master:
+                current_app.logger.warning(f"Tentativa negada de exclusao do relatorio {relatorio_id} por usuario sem privilégio Master")
+                return jsonify({
+                    'success': False, 
+                    'error': 'Ação negada: A exclusão de relatórios é permitida exclusivamente para o perfil Master ou Administrador.'
+                }), 403
+
+            FotoRelatorio.query.filter_by(relatorio_id=relatorio.id).delete()
+            db.session.delete(relatorio)
+            db.session.commit()
+            current_app.logger.info(f"🗑️ Relatório {relatorio.numero} (ID {relatorio_id}) excluído com sucesso por usuário Master/Admin")
+            return jsonify({'success': True, 'message': 'Relatório excluído com sucesso'}), 200
 
         if request.method in ['PUT', 'POST']:
             data = request.get_json(silent=True) or request.form or {}
@@ -12899,6 +12920,7 @@ def api_relatorio_detail_sync(relatorio_id):
 
             db.session.commit()
             return jsonify({'success': True, 'id': relatorio.id, 'status': relatorio.status}), 200
+
 
         base_app_url = 'https://elpandroid-production.up.railway.app'
         fotos_db = FotoRelatorio.query.filter_by(relatorio_id=relatorio.id).order_by(FotoRelatorio.ordem).all()

@@ -31,6 +31,30 @@ export interface DashboardWidgetsConfig {
   showProximasVisitas: boolean;
 }
 
+export type DashboardSectionId = 'hero' | 'badges' | 'approverAlert' | 'stats' | 'quickActions' | 'recentReports' | 'upcomingVisits';
+
+const DEFAULT_SECTIONS_ORDER: DashboardSectionId[] = [
+  'hero',
+  'badges',
+  'approverAlert',
+  'stats',
+  'quickActions',
+  'recentReports',
+  'upcomingVisits'
+];
+
+const SECTION_METAS: Record<DashboardSectionId, { title: string; icon: keyof typeof Ionicons.glyphMap; desc: string }> = {
+  hero: { title: 'Logo & Banner Principal', icon: 'image-outline', desc: 'Identidade visual da ELP' },
+  badges: { title: 'Identificação do Usuário', icon: 'person-circle-outline', desc: 'Nome e empresa do engenheiro' },
+  approverAlert: { title: 'Aviso de Aprovações', icon: 'alert-circle-outline', desc: 'Card para engenheiros aprovadores' },
+  stats: { title: 'Painel de Indicadores', icon: 'grid-outline', desc: 'Contadores de obras e relatórios' },
+  quickActions: { title: 'Ações Rápidas no Canteiro', icon: 'flash-outline', desc: 'Novo Relatório, Obra, Visita' },
+  recentReports: { title: 'Relatórios Recentes', icon: 'document-text-outline', desc: 'Lista dos relatórios mais recentes' },
+  upcomingVisits: { title: 'Próximas Visitas', icon: 'calendar-outline', desc: 'Agenda de vistorias' },
+};
+
+const SECTIONS_ORDER_KEY = '@elp_dashboard_sections_order_v2';
+
 const DEFAULT_CONFIG: DashboardWidgetsConfig = {
   showHero: true,
   showBadges: true,
@@ -52,15 +76,23 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [widgetsConfig, setWidgetsConfig] = useState<DashboardWidgetsConfig>(DEFAULT_CONFIG);
+  const [sectionsOrder, setSectionsOrder] = useState<DashboardSectionId[]>(DEFAULT_SECTIONS_ORDER);
   const [showConfigModal, setShowConfigModal] = useState(false);
 
-  // Load custom user widgets configuration
+  // Load custom user widgets configuration and section order
   useEffect(() => {
     (async () => {
       try {
         const saved = await AsyncStorage.getItem(WIDGETS_CONFIG_KEY);
         if (saved) {
           setWidgetsConfig({ ...DEFAULT_CONFIG, ...JSON.parse(saved) });
+        }
+        const savedOrder = await AsyncStorage.getItem(SECTIONS_ORDER_KEY);
+        if (savedOrder) {
+          const parsed = JSON.parse(savedOrder);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSectionsOrder(parsed);
+          }
         }
       } catch (err) {
         console.warn('Erro ao carregar configuracoes do dashboard:', err);
@@ -78,12 +110,35 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     }
   }
 
+  function moveSectionUp(index: number) {
+    if (index <= 0) return;
+    const newOrder = [...sectionsOrder];
+    const temp = newOrder[index - 1];
+    newOrder[index - 1] = newOrder[index];
+    newOrder[index] = temp;
+    setSectionsOrder(newOrder);
+    AsyncStorage.setItem(SECTIONS_ORDER_KEY, JSON.stringify(newOrder)).catch(() => {});
+  }
+
+  function moveSectionDown(index: number) {
+    if (index >= sectionsOrder.length - 1) return;
+    const newOrder = [...sectionsOrder];
+    const temp = newOrder[index + 1];
+    newOrder[index + 1] = newOrder[index];
+    newOrder[index] = temp;
+    setSectionsOrder(newOrder);
+    AsyncStorage.setItem(SECTIONS_ORDER_KEY, JSON.stringify(newOrder)).catch(() => {});
+  }
+
   async function resetWidgetConfig() {
     setWidgetsConfig(DEFAULT_CONFIG);
+    setSectionsOrder(DEFAULT_SECTIONS_ORDER);
     try {
       await AsyncStorage.removeItem(WIDGETS_CONFIG_KEY);
+      await AsyncStorage.removeItem(SECTIONS_ORDER_KEY);
     } catch {}
   }
+
 
   const loadData = useCallback(async () => {
     try {
@@ -174,49 +229,14 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const isApprover = Boolean(user?.is_master || (user as any)?.is_aprovador || user?.is_aprovador_express);
 
-  return (
-    <View style={styles.container}>
-      {/* Top Header matching Web System */}
-      <Header 
-        title="Dashboard ELP" 
-        subtitle="Acompanhamento de Obras & Vistorias"
-        rightAction={
-          <View style={styles.headerActionsRow}>
-            <TouchableOpacity 
-              style={styles.headerBtn} 
-              onPress={() => setShowConfigModal(true)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="options-outline" size={20} color="#334155" />
-            </TouchableOpacity>
+  const [modalTab, setModalTab] = useState<'order' | 'visibility'>('order');
 
-            <TouchableOpacity 
-              style={[styles.headerBtn, styles.headerSyncBtn]} 
-              onPress={async () => {
-                const res = await triggerSync();
-                Alert.alert(res.success ? 'Sincronização Concluída' : 'Aviso', res.message);
-                await loadData();
-              }}
-              disabled={syncState === 'syncing'}
-            >
-              <Ionicons 
-                name={syncState === 'syncing' ? "sync" : "cloud-done-outline"} 
-                size={20} 
-                color={Colors.primary} 
-              />
-            </TouchableOpacity>
-          </View>
-        }
-      />
-      <OfflineBanner />
-
-      <ScrollView 
-        contentContainerStyle={styles.scroll}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
-      >
-        {/* 1. HERO SECTION WITH LOGO */}
-        {widgetsConfig.showHero && (
-          <View style={styles.heroCard}>
+  function renderDashboardSection(sectionId: DashboardSectionId) {
+    switch (sectionId) {
+      case 'hero':
+        if (!widgetsConfig.showHero) return null;
+        return (
+          <View key="hero" style={styles.heroCard}>
             <View style={styles.heroLeft}>
               <Image 
                 source={require('../../../assets/logo.png')} 
@@ -237,11 +257,12 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               <Text style={styles.customizeShortcutText}>Editar</Text>
             </TouchableOpacity>
           </View>
-        )}
+        );
 
-        {/* 2. USER AND COMPANY BADGES BAR */}
-        {widgetsConfig.showBadges && (
-          <View style={styles.userBadgeBar}>
+      case 'badges':
+        if (!widgetsConfig.showBadges) return null;
+        return (
+          <View key="badges" style={styles.userBadgeBar}>
             <View style={styles.badgePrimary}>
               <Ionicons name="person" size={14} color="#FFFFFF" />
               <Text style={styles.badgeTextWhite} numberOfLines={1}>
@@ -255,11 +276,13 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               </Text>
             </View>
           </View>
-        )}
+        );
 
-        {/* Approver Alert Box (Strict RBAC integration) */}
-        {isApprover && relatoriosPendentes > 0 && (
+      case 'approverAlert':
+        if (!isApprover || relatoriosPendentes === 0) return null;
+        return (
           <TouchableOpacity 
+            key="approverAlert"
             style={styles.approverAlertBanner}
             onPress={() => navigation.navigate('PendentesTab')}
             activeOpacity={0.8}
@@ -275,86 +298,88 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
             </View>
             <Ionicons name="chevron-forward" size={18} color="#D97706" />
           </TouchableOpacity>
-        )}
+        );
 
-        {/* Section Title */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="trending-up" size={20} color="#4E73DF" />
-            <Text style={styles.sectionTitle}>Dashboard</Text>
+      case 'stats':
+        const showAnyStat = widgetsConfig.showObrasAtivas || widgetsConfig.showRelatoriosPendentes || widgetsConfig.showVisitasAgendadas || widgetsConfig.showRelatoriosRascunho;
+        if (!showAnyStat) return null;
+        return (
+          <View key="stats">
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="trending-up" size={20} color="#4E73DF" />
+                <Text style={styles.sectionTitle}>Dashboard</Text>
+              </View>
+              <View style={styles.onlinePill}>
+                <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+                <Text style={styles.onlinePillText}>{isOnline ? 'Online (Railway)' : 'Offline (Local)'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.cardsGrid}>
+              {widgetsConfig.showObrasAtivas && (
+                <TouchableOpacity 
+                  style={[styles.webCard, styles.borderPrimary]} 
+                  onPress={() => navigation.navigate('ObrasTab')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardContent}>
+                    <Text style={[styles.cardLabel, { color: '#4E73DF' }]}>🏗️ OBRAS ATIVAS</Text>
+                    <Text style={styles.cardValue}>{obrasAtivas}</Text>
+                  </View>
+                  <Ionicons name="business" size={38} color="#CBD5E1" />
+                </TouchableOpacity>
+              )}
+
+              {widgetsConfig.showRelatoriosPendentes && (
+                <TouchableOpacity 
+                  style={[styles.webCard, styles.borderInfo]} 
+                  onPress={() => navigation.navigate('PendentesTab')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardContent}>
+                    <Text style={[styles.cardLabel, { color: '#0891B2' }]}>📋 RELATÓRIOS PENDENTES</Text>
+                    <Text style={styles.cardValue}>{relatoriosPendentes}</Text>
+                  </View>
+                  <Ionicons name="clipboard" size={38} color="#CBD5E1" />
+                </TouchableOpacity>
+              )}
+
+              {widgetsConfig.showVisitasAgendadas && (
+                <TouchableOpacity 
+                  style={[styles.webCard, styles.borderSuccess]} 
+                  onPress={() => navigation.navigate('VisitasTab')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardContent}>
+                    <Text style={[styles.cardLabel, { color: '#059669' }]}>🗓️ VISITAS AGENDADAS</Text>
+                    <Text style={styles.cardValue}>{visitasAgendadas}</Text>
+                  </View>
+                  <Ionicons name="calendar" size={38} color="#CBD5E1" />
+                </TouchableOpacity>
+              )}
+
+              {widgetsConfig.showRelatoriosRascunho && (
+                <TouchableOpacity 
+                  style={[styles.webCard, styles.borderWarning]} 
+                  onPress={() => navigation.navigate('PendentesTab')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardContent}>
+                    <Text style={[styles.cardLabel, { color: '#D97706' }]}>📝 EM RASCUNHO</Text>
+                    <Text style={styles.cardValue}>{relatoriosRascunho}</Text>
+                  </View>
+                  <Ionicons name="document-text" size={38} color="#CBD5E1" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <View style={styles.onlinePill}>
-            <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-            <Text style={styles.onlinePillText}>{isOnline ? 'Online (Railway)' : 'Offline (Local)'}</Text>
-          </View>
-        </View>
+        );
 
-        {/* 4 Cards strictly matching Web dashboard_simple.html */}
-        <View style={styles.cardsGrid}>
-          {/* Card 1: Obras Ativas (#4e73df) */}
-          {widgetsConfig.showObrasAtivas && (
-            <TouchableOpacity 
-              style={[styles.webCard, styles.borderPrimary]} 
-              onPress={() => navigation.navigate('ObrasTab')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardLabel, { color: '#4E73DF' }]}>🏗️ OBRAS ATIVAS</Text>
-                <Text style={styles.cardValue}>{obrasAtivas}</Text>
-              </View>
-              <Ionicons name="business" size={38} color="#CBD5E1" />
-            </TouchableOpacity>
-          )}
-
-          {/* Card 2: Relatórios Pendentes (#36b9cc) */}
-          {widgetsConfig.showRelatoriosPendentes && (
-            <TouchableOpacity 
-              style={[styles.webCard, styles.borderInfo]} 
-              onPress={() => navigation.navigate('PendentesTab')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardLabel, { color: '#0891B2' }]}>📋 RELATÓRIOS PENDENTES</Text>
-                <Text style={styles.cardValue}>{relatoriosPendentes}</Text>
-              </View>
-              <Ionicons name="clipboard" size={38} color="#CBD5E1" />
-            </TouchableOpacity>
-          )}
-
-          {/* Card 3: Visitas Agendadas (#1cc88a) */}
-          {widgetsConfig.showVisitasAgendadas && (
-            <TouchableOpacity 
-              style={[styles.webCard, styles.borderSuccess]} 
-              onPress={() => navigation.navigate('VisitasTab')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardLabel, { color: '#059669' }]}>🗓️ VISITAS AGENDADAS</Text>
-                <Text style={styles.cardValue}>{visitasAgendadas}</Text>
-              </View>
-              <Ionicons name="calendar" size={38} color="#CBD5E1" />
-            </TouchableOpacity>
-          )}
-
-          {/* Card 4: Relatórios em Rascunho (#f6c23e) */}
-          {widgetsConfig.showRelatoriosRascunho && (
-            <TouchableOpacity 
-              style={[styles.webCard, styles.borderWarning]} 
-              onPress={() => navigation.navigate('PendentesTab')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <Text style={[styles.cardLabel, { color: '#D97706' }]}>📝 EM RASCUNHO</Text>
-                <Text style={styles.cardValue}>{relatoriosRascunho}</Text>
-              </View>
-              <Ionicons name="document-text" size={38} color="#CBD5E1" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Quick Actions Grid */}
-        {widgetsConfig.showAcoesRapidas && (
-          <>
+      case 'quickActions':
+        if (!widgetsConfig.showAcoesRapidas) return null;
+        return (
+          <View key="quickActions">
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
                 <Ionicons name="flash-outline" size={18} color="#2563EB" />
@@ -403,12 +428,13 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <Text style={styles.actionBtnSub}>Novo Projeto</Text>
               </TouchableOpacity>
             </View>
-          </>
-        )}
+          </View>
+        );
 
-        {/* Recent Relatórios Section */}
-        {widgetsConfig.showRelatoriosRecentes && (
-          <>
+      case 'recentReports':
+        if (!widgetsConfig.showRelatoriosRecentes) return null;
+        return (
+          <View key="recentReports">
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
                 <Ionicons name="document-text-outline" size={18} color={Colors.text} />
@@ -486,12 +512,13 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 );
               })
             )}
-          </>
-        )}
+          </View>
+        );
 
-        {/* Recent Visitas Section */}
-        {widgetsConfig.showProximasVisitas && (
-          <>
+      case 'upcomingVisits':
+        if (!widgetsConfig.showProximasVisitas) return null;
+        return (
+          <View key="upcomingVisits">
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
                 <Ionicons name="calendar-outline" size={18} color={Colors.text} />
@@ -535,13 +562,61 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 </TouchableOpacity>
               ))
             )}
-          </>
-        )}
+          </View>
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Top Header matching Web System */}
+      <Header 
+        title="Dashboard ELP" 
+        subtitle="Acompanhamento de Obras & Vistorias"
+        rightAction={
+          <View style={styles.headerActionsRow}>
+            <TouchableOpacity 
+              style={styles.headerBtn} 
+              onPress={() => setShowConfigModal(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="options-outline" size={20} color="#334155" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.headerBtn, styles.headerSyncBtn]} 
+              onPress={async () => {
+                const res = await triggerSync();
+                Alert.alert(res.success ? 'Sincronização Concluída' : 'Aviso', res.message);
+                await loadData();
+              }}
+              disabled={syncState === 'syncing'}
+            >
+              <Ionicons 
+                name={syncState === 'syncing' ? "sync" : "cloud-done-outline"} 
+                size={20} 
+                color={Colors.primary} 
+              />
+            </TouchableOpacity>
+          </View>
+        }
+      />
+      <OfflineBanner />
+
+      <ScrollView 
+        contentContainerStyle={styles.scroll}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+      >
+        {/* Renderiza as seções seguindo rigorosamente a ordem escolhida pelo usuário */}
+        {sectionsOrder.map(secId => renderDashboardSection(secId))}
 
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* MODAL: PERSONALIZAR TELA INICIAL (DASHBOARD) */}
+      {/* MODAL: PERSONALIZAR TELA INICIAL (DASHBOARD) COM REORDENAÇÃO */}
       <Modal visible={showConfigModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -555,127 +630,223 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.modalSubtitle}>
-              Selecione quais seções e indicadores deseja exibir ou ocultar no início do aplicativo.
-            </Text>
+            {/* Abas do Modal: Organizar Ordem vs Exibir/Ocultar */}
+            <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 8, padding: 3, marginBottom: 12 }}>
+              <TouchableOpacity 
+                style={[
+                  { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 },
+                  modalTab === 'order' && { backgroundColor: '#FFFFFF', elevation: 2 }
+                ]}
+                onPress={() => setModalTab('order')}
+              >
+                <Ionicons name="reorder-four" size={16} color={modalTab === 'order' ? Colors.primary : '#64748B'} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: modalTab === 'order' ? Colors.primary : '#64748B' }}>
+                  Organizar Ordem
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[
+                  { flex: 1, paddingVertical: 8, borderRadius: 6, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 4 },
+                  modalTab === 'visibility' && { backgroundColor: '#FFFFFF', elevation: 2 }
+                ]}
+                onPress={() => setModalTab('visibility')}
+              >
+                <Ionicons name="eye-outline" size={16} color={modalTab === 'visibility' ? Colors.primary : '#64748B'} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: modalTab === 'visibility' ? Colors.primary : '#64748B' }}>
+                  Exibir / Ocultar
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <ScrollView style={styles.modalScroll}>
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>Logo & Identidade Visual (Hero)</Text>
-                  <Text style={styles.toggleDesc}>Banner superior com logo da ELP e slogan</Text>
-                </View>
-                <Switch
-                  value={widgetsConfig.showHero}
-                  onValueChange={v => updateWidgetConfig('showHero', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showHero ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+              {modalTab === 'order' ? (
+                <View style={{ gap: 8 }}>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 6 }}>
+                    Toque nas setas ▲ e ▼ para reposicionar onde quer que cada seção apareça na tela inicial:
+                  </Text>
+                  {sectionsOrder.map((secId, index) => {
+                    const meta = SECTION_METAS[secId];
+                    if (!meta) return null;
+                    return (
+                      <View 
+                        key={secId} 
+                        style={{ 
+                          flexDirection: 'row', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 8,
+                          padding: 10,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0'
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                          <View style={{ 
+                            width: 24, 
+                            height: 24, 
+                            borderRadius: 12, 
+                            backgroundColor: '#E0E7FF', 
+                            alignItems: 'center', 
+                            justifyContent: 'center' 
+                          }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#3730A3' }}>{index + 1}º</Text>
+                          </View>
+                          <Ionicons name={meta.icon} size={18} color="#2563EB" />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B' }}>{meta.title}</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B' }} numberOfLines={1}>{meta.desc}</Text>
+                          </View>
+                        </View>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>Badges de Usuário / Empresa</Text>
-                  <Text style={styles.toggleDesc}>Identificação do engenheiro e consultoria</Text>
-                </View>
-                <Switch
-                  value={widgetsConfig.showBadges}
-                  onValueChange={v => updateWidgetConfig('showBadges', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showBadges ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+                        <View style={{ flexDirection: 'row', gap: 4 }}>
+                          <TouchableOpacity 
+                            style={[
+                              { backgroundColor: '#E2E8F0', padding: 6, borderRadius: 6 },
+                              index === 0 && { opacity: 0.3 }
+                            ]}
+                            onPress={() => moveSectionUp(index)}
+                            disabled={index === 0}
+                          >
+                            <Ionicons name="arrow-up" size={16} color="#0F172A" />
+                          </TouchableOpacity>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>🏗️ Card: Obras Ativas</Text>
-                  <Text style={styles.toggleDesc}>Contador de empreendimentos ativos</Text>
+                          <TouchableOpacity 
+                            style={[
+                              { backgroundColor: '#E2E8F0', padding: 6, borderRadius: 6 },
+                              index === sectionsOrder.length - 1 && { opacity: 0.3 }
+                            ]}
+                            onPress={() => moveSectionDown(index)}
+                            disabled={index === sectionsOrder.length - 1}
+                          >
+                            <Ionicons name="arrow-down" size={16} color="#0F172A" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
-                <Switch
-                  value={widgetsConfig.showObrasAtivas}
-                  onValueChange={v => updateWidgetConfig('showObrasAtivas', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showObrasAtivas ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+              ) : (
+                <View>
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>Logo & Identidade Visual (Hero)</Text>
+                      <Text style={styles.toggleDesc}>Banner superior com logo da ELP e slogan</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showHero}
+                      onValueChange={v => updateWidgetConfig('showHero', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showHero ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>📋 Card: Relatórios Pendentes</Text>
-                  <Text style={styles.toggleDesc}>Vistorias aguardando aprovação técnica</Text>
-                </View>
-                <Switch
-                  value={widgetsConfig.showRelatoriosPendentes}
-                  onValueChange={v => updateWidgetConfig('showRelatoriosPendentes', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showRelatoriosPendentes ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>Badges de Usuário / Empresa</Text>
+                      <Text style={styles.toggleDesc}>Identificação do engenheiro e consultoria</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showBadges}
+                      onValueChange={v => updateWidgetConfig('showBadges', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showBadges ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>🗓️ Card: Visitas Agendadas</Text>
-                  <Text style={styles.toggleDesc}>Agendamentos futuros na agenda</Text>
-                </View>
-                <Switch
-                  value={widgetsConfig.showVisitasAgendadas}
-                  onValueChange={v => updateWidgetConfig('showVisitasAgendadas', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showVisitasAgendadas ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>🏗️ Card: Obras Ativas</Text>
+                      <Text style={styles.toggleDesc}>Contador de empreendimentos ativos</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showObrasAtivas}
+                      onValueChange={v => updateWidgetConfig('showObrasAtivas', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showObrasAtivas ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>📝 Card: Em Rascunho</Text>
-                  <Text style={styles.toggleDesc}>Relatórios em preenchimento local</Text>
-                </View>
-                <Switch
-                  value={widgetsConfig.showRelatoriosRascunho}
-                  onValueChange={v => updateWidgetConfig('showRelatoriosRascunho', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showRelatoriosRascunho ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>📋 Card: Relatórios Pendentes</Text>
+                      <Text style={styles.toggleDesc}>Vistorias aguardando aprovação técnica</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showRelatoriosPendentes}
+                      onValueChange={v => updateWidgetConfig('showRelatoriosPendentes', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showRelatoriosPendentes ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>⚡ Ações Rápidas no Canteiro</Text>
-                  <Text style={styles.toggleDesc}>Botões de Novo Relatório, Express, Visita, Obra</Text>
-                </View>
-                <Switch
-                  value={widgetsConfig.showAcoesRapidas}
-                  onValueChange={v => updateWidgetConfig('showAcoesRapidas', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showAcoesRapidas ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>🗓️ Card: Visitas Agendadas</Text>
+                      <Text style={styles.toggleDesc}>Agendamentos futuros na agenda</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showVisitasAgendadas}
+                      onValueChange={v => updateWidgetConfig('showVisitasAgendadas', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showVisitasAgendadas ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>📄 Relatórios Recentes</Text>
-                  <Text style={styles.toggleDesc}>Lista resumida dos últimos relatórios</Text>
-                </View>
-                <Switch
-                  value={widgetsConfig.showRelatoriosRecentes}
-                  onValueChange={v => updateWidgetConfig('showRelatoriosRecentes', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showRelatoriosRecentes ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>📝 Card: Em Rascunho</Text>
+                      <Text style={styles.toggleDesc}>Relatórios em preenchimento local</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showRelatoriosRascunho}
+                      onValueChange={v => updateWidgetConfig('showRelatoriosRascunho', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showRelatoriosRascunho ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
 
-              <View style={styles.toggleRow}>
-                <View style={styles.toggleLabelBox}>
-                  <Text style={styles.toggleTitle}>📅 Próximas Visitas</Text>
-                  <Text style={styles.toggleDesc}>Lista com as próximas vistorias agendadas</Text>
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>⚡ Ações Rápidas no Canteiro</Text>
+                      <Text style={styles.toggleDesc}>Botões de Novo Relatório, Express, Visita, Obra</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showAcoesRapidas}
+                      onValueChange={v => updateWidgetConfig('showAcoesRapidas', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showAcoesRapidas ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
+
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>📄 Relatórios Recentes</Text>
+                      <Text style={styles.toggleDesc}>Lista resumida dos últimos relatórios</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showRelatoriosRecentes}
+                      onValueChange={v => updateWidgetConfig('showRelatoriosRecentes', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showRelatoriosRecentes ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
+
+                  <View style={styles.toggleRow}>
+                    <View style={styles.toggleLabelBox}>
+                      <Text style={styles.toggleTitle}>📅 Próximas Visitas</Text>
+                      <Text style={styles.toggleDesc}>Lista com as próximas vistorias agendadas</Text>
+                    </View>
+                    <Switch
+                      value={widgetsConfig.showProximasVisitas}
+                      onValueChange={v => updateWidgetConfig('showProximasVisitas', v)}
+                      trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                      thumbColor={widgetsConfig.showProximasVisitas ? '#2563EB' : '#F1F5F9'}
+                    />
+                  </View>
                 </View>
-                <Switch
-                  value={widgetsConfig.showProximasVisitas}
-                  onValueChange={v => updateWidgetConfig('showProximasVisitas', v)}
-                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
-                  thumbColor={widgetsConfig.showProximasVisitas ? '#2563EB' : '#F1F5F9'}
-                />
-              </View>
+              )}
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -689,6 +860,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
         </View>
       </Modal>
+
     </View>
   );
 };

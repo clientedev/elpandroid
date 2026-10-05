@@ -9,13 +9,15 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
-  getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue 
+  getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue, deleteLocalRelatorio 
 } from '../../database/db';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
+import { apiClient } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Relatorio, FotoRelatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+
 
 export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { reportId } = route.params;
@@ -166,6 +168,45 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
       Alert.alert('Erro', err.message);
     }
   }
+
+  async function handleDeleteReport() {
+    if (!relatorio || !isMasterOrAdmin) {
+      Alert.alert('Acesso Negado', 'Apenas usuários Master ou Administradores têm permissão para excluir relatórios.');
+      return;
+    }
+
+    Alert.alert(
+      'Excluir Relatório',
+      `Tem certeza que deseja excluir permanentemente o relatório ${relatorio.numero}? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setApproving(true);
+              await deleteLocalRelatorio(relatorio.id);
+              if (isOnline) {
+                await apiClient.axios.delete(`/api/relatorios/${relatorio.id}`, {
+                  data: { user_id: user?.id, is_master: true }
+                }).catch(() => null);
+              } else {
+                await addToSyncQueue('relatorio', relatorio.id, 'delete', `/api/relatorios/${relatorio.id}`, 'DELETE', { user_id: user?.id, is_master: true });
+              }
+              Alert.alert('Sucesso', 'Relatório excluído com sucesso.');
+              navigation.goBack();
+            } catch (delErr: any) {
+              Alert.alert('Erro', delErr?.message || 'Falha ao excluir relatório.');
+            } finally {
+              setApproving(false);
+            }
+          }
+        }
+      ]
+    );
+  }
+
 
   if (!relatorio) {
     return (
@@ -485,7 +526,22 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           </TouchableOpacity>
         )}
 
+        {/* Botão de Excluir: Exclusivo para Master e Admin */}
+        {isMasterOrAdmin && (
+          <TouchableOpacity 
+            style={[styles.btn, { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5', marginTop: 12 }]} 
+            onPress={handleDeleteReport}
+            disabled={approving}
+          >
+            <Ionicons name="trash-outline" size={20} color="#DC2626" />
+            <Text style={[styles.btnText, { color: '#DC2626', fontWeight: '700' }]}>
+              Excluir Relatório (Privilégio Master/Admin)
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: 40 }} />
+
       </ScrollView>
     </View>
   );

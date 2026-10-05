@@ -430,7 +430,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                   <TouchableOpacity 
                     style={styles.photoActionBtn} 
                     onPress={async () => {
-                      const u = await takePhoto();
+                      const u = await takePhoto(obraNome || 'Obra Express');
                       if (u) setPhotoUri(u.uri);
                     }}
                   >
@@ -441,7 +441,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                   <TouchableOpacity 
                     style={[styles.photoActionBtn, { backgroundColor: '#0F172A' }]}
                     onPress={async () => {
-                      const u = await pickImage();
+                      const u = await pickImage(obraNome || 'Obra Express');
                       if (u) setPhotoUri(u.uri);
                     }}
                   >
