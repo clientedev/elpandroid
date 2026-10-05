@@ -1,3 +1,5 @@
+providers = ["python"]
+
 [phases.setup]
 nixPkgs = ["python310", "python310Packages.pip"]
 
@@ -14,7 +16,7 @@ cmds = [
 ]
 
 [start]
-cmd = "python main_production.py"
+cmd = "bash start.sh"
 
 [variables]
 PYTHONPATH = "/app"
