@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Express - {{ relatorio.numero }}</title>
+    <style>
+        /* Estilos idênticos ao template WeasyPrint padrão */
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+        
+        body {
+            font-family: 'Arial', 'Helvetica', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 2px solid #343a40;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .logo-elp {
+            max-height: 60px;
+            width: auto;
+        }
+        
+        .header-info {
+            text-align: right;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        /* SEÇÃO ESPECÍFICA PARA DADOS DA EMPRESA */
+        .empresa-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .empresa-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #343a40;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #20c1e8;
+            padding-bottom: 5px;
+        }
+        
+        .empresa-dados {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .empresa-item {
+            font-size: 11px;
+        }
+        
+        .empresa-item strong {
+            color: #343a40;
+        }
+        
+        /* Restante dos estilos idênticos ao template padrão */
+        .relatorio-title {
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #343a40;
+            margin: 20px 0;
+            text-transform: uppercase;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .info-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        
+        .section-title {
+            font-weight: bold;
+            color: #343a40;
+            border-bottom: 1px solid #20c1e8;
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .info-item {
+            margin-bottom: 5px;
+            font-size: 11px;
+        }
+        
+        .info-item strong {
+            color: #343a40;
+            min-width: 80px;
+            display: inline-block;
+        }
+        
+        .observacoes-section {
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        
+        .observacoes-content {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            min-height: 80px;
+            white-space: pre-wrap;
+        }
+        
+        .fotos-section {
+            margin-top: 20px;
+        }
+        
+        .foto-container {
+            page-break-inside: avoid;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .foto-img {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            display: block;
+        }
+        
+        .foto-info {
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .foto-titulo {
+            font-weight: bold;
+            color: #343a40;
+            margin-bottom: 5px;
+        }
+        
+        .foto-legenda {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        
+        .foto-descricao {
+            font-size: 10px;
+            color: #555;
+        }
+        
+        .footer {
+            position: fixed;
+            bottom: 1cm;
+            left: 1cm;
+            right: 1cm;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+            border-top: 1px solid #dee2e6;
+            padding-top: 10px;
+        }
+        
+        .page-number::after {
+            content: counter(page);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header com logo ELP -->
+    <div class="header">
+        <div>
+            {% if logo_elp %}
+                <img src="data:image/jpeg;base64,{{ logo_elp }}" alt="Logo ELP" class="logo-elp">
+            {% endif %}
+        </div>
+        <div class="header-info">
+            <div><strong>ELP Consultoria e Engenharia</strong></div>
+            <div>Engenharia Civil & Fachadas</div>
+            <div>Data: {{ data_geracao }}</div>
+        </div>
+    </div>
+    
+    <!-- SEÇÃO DE DADOS DA EMPRESA (NOVA) -->
+    <div class="empresa-section">
+        <div class="empresa-title">📋 DADOS DA EMPRESA</div>
+        <div class="empresa-dados">
+            <div class="empresa-item">
+                <strong>Empresa:</strong> {{ empresa.nome }}
+            </div>
+            <div class="empresa-item">
+                <strong>Responsável:</strong> {{ empresa.responsavel }}
+            </div>
+            <div class="empresa-item">
+                <strong>Telefone:</strong> {{ empresa.telefone }}
+            </div>
+            <div class="empresa-item">
+                <strong>E-mail:</strong> {{ empresa.email }}
+            </div>
+        </div>
+        {% if empresa.endereco and empresa.endereco != 'Não informado' %}
+        <div class="empresa-item" style="margin-top: 10px;">
+            <strong>Endereço:</strong> {{ empresa.endereco }}
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Título do relatório -->
+    <div class="relatorio-title">
+        Relatório Express de Visita Técnica
+        <br><small>Nº {{ relatorio.numero }}</small>
+    </div>
+    
+    <!-- Informações da visita (idênticas ao template padrão) -->
+    <div class="info-grid">
+        <div class="info-section">
+            <div class="section-title">📅 Dados da Visita</div>
+            <div class="info-item">
+                <strong>Data:</strong> {{ relatorio.data_visita }}
+            </div>
+            {% if relatorio.periodo_inicio and relatorio.periodo_fim %}
+            <div class="info-item">
+                <strong>Período:</strong> {{ relatorio.periodo_inicio }} às {{ relatorio.periodo_fim }}
+            </div>
+            {% endif %}
+            {% if relatorio.endereco_visita %}
+            <div class="info-item">
+                <strong>Local:</strong> {{ relatorio.endereco_visita }}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="info-section">
+            <div class="section-title">🌤️ Condições Climáticas</div>
+            {% if relatorio.condicoes_climaticas %}
+            <div class="info-item">
+                <strong>Condições:</strong> {{ relatorio.condicoes_climaticas }}
+            </div>
+            {% endif %}
+            {% if relatorio.temperatura %}
+            <div class="info-item">
+                <strong>Temperatura:</strong> {{ relatorio.temperatura }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Observações Gerais -->
+    {% if relatorio.observacoes_gerais %}
+    <div class="observacoes-section">
+        <div class="section-title">📝 Observações Gerais</div>
+        <div class="observacoes-content">{{ relatorio.observacoes_gerais }}</div>
+    </div>
+    {% endif %}
+    
+    <!-- Pendências -->
+    {% if relatorio.pendencias %}
+    <div class="observacoes-section">
+        <div class="section-title">⚠️ Pendências</div>
+        <div class="observacoes-content">{{ relatorio.pendencias }}</div>
+    </div>
+    {% endif %}
+    
+    <!-- Recomendações -->
+    {% if relatorio.recomendacoes %}
+    <div class="observacoes-section">
+        <div class="section-title">💡 Recomendações</div>
+        <div class="observacoes-content">{{ relatorio.recomendacoes }}</div>
+    </div>
+    {% endif %}
+    
+    <!-- Fotos (idênticas ao template padrão) -->
+    {% if fotos %}
+    <div class="fotos-section">
+        <div class="section-title">📸 Registro Fotográfico</div>
+        {% for foto in fotos %}
+        <div class="foto-container">
+            <img src="data:image/jpeg;base64,{{ foto.base64 }}" alt="{{ foto.titulo }}" class="foto-img">
+            <div class="foto-info">
+                <div class="foto-titulo">{{ foto.titulo }}</div>
+                {% if foto.legenda %}
+                <div class="foto-legenda">{{ foto.legenda }}</div>
+                {% endif %}
+                {% if foto.descricao %}
+                <div class="foto-descricao">{{ foto.descricao }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Participantes -->
+    {% if participantes %}
+    <div class="info-grid" style="margin-top: 20px;">
+        <div class="info-section">
+            <div class="section-title">👥 Funcionários Participantes</div>
+            {% for participante in participantes %}
+            <div class="info-item">
+                <strong>{{ participante.nome_completo }}</strong> - {{ participante.cargo }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Responsável técnico -->
+    <div class="info-grid" style="margin-top: 20px;">
+        <div class="info-section">
+            <div class="section-title">👨‍💼 Responsável Técnico</div>
+            <div class="info-item">
+                <strong>Nome:</strong> {{ autor.nome }}
+            </div>
+            <div class="info-item">
+                <strong>Cargo:</strong> {{ autor.cargo }}
+            </div>
+            <div class="info-item">
+                <strong>E-mail:</strong> {{ autor.email }}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <div>ELP Consultoria e Engenharia - Engenharia Civil & Fachadas</div>
+        <div>Relatório Express gerado em {{ data_geracao }} | Página <span class="page-number"></span></div>
+    </div>
+</body>
+</html>

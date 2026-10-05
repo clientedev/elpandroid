@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitar Reembolso{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-plus"></i> Solicitar Reembolso</h3>
+                    <a href="{{ url_for('reimbursements_list') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('request_reimbursement') }}" enctype="multipart/form-data" id="reimbursementForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <!-- Informações básicas -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="projeto_id" class="form-label">Projeto <span class="text-danger">*</span></label>
+                                <select class="form-select" name="projeto_id" id="projeto_id" required>
+                                    <option value="">Selecione um projeto</option>
+                                    {% for projeto in projetos %}
+                                    <option value="{{ projeto.id }}">{{ projeto.numero }} - {{ projeto.nome }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="periodo_inicio" class="form-label">Data Início</label>
+                                <input type="date" class="form-control" name="periodo_inicio" id="periodo_inicio" required>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="periodo_fim" class="form-label">Data Fim</label>
+                                <input type="date" class="form-control" name="periodo_fim" id="periodo_fim" required>
+                            </div>
+                        </div>
+                        
+                        <!-- Motivo -->
+                        <div class="mb-3">
+                            <label for="motivo" class="form-label">Motivo da Solicitação <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="motivo" id="motivo" rows="3" required
+                                      placeholder="Descreva o motivo da solicitação de reembolso"></textarea>
+                        </div>
+                        
+                        <!-- Detalhamento dos gastos -->
+                        <h5 class="mb-3"><i class="fas fa-calculator"></i> Detalhamento dos Gastos</h5>
+                        
+                        <!-- Combustível/Transporte -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="distancia_km" class="form-label">Distância Percorrida (km)</label>
+                                <input type="number" step="0.1" class="form-control" name="distancia_km" id="distancia_km" 
+                                       min="0" value="0" onchange="calcularTotal()">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="valor_km" class="form-label">Valor por KM (R$)</label>
+                                <input type="number" step="0.01" class="form-control" name="valor_km" id="valor_km" 
+                                       min="0" value="0.75" onchange="calcularTotal()">
+                                <small class="text-muted">Valor padrão: R$ 0,75 por km</small>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Total Combustível</label>
+                                <input type="text" class="form-control" id="total_combustivel" readonly>
+                            </div>
+                        </div>
+                        
+                        <!-- Outros gastos -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="alimentacao" class="form-label">Alimentação (R$)</label>
+                                <input type="number" step="0.01" class="form-control" name="alimentacao" id="alimentacao" 
+                                       min="0" value="0" onchange="calcularTotal()">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="hospedagem" class="form-label">Hospedagem (R$)</label>
+                                <input type="number" step="0.01" class="form-control" name="hospedagem" id="hospedagem" 
+                                       min="0" value="0" onchange="calcularTotal()">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="outros_gastos" class="form-label">Outros Gastos (R$)</label>
+                                <input type="number" step="0.01" class="form-control" name="outros_gastos" id="outros_gastos" 
+                                       min="0" value="0" onchange="calcularTotal()">
+                            </div>
+                        </div>
+                        
+                        <!-- Descrição outros gastos -->
+                        <div class="mb-3">
+                            <label for="descricao_outros" class="form-label">Descrição dos Outros Gastos</label>
+                            <textarea class="form-control" name="descricao_outros" id="descricao_outros" rows="2"
+                                      placeholder="Descreva os outros gastos (materiais, taxas, etc.)"></textarea>
+                        </div>
+                        
+                        <!-- Total -->
+                        <div class="alert alert-info">
+                            <h5><i class="fas fa-calculator"></i> Total Geral: R$ <span id="total_geral">0,00</span></h5>
+                        </div>
+                        
+                        <!-- Comprovantes -->
+                        <h5 class="mb-3"><i class="fas fa-paperclip"></i> Comprovantes</h5>
+                        <p class="text-muted mb-3">Anexe até 4 comprovantes (notas fiscais, recibos, etc.)</p>
+                        
+                        <div class="row" id="comprovantes-container">
+                            {% for i in range(4) %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Comprovante {{ i + 1 }}</h6>
+                                        <div class="mb-2">
+                                            <label for="comprovante_{{ i }}" class="form-label">Arquivo</label>
+                                            <input type="file" class="form-control" name="comprovante_{{ i }}" id="comprovante_{{ i }}" 
+                                                   accept=".pdf,.jpg,.jpeg,.png">
+                                        </div>
+                                        <div>
+                                            <label for="desc_comprovante_{{ i }}" class="form-label">Descrição</label>
+                                            <input type="text" class="form-control" name="desc_comprovante_{{ i }}" 
+                                                   id="desc_comprovante_{{ i }}" placeholder="Ex: Nota fiscal combustível">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Botões -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('reimbursements_list') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Solicitar Reembolso
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function calcularTotal() {
+    const distancia = parseFloat(document.getElementById('distancia_km').value) || 0;
+    const valorKm = parseFloat(document.getElementById('valor_km').value) || 0;
+    const alimentacao = parseFloat(document.getElementById('alimentacao').value) || 0;
+    const hospedagem = parseFloat(document.getElementById('hospedagem').value) || 0;
+    const outros = parseFloat(document.getElementById('outros_gastos').value) || 0;
+    
+    const totalCombustivel = distancia * valorKm;
+    const totalGeral = totalCombustivel + alimentacao + hospedagem + outros;
+    
+    document.getElementById('total_combustivel').value = 'R$ ' + totalCombustivel.toFixed(2).replace('.', ',');
+    document.getElementById('total_geral').textContent = totalGeral.toFixed(2).replace('.', ',');
+}
+
+// Calcular total inicial
+document.addEventListener('DOMContentLoaded', function() {
+    calcularTotal();
+});
+</script>
+{% endblock %}

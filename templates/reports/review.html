@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block title %}Revisão - {{ relatorio.titulo }} - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<!-- Mobile responsive header -->
+<div class="row">
+    <div class="col-12">
+        <!-- Mobile: Stack title and buttons vertically -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+            <h1 class="mb-2 mb-md-0 fs-3 fs-md-1">
+                <i class="fas fa-search-plus me-2"></i>
+                <span class="d-block d-md-inline">Revisão: {{ relatorio.titulo }}</span>
+                <small class="text-muted d-block d-md-inline">({{ relatorio.numero }})</small>
+            </h1>
+            <div class="btn-group" role="group">
+                {% if current_user.is_master %}
+                <form action="/reports/delete/{{ relatorio.id }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir este relatório? Esta ação não pode ser desfeita.');" style="display: inline;" class="me-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger btn-sm btn-md-normal" title="Excluir Relatório">
+                        <i class="fas fa-trash-alt me-1 me-md-2"></i>Excluir
+                    </button>
+                </form>
+                {% endif %}
+
+                {% if relatorio.status == 'Aprovado' %}
+                <a href="{{ url_for('generate_pdf_report', report_id=relatorio.id) }}" class="btn btn-outline-info btn-sm btn-md-normal" target="_blank">
+                    <i class="fas fa-file-pdf me-1 me-md-2"></i><span class="d-none d-sm-inline">Visualizar </span>PDF
+                </a>
+                {% endif %}
+
+                <a href="{{ url_for('reports') }}" class="btn btn-secondary btn-sm btn-md-normal">
+                    <i class="fas fa-arrow-left me-1 me-md-2"></i>Voltar
+                </a>
+            </div>
+        </div>
+
+        <!-- Data do Relatório no Topo da Página -->
+        <div class="mb-4">
+            <div class="alert alert-light border-0 mb-0 py-2">
+                <strong class="text-primary">
+                    <i class="fas fa-calendar-alt me-2"></i>Data: 
+                    {% if relatorio.data_relatorio %}
+                        {{ relatorio.data_relatorio.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        {{ relatorio.created_at.strftime('%d/%m/%Y') }}
+                    {% endif %}
+                </strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Status -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>Status Atual:</strong>
+                        {% if relatorio.status == 'Aprovado' %}
+                            <span class="badge bg-success fs-6">{{ relatorio.status }}</span>
+                        {% elif relatorio.status == 'Aguardando Aprovação' %}
+                            <span class="badge bg-warning fs-6">{{ relatorio.status }}</span>
+                        {% elif relatorio.status == 'Rejeitado' %}
+                            <span class="badge bg-danger fs-6">{{ relatorio.status }}</span>
+                        {% elif relatorio.status == 'Em edição' %}
+                            <span class="badge bg-info fs-6">{{ relatorio.status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary fs-6">{{ relatorio.status }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        {% if relatorio.status == 'Aprovado' %}
+                            <span class="text-success">
+                                <i class="fas fa-check-circle me-1"></i>Relatório aprovado
+                                {% if relatorio.data_aprovacao %}
+                                    em {{ relatorio.data_aprovacao|format_datetime_br }}
+                                {% endif %}
+                                {% if relatorio.aprovador %}
+                                    por {{ relatorio.aprovador.nome_completo }}
+                                {% endif %}
+                            </span>
+                        {% elif relatorio.status == 'Rejeitado' %}
+                            <span class="text-danger">
+                                <i class="fas fa-times-circle me-1"></i>Relatório rejeitado
+                                {% if relatorio.data_aprovacao %}
+                                    em {{ relatorio.data_aprovacao|format_datetime_br }}
+                                {% endif %}
+                                {% if relatorio.aprovador %}
+                                    por {{ relatorio.aprovador.nome_completo }}
+                                {% endif %}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Information -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Informações do Relatório
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Obra:</strong> {{ relatorio.projeto.nome }} ({{ relatorio.projeto.numero }})</p>
+                        <p><strong>Autor:</strong> {{ relatorio.autor.nome_completo }}</p>
+                        <p><strong>Data do Relatório:</strong> {{ relatorio.data_relatorio.strftime('%d/%m/%Y') }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        {% if relatorio.aprovador %}
+                            <p><strong>Aprovador:</strong> {{ relatorio.aprovador.nome_completo }}</p>
+                        {% endif %}
+                        {% if relatorio.visita %}
+                            <p><strong>Visita Relacionada:</strong> {{ relatorio.visita.data_agendada|format_datetime_br }}</p>
+                        {% endif %}
+                        <p><strong>Criado em:</strong> {{ relatorio.created_at|format_datetime_br }}</p>
+                        {% if relatorio.lembrete_proxima_visita %}
+                        <p><strong><i class="fas fa-bell me-1"></i>Lembrete Próxima Visita:</strong> 
+                            <span class="badge bg-warning text-dark">
+                                {% if relatorio.lembrete_proxima_visita is string %}
+                                    {{ relatorio.lembrete_proxima_visita }}
+                                {% else %}
+                                    {{ relatorio.lembrete_proxima_visita|format_datetime_br }}
+                                {% endif %}
+                            </span>
+                        </p>
+                        {% endif %}
+                        {% if notificacoes and notificacoes|length > 0 %}
+                            <p><strong><i class="fas fa-envelope me-1"></i>Envios Realizados:</strong> <span class="badge bg-success">{{ notificacoes|length }}</span></p>
+                            <div class="ms-3 small">
+                                {% for notif in notificacoes %}
+                                    <div class="text-muted"><i class="fas fa-check text-success me-1"></i> {{ notif.tipo_notificacao }}: {{ notif.destinatario }} ({{ notif.data_envio.strftime('%d/%m/%Y %H:%M') }})</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if relatorio.observacoes_gerais and relatorio.observacoes_gerais != relatorio.observacoes_finais %}
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <p><strong><i class="fas fa-align-left me-1"></i>Detalhes:</strong></p>
+                        <div class="p-3 bg-white border rounded">
+                            {{ relatorio.observacoes_gerais|replace('\n', '<br>')|safe }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% include 'reports/_detalhes_visita.html' %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rejection Reason and Actions -->
+{% if relatorio.status == 'Rejeitado' and relatorio.comentario_aprovacao %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Motivo da Rejeição
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning mb-3" style="max-width: 100%; overflow: hidden;">
+                    <strong>Motivo da rejeição:</strong>
+                    <br><span style="display: block; word-break: break-all; overflow-wrap: anywhere; white-space: pre-wrap;">{{ relatorio.comentario_aprovacao }}</span>
+                </div>
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                    <a href="{{ url_for('report_edit', report_id=relatorio.id) }}" class="btn btn-warning btn-lg">
+                        <i class="fas fa-edit me-2"></i>Editar e Corrigir
+                    </a>
+                </div>
+                <div class="mt-3 text-center">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Faça as correções solicitadas e reenvie o relatório para aprovação.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Approved Report Actions -->
+{% if relatorio.status == 'Aprovado' %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-check-circle me-2"></i>Relatório Aprovado
+                </h5>
+            </div>
+            <div class="card-body text-center">
+                <p class="mb-3">Este relatório foi aprovado e está disponível para download.</p>
+                <a href="{{ url_for('generate_pdf_report', report_id=relatorio.id) }}" class="btn btn-success btn-lg" target="_blank">
+                    <i class="fas fa-download me-2"></i>Baixar PDF
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Photos Gallery -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-images me-2"></i>Galeria de Fotos ({{ fotos|length }})
+                    </h5>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if fotos %}
+                    <!-- Mobile responsive photo grid -->
+                    <div class="row g-2 g-md-3 photo-gallery">
+                        {% for foto in fotos %}
+                        <div class="col-12">
+                            <div class="card photo-container h-100">
+                                <img src="{{ url_for('get_imagem', id=foto.id) }}" 
+                                     class="card-img-top" 
+                                     style="height: 150px !important; object-fit: cover !important; width: 100% !important;" 
+                                     alt="{{ foto.legenda or foto.titulo or 'Foto do relatório' }}"
+                                     onerror="handleImageError(this);" 
+                                     data-original-src="{{ url_for('get_imagem', id=foto.id) }}"
+                                     data-filename="{{ foto.filename }}"
+                                     loading="lazy">
+                                <div class="card-body p-2">
+                                    {% if foto.legenda %}
+                                        <h6 class="card-title small mb-1">{{ foto.legenda }}</h6>
+                                    {% elif foto.titulo %}
+                                        <h6 class="card-title small mb-1">{{ foto.titulo }}</h6>
+                                    {% endif %}
+                                    {% if foto.tipo_servico %}
+                                        <span class="badge bg-info mb-1" title="Categoria"><i class="fas fa-tag me-1"></i>{{ foto.tipo_servico }}</span>
+                                    {% endif %}
+                                    {% if foto.local %}
+                                        <span class="badge bg-secondary mb-1" title="Localização"><i class="fas fa-map-marker-alt me-1"></i>{{ foto.local }}</span>
+                                    {% endif %}
+                                    {% if foto.descricao %}
+                                        <p class="card-text small text-muted mb-0">{{ foto.descricao }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-camera fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma foto adicionada</h5>
+                        <p class="text-muted">Este relatório não possui fotos anexadas.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Approval Actions - Only visible to the designated approver for this project -->
+{% if current_user.is_authenticated and user_is_approver and relatorio.status == 'Aguardando Aprovação' %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card mb-4 shadow-sm border-0">
+            <div class="card-body">
+                <!-- Mobile: Stack buttons vertically -->
+                <div class="d-grid gap-3 d-md-flex">
+                    <div class="flex-fill">
+                        <form method="POST" action="{{ url_for('approve_report', id=relatorio.id) }}" 
+                              onsubmit="return confirm('Tem certeza que deseja APROVAR este relatório? Ele será enviado automaticamente aos clientes.')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-success btn-lg w-100">
+                                <i class="fas fa-check me-2"></i>Aprovar Relatório
+                            </button>
+                        </form>
+                    </div>
+                    <div class="flex-fill">
+                        <a href="{{ url_for('report_edit_complete', report_id=relatorio.id) }}" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-edit me-2"></i>Editar Relatório
+                        </a>
+                    </div>
+                    <div class="flex-fill">
+                        <button type="button" class="btn btn-danger btn-lg w-100" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                            <i class="fas fa-times me-2"></i>Reprovar Relatório
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Rejection Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="rejectModalLabel">
+                    <i class="fas fa-times me-2"></i>Reprovar Relatório
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('reject_report', id=relatorio.id) }}" id="rejectForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Atenção:</strong> Ao reprovar este relatório, ele voltará para o status "Em edição" 
+                        e o autor receberá uma notificação com o motivo da reprovação.
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="comentario_reprovacao" class="form-label">
+                            <strong>Motivo da reprovação *</strong>
+                        </label>
+                        <textarea class="form-control" id="comentario_reprovacao" name="comentario_reprovacao" 
+                                  rows="4" required 
+                                  placeholder="Descreva os motivos da reprovação e as correções necessárias..."></textarea>
+                        <div class="form-text">
+                            Este comentário será enviado ao autor do relatório para que possa fazer as correções necessárias.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-danger" id="confirmRejectBtn">
+                        <i class="fas fa-times me-1"></i>Confirmar Reprovação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Fallback para handleImageError se não estiver carregado
+if (typeof window.handleImageError === 'undefined') {
+    window.handleImageError = function(img) {
+        console.log('📋 Fallback: Imagem não carregou:', img.src);
+        img.src = '/static/img/no-image.png';
+        img.alt = 'Imagem não encontrada';
+        img.style.border = '2px dashed #ffc107';
+        img.style.opacity = '0.7';
+    };
+}
+
+// Image modal functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const images = document.querySelectorAll('.card-img-top');
+
+    images.forEach(img => {
+        img.style.cursor = 'pointer';
+        img.addEventListener('click', function() {
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Visualizar Foto</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <img src="${this.src}" class="img-fluid" alt="${this.alt}">
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+
+            modal.addEventListener('hidden.bs.modal', function() {
+                document.body.removeChild(modal);
+            });
+        });
+    });
+
+    // Form validation for rejection
+    const rejectForm = document.getElementById('rejectForm');
+    if (rejectForm) {
+        rejectForm.addEventListener('submit', function(e) {
+            const comment = document.getElementById('comentario_reprovacao').value.trim();
+            if (!comment) {
+                e.preventDefault();
+                alert('Por favor, informe o motivo da reprovação.');
+                document.getElementById('comentario_reprovacao').focus();
+                return false;
+            }
+
+            if (!confirm('Tem certeza que deseja REPROVAR este relatório? O autor será notificado e o relatório voltará para edição.')) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

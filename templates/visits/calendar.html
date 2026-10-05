@@ -1,0 +1,1139 @@
+{% extends "base.html" %}
+
+{% block title %}Calendário de Visitas - Sistema ELP{% endblock %}
+
+{% block extra_head %}
+<!-- FullCalendar CSS -->
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css' rel='stylesheet' />
+<style>
+    .fc-event {
+        border-radius: 3px;
+        border: none;
+    }
+    .fc-event-agendada {
+        /* background-color removido para permitir cor dinâmica do responsável */
+        color: white;
+    }
+    .fc-event-realizada {
+        background-color: #28a745;
+        color: white;
+    }
+    .fc-event-cancelada {
+        background-color: #dc3545;
+        color: white;
+    }
+    .calendar-controls {
+        margin-bottom: 20px;
+    }
+    .export-buttons {
+        margin-top: 15px;
+    }
+    .visit-tooltip {
+        max-width: 300px;
+        z-index: 9999;
+    }
+    .calendar-legend {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+    }
+    .fc-toolbar {
+        margin-bottom: 20px !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+    }
+    
+    /* Responsividade para mobile */
+    @media (max-width: 768px) {
+        .fc-toolbar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+        }
+        .fc-toolbar-chunk {
+            display: flex !important;
+            justify-content: center !important;
+            margin-bottom: 10px !important;
+        }
+        .fc-button-group {
+            display: flex !important;
+            width: 100% !important;
+        }
+        .fc-button {
+            min-height: 44px !important;
+            font-size: 14px !important;
+            flex: 1 !important;
+        }
+        .fc-toolbar-title {
+            font-size: 1.2rem !important;
+            text-align: center !important;
+            margin: 10px 0 !important;
+        }
+        .fc-dayGridMonth-view .fc-daygrid-day-number {
+            font-size: 14px !important;
+            padding: 4px !important;
+        }
+        /* Melhorar exibição de eventos no mobile */
+        .fc-event {
+            font-size: 11px !important;
+            padding: 3px 5px !important;
+            margin: 1px 0 !important;
+            border-radius: 4px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+            display: block !important;
+            line-height: 1.3 !important;
+        }
+        .fc-event-title {
+            font-weight: 600 !important;
+        }
+        .fc-col-header-cell {
+            padding: 8px 4px !important;
+            font-size: 12px !important;
+        }
+        /* Células do calendário com mais espaço */
+        .fc-daygrid-day {
+            min-height: 70px !important;
+        }
+        .fc-daygrid-day-events {
+            margin-bottom: 2px !important;
+        }
+    }
+    
+    /* Melhorias para telas pequenas */
+    @media (max-width: 576px) {
+        .fc-toolbar-title {
+            font-size: 1rem !important;
+        }
+        .fc-button {
+            font-size: 11px !important;
+            padding: 6px 10px !important;
+        }
+        .fc-dayGridMonth-view .fc-daygrid-day-number {
+            font-size: 11px !important;
+        }
+        .calendar-legend {
+            justify-content: center !important;
+        }
+        .legend-item {
+            font-size: 11px !important;
+        }
+        /* Evento no mobile extra pequeno */
+        .fc-event {
+            font-size: 10px !important;
+            padding: 2px 4px !important;
+            min-height: 18px !important;
+        }
+        .fc-daygrid-day {
+            min-height: 60px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+            <h1 class="mb-0"><i class="fas fa-calendar-alt me-2 text-primary"></i>Calendário de Visitas</h1>
+            <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-md-auto">
+                <a href="{{ url_for('visit_new') }}" class="btn btn-primary" style="min-height: 44px;">
+                    <i class="fas fa-plus me-2"></i>Nova Visita
+                </a>
+                <a href="{{ url_for('visits_list') }}" class="btn btn-outline-secondary" style="min-height: 44px;">
+                    <i class="fas fa-list me-2"></i>Lista
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <!-- Legenda de Status -->
+                <div class="calendar-legend mb-3">
+                    <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Status das Visitas</h6>
+                    <div class="d-flex gap-3 flex-wrap">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #007bff;"></div>
+                            <span>Agendada</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #28a745;"></div>
+                            <span>Realizada</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #dc3545;"></div>
+                            <span>Cancelada</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legenda de Cores dos Funcionários -->
+                <div class="calendar-legend mb-3" id="employeeColorsLegend" style="display: none;">
+                    <h6 class="mb-2"><i class="fas fa-users me-2"></i>Cores dos Funcionários</h6>
+                    <div class="d-flex gap-2 flex-wrap" id="employeeColorsContainer">
+                        <!-- Cores dos funcionários carregadas dinamicamente -->
+                    </div>
+                </div>
+
+                <!-- Calendário -->
+                <div id='calendar'></div>
+
+                <!-- Botões de Export -->
+                <div class="export-buttons">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-download me-2"></i>Exportar Calendário</h6>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-success" onclick="exportToGoogleCalendar()">
+                                    <i class="fab fa-google me-2"></i>Google Calendar
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" onclick="exportToOutlook()">
+                                    <i class="fab fa-microsoft me-2"></i>Outlook
+                                </button>
+                                <button type="button" class="btn btn-outline-info" onclick="exportToICS()">
+                                    <i class="fas fa-calendar-download me-2"></i>Arquivo ICS
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-filter me-2"></i>Filtros</h6>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="filterAgendada" checked>
+                                <label class="form-check-label" for="filterAgendada">Agendadas</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="filterRealizada" checked>
+                                <label class="form-check-label" for="filterRealizada">Realizadas</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="filterCancelada" checked>
+                                <label class="form-check-label" for="filterCancelada">Canceladas</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para detalhes da visita - Design melhorado -->
+<div class="modal fade" id="visitModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 pb-0" id="visitModalHeader" style="background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%); border-radius: 0.5rem 0.5rem 0 0;">
+                <div class="w-100 text-white py-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="modal-title mb-1" id="visitModalTitle">
+                                <i class="fas fa-calendar-check me-2"></i>Detalhes da Visita
+                            </h4>
+                            <p class="mb-0 opacity-75" id="visitModalSubtitle"></p>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body pt-4" id="visitModalBody">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Carregando...</span>
+                    </div>
+                    <p class="text-muted mt-2">Carregando detalhes...</p>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light" style="border-radius: 0 0 0.5rem 0.5rem;">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Fechar
+                </button>
+                <div id="visitModalActions" class="d-flex gap-2">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- FullCalendar JS -->
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js'></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+    let calendar;
+    let allEvents = [];
+
+    // Inicializar calendário
+    calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        eventDisplay: 'block', // Força exibição em bloco com cor de fundo
+        locale: 'pt-br',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        },
+        slotMinTime: '07:00:00',
+        slotMaxTime: '18:00:00',
+        height: 'auto',
+        // Item 28: Implementar clique em eventos para mostrar modal de detalhes
+        eventClick: function(info) {
+            info.jsEvent.preventDefault();
+            showVisitDetails(info.event.extendedProps.visitId);
+        },
+        // Item 28: Implementar clique em datas para novo agendamento
+        dateClick: function(info) {
+            // No modo mês: abrir nova visita com data preenchida
+            // No modo semana/dia: abrir com data e horário preenchidos
+            const dateStr = info.dateStr;
+            const timeStr = info.date.toTimeString().substring(0, 5); // HH:MM
+            
+            // Construir URL com data e horário
+            let url = "/visits/new?data=" + dateStr;
+            if (info.view.type !== 'dayGridMonth') {
+                // Em modo semana/dia, incluir horário
+                url += "&hora=" + timeStr;
+            }
+            
+            window.location.href = url;
+        },
+        eventDidMount: function(info) {
+            // Adicionar tooltip
+            info.el.setAttribute('title', info.event.extendedProps.tooltip);
+            info.el.setAttribute('data-bs-toggle', 'tooltip');
+        },
+        eventClassNames: function(info) {
+            return 'fc-event-' + info.event.extendedProps.status.toLowerCase();
+        }
+    });
+
+    // Carregar eventos e cores dos funcionários
+    loadVisits();
+    loadEmployeeColors();
+
+    // Configurar filtros
+    document.querySelectorAll('input[id^="filter"]').forEach(checkbox => {
+        checkbox.addEventListener('change', applyFilters);
+    });
+
+    // Criar tooltip detalhado com cores dos participantes
+    function createDetailedTooltip(visit, participantesNomes) {
+        let tooltip = `${visit.title || visit.numero}\n`;
+        tooltip += `Projeto: ${visit.projeto_nome}\n`;
+        tooltip += `Responsável: ${visit.responsavel_nome}\n`;
+        tooltip += `Status: ${visit.status}`;
+        
+        if (visit.participantes && visit.participantes.length > 0 && !visit.is_pessoal) {
+            tooltip += `\n\nParticipantes (${visit.participantes.length}):`;
+            visit.participantes.forEach(p => {
+                const roleIndicator = p.is_responsavel ? ' (Responsável)' : '';
+                tooltip += `\n• ${p.nome}${roleIndicator}`;
+            });
+        }
+        
+        if (visit.observacoes) {
+            tooltip += `\n\nObservações: ${visit.observacoes}`;
+        }
+        
+        return tooltip;
+    }
+    
+    // Carregar e exibir cores dos funcionários na legenda
+    function loadEmployeeColors() {
+        fetch('/api/visits/calendar')
+            .then(response => {
+                if (!response.ok) {
+                    console.error('Employee colors error', response.status);
+                    return;
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data) return;
+                
+                const employeeColors = new Map();
+                
+                // Se a API retornou a lista de funcionários ativos, usar ela (prioridade)
+                if (data.employees && Array.isArray(data.employees)) {
+                    data.employees.forEach(emp => {
+                        if (emp.nome && emp.cor_agenda) {
+                            employeeColors.set(emp.nome, emp.cor_agenda);
+                        }
+                    });
+                } else {
+                    // Fallback: Extrair cores únicas dos funcionários apenas das visitas carregadas
+                    const visits = Array.isArray(data) ? data : (data.visits || []);
+                    visits.forEach(visit => {
+                        // Adicionar responsável
+                        if (visit.responsavel_nome && visit.responsavel_cor) {
+                            employeeColors.set(visit.responsavel_nome, visit.responsavel_cor);
+                        }
+                        
+                        // Adicionar participantes
+                        if (visit.participantes && visit.participantes.length > 0) {
+                            visit.participantes.forEach(participante => {
+                                if (participante.nome && participante.cor_agenda) {
+                                    employeeColors.set(participante.nome, participante.cor_agenda);
+                                }
+                            });
+                        }
+                    });
+                }
+                
+                // Exibir legenda se houver funcionários com cores
+                if (employeeColors.size > 0) {
+                    const container = document.getElementById('employeeColorsContainer');
+                    const legend = document.getElementById('employeeColorsLegend');
+                    
+                    container.innerHTML = '';
+                    
+                    // Converter para array e ordenar por nome
+                    const sortedEmployees = Array.from(employeeColors.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+                    
+                    sortedEmployees.forEach(([name, color]) => {
+                        const legendItem = document.createElement('div');
+                        legendItem.className = 'legend-item';
+                        legendItem.innerHTML = `
+                            <div class="legend-color" style="background-color: ${color}; border: 1px solid #dee2e6;"></div>
+                            <small class="text-muted">${name}</small>
+                        `;
+                        container.appendChild(legendItem);
+                    });
+                    
+                    legend.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar cores dos funcionários:', error);
+            });
+    }
+
+    function loadVisits() {
+        fetch('/api/visits/calendar')
+            .then(response => {
+                // Check response.ok before response.json() - defensive programming
+                if (!response.ok) {
+                    console.error('Calendar error', response.status);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Ensure that code only executes .map() on arrays - defensive check
+                if (!data) {
+                    console.warn('Calendar API returned null/undefined data');
+                    allEvents = [];
+                    applyFilters();
+                    return;
+                }
+                
+                const visits = Array.isArray(data) ? data : (data.visits || []);
+                
+                if (!Array.isArray(visits)) {
+                    console.warn('Calendar API did not return array data:', data);
+                    allEvents = [];
+                    applyFilters();
+                    return;
+                }
+                
+                allEvents = visits.map(visit => {
+                    // Título simplificado: código da visita + número de participantes
+                    let displayTitle = visit.numero || visit.title || `VIS-${visit.id}`;
+                    let participantesNomes = visit.participantes ? visit.participantes.map(p => p.nome).join(', ') : '';
+                    
+                    // Indicador de participantes apenas se houver múltiplos
+                    if (visit.participantes && visit.participantes.length > 1 && !visit.is_pessoal) {
+                        displayTitle = `${displayTitle} (${visit.participantes.length})`;
+                    }
+                    
+                    // Cor do evento baseada no status e responsável
+                    let eventColor = '#0EA5E9'; // Default Blue
+                    const status = visit.status ? visit.status.toLowerCase() : '';
+                    let isOverdue = false;
+                    let displayStatus = visit.status;
+                    
+                    if (status !== 'realizada' && status !== 'cancelada' && status !== 'cancelado') {
+                        const start = new Date(visit.data_inicio);
+                        // Fuso horário de Brasília (UTC-3)
+                        const agoraUTC = new Date();
+                        const agoraBR = new Date(agoraUTC.getTime() - (agoraUTC.getTimezoneOffset() * 60000) - (3 * 60 * 60 * 1000));
+                        
+                        if (start < agoraBR) {
+                            isOverdue = true;
+                            displayStatus = 'Atrasada';
+                        }
+                    }
+                    
+                    if (status === 'realizada') {
+                        eventColor = '#28a745'; // Green for Realizada
+                    } else if (status === 'cancelada' || status === 'cancelado') {
+                        eventColor = '#dc3545'; // Red for Cancelada
+                    } else if (isOverdue) {
+                        eventColor = '#dc3545'; // Red for Atrasada
+                    } else {
+                        // Para agendadas/pendentes, usar cor do responsável
+                        eventColor = visit.responsavel_cor || '#0EA5E9';
+                        if (visit.participantes && visit.participantes.length > 0) {
+                            const responsavel = visit.participantes.find(p => p.is_responsavel);
+                            if (responsavel) {
+                                eventColor = responsavel.cor_agenda || eventColor;
+                            } else {
+                                // Se não houver marcado como responsável, pega o primeiro
+                                eventColor = visit.participantes[0].cor_agenda || eventColor;
+                            }
+                        }
+                    }
+
+                    return {
+                        id: visit.id,
+                        title: displayTitle,
+                        start: visit.data_inicio,
+                        end: visit.data_fim || visit.data_realizada,
+                        backgroundColor: eventColor,
+                        borderColor: eventColor,
+                        extendedProps: {
+                            visitId: visit.visit_id || visit.id,
+                            status: visit.status,
+                            projeto: visit.projeto_nome,
+                            responsavel: visit.responsavel_nome,
+                            observacoes: visit.observacoes,
+                            participantes: visit.participantes,
+                            is_pessoal: visit.is_pessoal,
+                            tooltip: createDetailedTooltip(visit, participantesNomes)
+                        }
+                    };
+                });
+                
+                applyFilters();
+            })
+            .catch(error => {
+                console.error('Erro ao carregar visitas:', error);
+                // Set empty array to prevent undefined.map() errors
+                allEvents = [];
+                applyFilters();
+                
+                // Show user-friendly error message instead of technical alert
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger';
+                const errorMsg = error.message.includes('500') 
+                    ? '⚠️ Erro no servidor. Por favor, tente novamente em alguns instantes.'
+                    : '⚠️ Erro ao carregar lista de visitas. Verifique sua conexão e tente novamente.';
+                errorDiv.innerHTML = errorMsg;
+                const container = document.querySelector('.container-fluid');
+                if (container) container.prepend(errorDiv);
+                
+                // Initialize empty events to prevent further errors
+                allEvents = [];
+                applyFilters();
+            });
+    }
+
+    function applyFilters() {
+        const showAgendada = document.getElementById('filterAgendada').checked;
+        const showRealizada = document.getElementById('filterRealizada').checked;
+        const showCancelada = document.getElementById('filterCancelada').checked;
+
+        const filteredEvents = allEvents.filter(event => {
+            const status = event.extendedProps.status.toLowerCase();
+            return (showAgendada && status === 'agendada') ||
+                   (showRealizada && status === 'realizada') ||
+                   (showCancelada && status === 'cancelada');
+        });
+
+        calendar.removeAllEvents();
+        calendar.addEventSource(filteredEvents);
+    }
+
+    function showVisitDetails(visitId) {
+        const modal = new bootstrap.Modal(document.getElementById('visitModal'));
+        modal.show();
+        
+        const modalHeader = document.getElementById('visitModalHeader');
+        const modalTitle = document.getElementById('visitModalTitle');
+        const modalSubtitle = document.getElementById('visitModalSubtitle');
+        const modalBody = document.getElementById('visitModalBody');
+        const modalActions = document.getElementById('visitModalActions');
+        
+        modalBody.innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <p class="text-muted mt-2">Carregando detalhes...</p>
+            </div>
+        `;
+        
+        fetch(`/api/visits/${visitId}/details`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const visit = data.visit;
+                    
+                    const statusColors = {
+                        'Agendada': { bg: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)', badge: 'primary' },
+                        'Realizada': { bg: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', badge: 'success' },
+                        'Cancelado': { bg: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', badge: 'danger' },
+                        'Cancelada': { bg: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', badge: 'danger' },
+                        'Atrasada':  { bg: 'linear-gradient(135deg, #DC3545 0%, #C82333 100%)', badge: 'danger' }
+                    };
+                    
+                    let displayStatus = visit.status;
+                    if (visit.status !== 'Realizada' && visit.status !== 'Cancelada' && visit.data_inicio) {
+                        const start = new Date(visit.data_inicio);
+                        // Fuso horário de Brasília (UTC-3) para cálculo de atraso real
+                        const agoraUTC = new Date();
+                        const agoraBR = new Date(agoraUTC.getTime() - (agoraUTC.getTimezoneOffset() * 60000) - (3 * 60 * 60 * 1000));
+
+                        if (start < agoraBR) {
+                            displayStatus = 'Atrasada';
+                        }
+                    }
+                    const statusStyle = statusColors[displayStatus] || statusColors['Agendada'];
+                    
+                    modalHeader.style.background = statusStyle.bg;
+                    modalTitle.innerHTML = `<i class="fas fa-calendar-check me-2"></i>Visita ${visit.numero}`;
+                    modalSubtitle.innerHTML = visit.is_pessoal ? 
+                        '<i class="fas fa-user me-1"></i>Compromisso Pessoal' : 
+                        `<i class="fas fa-building me-1"></i>${visit.projeto_nome}${visit.projeto_numero ? ' (' + visit.projeto_numero + ')' : ''}`;
+                    
+                    const dataInicio = visit.data_inicio ? new Date(visit.data_inicio) : null;
+                    const dataFim = visit.data_fim ? new Date(visit.data_fim) : null;
+                    const dataRealizada = visit.data_realizada ? new Date(visit.data_realizada) : null;
+                    
+                    let participantesHtml = '';
+                    if (visit.participantes && visit.participantes.length > 0) {
+                        participantesHtml = `
+                            <div class="mb-3">
+                                <h6 class="text-muted mb-2"><i class="fas fa-users me-2"></i>Participantes</h6>
+                                <div class="d-flex flex-wrap gap-2">
+                                    ${visit.participantes.map(p => `
+                                        <span class="badge" style="background-color: ${p.cor_agenda}; font-size: 0.85rem; padding: 8px 12px;">
+                                            ${p.is_responsavel ? '<i class="fas fa-star me-1"></i>' : ''}
+                                            ${p.nome}
+                                            ${p.confirmado ? '<i class="fas fa-check-circle ms-1"></i>' : ''}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    modalBody.innerHTML = `
+                        <div class="row g-4">
+                            <div class="col-12">
+                                <div class="d-flex align-items-center mb-3">
+                                    <span class="badge bg-${statusStyle.badge} me-2" style="font-size: 0.9rem; padding: 8px 16px;">
+                                        <i class="fas fa-${displayStatus === 'Realizada' ? 'check-circle' : displayStatus === 'Atrasada' ? 'exclamation-circle' : displayStatus === 'Agendada' ? 'clock' : 'times-circle'} me-1"></i>
+                                        ${displayStatus}
+                                    </span>
+                                    ${visit.is_pessoal ? '<span class="badge bg-secondary"><i class="fas fa-user me-1"></i>Pessoal</span>' : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-primary mb-3"><i class="fas fa-calendar-alt me-2"></i>Datas</h6>
+                                        
+                                        <div class="mb-2">
+                                            <small class="text-muted d-block">Início</small>
+                                            <strong>${dataInicio ? dataInicio.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' }) : 'N/A'}</strong>
+                                        </div>
+                                        
+                                        ${dataFim ? `
+                                        <div class="mb-2">
+                                            <small class="text-muted d-block">Término</small>
+                                            <strong>${dataFim.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' })}</strong>
+                                        </div>
+                                        ` : ''}
+                                        
+                                        ${dataRealizada ? `
+                                        <div class="mb-2">
+                                            <small class="text-muted d-block"><i class="fas fa-check-circle text-success me-1"></i>Realizada em</small>
+                                            <strong class="text-success">${dataRealizada.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' })}</strong>
+                                        </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light h-100">
+                                    <div class="card-body">
+                                        <h6 class="text-primary mb-3"><i class="fas fa-user-tie me-2"></i>Responsável</h6>
+                                        <div class="d-flex align-items-center">
+                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3" 
+                                                 style="width: 40px; height: 40px; background-color: ${visit.responsavel_cor || '#0EA5E9'}; color: white;">
+                                                <i class="fas fa-user"></i>
+                                            </div>
+                                            <div>
+                                                <strong>${visit.responsavel_nome}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${participantesHtml ? `<div class="col-12">${participantesHtml}</div>` : ''}
+                            
+                            ${visit.observacoes ? `
+                            <div class="col-12">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="text-primary mb-2"><i class="fas fa-clipboard-list me-2"></i>Observações</h6>
+                                        <p class="mb-0">${visit.observacoes}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${visit.atividades_realizadas ? `
+                            <div class="col-12">
+                                <div class="card border-0 bg-success bg-opacity-10">
+                                    <div class="card-body">
+                                        <h6 class="text-success mb-2"><i class="fas fa-tasks me-2"></i>Atividades Realizadas</h6>
+                                        <p class="mb-0">${visit.atividades_realizadas}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${(visit.endereco_gps || visit.projeto_endereco) ? `
+                            <div class="col-12">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body">
+                                        <h6 class="text-primary mb-2"><i class="fas fa-map-marker-alt me-2"></i>Localização</h6>
+                                        <p class="mb-0">${visit.endereco_gps || visit.projeto_endereco}</p>
+                                        ${visit.latitude && visit.longitude ? `
+                                        <a href="https://www.google.com/maps?q=${visit.latitude},${visit.longitude}" 
+                                           target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                                            <i class="fas fa-external-link-alt me-1"></i>Abrir no Mapa
+                                        </a>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                    `;
+
+                    let actions = '';
+                    if (displayStatus === 'Agendada' || displayStatus === 'Atrasada') {
+                        if(visit.projeto_id) {
+                            actions += `<a href="/projects/${visit.projeto_id}" class="btn btn-success"><i class="fas fa-check me-1"></i>Realizar</a>`;
+                        }
+                        actions += `<a href="/visits/${visit.id}/edit" class="btn btn-warning"><i class="fas fa-edit me-1"></i>Editar</a>`;
+                    }
+                    actions += `<a href="/visits/${visit.id}" class="btn btn-primary"><i class="fas fa-eye me-1"></i>Ver Detalhes</a>`;
+                    
+                    modalActions.innerHTML = actions;
+                } else {
+                    modalBody.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Erro ao carregar detalhes da visita.
+                        </div>
+                    `;
+                    modalActions.innerHTML = '';
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar detalhes:', error);
+                modalBody.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar detalhes da visita. Tente novamente.
+                    </div>
+                `;
+                modalActions.innerHTML = '';
+            });
+    }
+
+    // Inicializar tooltips
+    calendar.render();
+    
+    // Inicializar tooltips do Bootstrap após renderizar o calendário
+    setTimeout(() => {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }, 100);
+});
+
+// Funções de exportação
+let currentIncludeAll = false;
+
+function exportToGoogleCalendar(includeAll = false) {
+    currentIncludeAll = includeAll;
+    fetch(`/api/visits/export/google?include_all=${includeAll}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const totalVisitas = data.export_urls ? data.export_urls.length : 0;
+                const jaExportadas = data.ja_exportadas || 0;
+                const totalGeral = data.total_visits || 0;
+                
+                if (totalVisitas === 0 && !includeAll && jaExportadas > 0) {
+                    if (confirm(`Todas as ${jaExportadas} visitas já foram exportadas anteriormente.\n\nDeseja ver todas as visitas para re-exportar?`)) {
+                        exportToGoogleCalendar(true);
+                    }
+                    return;
+                }
+                
+                if (totalVisitas === 0) {
+                    alert('Nenhuma visita encontrada para exportação.');
+                    return;
+                }
+                
+                const infoMessage = includeAll 
+                    ? `<strong>${totalVisitas} visitas</strong> disponíveis (incluindo já exportadas).`
+                    : `<strong>${totalVisitas} visitas novas</strong> para exportar. ${jaExportadas > 0 ? `(${jaExportadas} já exportadas)` : ''}`;
+                
+                const toggleBtn = includeAll
+                    ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="exportToGoogleCalendar(false)">
+                        <i class="fas fa-filter me-1"></i>Mostrar Apenas Novas
+                       </button>`
+                    : (jaExportadas > 0 ? `<button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportToGoogleCalendar(true)">
+                        <i class="fas fa-eye me-1"></i>Mostrar Todas (${totalGeral})
+                       </button>` : '');
+                
+                const modalHtml = `
+                    <div class="modal fade" id="googleExportModal" tabindex="-1">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header bg-success text-white">
+                                    <h5 class="modal-title"><i class="fab fa-google me-2"></i>Exportar para Google Calendar</h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="alert alert-info mb-0 flex-grow-1 me-2">
+                                            <i class="fas fa-info-circle me-2"></i>${infoMessage}
+                                        </div>
+                                        ${toggleBtn}
+                                    </div>
+                                    
+                                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="selectAllVisits" onchange="toggleSelectAllVisits(this)">
+                                            <label class="form-check-label fw-bold" for="selectAllVisits">
+                                                Selecionar Todas
+                                            </label>
+                                        </div>
+                                        <span class="badge bg-primary" id="selectedCount">0 selecionadas</span>
+                                    </div>
+                                    
+                                    <div class="list-group" id="visitExportList">
+                                        ${data.export_urls.map((visit, index) => `
+                                            <label class="list-group-item list-group-item-action d-flex align-items-center ${visit.ja_exportada ? 'list-group-item-light' : ''}" style="cursor: pointer;">
+                                                <input class="form-check-input me-3 visit-checkbox" type="checkbox" 
+                                                       data-url="${visit.url}" data-title="${visit.title}" data-id="${visit.visit_id}"
+                                                       onchange="updateSelectedCount()">
+                                                <div class="flex-grow-1">
+                                                    <i class="fas fa-calendar-check ${visit.ja_exportada ? 'text-secondary' : 'text-success'} me-2"></i>
+                                                    <span>${visit.title}</span>
+                                                    ${visit.ja_exportada ? '<span class="badge bg-secondary ms-2">Já exportada</span>' : ''}
+                                                </div>
+                                            </label>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                                        <i class="fas fa-times me-1"></i>Cancelar
+                                    </button>
+                                    <button type="button" class="btn btn-success" onclick="exportSelectedVisits()" id="btnExportSelected" disabled>
+                                        <i class="fab fa-google me-1"></i>Exportar Selecionadas
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                const existingModal = document.getElementById('googleExportModal');
+                if (existingModal) {
+                    // Garantir que modal anterior é destruído corretamente
+                    const existingInstance = bootstrap.Modal.getInstance(existingModal);
+                    if (existingInstance) {
+                        existingInstance.dispose();
+                    }
+                    existingModal.remove();
+                }
+                
+                // Remover qualquer backdrop dangling
+                const backdrops = document.querySelectorAll('.modal-backdrop');
+                backdrops.forEach(bd => bd.remove());
+                
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                const newModal = document.getElementById('googleExportModal');
+                const modal = new bootstrap.Modal(newModal);
+                
+                // Remover backdrop ao fechar
+                newModal.addEventListener('hidden.bs.modal', function() {
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+                });
+                
+                modal.show();
+            } else {
+                alert(data.error || 'Erro ao gerar link do Google Calendar.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro na exportação:', error);
+            alert('Erro ao exportar para Google Calendar.');
+        });
+}
+
+function toggleSelectAllVisits(checkbox) {
+    const allCheckboxes = document.querySelectorAll('.visit-checkbox');
+    allCheckboxes.forEach(cb => cb.checked = checkbox.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.visit-checkbox');
+    const checkedCount = document.querySelectorAll('.visit-checkbox:checked').length;
+    const countBadge = document.getElementById('selectedCount');
+    const exportBtn = document.getElementById('btnExportSelected');
+    const selectAllCheckbox = document.getElementById('selectAllVisits');
+    
+    if (countBadge) {
+        countBadge.textContent = `${checkedCount} selecionada${checkedCount !== 1 ? 's' : ''}`;
+    }
+    
+    if (exportBtn) {
+        exportBtn.disabled = checkedCount === 0;
+        exportBtn.innerHTML = checkedCount > 0 
+            ? `<i class="fab fa-google me-1"></i>Exportar ${checkedCount} Visita${checkedCount !== 1 ? 's' : ''}`
+            : `<i class="fab fa-google me-1"></i>Exportar Selecionadas`;
+    }
+    
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = checkedCount === checkboxes.length && checkboxes.length > 0;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+    }
+}
+
+let pendingExportUrls = [];
+let currentExportIndex = 0;
+
+function exportSelectedVisits() {
+    const selectedVisits = document.querySelectorAll('.visit-checkbox:checked');
+    
+    if (selectedVisits.length === 0) {
+        alert('Selecione pelo menos uma visita para exportar.');
+        return;
+    }
+    
+    pendingExportUrls = [];
+    currentExportIndex = 0;
+    const visitIds = [];
+    
+    selectedVisits.forEach((checkbox) => {
+        const url = checkbox.dataset.url;
+        const title = checkbox.dataset.title;
+        const visitId = checkbox.dataset.id;
+        pendingExportUrls.push({ url, title, visitId });
+        visitIds.push(parseInt(visitId));
+    });
+    
+    fetch('/api/visits/export/google/mark', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({ visit_ids: visitIds })
+    }).catch(err => console.log('Erro ao marcar visitas:', err));
+    
+    const existingModal = document.getElementById('googleExportModal');
+    if (existingModal) {
+        const modal = bootstrap.Modal.getInstance(existingModal);
+        if (modal) {
+            modal.hide();
+            // Aguardar fechamento da modal
+            setTimeout(() => {
+                showExportProgressModal();
+                openNextVisit();
+            }, 300);
+        } else {
+            showExportProgressModal();
+            openNextVisit();
+        }
+    } else {
+        showExportProgressModal();
+        openNextVisit();
+    }
+}
+
+function showExportProgressModal() {
+    const existingProgress = document.getElementById('exportProgressModal');
+    if (existingProgress) existingProgress.remove();
+    
+    const totalVisits = pendingExportUrls.length;
+    
+    const modalHtml = `
+        <div class="modal fade" id="exportProgressModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="fab fa-google me-2"></i>Exportando para Google Calendar</h5>
+                    </div>
+                    <div class="modal-body text-center py-4">
+                        <div class="mb-3">
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" 
+                                     id="exportProgressBar" role="progressbar" style="width: 0%">
+                                    <span id="exportProgressText">0 / ${totalVisits}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mb-3" id="exportCurrentVisit">Preparando exportação...</p>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Importante:</strong> Clique em "Abrir Próxima" para cada visita.<br>
+                            Salve cada evento no Google Calendar antes de continuar.
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-success btn-lg" id="btnOpenNext" onclick="openNextVisit()">
+                                <i class="fab fa-google me-2"></i>Abrir Visita 1 de ${totalVisits}
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="skipRemainingExports()">
+                                <i class="fas fa-times me-1"></i>Cancelar Restantes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('exportProgressModal'));
+    modal.show();
+}
+
+function openNextVisit() {
+    if (currentExportIndex >= pendingExportUrls.length) {
+        finishExport();
+        return;
+    }
+    
+    const visit = pendingExportUrls[currentExportIndex];
+    const totalVisits = pendingExportUrls.length;
+    
+    const progressBar = document.getElementById('exportProgressBar');
+    const progressText = document.getElementById('exportProgressText');
+    const currentVisitText = document.getElementById('exportCurrentVisit');
+    const btnOpenNext = document.getElementById('btnOpenNext');
+    
+    const popup = window.open(visit.url, '_blank');
+    
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+        currentVisitText.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Pop-up bloqueado!</strong><br>
+                <a href="${visit.url}" target="_blank" class="btn btn-success btn-sm mt-2">
+                    <i class="fab fa-google me-1"></i>Clique aqui para abrir: ${visit.title}
+                </a>
+            </div>
+        `;
+    } else {
+        currentVisitText.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>Aberto: <strong>${visit.title}</strong>`;
+    }
+    
+    currentExportIndex++;
+    
+    const progress = Math.round((currentExportIndex / totalVisits) * 100);
+    progressBar.style.width = `${progress}%`;
+    progressText.textContent = `${currentExportIndex} / ${totalVisits}`;
+    
+    if (currentExportIndex >= totalVisits) {
+        btnOpenNext.innerHTML = '<i class="fas fa-check-circle me-2"></i>Concluir';
+        btnOpenNext.classList.remove('btn-success');
+        btnOpenNext.classList.add('btn-primary');
+        btnOpenNext.onclick = finishExport;
+    } else {
+        btnOpenNext.innerHTML = `<i class="fab fa-google me-2"></i>Abrir Visita ${currentExportIndex + 1} de ${totalVisits}`;
+    }
+}
+
+function skipRemainingExports() {
+    if (confirm('Deseja cancelar a exportação das visitas restantes?')) {
+        finishExport();
+    }
+}
+
+function finishExport() {
+    const modalEl = document.getElementById('exportProgressModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (modal) {
+        modal.hide();
+        setTimeout(() => {
+            if (modalEl) modalEl.remove();
+            // Remover backdrop dangling e resetar body
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(bd => bd.remove());
+            document.body.classList.remove('modal-open');
+        }, 300);
+    }
+    
+    const exported = currentExportIndex;
+    const total = pendingExportUrls.length;
+    
+    if (exported > 0) {
+        alert(`${exported} de ${total} visita(s) exportada(s) para o Google Calendar!`);
+    }
+    
+    pendingExportUrls = [];
+    currentExportIndex = 0;
+}
+
+function exportToOutlook() {
+    window.open('/api/visits/export/ics', '_blank');
+}
+
+function exportToICS() {
+    window.location.href = '/api/visits/export/ics';
+}
+
+function exportSingleVisit(visitId) {
+    fetch(`/api/visits/${visitId}/export/google`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.open(data.url, '_blank');
+            } else {
+                alert('Erro ao gerar link do Google Calendar.');
+            }
+        })
+        .catch(error => {
+            console.error('Erro na exportação:', error);
+            alert('Erro ao exportar visita.');
+        });
+}
+</script>
+{% endblock %}

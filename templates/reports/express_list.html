@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios Express{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-bolt text-warning"></i> Relatórios Express</h3>
+                    <a href="{{ url_for('new_express_report') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Novo Relatório Express
+                    </a>
+                </div>
+
+                <div class="card-body border-bottom">
+                    <form method="GET" action="{{ url_for('express_reports_list') }}" id="expressFiltersForm">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Busca Rápida</label>
+                                <input type="text" class="form-control" name="q" value="{{ search_query or '' }}" 
+                                       placeholder="Digite o número, título ou obra...">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-1"></i>Buscar
+                                    </button>
+                                    {% if search_query or status_filter %}
+                                    <a href="{{ url_for('express_reports_list') }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Limpar
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Status:</label>
+                                <select class="form-select form-select-sm" name="status" onchange="this.form.submit()">
+                                    <option value="">Todos os Status</option>
+                                    <option value="Em preenchimento" {% if status_filter == 'Em preenchimento' %}selected{% endif %}>Em preenchimento</option>
+                                    <option value="Aguardando Aprovação" {% if status_filter == 'Aguardando Aprovação' %}selected{% endif %}>Aguardando Aprovação</option>
+                                    <option value="Aprovado" {% if status_filter == 'Aprovado' %}selected{% endif %}>Aprovado</option>
+                                    <option value="Rejeitado" {% if status_filter == 'Rejeitado' %}selected{% endif %}>Rejeitado</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <small class="text-muted">
+                                    <strong>{{ relatorios.total if relatorios else 0 }}</strong> relatório(s) encontrado(s)
+                                </small>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card-body">
+                    {% if relatorios and relatorios.items %}
+                        <div class="mobile-reports-list">
+                            {% for report in relatorios.items %}
+                            <div class="report-card mb-2">
+                                <div class="card border-0 shadow-sm h-100" style="background: #f8f9fa;">
+                                    <div class="card-body p-3">
+                                        <div class="row align-items-center">
+                                            <div class="col-8">
+                                                <div class="fw-bold text-primary mb-1" style="font-size: 0.9rem;">
+                                                    {{ report.numero or 'N/A' }}
+                                                </div>
+
+                                                <div class="fw-semibold text-dark mb-1" style="font-size: 0.95rem; line-height: 1.2;">
+                                                    {{ report.titulo or 'Sem título' }}
+                                                </div>
+
+                                                <div class="text-muted" style="font-size: 0.8rem;">
+                                                    <i class="fas fa-building me-1"></i>{{ report.obra_nome or 'Sem obra' }}
+                                                    {% if report.data_relatorio %} 
+                                                    <i class="fas fa-calendar-alt ms-2 me-1"></i>{{ report.data_relatorio.strftime('%d/%m/%Y') }}
+                                                    {% endif %}
+                                                </div>
+
+                                                <div class="text-muted" style="font-size: 0.75rem;">
+                                                    {% if report.autor %}
+                                                        <i class="fas fa-user me-1"></i>{{ report.autor.nome_completo }}
+                                                    {% endif %}
+                                                    {% if report.obra_construtora %}
+                                                        <i class="fas fa-hard-hat ms-2 me-1"></i>{{ report.obra_construtora }}
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+
+                                            <div class="col-4 text-end">
+                                                <div class="mb-2 d-flex justify-content-end">
+                                                    {% if report.status == 'Em preenchimento' %}
+                                                        <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">Em preenchimento</span>
+                                                    {% elif report.status == 'Aprovado' %}
+                                                        <span class="badge bg-success" style="font-size: 0.65rem;">Aprovado</span>
+                                                    {% elif report.status == 'Rejeitado' %}
+                                                        <span class="badge bg-danger" style="font-size: 0.65rem;">Rejeitado</span>
+                                                    {% elif report.status == 'Aguardando Aprovação' %}
+                                                        <span class="badge bg-info" style="font-size: 0.6rem;">Aguardando</span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary" style="font-size: 0.65rem;">{{ report.status or 'Indefinido' }}</span>
+                                                    {% endif %}
+                                                </div>
+
+                                                <div class="d-flex flex-column gap-1">
+                                                    {% if report.status == 'Aprovado' %}
+                                                        <a href="{{ url_for('view_express_report', report_id=report.id) }}" 
+                                                           class="btn btn-sm btn-outline-success">
+                                                            <i class="fas fa-eye me-1"></i>Ver
+                                                        </a>
+                                                        <a href="{{ url_for('duplicate_express_report', report_id=report.id) }}" 
+                                                           class="btn btn-sm btn-outline-info">
+                                                            <i class="fas fa-copy me-1"></i>Duplicar
+                                                        </a>
+                                                    {% elif report.status == 'Rejeitado' %}
+                                                        <a href="{{ url_for('edit_express_report', report_id=report.id) }}" 
+                                                           class="btn btn-sm btn-outline-warning">
+                                                            <i class="fas fa-edit me-1"></i>Revisar
+                                                        </a>
+                                                    {% elif report.status == 'Em preenchimento' %}
+                                                        <a href="{{ url_for('edit_express_report', report_id=report.id) }}" 
+                                                           class="btn btn-sm btn-outline-primary">
+                                                            <i class="fas fa-edit me-1"></i>Continuar
+                                                        </a>
+                                                    {% elif report.status == 'Aguardando Aprovação' %}
+                                                        <a href="{{ url_for('view_express_report', report_id=report.id) }}" 
+                                                           class="btn btn-sm btn-outline-info">
+                                                            <i class="fas fa-search me-1"></i>Revisar
+                                                        </a>
+                                                    {% endif %}
+                                                    
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% endfor %}
+                        </div>
+
+                        {% if relatorios.pages > 1 %}
+                        <nav class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                {% if relatorios.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('express_reports_list', page=relatorios.prev_num, status=status_filter, q=search_query) }}">
+                                        <i class="fas fa-chevron-left"></i>
+                                    </a>
+                                </li>
+                                {% endif %}
+                                
+                                {% for page_num in relatorios.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                                    {% if page_num %}
+                                        <li class="page-item {% if page_num == relatorios.page %}active{% endif %}">
+                                            <a class="page-link" href="{{ url_for('express_reports_list', page=page_num, status=status_filter, q=search_query) }}">
+                                                {{ page_num }}
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if relatorios.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('express_reports_list', page=relatorios.next_num, status=status_filter, q=search_query) }}">
+                                        <i class="fas fa-chevron-right"></i>
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-bolt fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Nenhum Relatório Express encontrado</h5>
+                            <p class="text-muted">Crie seu primeiro Relatório Express clicando no botão acima.</p>
+                            <a href="{{ url_for('new_express_report') }}" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i>Novo Relatório Express
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

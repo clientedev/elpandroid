@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Reembolsos - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-money-bill-wave me-2"></i>
+                Meus Reembolsos
+            </h1>
+            <a href="{{ url_for('reimbursement_new') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Nova Solicitação
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if reembolsos %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Período</th>
+                                    <th>Projeto</th>
+                                    <th>Quilometragem</th>
+                                    <th>Alimentação</th>
+                                    <th>Hospedagem</th>
+                                    <th>Outros</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                    <th>Criado em</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reembolso in reembolsos %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ reembolso.periodo_inicio.strftime('%d/%m/%Y') }}</strong> a<br>
+                                        <strong>{{ reembolso.periodo_fim.strftime('%d/%m/%Y') }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if reembolso.projeto %}
+                                            {{ reembolso.projeto.numero }}<br>
+                                            <small class="text-muted">{{ reembolso.projeto.nome }}</small>
+                                        {% else %}
+                                            <span class="text-muted">Geral</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if reembolso.quilometragem %}
+                                            {{ "%.1f"|format(reembolso.quilometragem) }} km<br>
+                                            <small class="text-muted">R$ {{ "%.2f"|format(reembolso.valor_km) }}/km</small><br>
+                                            <strong>R$ {{ "%.2f"|format(reembolso.quilometragem * reembolso.valor_km) }}</strong>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if reembolso.alimentacao %}
+                                            <strong>R$ {{ "%.2f"|format(reembolso.alimentacao) }}</strong>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if reembolso.hospedagem %}
+                                            <strong>R$ {{ "%.2f"|format(reembolso.hospedagem) }}</strong>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if reembolso.outros_gastos %}
+                                            <strong>R$ {{ "%.2f"|format(reembolso.outros_gastos) }}</strong>
+                                            {% if reembolso.descricao_outros %}
+                                                <br><small class="text-muted">{{ reembolso.descricao_outros[:30] }}{{ '...' if reembolso.descricao_outros|length > 30 else '' }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong class="text-success">R$ {{ "%.2f"|format(reembolso.total) }}</strong>
+                                    </td>
+                                    <td>
+                                        {% if reembolso.status == 'Aprovado' %}
+                                            <span class="badge bg-success">{{ reembolso.status }}</span>
+                                        {% elif reembolso.status == 'Rejeitado' %}
+                                            <span class="badge bg-danger">{{ reembolso.status }}</span>
+                                        {% elif reembolso.status == 'Em Análise' %}
+                                            <span class="badge bg-warning">{{ reembolso.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ reembolso.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ reembolso.created_at.strftime('%d/%m/%Y') }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Summary -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-calculator me-2"></i>Resumo Geral
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h5 class="text-primary">{{ reembolsos|length }}</h5>
+                                                <small class="text-muted">Total de Solicitações</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h5 class="text-success">R$ {{ "%.2f"|format(reembolsos|sum(attribute='total')) }}</h5>
+                                                <small class="text-muted">Valor Total Solicitado</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h5 class="text-warning">{{ reembolsos|selectattr('status', 'equalto', 'Pendente')|list|length }}</h5>
+                                                <small class="text-muted">Pendentes</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="text-center">
+                                                <h5 class="text-info">{{ reembolsos|selectattr('status', 'equalto', 'Aprovado')|list|length }}</h5>
+                                                <small class="text-muted">Aprovados</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-money-bill-wave fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma solicitação de reembolso</h5>
+                        <p class="text-muted">Crie sua primeira solicitação de reembolso para quilometragem, alimentação e outros gastos.</p>
+                        <a href="{{ url_for('reimbursement_new') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Criar Primeira Solicitação
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

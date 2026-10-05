@@ -1,0 +1,356 @@
+
+{% extends "base.html" %}
+
+{% block title %}Relatórios Pendentes{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-clock me-2"></i>Relatórios Aguardando Aprovação</h3>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-warning fs-6">{{ relatorios.total if relatorios else 0 }} pendentes</span>
+                        <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Voltar
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Busca Simples -->
+                <div class="card-body border-bottom">
+                    <form method="GET" action="{{ url_for('pending_reports') }}">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">🔍 Busca Rápida</label>
+                                <input type="text" class="form-control" name="q" value="{{ request.args.get('q', '') }}" 
+                                       placeholder="Digite o número, título ou projeto do relatório...">
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-1"></i>Buscar
+                                    </button>
+                                    {% if request.args.get('q') %}
+                                    <a href="{{ url_for('pending_reports') }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Limpar
+                                    </a>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#filtrosAvancadosPending">
+                                        <i class="fas fa-filter me-1"></i>Busca Avançada
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Filtros Avançados (Colapsáveis) -->
+                <div class="collapse" id="filtrosAvancadosPending">
+                    <div class="card-body border-bottom">
+                        <h6 class="mb-3"><i class="fas fa-filter me-2"></i>Filtros Avançados</h6>
+                        <div class="row g-3">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Obra:</label>
+                                <select class="form-select form-select-sm" id="filterProjeto">
+                                    <option value="">Todas as Obras</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Autor:</label>
+                                <select class="form-select form-select-sm" id="filterAutor">
+                                    <option value="">Todos Autores</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Data Criação:</label>
+                                <input type="date" class="form-control form-control-sm" id="filterData">
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Pesquisar nos filtros:</label>
+                                <input type="text" class="form-control form-control-sm" id="searchPending" placeholder="Número ou título">
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="clearPendingFilters()">
+                                    <i class="fas fa-times"></i> Limpar Filtros Avançados
+                                </button>
+                                <small class="text-muted">
+                                    <span id="pendingFilteredCount">{{ relatorios.items|length if relatorios and relatorios.items else 0 }}</span> relatório(s) encontrado(s)
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    {% if relatorios and relatorios.items %}
+                        <!-- Layout de cards mobile-first sem rolagem horizontal -->
+                        <div class="mobile-reports-list" id="pendingTable">
+                            {% for report in relatorios.items %}
+                            <div class="report-card mb-2" 
+                                 data-projeto="{{ report.projeto.nome if report.projeto else 'Sem obra' }}"
+                                 data-autor="{{ report.autor.nome_completo if report.autor else 'Sem autor' }}"
+                                 data-search="{{ (report.numero + ' ' + (report.titulo or ''))|lower }}"
+                                 data-date="{{ report.created_at.strftime('%Y-%m-%d') if report.created_at else '' }}">
+
+                                <div class="card border-0 shadow-sm h-100" style="background: #fff3cd;">
+                                    <div class="card-body p-3">
+                                        <div class="row align-items-center">
+                                            <!-- Coluna principal com informações -->
+                                            <div class="col-8">
+                                                <!-- Número do relatório -->
+                                                <div class="fw-bold text-warning mb-1" style="font-size: 0.9rem;">
+                                                    <i class="fas fa-clock me-1"></i>{{ report.numero or 'N/A' }}
+                                                </div>
+
+                                                <!-- Título do relatório -->
+                                                <div class="fw-semibold text-dark mb-1" style="font-size: 0.95rem; line-height: 1.2;">
+                                                    {{ report.titulo or 'Sem título' }}
+                                                </div>
+
+                                                <!-- Informações adicionais -->
+                                                <div class="text-muted" style="font-size: 0.8rem;">
+                                                    {% if report.projeto %}
+                                                        {{ report.projeto.nome }}
+                                                    {% else %}
+                                                        Sem obra
+                                                    {% endif %}
+                                                    {% if report.data_relatorio %} • {{ report.data_relatorio.strftime('%d/%m/%Y') }}{% endif %}
+                                                </div>
+
+                                                <!-- Autor e data de criação -->
+                                                <div class="text-muted" style="font-size: 0.75rem;">
+                                                    {% if report.autor %}
+                                                        Por: {{ report.autor.nome_completo }}
+                                                    {% endif %}
+                                                    {% if report.created_at %}
+                                                        <br>Criado em: {{ report.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+
+                                            <!-- Coluna lateral com status e ações -->
+                                            <div class="col-4 text-end">
+                                                <!-- Status -->
+                                                <div class="mb-2 d-flex justify-content-end">
+                                                    <span class="badge bg-warning text-dark" style="font-size: 0.6rem; white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; padding: 4px 8px;">
+                                                        <i class="fas fa-clock me-1"></i>Aguardando
+                                                    </span>
+                                                </div>
+
+                                                <!-- Ações -->
+                                                <div class="d-flex flex-column gap-1">
+                                                    <!-- Botão Revisão (principal) - apenas para aprovadores deste projeto -->
+                                                    {% if current_user_is_aprovador(report.projeto_id) %}
+                                                    <a href="{{ url_for('review_report', report_id=report.id) }}" 
+                                                       class="btn btn-sm btn-warning" 
+                                                       title="Revisar relatório">
+                                                        <i class="fas fa-search-plus me-1"></i>Revisão
+                                                    </a>
+                                                    {% endif %}
+
+                                                    <!-- Botão Ver -->
+                                                    <a href="{{ url_for('view_report', report_id=report.id) }}" 
+                                                       class="btn btn-sm btn-outline-primary w-100" 
+                                                       title="Ver relatório">
+                                                        <i class="fas fa-eye me-1"></i>Ver
+                                                    </a>
+                                                    
+                                                    <!-- Ações de administrador -->
+                                                    {% if current_user.is_master %}
+                                                        <a href="{{ url_for('delete_report', id=report.id) }}" class="btn btn-sm btn-outline-danger w-100"
+                                                           onclick="return confirm('Excluir relatório {{ report.numero or 'este' }}? Esta ação não pode ser desfeita.')">
+                                                            <i class="fas fa-trash me-1"></i>Excluir
+                                                        </a>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Paginação -->
+                        {% if relatorios.pages > 1 %}
+                        <nav aria-label="Navegação de páginas">
+                            <ul class="pagination justify-content-center">
+                                {% if relatorios.has_prev %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('pending_reports', page=relatorios.page-1, q=request.args.get('q')) }}">Anterior</a>
+                                </li>
+                                {% endif %}
+
+                                {% for page_num in relatorios.iter_pages() %}
+                                    {% if page_num %}
+                                        {% if page_num != relatorios.page %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ url_for('pending_reports', page=page_num, q=request.args.get('q')) }}">{{ page_num }}</a>
+                                        </li>
+                                        {% else %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ page_num }}</span>
+                                        </li>
+                                        {% endif %}
+                                    {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% if relatorios.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ url_for('pending_reports', page=relatorios.page+1, q=request.args.get('q')) }}">Próxima</a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        {% endif %}
+
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-check-circle fa-4x text-success mb-3"></i>
+                            <h4>Nenhum relatório pendente</h4>
+                            <p class="text-muted">Todos os relatórios foram aprovados ou rejeitados.</p>
+                            <a href="{{ url_for('reports') }}" class="btn btn-primary">
+                                <i class="fas fa-file-alt me-1"></i>Ver Todos os Relatórios
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const pendingList = document.getElementById('pendingTable');
+    if (!pendingList) return;
+
+    const pendingCards = pendingList.querySelectorAll('.report-card');
+    console.log('Relatórios pendentes: encontrados', pendingCards.length, 'cards');
+
+    // Preencher filtros dinamicamente
+    fillPendingFilterOptions();
+
+    // Configurar eventos dos filtros
+    setupPendingFilters();
+
+    function fillPendingFilterOptions() {
+        const projetoSet = new Set();
+        const autorSet = new Set();
+
+        pendingCards.forEach(card => {
+            const projeto = card.getAttribute('data-projeto');
+            const autor = card.getAttribute('data-autor');
+
+            if (projeto && projeto !== '-' && projeto !== 'Sem obra') projetoSet.add(projeto);
+            if (autor && autor !== '-' && autor !== 'Sem autor') autorSet.add(autor);
+        });
+
+        console.log('Obras encontradas:', Array.from(projetoSet));
+        console.log('Autores encontrados:', Array.from(autorSet));
+
+        // Preencher select de projetos
+        const projetoSelect = document.getElementById('filterProjeto');
+        if (projetoSelect) {
+            projetoSet.forEach(projeto => {
+                const option = document.createElement('option');
+                option.value = projeto;
+                option.textContent = projeto;
+                projetoSelect.appendChild(option);
+            });
+        }
+
+        // Preencher select de autores
+        const autorSelect = document.getElementById('filterAutor');
+        if (autorSelect) {
+            autorSet.forEach(autor => {
+                const option = document.createElement('option');
+                option.value = autor;
+                option.textContent = autor;
+                autorSelect.appendChild(option);
+            });
+        }
+    }
+
+    function setupPendingFilters() {
+        const filterProjeto = document.getElementById('filterProjeto');
+        const filterAutor = document.getElementById('filterAutor');
+        const filterData = document.getElementById('filterData');
+        const searchInput = document.getElementById('searchPending');
+
+        [filterProjeto, filterAutor, filterData].forEach(filter => {
+            if (filter) filter.addEventListener('change', applyPendingFilters);
+        });
+
+        if (searchInput) searchInput.addEventListener('input', applyPendingFilters);
+    }
+
+    function applyPendingFilters() {
+        const projetoFilter = document.getElementById('filterProjeto')?.value || '';
+        const autorFilter = document.getElementById('filterAutor')?.value || '';
+        const dataFilter = document.getElementById('filterData')?.value || '';
+        const searchText = (document.getElementById('searchPending')?.value || '').toLowerCase();
+
+        console.log('Aplicando filtros pendentes:', { projetoFilter, autorFilter, dataFilter, searchText });
+
+        let visibleCount = 0;
+
+        pendingCards.forEach(card => {
+            const projeto = card.getAttribute('data-projeto') || '';
+            const autor = card.getAttribute('data-autor') || '';
+            const date = card.getAttribute('data-date') || '';
+            const searchData = card.getAttribute('data-search') || '';
+
+            const projetoMatch = !projetoFilter || projeto === projetoFilter;
+            const autorMatch = !autorFilter || autor === autorFilter;
+            const dateMatch = !dataFilter || date === dataFilter;
+            const searchMatch = !searchText || searchData.includes(searchText);
+
+            if (projetoMatch && autorMatch && dateMatch && searchMatch) {
+                card.style.display = '';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        const countElement = document.getElementById('pendingFilteredCount');
+        if (countElement) countElement.textContent = visibleCount;
+
+        console.log('Filtros aplicados. Visíveis:', visibleCount);
+    }
+
+    // Expor função global para o botão de limpar
+    window.clearPendingFilters = function() {
+        console.log('Limpando filtros pendentes');
+
+        const filters = ['filterProjeto', 'filterAutor', 'filterData', 'searchPending'];
+        filters.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.value = '';
+        });
+
+        pendingCards.forEach(card => {
+            card.style.display = '';
+        });
+
+        const countElement = document.getElementById('pendingFilteredCount');
+        if (countElement) countElement.textContent = pendingCards.length;
+    };
+
+    // Inicializar dropdowns Bootstrap
+    const dropdownElementList = document.querySelectorAll('.dropdown-toggle');
+    const dropdownList = [...dropdownElementList].map(dropdownToggleEl => new bootstrap.Dropdown(dropdownToggleEl));
+});
+</script>
+{% endblock %}

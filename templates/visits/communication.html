@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Comunicação da Visita - {{ visita.objetivo or 'Visita' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-comments me-2"></i>
+                        Comunicação da Visita
+                    </h5>
+                    <small class="text-muted">
+                        Projeto: {{ visita.projeto.nome }} | 
+                        Data: {{ visita.data_agendada.strftime('%d/%m/%Y às %H:%M') }}
+                    </small>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- Visit Information -->
+                    <div class="alert alert-info mb-4">
+                        <h6 class="alert-heading">Informações da Visita</h6>
+                        <p class="mb-1"><strong>Objetivo:</strong> {{ visita.objetivo or 'N/A' }}</p>
+                        <p class="mb-1"><strong>Responsável:</strong> {{ visita.responsavel.nome_completo if visita.responsavel else 'N/A' }}</p>
+                        <p class="mb-0"><strong>Status:</strong> 
+                            <span class="badge bg-{{ 'success' if visita.status == 'Realizada' else 'warning' if visita.status == 'Agendada' else 'danger' }}">
+                                {{ visita.status }}
+                            </span>
+                        </p>
+                    </div>
+                    
+                    <!-- Communication Form -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <form method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <div class="mb-3">
+                                    <label for="tipo" class="form-label">Tipo de Comunicação:</label>
+                                    <select class="form-select" id="tipo" name="tipo" required>
+                                        <option value="Comunicacao">Comunicação Geral</option>
+                                        <option value="Alerta">Alerta</option>
+                                        <option value="Observacao">Observação</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="mensagem" class="form-label">Mensagem:</label>
+                                    <textarea class="form-control" id="mensagem" name="mensagem" rows="4" required maxlength="1000"></textarea>
+                                    <div class="form-text">Máximo 1000 caracteres</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane"></i> Enviar Comunicação
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Communications History -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2 mb-3">
+                                <i class="fas fa-history me-2"></i>
+                                Histórico de Comunicações ({{ comunicacoes|length }})
+                            </h6>
+                            
+                            {% if comunicacoes %}
+                            <div class="timeline">
+                                {% for comunicacao in comunicacoes %}
+                                <div class="timeline-item mb-3">
+                                    <div class="card border-left-{{ 'danger' if comunicacao.tipo == 'Alerta' else 'info' if comunicacao.tipo == 'Observacao' else 'primary' }}">
+                                        <div class="card-body">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div>
+                                                    <h6 class="card-title mb-1">
+                                                        {{ comunicacao.usuario.nome_completo if comunicacao.usuario else 'Usuário Desconhecido' }}
+                                                        <span class="badge bg-{{ 'danger' if comunicacao.tipo == 'Alerta' else 'info' if comunicacao.tipo == 'Observacao' else 'primary' }} ms-2">
+                                                            {{ comunicacao.tipo }}
+                                                        </span>
+                                                    </h6>
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        {{ comunicacao.created_at.strftime('%d/%m/%Y às %H:%M') }}
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            <p class="card-text">{{ comunicacao.mensagem }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="alert alert-secondary text-center">
+                                <i class="fas fa-comments-slash fa-2x mb-2"></i>
+                                <p class="mb-0">Nenhuma comunicação registrada para esta visita.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="mt-4 border-top pt-3">
+                        <a href="{{ url_for('visit_view', visit_id=visita.id) }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Voltar à Visita
+                        </a>
+                        <a href="{{ url_for('visits_list') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-list"></i> Lista de Visitas
+                        </a>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.border-left-primary {
+    border-left: 4px solid #007bff !important;
+}
+
+.border-left-info {
+    border-left: 4px solid #17a2b8 !important;
+}
+
+.border-left-danger {
+    border-left: 4px solid #dc3545 !important;
+}
+
+.timeline-item {
+    position: relative;
+}
+
+.timeline-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 100%;
+    height: 20px;
+    width: 2px;
+    background-color: #dee2e6;
+}
+
+.timeline-item .card {
+    margin-left: 30px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #007bff;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px #dee2e6;
+}
+</style>
+{% endblock %}

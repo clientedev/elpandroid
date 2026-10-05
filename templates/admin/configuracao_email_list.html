@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações de E-mail{% endblock %}
+
+{% block extra_css %}
+<style>
+.config-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid #007bff;
+}
+.config-card.ativo {
+    border-left-color: #28a745;
+    background-color: #f8fff9;
+}
+.config-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.badge-status {
+    font-size: 0.75rem;
+}
+@media (max-width: 768px) {
+    .config-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .config-actions .btn {
+        width: 100%;
+        font-size: 0.875rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="fas fa-envelope-open-text me-2"></i>Configurações de E-mail</h2>
+        <p class="text-muted">Gerencie as configurações SMTP para envio de relatórios</p>
+    </div>
+    <a href="{{ url_for('configuracao_email_nova') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Nova Configuração
+    </a>
+</div>
+
+{% if configs %}
+    <div class="row">
+        {% for config in configs %}
+        <div class="col-lg-6 col-12 mb-4">
+            <div class="card config-card {% if config.ativo %}ativo{% endif %}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-1">
+                            <i class="fas fa-server me-2"></i>{{ config.nome_configuracao }}
+                        </h5>
+                        {% if config.ativo %}
+                            <span class="badge bg-success badge-status">Ativo</span>
+                        {% else %}
+                            <span class="badge bg-secondary badge-status">Inativo</span>
+                        {% endif %}
+                    </div>
+                    <div class="config-actions d-flex gap-2">
+                        <a href="{{ url_for('configuracao_email_editar', config_id=config.id) }}" 
+                           class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12 col-md-6">
+                            <strong>Servidor SMTP:</strong><br>
+                            <span class="text-muted">{{ config.servidor_smtp }}:{{ config.porta_smtp }}</span>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>Remetente:</strong><br>
+                            <span class="text-muted">{{ config.nome_remetente }}</span><br>
+                            <small class="text-muted">{{ config.email_remetente }}</small>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <strong>Configurações:</strong><br>
+                            <span class="badge bg-info me-1">
+                                {% if config.use_tls %}TLS{% else %}No TLS{% endif %}
+                            </span>
+                            <span class="badge bg-info me-1">
+                                {% if config.use_ssl %}SSL{% else %}No SSL{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>
+                                Criado em {{ config.created_at.strftime('%d/%m/%Y às %H:%M') }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-envelope-open fa-4x text-muted mb-3"></i>
+        <h4>Nenhuma configuração de e-mail</h4>
+        <p class="text-muted mb-4">Configure o SMTP para começar a enviar relatórios por e-mail</p>
+        <a href="{{ url_for('configuracao_email_nova') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Criar Primeira Configuração
+        </a>
+    </div>
+{% endif %}
+
+<!-- Cards informativos -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <h6><i class="fas fa-info-circle me-2"></i>Como funciona:</h6>
+            <ul class="mb-0">
+                <li>Configure suas credenciais SMTP (Gmail, Outlook, ou outro servidor)</li>
+                <li>Apenas uma configuração pode estar ativa por vez</li>
+                <li>Os relatórios serão enviados usando a configuração ativa</li>
+                <li>Você pode personalizar os templates de assunto e corpo do e-mail</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <i class="fab fa-google fa-2x text-primary mb-2"></i>
+                <h6>Gmail SMTP</h6>
+                <small class="text-muted">smtp.gmail.com:587<br>TLS ativado</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <i class="fab fa-microsoft fa-2x text-info mb-2"></i>
+                <h6>Outlook SMTP</h6>
+                <small class="text-muted">smtp-mail.outlook.com:587<br>TLS ativado</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <i class="fas fa-server fa-2x text-warning mb-2"></i>
+                <h6>Servidor Personalizado</h6>
+                <small class="text-muted">Configure seu próprio<br>servidor SMTP</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

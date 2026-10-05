@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Usuários - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-users me-2"></i>
+                Usuários do Sistema
+            </h1>
+            <a href="{{ url_for('register') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Novo Usuário
+            </a>
+        </div>
+        
+        <!-- Busca Simples -->
+        <div class="card mb-4">
+            <div class="card-body py-3">
+                <form method="GET" action="{{ url_for('users_list') }}">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-10">
+                            <label class="form-label fw-bold">🔍 Busca Rápida</label>
+                            <input type="text" class="form-control" name="q" value="{{ request.args.get('q', '') }}" 
+                                   placeholder="Digite o nome, usuário ou email...">
+                        </div>
+                        <div class="col-md-2">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-1"></i>Buscar
+                                </button>
+                                {% if request.args.get('q') %}
+                                <a href="{{ url_for('users_list') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i>Limpar
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if users %}
+                    <!-- Mobile-first responsive design -->
+                    <div class="d-none d-md-block">
+                        <!-- Desktop table view -->
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Nome Completo</th>
+                                        <th>Usuário</th>
+                                        <th>Email</th>
+                                        <th>Cargo</th>
+                                        <th>Tipo</th>
+                                        <th>Status</th>
+                                        <th>Cadastrado em</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in users %}
+                                    <tr>
+                                        <td>{{ user.nome_completo }}</td>
+                                        <td>{{ user.username }}</td>
+                                        <td>{{ user.email }}</td>
+                                        <td>{{ user.cargo or '-' }}</td>
+                                        <td>
+                                            {% if user.is_master %}
+                                                <span class="badge bg-danger">Master</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Usuário</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if user.ativo %}
+                                                <span class="badge bg-success">Ativo</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Inativo</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
+                                        <td>
+                                            <a href="{{ url_for('user_edit', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Mobile card view -->
+                    <div class="d-md-none">
+                        {% for user in users %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">{{ user.nome_completo }}</h6>
+                                    <div class="d-flex gap-1">
+                                        {% if user.is_master %}
+                                            <span class="badge bg-danger">Master</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Usuário</span>
+                                        {% endif %}
+                                        {% if user.ativo %}
+                                            <span class="badge bg-success">Ativo</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Inativo</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="small text-muted mb-2">
+                                    <div><strong>Usuário:</strong> {{ user.username }}</div>
+                                    <div><strong>Email:</strong> {{ user.email }}</div>
+                                    <div><strong>Cargo:</strong> {{ user.cargo or '-' }}</div>
+                                    <div><strong>Cadastrado em:</strong> {{ user.created_at.strftime('%d/%m/%Y') }}</div>
+                                </div>
+                                <div class="d-flex justify-content-end">
+                                    <a href="{{ url_for('user_edit', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum usuário cadastrado</h5>
+                        <p class="text-muted">Comece cadastrando o primeiro usuário do sistema.</p>
+                        <a href="{{ url_for('register') }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Cadastrar Primeiro Usuário
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Novo Relatório{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3><i class="fas fa-file-alt"></i> Novo Relatório</h3>
+                <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Voltar
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('create_report') }}" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="titulo" class="form-label">Título do Relatório *</label>
+                                    <input type="text" class="form-control" id="titulo" name="titulo" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="projeto_id" class="form-label">Obra *</label>
+                                    <select class="form-select" id="projeto_id" name="projeto_id" required>
+                                        <option value="">Selecione uma obra</option>
+                                        {% for projeto in projetos %}
+                                        <option value="{{ projeto.id }}">{{ projeto.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="data_relatorio" class="form-label">Data do Relatório</label>
+                                    <input type="date" class="form-control" id="data_relatorio" name="data_relatorio" value="{{ today }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="conteudo" class="form-label">Conteúdo / Observações</label>
+                            <textarea class="form-control" id="conteudo" name="conteudo" rows="5" 
+                                    placeholder="Descreva os detalhes da visita, observações importantes, etc."></textarea>
+                        </div>
+
+                        <!-- Upload de Fotos -->
+                        <div class="mb-4">
+                            <h5><i class="fas fa-camera"></i> Fotos</h5>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Foto 1</label>
+                                    <input type="file" class="form-control" name="photo_0" accept="image/*">
+                                    <input type="text" class="form-control mt-2" name="photo_caption_0" placeholder="Legenda da foto">
+                                    <select class="form-select mt-2" name="photo_category_0">
+                                        <option value="Geral">Geral</option>
+                                        <option value="Estrutura">Estrutura</option>
+                                        <option value="Acabamento">Acabamento</option>
+                                        <option value="Instalações">Instalações</option>
+                                        <option value="Problema">Problema</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Foto 2</label>
+                                    <input type="file" class="form-control" name="photo_1" accept="image/*">
+                                    <input type="text" class="form-control mt-2" name="photo_caption_1" placeholder="Legenda da foto">
+                                    <select class="form-select mt-2" name="photo_category_1">
+                                        <option value="Geral">Geral</option>
+                                        <option value="Estrutura">Estrutura</option>
+                                        <option value="Acabamento">Acabamento</option>
+                                        <option value="Instalações">Instalações</option>
+                                        <option value="Problema">Problema</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Foto 3</label>
+                                    <input type="file" class="form-control" name="photo_2" accept="image/*">
+                                    <input type="text" class="form-control mt-2" name="photo_caption_2" placeholder="Legenda da foto">
+                                    <select class="form-select mt-2" name="photo_category_2">
+                                        <option value="Geral">Geral</option>
+                                        <option value="Estrutura">Estrutura</option>
+                                        <option value="Acabamento">Acabamento</option>
+                                        <option value="Instalações">Instalações</option>
+                                        <option value="Problema">Problema</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Foto 4</label>
+                                    <input type="file" class="form-control" name="photo_3" accept="image/*">
+                                    <input type="text" class="form-control mt-2" name="photo_caption_3" placeholder="Legenda da foto">
+                                    <select class="form-select mt-2" name="photo_category_3">
+                                        <option value="Geral">Geral</option>
+                                        <option value="Estrutura">Estrutura</option>
+                                        <option value="Acabamento">Acabamento</option>
+                                        <option value="Instalações">Instalações</option>
+                                        <option value="Problema">Problema</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Foto 5</label>
+                                    <input type="file" class="form-control" name="photo_4" accept="image/*">
+                                    <input type="text" class="form-control mt-2" name="photo_caption_4" placeholder="Legenda da foto">
+                                    <select class="form-select mt-2" name="photo_category_4">
+                                        <option value="Geral">Geral</option>
+                                        <option value="Estrutura">Estrutura</option>
+                                        <option value="Acabamento">Acabamento</option>
+                                        <option value="Instalações">Instalações</option>
+                                        <option value="Problema">Problema</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('reports') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Concluir relatório
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

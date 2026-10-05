@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório Mensal de Visitas{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <h1 class="h3 fw-bold text-dark mb-4">
+                📊 Relatório Mensal de Visitas por Usuário
+            </h1>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <form method="POST" action="{{ url_for('reports_visits_monthly') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <!-- Selecionar Usuário -->
+                        <div class="mb-3">
+                            <label for="user_id" class="form-label fw-semibold">
+                                Selecionar Usuário *
+                            </label>
+                            <select id="user_id" name="user_id" required class="form-select">
+                                <option value="">Selecione um usuário...</option>
+                                {% for usuario in usuarios %}
+                                    <option value="{{ usuario.id }}">{{ usuario.nome_completo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Selecionar Mês e Ano -->
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label for="mes" class="form-label fw-semibold">
+                                    Mês *
+                                </label>
+                                <select id="mes" name="mes" required class="form-select">
+                                    {% set mes_atual = now().month if now else 1 %}
+                                    <option value="1" {% if mes_atual == 1 %}selected{% endif %}>Janeiro</option>
+                                    <option value="2" {% if mes_atual == 2 %}selected{% endif %}>Fevereiro</option>
+                                    <option value="3" {% if mes_atual == 3 %}selected{% endif %}>Março</option>
+                                    <option value="4" {% if mes_atual == 4 %}selected{% endif %}>Abril</option>
+                                    <option value="5" {% if mes_atual == 5 %}selected{% endif %}>Maio</option>
+                                    <option value="6" {% if mes_atual == 6 %}selected{% endif %}>Junho</option>
+                                    <option value="7" {% if mes_atual == 7 %}selected{% endif %}>Julho</option>
+                                    <option value="8" {% if mes_atual == 8 %}selected{% endif %}>Agosto</option>
+                                    <option value="9" {% if mes_atual == 9 %}selected{% endif %}>Setembro</option>
+                                    <option value="10" {% if mes_atual == 10 %}selected{% endif %}>Outubro</option>
+                                    <option value="11" {% if mes_atual == 11 %}selected{% endif %}>Novembro</option>
+                                    <option value="12" {% if mes_atual == 12 %}selected{% endif %}>Dezembro</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="ano" class="form-label fw-semibold">
+                                    Ano *
+                                </label>
+                                <select id="ano" name="ano" required class="form-select">
+                                    {% set ano_atual = now().year if now else 2024 %}
+                                    {% for ano in range(ano_atual - 2, ano_atual + 2) %}
+                                        <option value="{{ ano }}" {% if ano == ano_atual %}selected{% endif %}>{{ ano }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Selecionar Formato -->
+                        <div class="mb-3">
+                            <label for="formato" class="form-label fw-semibold">
+                                Formato do Relatório *
+                            </label>
+                            <select id="formato" name="formato" required class="form-select">
+                                <option value="pdf">PDF</option>
+                                <option value="excel">Excel (XLSX)</option>
+                            </select>
+                        </div>
+
+                        <!-- Informações sobre o relatório -->
+                        <div class="alert alert-info mb-3">
+                            <h6 class="alert-heading fw-semibold">ℹ️ Informações</h6>
+                            <ul class="mb-0 small">
+                                <li>O relatório inclui <strong>todas as visitas</strong> do usuário selecionado no período</li>
+                                <li>São consideradas visitas onde o usuário é <strong>responsável</strong> ou <strong>participante</strong></li>
+                                <li>Métricas incluem: total de visitas, distribuição por status e por projeto</li>
+                                <li>O detalhamento lista todas as visitas com data, número, projeto e status</li>
+                            </ul>
+                        </div>
+
+                        <!-- Botões -->
+                        <div class="d-grid gap-2 d-md-flex">
+                            <button type="submit" class="btn btn-primary flex-grow-1">
+                                <i class="fas fa-download me-2"></i>
+                                Gerar Relatório
+                            </button>
+                            <a href="{{ url_for('visits_list') }}" class="btn btn-secondary">
+                                Voltar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Exemplos de uso -->
+            <div class="card mt-4 bg-light">
+                <div class="card-body">
+                    <h6 class="card-title fw-semibold">💡 Como usar</h6>
+                    <ol class="mb-0 small">
+                        <li>Selecione o usuário para o qual deseja gerar o relatório</li>
+                        <li>Escolha o mês e ano do período de análise</li>
+                        <li>Selecione o formato desejado (PDF para impressão, Excel para análise)</li>
+                        <li>Clique em "Gerar Relatório" para fazer o download</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

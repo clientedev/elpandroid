@@ -1,0 +1,205 @@
+<!-- Indicador de Status Offline -->
+<div id="offline-status-panel" class="card border-warning" style="display: none; position: fixed; bottom: 20px; right: 20px; z-index: 9999; min-width: 320px;">
+    <div class="card-header bg-warning text-dark">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <i class="fas fa-wifi-slash me-2"></i>
+                <strong>Modo Offline</strong>
+            </div>
+            <button type="button" class="btn-close btn-close-dark" onclick="document.getElementById('offline-status-panel').style.display='none'"></button>
+        </div>
+    </div>
+    <div class="card-body">
+        <p class="mb-2">
+            <i class="fas fa-info-circle text-info me-2"></i>
+            Você está trabalhando offline. Seus dados serão salvos localmente.
+        </p>
+        <div id="pending-sync-count" style="display: none;">
+            <p class="mb-2">
+                <i class="fas fa-clock text-warning me-2"></i>
+                <span id="pending-count">0</span> item(s) aguardando sincronização
+            </p>
+        </div>
+        <div class="d-grid gap-2">
+            <button class="btn btn-sm btn-primary" onclick="window.offlineManager?.forcSync()" id="force-sync-btn">
+                <i class="fas fa-sync me-2"></i>
+                Tentar Sincronizar
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="showOfflineData()">
+                <i class="fas fa-database me-2"></i>
+                Ver Dados Locais
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para visualizar dados offline -->
+<div class="modal fade" id="offlineDataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-database me-2"></i>
+                    Dados Salvos Offline
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="offline-data-content">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                        <p class="mt-2">Carregando dados offline...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-warning" onclick="clearOfflineData()">
+                    <i class="fas fa-trash me-2"></i>
+                    Limpar Dados Locais
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Função para mostrar dados offline
+function showOfflineData() {
+    const modal = new bootstrap.Modal(document.getElementById('offlineDataModal'));
+    const content = document.getElementById('offline-data-content');
+    
+    // Obter dados do gerenciador offline
+    if (window.offlineManager) {
+        const offlineData = JSON.parse(localStorage.getItem('elp_offline_data') || '{}');
+        const syncQueue = JSON.parse(localStorage.getItem('elp_sync_queue') || '[]');
+        
+        let html = '<div class="row">';
+        
+        // Dados salvos offline
+        html += '<div class="col-md-6">';
+        html += '<h6><i class="fas fa-save me-2"></i>Dados Salvos Localmente</h6>';
+        
+        if (Object.keys(offlineData).length === 0) {
+            html += '<p class="text-muted">Nenhum dado salvo offline</p>';
+        } else {
+            Object.keys(offlineData).forEach(type => {
+                if (offlineData[type] && offlineData[type].length > 0) {
+                    html += `<div class="mb-3">`;
+                    html += `<strong>${getTypeName(type)}:</strong> ${offlineData[type].length} item(s)`;
+                    html += `<ul class="list-unstyled ms-3">`;
+                    offlineData[type].forEach(item => {
+                        html += `<li><small>• ${item.created_offline ? new Date(item.created_offline).toLocaleString() : 'Data não disponível'}</small></li>`;
+                    });
+                    html += `</ul></div>`;
+                }
+            });
+        }
+        html += '</div>';
+        
+        // Fila de sincronização
+        html += '<div class="col-md-6">';
+        html += '<h6><i class="fas fa-clock me-2"></i>Aguardando Sincronização</h6>';
+        
+        if (syncQueue.length === 0) {
+            html += '<p class="text-muted">Nenhum item na fila</p>';
+        } else {
+            syncQueue.forEach(item => {
+                html += `<div class="alert alert-warning py-2">`;
+                html += `<strong>${getTypeName(item.type)}</strong><br>`;
+                html += `<small>Criado: ${item.data.created_offline ? new Date(item.data.created_offline).toLocaleString() : 'N/A'}</small>`;
+                html += `</div>`;
+            });
+        }
+        html += '</div>';
+        html += '</div>';
+        
+        content.innerHTML = html;
+    } else {
+        content.innerHTML = '<p class="text-danger">Gerenciador offline não disponível</p>';
+    }
+    
+    modal.show();
+}
+
+// Função para obter nome amigável do tipo
+function getTypeName(type) {
+    const names = {
+        'reports': 'Relatórios',
+        'visits': 'Visitas', 
+        'projects': 'Projetos',
+        'reimbursements': 'Reembolsos'
+    };
+    return names[type] || type;
+}
+
+// Função para limpar dados offline
+function clearOfflineData() {
+    if (confirm('Tem certeza que deseja limpar todos os dados salvos offline? Esta ação não pode ser desfeita.')) {
+        localStorage.removeItem('elp_offline_data');
+        localStorage.removeItem('elp_sync_queue');
+        
+        // Atualizar interface
+        document.getElementById('pending-sync-count').style.display = 'none';
+        document.getElementById('pending-count').textContent = '0';
+        
+        // Fechar modal
+        bootstrap.Modal.getInstance(document.getElementById('offlineDataModal')).hide();
+        
+        // Mostrar confirmação
+        if (window.offlineManager) {
+            window.offlineManager.showSuccessMessage('Dados offline limpos com sucesso!');
+        }
+    }
+}
+
+// Atualizar status do painel offline
+function updateOfflineStatus() {
+    if (!window.offlineManager) return;
+    
+    const panel = document.getElementById('offline-status-panel');
+    const pendingDiv = document.getElementById('pending-sync-count');
+    const pendingCount = document.getElementById('pending-count');
+    const forceSyncBtn = document.getElementById('force-sync-btn');
+    
+    if (!navigator.onLine) {
+        panel.style.display = 'block';
+        
+        const count = window.offlineManager.getPendingCount();
+        if (count > 0) {
+            pendingDiv.style.display = 'block';
+            pendingCount.textContent = count;
+        } else {
+            pendingDiv.style.display = 'none';
+        }
+        
+        forceSyncBtn.disabled = true;
+        forceSyncBtn.innerHTML = '<i class="fas fa-wifi-slash me-2"></i>Sem Conexão';
+    } else {
+        // Online - ocultar painel após alguns segundos se não houver dados pendentes
+        const count = window.offlineManager.getPendingCount();
+        if (count === 0) {
+            setTimeout(() => {
+                panel.style.display = 'none';
+            }, 3000);
+        }
+        
+        forceSyncBtn.disabled = false;
+        forceSyncBtn.innerHTML = '<i class="fas fa-sync me-2"></i>Sincronizar';
+    }
+}
+
+// Verificar status a cada 5 segundos
+setInterval(updateOfflineStatus, 5000);
+
+// Atualizar status inicial
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(updateOfflineStatus, 1000);
+});
+
+// Atualizar status quando conexão mudar
+window.addEventListener('online', updateOfflineStatus);
+window.addEventListener('offline', updateOfflineStatus);
+</script>

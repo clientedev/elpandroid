@@ -1,0 +1,112 @@
+/* Mobile Accessibility - Eliminar Conflitos de Touch */
+
+/* Divs principais com formulários e listas - SEM ANIMAÇÃO */
+.card, .card-body, .card-header, 
+.container, .container-fluid, 
+.row, .col-12, .col-md-3, .col-sm-6,
+.form-group, .mb-3, .mb-4 {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    touch-action: manipulation !important;
+    
+    /* ELIMINAR TODAS ANIMAÇÕES */
+    -webkit-transition: none !important;
+    -moz-transition: none !important;
+    -o-transition: none !important;
+    transition: none !important;
+    
+    /* ELIMINAR TRANSFORMAÇÕES */
+    -webkit-transform: none !important;
+    -moz-transform: none !important;
+    -o-transform: none !important;
+    transform: none !important;
+    
+    /* ESTABILIZAR POSIÇÃO */
+    position: relative;
+    will-change: auto;
+}
+
+/* Formulários e inputs - PERMITIR apenas interação necessária */
+.form-control, .form-select, input, textarea, select {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-touch-callout: default !important;
+    touch-action: manipulation !important;
+    
+    /* SEM ANIMAÇÕES NOS INPUTS */
+    -webkit-transition: border-color 0.1s ease !important;
+    transition: border-color 0.1s ease !important;
+}
+
+/* Tabelas - SCROLL horizontal controlado APENAS dentro do container */
+.table-responsive {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    
+    /* FORÇA scroll horizontal APENAS dentro do container table-responsive */
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    max-width: 100% !important;
+    
+    /* SEM ANIMAÇÕES NA TABELA */
+    -webkit-transition: none !important;
+    transition: none !important;
+    -webkit-transform: none !important;
+    transform: none !important;
+}
+
+.table, .table th, .table td {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    
+    /* SEM ANIMAÇÕES NAS CÉLULAS */
+    -webkit-transition: none !important;
+    transition: none !important;
+    -webkit-transform: none !important;
+    transform: none !important;
+}
+
+/* Botões - SEM hover animações problemáticas */
+.btn {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    touch-action: manipulation !important;
+    
+    /* APENAS animação mínima de cor */
+    -webkit-transition: background-color 0.1s ease !important;
+    transition: background-color 0.1s ease !important;
+}
+
+/* Eliminar TODOS os hovers problemáticos em mobile */
+@media (max-width: 767.98px) {
+    *, *:hover, *:active, *:focus {
+        -webkit-transition: none !important;
+        transition: none !important;
+        -webkit-transform: none !important;
+        transform: none !important;
+    }
+    
+    /* FORÇA estabilidade total e previne overflow horizontal */
+    body, html {
+        overflow-x: hidden !important;
+        max-width: 100% !important;
+    }
+    
+    .card:hover, .btn:hover, .table-responsive:hover {
+        -webkit-transform: none !important;
+        transform: none !important;
+    }
+}
+
+/* Prevenir zoom acidental */
+input[type="text"], input[type="email"], input[type="password"], 
+input[type="number"], input[type="search"], textarea, select {
+    font-size: 16px !important;
+}

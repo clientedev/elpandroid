@@ -1,0 +1,2191 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório Express{% endblock %}
+
+{% block head %}
+<meta name="csrf-token" content="{{ csrf_token() }}">
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.checklist-item {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+}
+
+.checklist-item.completed {
+    border-left-color: #28a745;
+    background-color: #d4edda;
+}
+
+.photo-preview {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+.photo-category {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.photo-category.selected {
+    border-color: #007bff;
+    background-color: #e3f2fd;
+}
+
+.photo-category:hover {
+    border-color: #007bff;
+}
+
+@media (max-width: 768px) {
+    .photo-category {
+        min-height: 60px;
+        min-width: 60px;
+        touch-action: auto !important;
+        -webkit-user-select: none;
+        user-select: none;
+        cursor: pointer;
+        pointer-events: auto !important;
+        transition: all 0.15s ease;
+    }
+
+    .photo-category.touching {
+        transform: scale(0.95);
+        background-color: rgba(0, 123, 255, 0.1);
+        border-color: #007bff;
+    }
+
+    input[type="text"],
+    input[type="date"], 
+    input[type="file"],
+    input[type="email"],
+    input[type="tel"],
+    textarea,
+    select,
+    .form-control {
+        touch-action: auto !important;
+        -webkit-user-select: auto;
+        user-select: auto;
+    }
+
+    .container-fluid,
+    .row,
+    .card-body,
+    body,
+    html {
+        touch-action: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        overflow: auto !important;
+    }
+
+    #data_relatorio {
+        font-size: 16px;
+        font-weight: 400;
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+        box-shadow: none;
+    }
+}
+
+.mobile-photo-btn {
+    border-radius: 12px !important;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.mobile-photo-btn:hover, .mobile-photo-btn:focus {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.mobile-photo-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.mobile-photo-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.photo-card-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: #f8f9fa;
+}
+
+.photo-card-content {
+    padding: 16px;
+}
+
+.caption-input {
+    width: 100%;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 16px;
+    margin-bottom: 12px;
+    min-height: 48px;
+    transition: all 0.3s ease;
+}
+
+.caption-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.caption-select {
+    width: 100%;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 16px;
+    margin-bottom: 12px;
+    min-height: 48px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.caption-select:focus {
+    outline: none;
+    border-color: #28a745;
+    box-shadow: 0 0 0 3px rgba(40,167,69,0.1);
+}
+
+.photo-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.photo-card-btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    min-height: 42px;
+    border: 2px solid;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.photo-card-btn.edit {
+    background: white;
+    color: #007bff;
+    border-color: #007bff;
+}
+
+.photo-card-btn.edit:hover {
+    background: #007bff;
+    color: white;
+}
+
+.photo-card-btn.delete {
+    background: white;
+    color: #dc3545;
+    border-color: #dc3545;
+}
+
+.photo-card-btn.delete:hover {
+    background: #dc3545;
+    color: white;
+}
+
+.category-badge {
+    display: inline-block;
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.photo-count-badge {
+    background: #28a745;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.caption-status {
+    font-size: 12px;
+    margin-top: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.caption-status.complete {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.caption-status.pending {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.fixed-photo-buttons {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+@media (max-width: 768px) {
+    .mobile-photo-card {
+        margin-bottom: 20px;
+    }
+
+    .photo-card-image {
+        height: 160px;
+    }
+
+    .photo-card-content {
+        padding: 12px;
+    }
+
+    .caption-input, .caption-select {
+        font-size: 16px !important;
+    }
+}
+
+.obra-section {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #212529;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+}
+
+.obra-section .form-label {
+    color: #212529;
+    font-weight: 600;
+}
+
+.obra-section .form-control {
+    background: white;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+}
+
+.obra-section .form-control:focus {
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.15);
+    border-color: #80bdff;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<script>
+  const REPORT_DATA = {{ report_data | tojson | safe }};
+  const EDIT_MODE = {{ edit_mode | tojson | safe }};
+  const IS_DUPLICATE = {{ is_duplicate | default(false) | tojson | safe }};
+  console.log("📝 Dados carregados para Relatório Express:", REPORT_DATA);
+  console.log("📋 Modo duplicação:", IS_DUPLICATE);
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    // Preencher campos quando duplicando (existing_report é null)
+    if (IS_DUPLICATE && REPORT_DATA) {
+      console.log("📋 Preenchendo campos com dados duplicados...");
+      
+      // Campos da obra
+      if (REPORT_DATA.obra_nome) document.getElementById('obra_nome').value = REPORT_DATA.obra_nome;
+      if (REPORT_DATA.obra_construtora) document.getElementById('obra_construtora').value = REPORT_DATA.obra_construtora;
+      if (REPORT_DATA.obra_endereco) document.getElementById('obra_endereco').value = REPORT_DATA.obra_endereco;
+      if (REPORT_DATA.obra_tipo) document.getElementById('obra_tipo').value = REPORT_DATA.obra_tipo;
+      if (REPORT_DATA.obra_responsavel) document.getElementById('obra_responsavel').value = REPORT_DATA.obra_responsavel;
+      if (REPORT_DATA.obra_telefone) document.getElementById('obra_telefone').value = REPORT_DATA.obra_telefone;
+      if (REPORT_DATA.obra_email) document.getElementById('obra_email').value = REPORT_DATA.obra_email;
+      if (REPORT_DATA.titulo) document.getElementById('titulo').value = REPORT_DATA.titulo;
+      if (REPORT_DATA.numero) document.getElementById('numero').value = REPORT_DATA.numero;
+      
+      // Carregar acompanhantes duplicados
+      if (REPORT_DATA.acompanhantes && REPORT_DATA.acompanhantes.length > 0) {
+        try {
+          acompanhantesExpress = REPORT_DATA.acompanhantes;
+          if (typeof renderAcompanhantesExpress === 'function') {
+            setTimeout(renderAcompanhantesExpress, 150);
+          }
+        } catch (e) {
+          console.error('Erro ao carregar acompanhantes duplicados:', e);
+        }
+      }
+    }
+    
+    // Carregar checklist em modo edição OU duplicação
+    if ((EDIT_MODE || IS_DUPLICATE) && REPORT_DATA.checklist_data && REPORT_DATA.checklist_data.length > 0) {
+      console.log("📋 Carregando checklist salvo/duplicado...");
+      setTimeout(function() {
+        if (typeof loadChecklistData === 'function') {
+          loadChecklistData(REPORT_DATA.checklist_data);
+        }
+      }, 100);
+    }
+
+    // --- Lógica para Informações Técnicas ---
+    const technicalFields = document.querySelectorAll('.technical-field');
+    const technicalInput = document.getElementById('informacoes_tecnicas');
+
+    function updateTechnicalJson() {
+        const data = {};
+        technicalFields.forEach(field => {
+            const fieldName = field.getAttribute('data-field');
+            if (fieldName) {
+                data[fieldName] = field.value;
+            }
+        });
+        technicalInput.value = JSON.stringify(data);
+    }
+
+    // Adicionar listeners para atualização em tempo real
+    technicalFields.forEach(field => {
+        field.addEventListener('input', updateTechnicalJson);
+        field.addEventListener('change', updateTechnicalJson);
+    });
+
+    // Carregar dados existentes
+    if (REPORT_DATA.informacoes_tecnicas) {
+        try {
+            let techData = REPORT_DATA.informacoes_tecnicas;
+            // Se for string, tentar parsear
+            if (typeof techData === 'string') {
+                try {
+                    techData = JSON.parse(techData);
+                } catch (e) {
+                    console.error("Erro ao parsear informacoes_tecnicas:", e);
+                    techData = {};
+                }
+            }
+            
+            // Popula os campos
+            if (techData && typeof techData === 'object') {
+                technicalFields.forEach(field => {
+                    const fieldName = field.getAttribute('data-field');
+                    if (fieldName && techData[fieldName]) {
+                        field.value = techData[fieldName];
+                    }
+                });
+                // Atualiza o input hidden inicial
+                updateTechnicalJson();
+            }
+        } catch (e) {
+            console.error("Erro ao processar dados técnicos:", e);
+        }
+    }
+  });
+</script>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h3><i class="fas fa-bolt text-warning"></i> Relatório Express</h3>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-warning" id="status-badge">
+                                <i class="fas fa-edit me-1"></i>Em preenchimento
+                            </span>
+                            <div id="autosave-status"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{% if existing_report %}{{ url_for('update_express_report', report_id=existing_report.id) }}{% else %}{{ url_for('create_express_report') }}{% endif %}" enctype="multipart/form-data" id="expressReportForm" {% if existing_report %}data-report-id="{{ existing_report.id }}"{% endif %}>
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        {% if existing_report %}
+                        <input type="hidden" name="edit_report_id" value="{{ existing_report.id }}">
+                        {% endif %}
+
+                        {% if existing_report and existing_report.status == 'Rejeitado' and existing_report.comentario_aprovacao %}
+                        <div class="alert alert-danger mb-4" role="alert">
+                            <div class="d-flex align-items-start">
+                                <i class="fas fa-exclamation-triangle fa-2x me-3 text-danger"></i>
+                                <div>
+                                    <h5 class="alert-heading mb-2">
+                                        <i class="fas fa-times-circle me-2"></i>Relatório Rejeitado
+                                    </h5>
+                                    <p class="mb-2"><strong>Motivo da rejeição:</strong></p>
+                                    <p class="mb-0 border-start border-danger border-3 ps-3 py-2 bg-white rounded">
+                                        {{ existing_report.comentario_aprovacao }}
+                                    </p>
+                                    <hr class="my-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        Corrija os pontos indicados acima e reenvie o relatório para aprovação.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                                                <!-- 1. Título e Número -->
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label class="form-label fw-bold" for="titulo">Título do Relatório *</label>
+                                <input type="text" name="titulo" id="titulo" class="form-control" 
+                                       value="{% if existing_report %}{{ existing_report.titulo }}{% else %}Relatório Express de Visita{% endif %}" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="numero">
+                                    Número do Relatório
+                                    <i class="fas fa-info-circle text-info ms-1" data-bs-toggle="tooltip" 
+                                       title="O número é gerado automaticamente"></i>
+                                </label>
+                                {% if existing_report %}
+                                    <input type="text" name="numero" id="numero" class="form-control bg-light" 
+                                           value="{{ existing_report.numero }}" readonly>
+                                {% else %}
+                                    <input type="text" name="numero" id="numero" class="form-control bg-light" 
+                                           value="{{ next_numero }}" placeholder="EXP-0001" readonly>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- 3. Data -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <label class="form-label fw-bold" for="data_relatorio">Data do Relatório *</label>
+                                <input type="date" name="data_relatorio" id="data_relatorio" class="form-control" value="{{ today }}" required>
+                            </div>
+                        </div>
+
+                        <!-- 4. Cliente e 5. Nome da Obra -->
+                        <div class="row mb-4">
+                            <div class="col-md-6 mb-3 mb-md-0">
+                                <label class="form-label fw-bold" for="obra_construtora">Cliente</label>
+                                <input type="text" name="obra_construtora" id="obra_construtora" class="form-control" 
+                                       value="{% if existing_report %}{{ existing_report.obra_construtora }}{% endif %}"
+                                       placeholder="Nome do cliente">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold" for="obra_nome">Nome da Obra *</label>
+                                <input type="text" name="obra_nome" id="obra_nome" class="form-control" 
+                                       value="{% if existing_report %}{{ existing_report.obra_nome }}{% endif %}" 
+                                       placeholder="Ex: Edifício Residencial Aurora" required>
+                            </div>
+                        </div>
+
+                        <!-- 6. Endereço - Gps -->
+                        <div class="row mb-4">
+                             <div class="col-md-12">
+                                <label class="form-label fw-bold" for="obra_endereco">Endereço da Obra</label>
+                                <div class="input-group">
+                                    <input type="text" name="obra_endereco" id="obra_endereco" class="form-control" 
+                                           value="{% if existing_report %}{{ existing_report.obra_endereco }}{% endif %}"
+                                           placeholder="Rua, número, bairro, cidade">
+                                    <button class="btn btn-outline-primary fw-bold" type="button" id="btn-gps" onclick="getLocation()" title="Usar localização atual">
+                                        <i class="fas fa-map-marker-alt"></i> GPS
+                                    </button>
+                                </div>
+                                <small id="gps-status" class="form-text text-muted" style="display: none;"></small>
+                            </div>
+                        </div>
+
+                        <!-- 7. Funcionário da visita -->
+                        <div class="card mb-4 border-primary shadow-sm">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0 text-white">
+                                    <i class="fas fa-user-friends me-2"></i>Funcionários da Visita
+                                </h6>
+                                <button type="button" class="btn btn-sm btn-light text-primary fw-bold" onclick="abrirModalAcompanhantesExpress()">
+                                    <i class="fas fa-plus me-1"></i>Adicionar
+                                </button>
+                            </div>
+                            <div class="card-body p-3">
+                                <div id="lista-acompanhantes">
+                                    <p class="text-muted text-center py-2 mb-0">
+                                        <i class="fas fa-info-circle me-1"></i> Nenhum funcionário adicionado ainda.
+                                    </p>
+                                </div>
+                                <input type="hidden" id="acompanhantes-data" name="acompanhantes" value="[]">
+                            </div>
+                        </div>
+
+                        <!-- 8. Informações técnicas (botão precisa ser mais visível) -->
+                        <div class="mb-4">
+                            <button class="btn btn-primary btn-lg w-100 text-start d-flex justify-content-between align-items-center shadow" type="button" data-bs-toggle="collapse" data-bs-target="#technicalInfoCollapse" aria-expanded="false" aria-controls="technicalInfoCollapse">
+                                <span class="fw-bold"><i class="fas fa-ruler-combined me-2"></i>Informações Técnicas da Obra</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="collapse mt-3" id="technicalInfoCollapse">
+                                <div class="card card-body bg-light shadow-sm border-0">
+                                    <div class="row g-3">
+                                        <div class="col-12"><label class="form-label small fw-bold">Elementos construtivos da base</label><input type="text" class="form-control technical-field" data-field="elementos_construtivos_base"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Especificação chapisco colante</label><input type="text" class="form-control technical-field" data-field="especificacao_chapisco_colante"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Especificação chapisco da alvenaria</label><input type="text" class="form-control technical-field" data-field="especificacao_chapisco_alvenaria"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Especificação da argamassa de emboço</label><input type="text" class="form-control technical-field" data-field="especificacao_argamassa_emboco"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Forma da aplicação da argamassa de emboço</label><input type="text" class="form-control technical-field" data-field="forma_aplicacao_argamassa"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Acabamentos do revestimento</label><input type="text" class="form-control technical-field" data-field="acabamentos_revestimento"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Acabamento em peitoris de janela</label><input type="text" class="form-control technical-field" data-field="acabamento_peitoris"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Acabamento em muretas de terraços</label><input type="text" class="form-control technical-field" data-field="acabamento_muretas"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Definição sobre frisos de mudança de cor de textura</label><input type="text" class="form-control technical-field" data-field="definicao_frisos_cor"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Definição sobre face inferior das abas (friso pingadeira ou caimento invertido)</label><input type="text" class="form-control technical-field" data-field="definicao_face_inferior_abas"></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Caso haja projeto de fachada, especificar o projetista e fazer observações sobre procedimentos específicos ou divergências de orientações</label><textarea class="form-control technical-field" data-field="observacoes_projeto_fachada" rows="2"></textarea></div>
+                                        <div class="col-12"><label class="form-label small fw-bold">Outras observações</label><textarea class="form-control technical-field" data-field="outras_observacoes" rows="2"></textarea></div>
+                                    </div>
+                                    <input type="hidden" name="informacoes_tecnicas" id="informacoes_tecnicas">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 9. Checklist (botão precisa ser mais visível) -->
+                        <div class="mb-4">
+                            <button class="btn btn-info btn-lg w-100 text-start d-flex justify-content-between align-items-center shadow text-white" type="button" data-bs-toggle="collapse" data-bs-target="#checklistCollapse" aria-expanded="false" aria-controls="checklistCollapse" style="background-color: #17a2b8; border-color: #17a2b8;">
+                                <span class="fw-bold"><i class="fas fa-tasks me-2"></i>Checklist da Obra</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="collapse mt-3" id="checklistCollapse">
+                                <div class="card card-body bg-light shadow-sm border-0">
+                                    <div id="checklistItems">
+                                        {% if checklist_items %}
+                                            {% for item in checklist_items %}
+                                            <div class="checklist-item mb-3" data-item-id="std_{{ item.id }}">
+                                                <div class="form-check">
+                                                    <input class="form-check-input checklist-checkbox" type="checkbox" id="std_{{ item.id }}" data-item="{{ item.texto }}">
+                                                    <label class="form-check-label fw-bold" for="std_{{ item.id }}">
+                                                        {{ item.texto }}
+                                                    </label>
+                                                </div>
+                                                <textarea class="form-control mt-2 checklist-obs" name="obs_std_{{ item.id }}" placeholder="Observações..." style="display: none;"></textarea>
+                                            </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="alert alert-info">
+                                                <i class="fas fa-info-circle"></i> Nenhum item de checklist padrão encontrado. Adicione itens personalizados abaixo.
+                                            </div>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="text-center mt-3">
+                                        <button type="button" class="btn btn-outline-info fw-bold" onclick="addCustomChecklistItem()">
+                                            <i class="fas fa-plus me-1"></i> Adicionar Item Personalizado
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 10. Observações Gerais -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold" for="conteudo"><i class="fas fa-edit me-2 text-secondary"></i>Observações Gerais</label>
+                            <textarea class="form-control" name="conteudo" id="conteudo" rows="4" 
+                                    placeholder="Descreva detalhes gerais da visita, pontos importantes, etc.">{% if existing_report and existing_report.conteudo %}{{ existing_report.conteudo }}{% endif %}</textarea>
+                        </div>
+
+                        <!-- 11. Fotos -->
+                        <div class="mb-4">
+                            <h5 class="fw-bold"><i class="fas fa-camera text-primary me-2"></i>Fotos (Até 200 fotos) <span id="photoCount" class="badge bg-primary ms-2">0</span></h5>
+
+                            <div class="fixed-photo-buttons sticky-top bg-white p-3 mb-3 border rounded shadow-sm" style="z-index: 10;">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-primary w-100 mobile-photo-btn" 
+                                                id="mobileCameraBtn" onclick="mobileCaptureFromCamera()" style="min-height: 56px;">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <i class="fas fa-camera fa-lg mb-1"></i>
+                                                <small class="fw-bold">Câmera</small>
+                                            </div>
+                                        </button>
+                                    </div>
+                                    <div class="col-6">
+                                        <button type="button" class="btn btn-outline-success w-100 mobile-photo-btn" 
+                                                id="mobileGalleryBtn" onclick="mobileSelectFromGallery()" style="min-height: 56px;">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <i class="fas fa-images fa-lg mb-1"></i>
+                                                <small class="fw-bold">Galeria</small>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                                <input type="file" id="mobilePhotoInput" class="form-control" multiple accept="image/*" style="display: none;">
+                                <input type="file" id="mobileCameraInput" class="form-control" accept="image/*" capture="environment" style="display: none;">
+                                <div class="text-center mt-2">
+                                    <small class="text-muted"><strong>Máximo 200 fotos - Limite total: 3GB</strong></small>
+                                </div>
+                            </div>
+
+                            <div id="mobilePhotoCards" class="row g-3"></div>
+
+                            <div id="quickPhotoActions" class="text-center mt-3 p-3 bg-light rounded" style="display: none;">
+                                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                    <button type="button" class="btn btn-success fw-bold shadow-sm" onclick="mobileCaptureFromCamera()" style="min-height: 48px; border-radius: 24px;">
+                                        <i class="fas fa-camera me-2"></i>Adicionar da Câmera
+                                    </button>
+                                    <button type="button" class="btn btn-outline-success fw-bold bg-white shadow-sm" onclick="mobileSelectFromGallery()" style="min-height: 48px; border-radius: 24px;">
+                                        <i class="fas fa-images me-2"></i>Adicionar da Galeria
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mt-2">Total: <span id="quickPhotoCount">0</span> fotos (máximo 200)</small>
+                            </div>
+
+                            <div id="photoPreview" class="row" style="display: none;"></div>
+                        </div>
+
+                        <!-- Botões (Salvar de um lado, Enviar do outro) -->
+                        <div class="d-flex justify-content-between align-items-center mt-5 pt-4 border-top">
+                            <div class="d-flex w-100 justify-content-between gap-3">
+                                {% if existing_report and existing_report.status == 'Aguardando Aprovação' %}
+                                <a href="{{ url_for('express_reports_list') }}" class="btn btn-outline-secondary w-50 fw-bold py-2 shadow-sm bg-white">
+                                    <i class="fas fa-arrow-left me-1"></i> Cancelar
+                                </a>
+                                <button type="button" id="btnSaveDraft" class="btn btn-primary w-50 fw-bold py-2 shadow-sm" onclick="saveExpressDraft()">
+                                    <i class="fas fa-save me-1"></i> Salvar
+                                </button>
+                                {% else %}
+                                <button type="button" id="btnSaveDraft" class="btn btn-outline-primary w-50 fw-bold py-2 shadow-sm bg-white" onclick="saveExpressDraft()">
+                                    <i class="fas fa-save me-1"></i> Salvar Rascunho
+                                </button>
+                                <button type="button" id="btnSubmitApproval" class="btn btn-success w-50 fw-bold py-2 shadow-sm" onclick="submitExpressForApproval()">
+                                    <i class="fas fa-paper-plane me-1"></i> Enviar Aprovação
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <input type="hidden" id="express_report_id" name="report_id" value="{% if existing_report %}{{ existing_report.id }}{% endif %}">
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="acompanhantesExpressModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Adicionar Funcionário</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Nome *</label>
+                    <input type="text" id="acomp_nome" class="form-control" placeholder="Nome completo">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">E-mail</label>
+                    <input type="email" id="acomp_email" class="form-control" placeholder="exemplo@email.com">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Telefone</label>
+                    <input type="tel" id="acomp_telefone" class="form-control" placeholder="(00) 00000-0000">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Cargo/Função</label>
+                    <select id="acomp_cargo" class="form-select">
+                        <option value="">Selecione...</option>
+                        <option value="Engenheiro">Engenheiro</option>
+                        <option value="Mestre de Obras">Mestre de Obras</option>
+                        <option value="Técnico de Segurança">Técnico de Segurança</option>
+                        <option value="Arquiteto">Arquiteto</option>
+                        <option value="Gerente">Gerente</option>
+                        <option value="Estagiário/a">Estagiário/a</option>
+                        <option value="Cliente">Cliente</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Empresa</label>
+                    <input type="text" id="acomp_empresa" class="form-control" placeholder="Nome da empresa">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="adicionarAcompanhanteExpress()">Adicionar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="photoEditorModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editor de Foto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-9">
+                        <div style="overflow: auto; max-height: 500px;">
+                            <canvas id="photoCanvas" style="border: 1px solid #ddd; cursor: crosshair;"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <h6>Ferramentas</h6>
+                        <div class="btn-group-vertical w-100 mb-3">
+                            <button type="button" class="btn btn-outline-primary tool-btn" data-tool="pen">
+                                <i class="fas fa-pen"></i> Caneta
+                            </button>
+                            <button type="button" class="btn btn-outline-primary tool-btn" data-tool="arrow">
+                                <i class="fas fa-arrow-right"></i> Seta
+                            </button>
+                            <button type="button" class="btn btn-outline-primary tool-btn" data-tool="rectangle">
+                                <i class="fas fa-square"></i> Retângulo
+                            </button>
+                            <button type="button" class="btn btn-outline-primary tool-btn" data-tool="circle">
+                                <i class="fas fa-circle"></i> Círculo
+                            </button>
+                            <button type="button" class="btn btn-outline-primary tool-btn" data-tool="text">
+                                <i class="fas fa-font"></i> Texto
+                            </button>
+                        </div>
+
+                        <h6>Cores</h6>
+                        <div class="mb-3">
+                            <input type="color" id="colorPicker" value="#ff0000" class="form-control">
+                        </div>
+
+                        <h6>Espessura</h6>
+                        <div class="mb-3">
+                            <input type="range" id="lineWidth" min="1" max="10" value="3" class="form-range">
+                        </div>
+
+                        <button type="button" class="btn btn-warning w-100 mb-2" onclick="clearCanvas()">
+                            <i class="fas fa-eraser"></i> Limpar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveEditedPhoto()">Salvar Edição</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedPhotos = [];
+let currentEditingPhoto = null;
+let canvas, ctx;
+let isDrawing = false;
+let currentTool = 'pen';
+let startX, startY;
+let acompanhantesExpress = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    canvas = document.getElementById('photoCanvas');
+    if (canvas) {
+        ctx = canvas.getContext('2d');
+    }
+
+    const mobilePhotoInput = document.getElementById('mobilePhotoInput');
+    const mobileCameraInput = document.getElementById('mobileCameraInput');
+
+    if (mobilePhotoInput) {
+        mobilePhotoInput.addEventListener('change', handlePhotoUpload);
+    }
+
+    if (mobileCameraInput) {
+        mobileCameraInput.addEventListener('change', handlePhotoUpload);
+    }
+
+    document.querySelectorAll('.tool-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentTool = this.dataset.tool;
+        });
+    });
+
+    if (REPORT_DATA && REPORT_DATA.acompanhantes) {
+        try {
+            acompanhantesExpress = typeof REPORT_DATA.acompanhantes === 'string' 
+                ? JSON.parse(REPORT_DATA.acompanhantes) 
+                : REPORT_DATA.acompanhantes;
+            renderAcompanhantesExpress();
+        } catch (e) {
+            console.error('Erro ao carregar acompanhantes:', e);
+        }
+    }
+    
+    if (EDIT_MODE && REPORT_DATA.imagens && REPORT_DATA.imagens.length > 0) {
+        console.log("📸 Carregando imagens existentes:", REPORT_DATA.imagens.length);
+        loadExistingImages(REPORT_DATA.imagens);
+    }
+    
+    initExpressAutoSave();
+
+    // Carregar informações técnicas
+    if (REPORT_DATA.informacoes_tecnicas) {
+        try {
+            const infoTecnica = typeof REPORT_DATA.informacoes_tecnicas === 'string' 
+                ? JSON.parse(REPORT_DATA.informacoes_tecnicas) 
+                : REPORT_DATA.informacoes_tecnicas;
+            
+            Object.keys(infoTecnica).forEach(key => {
+                const field = document.querySelector(`.technical-field[data-field="${key}"]`);
+                if (field) field.value = infoTecnica[key];
+            });
+            
+            // Expandir se tiver dados
+            if (Object.keys(infoTecnica).length > 0) {
+                const collapse = document.getElementById('technicalInfoCollapse');
+                if (collapse) {
+                    new bootstrap.Collapse(collapse, { show: true });
+                }
+            }
+        } catch (e) {
+            console.error('Erro ao carregar info técnica:', e);
+        }
+    }
+    
+    // Auto-update hidden field for technical info
+    const technicalFields = document.querySelectorAll('.technical-field');
+    const technicalHidden = document.getElementById('informacoes_tecnicas');
+    
+    if (technicalFields.length > 0 && technicalHidden) {
+        technicalFields.forEach(field => {
+            field.addEventListener('input', updateTechnicalInfo);
+            field.addEventListener('change', updateTechnicalInfo); // Add change event for safety
+        });
+    }
+    
+    function updateTechnicalInfo() {
+        if (!technicalHidden) return;
+        
+        const data = {};
+        technicalFields.forEach(f => {
+            if (f.value) data[f.dataset.field] = f.value;
+        });
+        technicalHidden.value = JSON.stringify(data);
+        // console.log('Technical Info updated:', data); // Debug
+        triggerExpressAutoSave();
+    }
+});
+
+// Função GPS
+function getLocation() {
+    const status = document.getElementById('gps-status');
+    const input = document.getElementById('obra_endereco');
+    
+    if (!navigator.geolocation) {
+        alert('Geolocalização não é suportada pelo seu navegador');
+        return;
+    }
+
+    status.style.display = 'block';
+    status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Obtendo localização...';
+
+    navigator.geolocation.getCurrentPosition(
+        async (position) => {
+            try {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando endereço...';
+                // Usar endpoint do backend para manter a formatação igual à tela de Nova Obra
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+                const response = await fetch('/get_location', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        latitude: lat,
+                        longitude: lon
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data && data.success && data.endereco) {
+                    input.value = data.endereco;
+                    status.innerHTML = '<i class="fas fa-check text-success"></i> Endereço atualizado!';
+                    triggerExpressAutoSave();
+                    // Limpar msg após 3s
+                    setTimeout(() => status.style.display = 'none', 3000);
+                } else {
+                    status.innerHTML = '<i class="fas fa-times text-danger"></i> Endereço não encontrado';
+                }
+            } catch (error) {
+                console.error(error);
+                status.innerHTML = '<i class="fas fa-times text-danger"></i> Erro ao buscar endereço';
+            }
+        },
+        () => {
+            status.innerHTML = '<i class="fas fa-times text-danger"></i> Não foi possível obter sua localização';
+        }
+    );
+}
+
+function loadExistingImages(imagens) {
+    imagens.forEach((img, index) => {
+        const photoId = 'photo_existing_' + img.id;
+        
+        const cardsContainer = document.getElementById('mobilePhotoCards');
+        const photoDiv = document.createElement('div');
+        photoDiv.className = 'col-12 col-md-6 col-lg-4';
+        photoDiv.id = photoId;
+        photoDiv.setAttribute('data-photo-id', photoId);
+        photoDiv.innerHTML = `
+            <div class="mobile-photo-card enhanced" data-photo-id="${photoId}" style="border: 2px solid #007bff; border-radius: 12px; padding: 12px; background: white; box-shadow: 0 4px 12px rgba(0,123,255,0.15); margin-bottom: 16px;">
+                <div class="text-center mb-3">
+                    <img src="${img.url}" 
+                         alt="Foto ${index + 1}" 
+                         data-photo-id="${photoId}"
+                         style="width: 100%; max-width: 200px; height: 150px; object-fit: cover; border-radius: 8px; border: 2px solid #e9ecef; cursor: pointer;"
+                         onerror="this.src='/static/images/placeholder.png'">
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label fw-bold mb-1" style="font-size: 12px;">📍 Local</label>
+                    <input type="text" 
+                           class="form-control form-control-sm local-input" 
+                           id="local_${photoId}" 
+                           placeholder="Ex: Sala principal, Fachada norte..."
+                           data-photo-id="${photoId}"
+                           value="${img.local || ''}"
+                           style="border: 2px solid #ff9800; font-size: 13px; padding: 6px;">
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label fw-bold mb-1" style="font-size: 12px;">📝 Legenda *</label>
+                    <input type="text" 
+                           class="form-control caption-input" 
+                           id="manual_caption_${photoId}" 
+                           placeholder="Digite uma legenda..."
+                           data-photo-id="${photoId}"
+                           value="${img.legenda || ''}"
+                           required
+                           style="border: 2px solid #28a745; font-size: 13px; padding: 6px; background-color: #f8fff9;">
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label fw-bold mb-1" style="font-size: 12px;">📋 Ou escolha uma legenda</label>
+                    <select class="form-control form-control-sm predefined-caption-select"
+                            id="predefined_caption_${photoId}"
+                            data-photo-id="${photoId}"
+                            onchange="applyPredefinedCaptionExpress('${photoId}')"
+                            style="font-size: 13px; padding: 6px;">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+
+                <div id="caption_status_${photoId}" class="caption-status pending alert alert-warning py-1 px-2 mb-2" style="font-size: 12px;">
+                    ${img.legenda ? '✅ Legenda preenchida' : '⚠️ Legenda obrigatória'}
+                </div>
+
+                <div class="d-flex gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary flex-grow-1" onclick="openPhotoEditor('${photoId}')">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger flex-grow-1" onclick="removeExistingPhoto('${photoId}', ${img.id})">
+                        <i class="fas fa-trash"></i> Remover
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        cardsContainer.appendChild(photoDiv);
+        
+        selectedPhotos.push({
+            id: photoId,
+            savedId: img.id,
+            isExisting: true,
+            url: img.url,
+            manualCaption: img.legenda || '',
+            local: img.local || '',
+            element: photoDiv
+        });
+        
+        loadPredefinedCaptionsForPhoto(photoId, '');
+        
+        const localInput = document.getElementById('local_' + photoId);
+        const captionInput = document.getElementById('manual_caption_' + photoId);
+        
+        if (localInput) {
+            localInput.addEventListener('input', function() {
+                updatePhotoDataExpress(photoId);
+                triggerExpressAutoSave();
+            });
+        }
+        
+        if (captionInput) {
+            captionInput.addEventListener('input', function() {
+                updatePhotoDataExpress(photoId);
+                triggerExpressAutoSave();
+            });
+        }
+    });
+    
+    updatePhotoCount();
+    document.getElementById('quickPhotoActions').style.display = 'block';
+    console.log("✅ Imagens carregadas:", selectedPhotos.length);
+}
+
+function removeExistingPhoto(photoId, dbId) {
+    const element = document.getElementById(photoId);
+    if (element) {
+        element.remove();
+    }
+    
+    const photo = selectedPhotos.find(p => p.id === photoId);
+    if (photo) {
+        photo.deletar = true;
+    }
+    
+    selectedPhotos = selectedPhotos.filter(p => p.id !== photoId || p.deletar);
+    
+    if (!window.deletedPhotos) window.deletedPhotos = [];
+    window.deletedPhotos.push({ id: dbId, deletar: true });
+    
+    updatePhotoCount();
+    triggerExpressAutoSave();
+    
+    if (selectedPhotos.length === 0) {
+        document.getElementById('quickPhotoActions').style.display = 'none';
+    }
+}
+
+let expressAutoSaveTimer = null;
+let expressAutoSaveInterval = null;
+const EXPRESS_AUTOSAVE_DELAY = 3000;
+
+function initExpressAutoSave() {
+    const form = document.getElementById('expressReportForm');
+    if (!form) return;
+    
+    const fields = form.querySelectorAll('input:not([type="file"]):not([type="button"]):not([type="submit"]), textarea, select');
+    
+    fields.forEach(field => {
+        field.addEventListener('input', function() {
+            triggerExpressAutoSave();
+        });
+        
+        field.addEventListener('change', function() {
+            triggerExpressAutoSave();
+        });
+    });
+    
+    document.querySelectorAll('.checklist-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            triggerExpressAutoSave();
+        });
+    });
+    
+    expressAutoSaveInterval = setInterval(function() {
+        if (expressReportId) {
+            performExpressAutoSave();
+        }
+    }, 30000);
+    
+    window.addEventListener('beforeunload', function() {
+        if (expressReportId) {
+            performExpressAutoSave();
+        }
+    });
+    
+    console.log("✅ Express AutoSave inicializado");
+}
+
+function triggerExpressAutoSave() {
+    if (expressAutoSaveTimer) {
+        clearTimeout(expressAutoSaveTimer);
+    }
+    
+    showExpressAutoSaveStatus('Alterações pendentes...', 'warning');
+    
+    expressAutoSaveTimer = setTimeout(function() {
+        performExpressAutoSave();
+    }, EXPRESS_AUTOSAVE_DELAY);
+}
+
+async function performExpressAutoSave() {
+    if (isSavingExpress) {
+        console.log('⏸️ Express AutoSave: Já salvando...');
+        return;
+    }
+    
+    const obra_nome = document.getElementById('obra_nome')?.value?.trim();
+    if (!obra_nome) {
+        console.log('⏸️ Express AutoSave: Nome da obra obrigatório');
+        return;
+    }
+    
+    try {
+        isSavingExpress = true;
+        showExpressAutoSaveStatus('Salvando...', 'info');
+        
+        const payload = await collectExpressFormData();
+        
+        if (window.deletedPhotos && window.deletedPhotos.length > 0) {
+            payload.fotos = payload.fotos.concat(window.deletedPhotos);
+        }
+        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+        
+        const response = await fetch('/api/relatorios-express/autosave', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Express AutoSave:', result);
+        
+        if (result.relatorio_id && !expressReportId) {
+            expressReportId = result.relatorio_id;
+            document.getElementById('express_report_id').value = expressReportId;
+        }
+        
+        if (result.imagens && result.imagens.length > 0) {
+            result.imagens.forEach(imgResult => {
+                if (imgResult.temp_id) {
+                    const photo = selectedPhotos.find(p => p.tempId === imgResult.temp_id);
+                    if (photo) {
+                        photo.savedId = imgResult.id;
+                        photo.isExisting = true;
+                    }
+                }
+            });
+        }
+        
+        window.deletedPhotos = [];
+        
+        showExpressAutoSaveStatus('Salvo automaticamente', 'success');
+        
+    } catch (err) {
+        console.error('❌ Express AutoSave erro:', err);
+        showExpressAutoSaveStatus('Erro ao salvar', 'error');
+    } finally {
+        isSavingExpress = false;
+    }
+}
+
+function showExpressAutoSaveStatus(message, type) {
+    const statusDiv = document.getElementById('autosave-status');
+    if (!statusDiv) return;
+    
+    const icons = {
+        info: 'fas fa-sync-alt fa-spin',
+        success: 'fas fa-check',
+        warning: 'fas fa-clock',
+        error: 'fas fa-exclamation-circle'
+    };
+    
+    const colors = {
+        info: 'text-primary',
+        success: 'text-success',
+        warning: 'text-warning',
+        error: 'text-danger'
+    };
+    
+    statusDiv.innerHTML = `
+        <small class="${colors[type]}">
+            <i class="${icons[type]} me-1"></i>
+            ${message}
+        </small>
+    `;
+    
+    if (type === 'success') {
+        setTimeout(() => {
+            statusDiv.innerHTML = '';
+        }, 3000);
+    }
+}
+
+function updatePhotoDataExpress(photoId) {
+    const photo = selectedPhotos.find(p => p.id === photoId);
+    if (!photo) return;
+    
+    const localInput = document.getElementById('local_' + photoId);
+    const captionInput = document.getElementById('manual_caption_' + photoId);
+    
+    if (localInput) {
+        photo.local = localInput.value.trim();
+        if (!photo.metadata) photo.metadata = {};
+        photo.metadata.local = photo.local;
+    }
+    
+    if (captionInput) {
+        photo.manualCaption = captionInput.value.trim();
+        if (!photo.metadata) photo.metadata = {};
+        photo.metadata.legenda = photo.manualCaption;
+    }
+    
+    const statusDiv = document.getElementById('caption_status_' + photoId);
+    if (statusDiv) {
+        if (photo.manualCaption) {
+            statusDiv.className = 'caption-status complete alert alert-success py-1 px-2 mb-2';
+            statusDiv.innerHTML = '✅ Legenda preenchida';
+        } else {
+            statusDiv.className = 'caption-status pending alert alert-warning py-1 px-2 mb-2';
+            statusDiv.innerHTML = '⚠️ Legenda obrigatória';
+        }
+    }
+}
+
+function applyPredefinedCaptionExpress(photoId) {
+    const select = document.getElementById('predefined_caption_' + photoId);
+    const captionInput = document.getElementById('manual_caption_' + photoId);
+    
+    if (select && captionInput && select.value) {
+        captionInput.value = select.value;
+        updatePhotoDataExpress(photoId);
+        triggerExpressAutoSave();
+    }
+}
+
+function abrirModalAcompanhantesExpress() {
+    document.getElementById('acomp_nome').value = '';
+    document.getElementById('acomp_email').value = '';
+    document.getElementById('acomp_telefone').value = '';
+    document.getElementById('acomp_cargo').value = '';
+    document.getElementById('acomp_empresa').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('acompanhantesExpressModal'));
+    modal.show();
+}
+
+function adicionarAcompanhanteExpress() {
+    const nome = document.getElementById('acomp_nome').value.trim();
+    const email = document.getElementById('acomp_email').value.trim();
+    const telefone = document.getElementById('acomp_telefone').value.trim();
+    const cargo = document.getElementById('acomp_cargo').value.trim();
+    const empresa = document.getElementById('acomp_empresa').value.trim();
+
+    if (!nome) {
+        alert('Por favor, informe o nome do funcionário.');
+        return;
+    }
+
+    acompanhantesExpress.push({
+        id: Date.now(),
+        nome: nome,
+        email: email,
+        telefone: telefone,
+        cargo: cargo,
+        empresa: empresa,
+        origem: 'Inserido manualmente'
+    });
+
+    renderAcompanhantesExpress();
+    bootstrap.Modal.getInstance(document.getElementById('acompanhantesExpressModal')).hide();
+    triggerExpressAutoSave();
+}
+
+function renderAcompanhantesExpress() {
+    const container = document.getElementById('lista-acompanhantes');
+    const hiddenInput = document.getElementById('acompanhantes-data');
+
+    if (acompanhantesExpress.length === 0) {
+        container.innerHTML = `
+            <p class="text-muted text-center py-3">
+                <i class="fas fa-info-circle me-1"></i>
+                Nenhum funcionário adicionado ainda.
+            </p>
+        `;
+    } else {
+        container.innerHTML = acompanhantesExpress.map((acomp, index) => `
+            <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
+                <div>
+                    <strong>${acomp.nome}</strong>
+                    ${acomp.email ? `<div><small class="text-primary"><i class="fas fa-envelope me-1"></i>${acomp.email}</small></div>` : ''}
+                    ${acomp.telefone ? `<div><small class="text-secondary"><i class="fas fa-phone me-1"></i>${acomp.telefone}</small></div>` : ''}
+                    ${acomp.cargo ? `<small class="text-muted"> - ${acomp.cargo}</small>` : ''}
+                    ${acomp.empresa ? `<small class="text-muted"> (${acomp.empresa})</small>` : ''}
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerAcompanhanteExpress(${index})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    hiddenInput.value = JSON.stringify(acompanhantesExpress);
+}
+
+function removerAcompanhanteExpress(index) {
+    acompanhantesExpress.splice(index, 1);
+    renderAcompanhantesExpress();
+    triggerExpressAutoSave();
+}
+
+function mobileCaptureFromCamera() {
+    const input = document.getElementById('mobileCameraInput');
+    if (input) input.click();
+}
+
+function mobileSelectFromGallery() {
+    const input = document.getElementById('mobilePhotoInput');
+    if (input) input.click();
+}
+
+function handlePhotoUpload(event) {
+    const files = event.target.files;
+    if (files.length + selectedPhotos.length > 200) {
+        alert('Máximo de 200 fotos permitido.');
+        return;
+    }
+
+    for (let file of files) {
+        if (selectedPhotos.length >= 200) break;
+        addPhotoPreview(file, '');
+    }
+
+    event.target.value = '';
+    updatePhotoCount();
+}
+
+function addPhotoPreview(file, category) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const photoId = 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const src = e.target.result;
+
+        // Detectar se é captura de câmera ou galeria
+        // Heurística: se o arquivo foi modificado nos últimos 30 segundos, provavelmente é câmera
+        const isCamera = (file.lastModified && (Date.now() - file.lastModified < 30000));
+        
+        if (isCamera) {
+            console.log("📷 [Express] Captura de câmera detectada. Iniciando salvamento...");
+            try {
+                const timestamp = new Date().getTime();
+                const fileName = `foto_obra_express_${timestamp}.jpg`;
+                
+                // Forçar download para salvar na galeria
+                const downloadLink = document.createElement('a');
+                downloadLink.href = src;
+                downloadLink.download = fileName;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                console.log(`✅ Download acionado: ${fileName}`);
+                
+                // Gatilho imediato de AutoSave para garantir persistência no servidor
+                if (typeof triggerExpressAutoSave === 'function') {
+                    console.log("🔄 [Express] Acionando AutoSave para persistir foto capturada...");
+                    triggerExpressAutoSave();
+                }
+            } catch (err) {
+                console.error("❌ Erro ao tentar salvar foto na galeria:", err);
+            }
+        } else {
+            console.log("📁 [Express] Seleção de galeria detectada. Download ignorado.");
+        }
+
+        const cardsContainer = document.getElementById('mobilePhotoCards');
+        const photoDiv = document.createElement('div');
+        photoDiv.className = 'col-12 col-md-6 col-lg-4';
+        photoDiv.id = photoId;
+        photoDiv.setAttribute('data-photo-id', photoId);
+        photoDiv.innerHTML = `
+            <div class="mobile-photo-card enhanced" data-photo-id="${photoId}" style="border: 2px solid #007bff; border-radius: 12px; padding: 12px; background: white; box-shadow: 0 4px 12px rgba(0,123,255,0.15); margin-bottom: 16px;">
+                <div class="upload-status-express mb-2 text-center">
+                    <span class="badge bg-warning text-dark"><i class="fas fa-sync fa-spin"></i> Salvando no sistema...</span>
+                </div>
+                <div class="text-center mb-3">
+                    <img src="${src}" 
+                         alt="${file.name}" 
+                         data-photo-id="${photoId}"
+                         style="width: 100%; max-width: 200px; height: 150px; object-fit: cover; border-radius: 8px; border: 2px solid #e9ecef; cursor: pointer;">
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label fw-bold mb-1" style="font-size: 12px;">📍 Local</label>
+                    <input type="text" 
+                           class="form-control form-control-sm local-input" 
+                           id="local_${photoId}" 
+                           placeholder="Ex: Sala principal, Fachada norte..."
+                           data-photo-id="${photoId}"
+                           style="border: 2px solid #ff9800; font-size: 13px; padding: 6px;">
+                </div>
+
+                <div class="mb-2">
+                    <label class="form-label fw-bold mb-1" style="font-size: 12px;">📝 Legenda *</label>
+                    <input type="text" 
+                           class="form-control caption-input" 
+                           id="manual_caption_${photoId}" 
+                           placeholder="Digite uma legenda..."
+                           data-photo-id="${photoId}"
+                           required
+                           style="border: 2px solid #28a745; font-size: 13px; padding: 6px; background-color: #f8fff9;">
+                </div>
+
+                <div class="mb-2">
+                    <select class="form-select form-select-sm caption-select" 
+                            id="predefined_caption_${photoId}" 
+                            data-photo-id="${photoId}"
+                            style="font-size: 12px;">
+                        <option value="">📋 Ou escolha uma legenda pré-definida...</option>
+                    </select>
+                </div>
+
+                <div class="caption-status pending alert alert-warning py-1 px-2 mb-2" id="caption_status_${photoId}" style="font-size: 12px; margin: 0;">
+                    ⚠️ Legenda obrigatória - preencha o campo acima
+                </div>
+
+                <div class="d-flex gap-2 justify-content-center">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="openPhotoEditor('${photoId}')">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removePhoto('${photoId}')">
+                        <i class="fas fa-trash"></i> Excluir
+                    </button>
+                </div>
+            </div>
+        `;
+
+        cardsContainer.appendChild(photoDiv);
+
+        const photoData = {
+            id: photoId,
+            file: file,
+            category: category,
+            element: photoDiv,
+            originalSrc: src,
+            previewUrl: src,
+            name: file.name,
+            filename: file.name,
+            isExisting: false,
+            savedId: null,
+            tempId: null,
+            metadata: {
+                legenda: '',
+                categoria: category,
+                local: ''
+            }
+        };
+        selectedPhotos.push(photoData);
+
+        // Forçar salvamento imediato no sistema
+        console.log("🚀 [Express] Iniciando salvamento imediato...");
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('category', category || '');
+        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+        
+        fetch('/api/uploads/temp', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': csrfToken
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log("✅ [Express] Foto salva temporariamente:", data.temp_id);
+                photoData.tempId = data.temp_id;
+                photoDiv.setAttribute('data-temp-id', data.temp_id);
+                const indicator = photoDiv.querySelector('.upload-status-express');
+                if (indicator) {
+                    indicator.innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> Salvo no sistema</span>';
+                    setTimeout(() => indicator.style.display = 'none', 3000);
+                }
+            } else {
+                throw new Error(data.error || 'Erro desconhecido');
+            }
+        })
+        .catch(error => {
+            console.error("❌ [Express] Erro no salvamento imediato:", error);
+            const indicator = photoDiv.querySelector('.upload-status-express');
+            if (indicator) {
+                indicator.innerHTML = '<span class="badge bg-danger"><i class="fas fa-exclamation-triangle"></i> Erro ao salvar</span>';
+            }
+        });
+
+        loadPredefinedCaptionsForPhoto(photoId, category);
+        setupPhotoCardEventsExpress(photoId);
+        updatePhotoCount();
+        
+        document.getElementById('quickPhotoActions').style.display = 'block';
+        
+        setTimeout(() => {
+            const newCard = photoDiv.querySelector('.mobile-photo-card');
+            if (newCard) {
+                newCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const captionInput = newCard.querySelector('.caption-input');
+                if (captionInput) {
+                    setTimeout(() => {
+                        captionInput.focus();
+                    }, 600);
+                }
+            }
+        }, 300);
+    };
+    reader.readAsDataURL(file);
+}
+
+function setupPhotoCardEventsExpress(photoId) {
+    const manualInput = document.getElementById(`manual_caption_${photoId}`);
+    const predefinedSelect = document.getElementById(`predefined_caption_${photoId}`);
+    const localInput = document.getElementById(`local_${photoId}`);
+
+    if (manualInput) {
+        manualInput.addEventListener('input', () => savePhotoDataExpress(photoId));
+        manualInput.addEventListener('blur', () => savePhotoDataExpress(photoId));
+    }
+
+    if (localInput) {
+        localInput.addEventListener('input', () => savePhotoDataExpress(photoId));
+        localInput.addEventListener('blur', () => savePhotoDataExpress(photoId));
+    }
+
+    if (predefinedSelect) {
+        predefinedSelect.addEventListener('change', function() {
+            if (this.value && manualInput) {
+                manualInput.value = this.value;
+                savePhotoDataExpress(photoId);
+                setTimeout(() => {
+                    this.selectedIndex = 0;
+                }, 500);
+            }
+        });
+    }
+}
+
+function savePhotoDataExpress(photoId) {
+    const manualInput = document.getElementById(`manual_caption_${photoId}`);
+    const predefinedSelect = document.getElementById(`predefined_caption_${photoId}`);
+    const localInput = document.getElementById(`local_${photoId}`);
+    const statusDiv = document.getElementById(`caption_status_${photoId}`);
+
+    const manualCaption = manualInput ? manualInput.value.trim() : '';
+    const predefinedCaption = predefinedSelect ? predefinedSelect.value.trim() : '';
+    const local = localInput ? localInput.value.trim() : '';
+
+    const photoData = selectedPhotos.find(p => p.id === photoId);
+    if (photoData) {
+        photoData.metadata.legenda = manualCaption || predefinedCaption;
+        photoData.metadata.local = local;
+        photoData.manualCaption = manualCaption;
+        photoData.predefinedCaption = predefinedCaption;
+        photoData.local = local;
+    }
+
+    const hasCaption = manualCaption || predefinedCaption;
+
+    if (statusDiv) {
+        if (hasCaption) {
+            statusDiv.className = 'caption-status complete alert alert-success py-1 px-2 mb-2';
+            statusDiv.innerHTML = '✅ Legenda preenchida';
+            statusDiv.style.fontSize = '12px';
+        } else {
+            statusDiv.className = 'caption-status pending alert alert-warning py-1 px-2 mb-2';
+            statusDiv.innerHTML = '⚠️ Legenda obrigatória - preencha o campo acima';
+            statusDiv.style.fontSize = '12px';
+        }
+    }
+
+    console.log(`💾 Express Photo data saved for ${photoId}: local="${local}", caption="${manualCaption}"`);
+    
+    triggerExpressAutoSave();
+}
+
+function removePhoto(photoId) {
+    const element = document.getElementById(photoId);
+    if (element) {
+        element.remove();
+    }
+    selectedPhotos = selectedPhotos.filter(p => p.id !== photoId);
+    updatePhotoCount();
+    
+    if (selectedPhotos.length === 0) {
+        document.getElementById('quickPhotoActions').style.display = 'none';
+    }
+    
+    triggerExpressAutoSave();
+}
+
+function updatePhotoCount() {
+    const count = selectedPhotos.length;
+    document.getElementById('photoCount').textContent = count;
+    const quickCount = document.getElementById('quickPhotoCount');
+    if (quickCount) quickCount.textContent = count;
+}
+
+function loadPredefinedCaptionsForPhoto(photoId, category) {
+    const select = document.getElementById(`predefined_caption_${photoId}`);
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Carregando legendas...</option>';
+
+    fetch('/api/legendas?categoria=all')
+        .then(response => response.json())
+        .then(data => {
+            // Verificar formato da resposta (pode ser data.legendas ou data direto se for array)
+            const legendas = data.legendas || (Array.isArray(data) ? data : []);
+            
+            if (legendas.length > 0) {
+                select.innerHTML = '<option value="">📋 Ou escolha uma legenda pré-definida...</option>';
+
+                const cats = {
+                    'Acabamentos': [],
+                    'Estrutural': [],
+                    'Geral': [],
+                    'Segurança': [],
+                    'Instalações': []
+                };
+
+                legendas.forEach(leg => {
+                    // Normalizar categoria
+                    let cat = leg.categoria || 'Geral';
+                    // Tentar mapear categorias desconhecidas
+                    if (!cats[cat]) {
+                         // Se não existir, cria ou joga em Geral
+                         cats[cat] = [];
+                    }
+                    cats[cat].push(leg);
+                });
+
+                Object.keys(cats).forEach(cat => {
+                    if (cats[cat].length > 0) {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = cat + ' (' + cats[cat].length + ' itens)';
+
+                        cats[cat].forEach(legenda => {
+                            const option = document.createElement('option');
+                            option.value = legenda.texto;
+                            option.textContent = legenda.texto;
+                            optgroup.appendChild(option);
+                        });
+
+                        select.appendChild(optgroup);
+                    }
+                });
+            } else {
+                select.innerHTML = '<option value="">Nenhuma legenda disponível</option>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar legendas:', error);
+            select.innerHTML = '<option value="">Erro ao carregar legendas</option>';
+        });
+}
+
+function addCustomChecklistItem() {
+    const checklistItems = document.getElementById('checklistItems');
+    const itemId = 'custom_' + Date.now();
+
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'checklist-item mb-3';
+    itemDiv.innerHTML = `
+        <div class="form-check">
+            <input class="form-check-input checklist-checkbox" type="checkbox" id="${itemId}">
+            <input type="text" class="form-control d-inline-block fw-bold" style="width: 70%;" 
+                   name="custom_item_${itemId}" placeholder="Digite o item do checklist..." required>
+            <button type="button" class="btn btn-sm btn-outline-danger float-end" 
+                    onclick="this.parentElement.parentElement.remove()">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <textarea class="form-control mt-2 checklist-obs" name="custom_obs_${itemId}" placeholder="Observações..." rows="2" style="display: none;"></textarea>
+    `;
+
+    checklistItems.appendChild(itemDiv);
+}
+
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('form-check-input') && e.target.type === 'checkbox') {
+        const item = e.target.closest('.checklist-item');
+        if (item) {
+            const textarea = item.querySelector('textarea');
+            if (e.target.checked) {
+                item.classList.add('completed');
+                if (textarea) textarea.style.display = 'block';
+            } else {
+                item.classList.remove('completed');
+                if (textarea) textarea.style.display = 'none';
+            }
+        }
+    }
+});
+
+function loadChecklistData(checklistData) {
+    if (!checklistData || !Array.isArray(checklistData)) {
+        console.log('📋 Nenhum dado de checklist para carregar');
+        return;
+    }
+    
+    console.log('📋 Carregando checklist com', checklistData.length, 'itens');
+    
+    
+    // Remover lógica antiga de mapeamento fixo
+    /* const predefinedItems = { ... }; */
+    
+    checklistData.forEach(data => {
+        const itemName = data.item;
+        const isCompleted = data.completed;
+        const observations = data.observations || '';
+        
+        const itemId = `std_${data.id || ''}`;
+        const itemText = data.item;
+        
+        // Tentar encontrar por ID (padrão) ou texto (legado/duplicado)
+        let checkbox = null;
+        
+        // 1. Tentar por ID específico se existir
+        if (data.id) {
+             checkbox = document.getElementById(itemId);
+        }
+        
+        // 2. Se não achou, tentar pelo texto (data-item)
+        if (!checkbox && itemText) {
+             const allChecks = document.querySelectorAll('.checklist-checkbox');
+             for (let chk of allChecks) {
+                 if (chk.getAttribute('data-item') === itemText) {
+                     checkbox = chk;
+                     break;
+                 }
+             }
+        }
+        
+        if (checkbox) {
+            const itemDiv = checkbox.closest('.checklist-item');
+            const textarea = itemDiv?.querySelector('textarea');
+            
+            if (checkbox) {
+                checkbox.checked = isCompleted;
+                if (isCompleted && itemDiv) {
+                    itemDiv.classList.add('completed');
+                }
+            }
+            if (textarea) {
+                textarea.value = observations;
+                if (isCompleted) {
+                    textarea.style.display = 'block';
+                }
+            }
+            console.log(`✅ Checklist item "${itemName}" carregado: checked=${isCompleted}`);
+        } else {
+            console.log(`➕ Item personalizado detectado: "${itemName}"`);
+            addCustomChecklistItemWithData(itemName, isCompleted, observations);
+        }
+    });
+}
+
+function addCustomChecklistItemWithData(itemName, isCompleted, observations) {
+    const checklistItems = document.getElementById('checklistItems');
+    const itemId = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'checklist-item mb-3' + (isCompleted ? ' completed' : '');
+    itemDiv.innerHTML = `
+        <div class="form-check">
+            <input class="form-check-input checklist-checkbox" type="checkbox" id="${itemId}" ${isCompleted ? 'checked' : ''} data-item="${itemName}">
+            <input type="text" class="form-control d-inline-block fw-bold" style="width: 70%;" 
+                   name="custom_item_${itemId}" value="${itemName}" placeholder="Digite o item do checklist..." required>
+            <button type="button" class="btn btn-sm btn-outline-danger float-end" 
+                    onclick="this.parentElement.parentElement.remove()">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <textarea class="form-control mt-2 checklist-obs" name="custom_obs_${itemId}" placeholder="Observações..." rows="2" style="display: ${isCompleted ? 'block' : 'none'};">${observations}</textarea>
+    `;
+
+    checklistItems.appendChild(itemDiv);
+    console.log(`✅ Item personalizado adicionado: "${itemName}"`);
+}
+
+function openPhotoEditor(photoId) {
+    const card = document.querySelector(`[data-photo-id="${photoId}"]`);
+    if (!card) return;
+
+    const img = card.querySelector('img');
+    if (!img || !img.src) return;
+
+    if (window.fabricPhotoEditorModal) {
+        const saveCallback = async (data) => {
+            img.src = data.imageData;
+            img.dataset.edited = 'true';
+            img.dataset.legend = data.legend;
+            card.classList.add('edited');
+        };
+        window.fabricPhotoEditorModal.openEditor(img.src, photoId, saveCallback);
+    } else {
+        alert('Editor de fotos não disponível. Recarregue a página.');
+    }
+}
+
+function clearCanvas() {
+    if (ctx && canvas) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+}
+
+function saveEditedPhoto() {
+    if (currentEditingPhoto && canvas) {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const photo = selectedPhotos.find(p => p.id === currentEditingPhoto);
+        if (photo) {
+            photo.editedSrc = dataUrl;
+            const img = photo.element.querySelector('img');
+            if (img) {
+                img.src = dataUrl;
+            }
+        }
+        bootstrap.Modal.getInstance(document.getElementById('photoEditorModal')).hide();
+    }
+}
+
+let expressReportId = {% if existing_report %}{{ existing_report.id }}{% else %}null{% endif %};
+let isSavingExpress = false;
+
+async function convertFileToBlob(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const arrayBuffer = reader.result;
+            const blob = new Blob([arrayBuffer], { type: file.type || 'image/jpeg' });
+            resolve(blob);
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+async function uploadPhotoTemp(photo) {
+    try {
+        let fileData = photo.file || photo.blob;
+        
+        if (!fileData) {
+            if (photo.editedSrc && photo.editedSrc.startsWith('data:')) {
+                const res = await fetch(photo.editedSrc);
+                fileData = await res.blob();
+            } else if (photo.originalSrc && photo.originalSrc.startsWith('data:')) {
+                const res = await fetch(photo.originalSrc);
+                fileData = await res.blob();
+            }
+        }
+        
+        if (!fileData) {
+            console.warn("⚠️ Foto inválida ou arquivo ausente:", photo.id);
+            return null;
+        }
+        
+        const caption = photo.metadata?.legenda || photo.manualCaption || '';
+        const local = photo.metadata?.local || photo.local || '';
+        const filename = photo.filename || photo.name || `foto_${Date.now()}.jpg`;
+        
+        console.log("📤 Express AutoSave - Preparando upload:", filename);
+        
+        const formData = new FormData();
+        formData.append("file", fileData, filename);
+        formData.append("category", photo.category || "");
+        formData.append("local", local);
+        formData.append("caption", caption);
+        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+        const headers = csrfToken ? { "X-CSRFToken": csrfToken } : {};
+        
+        const response = await fetch("/api/uploads/temp", {
+            method: "POST",
+            headers,
+            body: formData,
+            credentials: "include"
+        });
+        
+        if (!response.ok) {
+            const msg = await response.text();
+            console.error("❌ Erro HTTP no upload:", response.status, msg);
+            throw new Error(`Upload falhou: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log("✅ Upload temporário bem-sucedido:", data);
+        
+        return data.temp_id || data.id || null;
+    } catch (err) {
+        console.error("❌ Erro no upload temporário:", err);
+        return null;
+    }
+}
+
+async function getExpressImageData() {
+    const uploaded = [];
+    
+    console.log(`📸 Express: Processando ${selectedPhotos.length} fotos`);
+    
+    for (let i = 0; i < selectedPhotos.length; i++) {
+        const photo = selectedPhotos[i];
+        
+        const caption = photo.metadata?.legenda || photo.manualCaption || '';
+        const local = photo.metadata?.local || photo.local || '';
+        
+        console.log(`📸 Foto ${i}: id=${photo.id}, savedId=${photo.savedId}, caption="${caption}"`);
+        
+        if (photo.isExisting || (photo.savedId && photo.savedId > 0)) {
+            uploaded.push({
+                id: photo.savedId || photo.id,
+                caption: caption,
+                local: local,
+                ordem: i
+            });
+            console.log(`📌 Foto já salva no banco: ID ${photo.savedId || photo.id}`);
+            continue;
+        }
+        
+        try {
+            const tempId = await uploadPhotoTemp(photo);
+            if (tempId) {
+                uploaded.push({
+                    temp_id: tempId,
+                    caption: caption,
+                    local: local,
+                    ordem: i
+                });
+                photo.tempId = tempId;
+                console.log(`✅ Foto ${i} enviada com temp_id: ${tempId}`);
+            }
+        } catch (err) {
+            console.error(`❌ Falha ao enviar foto ${i}:`, err);
+        }
+    }
+    
+    console.log(`📸 Express AutoSave - Total de ${uploaded.length} fotos processadas`);
+    return uploaded;
+}
+
+function getExpressChecklistData() {
+    const checklistData = [];
+    
+    document.querySelectorAll('.checklist-item').forEach(item => {
+        const checkbox = item.querySelector('.form-check-input[type="checkbox"]');
+        const label = item.querySelector('.form-check-label');
+        const customInput = item.querySelector('input[type="text"]');
+        const textarea = item.querySelector('textarea');
+        
+        if (checkbox) {
+            let itemText = '';
+            if (label) {
+                itemText = label.textContent.trim();
+            } else if (customInput) {
+                itemText = customInput.value.trim();
+            }
+            
+            if (itemText) {
+                checklistData.push({
+                    item: itemText,
+                    completed: checkbox.checked,
+                    observations: textarea ? textarea.value.trim() : ''
+                });
+            }
+        }
+    });
+    
+    console.log(`📋 Express Checklist: ${checklistData.length} itens`, checklistData);
+    return checklistData;
+}
+
+async function collectExpressFormData() {
+    const fotos = await getExpressImageData();
+    const checklistData = getExpressChecklistData();
+    
+    const data = {
+        titulo: document.getElementById('titulo')?.value?.trim() || 'Relatório Express de Visita',
+        numero: document.getElementById('numero')?.value?.trim() || '',
+        data_relatorio: document.getElementById('data_relatorio')?.value || null,
+        obra_nome: document.getElementById('obra_nome')?.value?.trim() || '',
+        obra_endereco: document.getElementById('obra_endereco')?.value?.trim() || '',
+        obra_tipo: document.getElementById('obra_tipo')?.value?.trim() || '',
+        obra_construtora: document.getElementById('obra_construtora')?.value?.trim() || '',
+        obra_responsavel: document.getElementById('obra_responsavel')?.value?.trim() || '',
+        obra_email: document.getElementById('obra_email')?.value?.trim() || '',
+        obat_telefone: document.getElementById('obra_telefone')?.value?.trim() || '',
+        conteudo: document.getElementById('conteudo')?.value?.trim() || '',
+        informacoes_tecnicas: document.getElementById('informacoes_tecnicas')?.value || '',
+        observacoes_finais: '',
+        acompanhantes: acompanhantesExpress || [],
+        checklist_data: checklistData,
+        fotos: fotos
+    };
+    
+    if (expressReportId) {
+        data.id = parseInt(expressReportId, 10);
+    }
+    
+    console.log('📦 Express AutoSave - Dados coletados:', {
+        ...data,
+        fotos: `${fotos.length} fotos`,
+        acompanhantes: `${data.acompanhantes.length} pessoas`,
+        checklist: `${checklistData.length} itens`
+    });
+    return data;
+}
+
+async function saveExpressDraft() {
+    if (isSavingExpress) {
+        console.log('⏸️ Express AutoSave: Salvamento já em progresso...');
+        return false;
+    }
+    
+    const btnSave = document.getElementById('btnSaveDraft');
+    const originalText = btnSave.innerHTML;
+    let saveSuccess = false;
+    
+    try {
+        isSavingExpress = true;
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        
+        const obra_nome = document.getElementById('obra_nome')?.value?.trim();
+        if (!obra_nome) {
+            alert('O nome da obra é obrigatório.');
+            btnSave.innerHTML = originalText;
+            btnSave.disabled = false;
+            isSavingExpress = false;
+            return false;
+        }
+        
+        const payload = await collectExpressFormData();
+        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+        
+        console.log('📤 Express AutoSave: Enviando dados ao servidor...');
+        
+        const response = await fetch('/api/relatorios-express/autosave', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            console.error('❌ Express AutoSave erro:', response.status, err);
+            throw new Error(err.error || `Falha ao salvar (HTTP ${response.status})`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Express AutoSave concluído:', result);
+        
+        if (result.relatorio_id) {
+            if (!expressReportId) {
+                console.log('📝 Novo relatório Express criado com ID:', result.relatorio_id);
+            }
+            expressReportId = result.relatorio_id;
+            document.getElementById('express_report_id').value = expressReportId;
+        }
+        
+        if (result.imagens && result.imagens.length > 0) {
+            result.imagens.forEach(imgResult => {
+                if (imgResult.temp_id) {
+                    const photo = selectedPhotos.find(p => p.tempId === imgResult.temp_id);
+                    if (photo) {
+                        photo.savedId = imgResult.id;
+                        photo.isExisting = true;
+                        console.log(`📸 Foto associada: temp_id=${imgResult.temp_id} -> savedId=${imgResult.id}`);
+                    }
+                }
+            });
+        }
+        
+        btnSave.innerHTML = '<i class="fas fa-check"></i> Salvo!';
+        btnSave.classList.remove('btn-outline-primary');
+        btnSave.classList.add('btn-success');
+        saveSuccess = true;
+        
+        // Redirect to express reports list after successful save
+        setTimeout(() => {
+            window.location.href = '/relatorios-express';
+        }, 500);
+        
+    } catch (err) {
+        console.error('❌ Erro ao salvar rascunho Express:', err);
+        alert('Erro ao salvar: ' + err.message);
+        btnSave.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Erro';
+        btnSave.classList.remove('btn-outline-primary');
+        btnSave.classList.add('btn-danger');
+        
+        setTimeout(() => {
+            btnSave.innerHTML = originalText;
+            btnSave.classList.remove('btn-danger');
+            btnSave.classList.add('btn-outline-primary');
+        }, 3000);
+    } finally {
+        isSavingExpress = false;
+        btnSave.disabled = false;
+    }
+    
+    return saveSuccess;
+}
+
+async function submitExpressForApproval() {
+    const btnSubmit = document.getElementById('btnSubmitApproval');
+    const originalText = btnSubmit.innerHTML;
+    
+    try {
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        
+        const saveResult = await saveExpressDraft();
+        
+        if (!saveResult) {
+            console.log('❌ Falha ao salvar antes de enviar para aprovação');
+            btnSubmit.innerHTML = originalText;
+            btnSubmit.disabled = false;
+            return;
+        }
+        
+        if (!expressReportId) {
+            alert('Por favor, salve o relatório primeiro.');
+            btnSubmit.innerHTML = originalText;
+            btnSubmit.disabled = false;
+            return;
+        }
+        
+        btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+        
+        const response = await fetch(`/api/relatorios-express/${expressReportId}/submit-approval`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            }
+        });
+        
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || `Falha ao enviar (HTTP ${response.status})`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Relatório enviado para aprovação:', result);
+        
+        alert('Relatório enviado para aprovação com sucesso!');
+        window.location.href = '/relatorios-express';
+        
+    } catch (err) {
+        console.error('❌ Erro ao enviar para aprovação:', err);
+        alert('Erro ao enviar para aprovação: ' + err.message);
+        btnSubmit.innerHTML = originalText;
+        btnSubmit.disabled = false;
+    }
+}
+</script>
+
+<script src="{{ url_for('static', filename='js/fabric-photo-editor-modal.js') }}"></script>
+{% endblock %}

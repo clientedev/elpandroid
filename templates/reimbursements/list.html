@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Meus Reembolsos{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-money-bill-wave"></i> Meus Reembolsos</h3>
+                    <a href="{{ url_for('request_reimbursement') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Nova Solicitação
+                    </a>
+                </div>
+                
+                <!-- Busca Simples -->
+                <div class="card-body border-bottom">
+                    <form method="GET" action="{{ url_for('reimbursements_list') }}">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label fw-bold">🔍 Busca Rápida</label>
+                                <input type="text" class="form-control" name="q" value="{{ request.args.get('q', '') }}" 
+                                       placeholder="Digite projeto, descrição ou observações...">
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-1"></i>Buscar
+                                    </button>
+                                    {% if request.args.get('q') %}
+                                    <a href="{{ url_for('reimbursements_list') }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Limpar
+                                    </a>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" data-bs-target="#filtrosAvancadosReemb">
+                                        <i class="fas fa-filter me-1"></i>Filtros Avançados
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Filtros Avançados (Colapsáveis) -->
+                <div class="collapse" id="filtrosAvancadosReemb">
+                    <div class="card-body border-bottom">
+                        <h6 class="mb-3"><i class="fas fa-filter me-2"></i>Filtros Avançados</h6>
+                        <div class="row g-3">
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Status:</label>
+                                <select class="form-select form-select-sm" id="filterStatusReemb">
+                                    <option value="">Todos os Status</option>
+                                    <option value="Pendente">Pendente</option>
+                                    <option value="Aprovado">Aprovado</option>
+                                    <option value="Rejeitado">Rejeitado</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Projeto:</label>
+                                <select class="form-select form-select-sm" id="filterProjetoReemb">
+                                    <option value="">Todos os Projetos</option>
+                                    <!-- Será preenchido dinamicamente -->
+                                </select>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Período:</label>
+                                <input type="month" class="form-control form-control-sm" id="filterPeriodo">
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label small fw-bold">Pesquisar nos filtros:</label>
+                                <input type="text" class="form-control form-control-sm" id="searchReembolso" placeholder="Número ou projeto">
+                            </div>
+                        </div>
+                    <div class="row mt-2">
+                        <div class="col-12">
+                            <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="clearReembFilters()">
+                                <i class="fas fa-times"></i> Limpar Filtros
+                            </button>
+                            <small class="text-muted">
+                                <span id="reembFilteredCount">{{ reembolsos|length if reembolsos else 0 }}</span> reembolso(s) encontrado(s)
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if reembolsos %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Projeto</th>
+                                    <th>Período</th>
+                                    <th>Status</th>
+                                    <th>Valor Total</th>
+                                    <th>Data Solicitação</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reembolso in reembolsos %}
+                                <tr>
+                                    <td><strong>REIMB-{{ reembolso.id }}</strong></td>
+                                    <td>{{ reembolso.projeto.nome if reembolso.projeto else 'N/A' }}</td>
+                                    <td>
+                                        {% if reembolso.periodo_inicio and reembolso.periodo_fim %}
+                                            {{ reembolso.periodo_inicio.strftime('%d/%m/%Y') }} - {{ reembolso.periodo_fim.strftime('%d/%m/%Y') }}
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if reembolso.status == 'Pendente' %}
+                                            <span class="badge bg-warning">{{ reembolso.status }}</span>
+                                        {% elif reembolso.status == 'Aprovado' %}
+                                            <span class="badge bg-success">{{ reembolso.status }}</span>
+                                        {% elif reembolso.status == 'Rejeitado' %}
+                                            <span class="badge bg-danger">{{ reembolso.status }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ reembolso.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>R$ {{ "%.2f"|format(reembolso.total or 0) }}</strong>
+                                    </td>
+                                    <td>{{ reembolso.created_at.strftime('%d/%m/%Y') if reembolso.created_at else 'N/A' }}</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="#" onclick="alert('Visualizar reembolso em desenvolvimento')" 
+                                               class="btn btn-sm btn-outline-primary" title="Visualizar">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            {% if reembolso.status == 'Pendente' %}
+                                            <a href="#" onclick="alert('Editar reembolso em desenvolvimento')" 
+                                               class="btn btn-sm btn-outline-secondary" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Você ainda não possui solicitações de reembolso.
+                        <a href="{{ url_for('request_reimbursement') }}" class="btn btn-primary btn-sm ms-2">
+                            <i class="fas fa-plus"></i> Criar primeira solicitação
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const table = document.querySelector('table');
+    if (!table) return;
+    
+    const rows = table.querySelectorAll('tbody tr');
+    
+    // Adicionar atributos data para filtros nos elementos existentes
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 4) {
+            row.setAttribute('data-status', cells[3].textContent.trim());
+            row.setAttribute('data-projeto', cells[1].textContent.trim());
+            const periodoText = cells[2].textContent.trim();
+            if (periodoText.includes('/')) {
+                // Extrair ano-mês do formato DD/MM/YYYY - DD/MM/YYYY
+                const dateParts = periodoText.split(' - ')[0].split('/');
+                if (dateParts.length === 3) {
+                    row.setAttribute('data-periodo', dateParts[2] + '-' + dateParts[1].padStart(2, '0'));
+                }
+            }
+            row.setAttribute('data-search', (cells[0].textContent + ' ' + cells[1].textContent).toLowerCase());
+        }
+    });
+    
+    // Preencher filtros dinamicamente
+    fillReembFilterOptions();
+    setupReembFilters();
+    
+    function fillReembFilterOptions() {
+        const projetoSet = new Set();
+        
+        rows.forEach(row => {
+            const projeto = row.getAttribute('data-projeto');
+            if (projeto && projeto !== 'N/A') projetoSet.add(projeto);
+        });
+        
+        const projetoSelect = document.getElementById('filterProjetoReemb');
+        if (projetoSelect) {
+            projetoSet.forEach(projeto => {
+                const option = document.createElement('option');
+                option.value = projeto;
+                option.textContent = projeto;
+                projetoSelect.appendChild(option);
+            });
+        }
+    }
+    
+    function setupReembFilters() {
+        const filterStatus = document.getElementById('filterStatusReemb');
+        const filterProjeto = document.getElementById('filterProjetoReemb');
+        const filterPeriodo = document.getElementById('filterPeriodo');
+        const searchInput = document.getElementById('searchReembolso');
+        
+        [filterStatus, filterProjeto, filterPeriodo].forEach(filter => {
+            if (filter) filter.addEventListener('change', applyReembFilters);
+        });
+        
+        if (searchInput) searchInput.addEventListener('input', applyReembFilters);
+    }
+    
+    function applyReembFilters() {
+        const statusFilter = document.getElementById('filterStatusReemb')?.value || '';
+        const projetoFilter = document.getElementById('filterProjetoReemb')?.value || '';
+        const periodoFilter = document.getElementById('filterPeriodo')?.value || '';
+        const searchText = (document.getElementById('searchReembolso')?.value || '').toLowerCase();
+        
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const status = row.getAttribute('data-status') || '';
+            const projeto = row.getAttribute('data-projeto') || '';
+            const periodo = row.getAttribute('data-periodo') || '';
+            const searchData = row.getAttribute('data-search') || '';
+            
+            const statusMatch = !statusFilter || status.includes(statusFilter);
+            const projetoMatch = !projetoFilter || projeto === projetoFilter;
+            const periodoMatch = !periodoFilter || periodo.startsWith(periodoFilter);
+            const searchMatch = !searchText || searchData.includes(searchText);
+            
+            if (statusMatch && projetoMatch && periodoMatch && searchMatch) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        const countElement = document.getElementById('reembFilteredCount');
+        if (countElement) countElement.textContent = visibleCount;
+    }
+    
+    // Expor função global para o botão de limpar
+    window.clearReembFilters = function() {
+        const filters = ['filterStatusReemb', 'filterProjetoReemb', 'filterPeriodo', 'searchReembolso'];
+        filters.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) element.value = '';
+        });
+        
+        rows.forEach(row => {
+            row.style.display = '';
+        });
+        
+        const countElement = document.getElementById('reembFilteredCount');
+        if (countElement) countElement.textContent = rows.length;
+    };
+});
+</script>
+{% endblock %}

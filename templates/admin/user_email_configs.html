@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações de E-mail por Usuário{% endblock %}
+
+{% block extra_css %}
+<style>
+.config-card {
+    transition: all 0.3s ease;
+    border-left: 4px solid #007bff;
+}
+.config-card.user-config {
+    border-left-color: #28a745;
+    background-color: #f8fff9;
+}
+.config-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #007bff, #28a745);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1rem;
+}
+@media (max-width: 768px) {
+    .config-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .config-actions .btn {
+        width: 100%;
+        font-size: 0.875rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2><i class="fas fa-users-cog me-2"></i>Configurações de E-mail por Usuário</h2>
+        <p class="text-muted">Gerencie configurações SMTP específicas para cada usuário</p>
+    </div>
+    {% if users_without_config %}
+    <a href="{{ url_for('admin_user_email_config_new') }}" class="btn btn-primary">
+        <i class="fas fa-plus me-2"></i>Nova Configuração
+    </a>
+    {% endif %}
+</div>
+
+<!-- Configurações Existentes -->
+{% if configs %}
+    <div class="row">
+        {% for config_data in configs %}
+        {% set config = config_data.UserEmailConfig %}
+        {% set user = config_data.User %}
+        <div class="col-lg-6 col-12 mb-4">
+            <div class="card config-card user-config">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <div class="user-avatar me-3">
+                            {{ user.nome_completo.split()[0][0] }}{% if user.nome_completo.split()|length > 1 %}{{ user.nome_completo.split()[1][0] }}{% endif %}
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-1">{{ user.nome_completo }}</h5>
+                            <small class="text-muted">{{ user.cargo or 'Sem cargo definido' }}</small>
+                            <br>
+                            {% if config.is_active %}
+                                <span class="badge bg-success badge-sm">Ativa</span>
+                            {% else %}
+                                <span class="badge bg-warning badge-sm">Inativa</span>
+                            {% endif %}
+                            
+                            {% if config.last_test_status == 'success' %}
+                                <span class="badge bg-success badge-sm" title="Testada com sucesso em {{ config.last_test_at.strftime('%d/%m/%Y às %H:%M') if config.last_test_at else 'Data desconhecida' }}">
+                                    <i class="fas fa-check"></i> Testada
+                                </span>
+                            {% elif config.last_test_status == 'error' %}
+                                <span class="badge bg-danger badge-sm" title="Erro no teste em {{ config.last_test_at.strftime('%d/%m/%Y às %H:%M') if config.last_test_at else 'Data desconhecida' }}">
+                                    <i class="fas fa-times"></i> Erro
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary badge-sm">Não testada</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="config-actions d-flex gap-2">
+                        <form method="POST" action="{{ url_for('admin_user_email_config_test', config_id=config.id) }}" 
+                              style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-info" title="Testar configuração SMTP">
+                                <i class="fas fa-vial"></i>
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin_user_email_config_toggle', config_id=config.id) }}" 
+                              style="display: inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            {% if config.is_active %}
+                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Desativar configuração">
+                                <i class="fas fa-pause"></i>
+                            </button>
+                            {% else %}
+                            <button type="submit" class="btn btn-sm btn-outline-success" title="Ativar configuração">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            {% endif %}
+                        </form>
+                        <a href="{{ url_for('admin_user_email_config_edit', config_id=config.id) }}" 
+                           class="btn btn-sm btn-outline-primary"
+                           title="Editar configuração">
+                            <i class="fas fa-edit"></i>
+                        </a>
+                        <form method="POST" action="{{ url_for('admin_user_email_config_delete', config_id=config.id) }}" 
+                              style="display: inline;"
+                              onsubmit="return confirm('Tem certeza que deseja excluir esta configuração de e-mail?');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir configuração">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-12 col-md-6">
+                            <strong>Servidor SMTP:</strong><br>
+                            <span class="text-muted">{{ config.smtp_server }}:{{ config.smtp_port }}</span>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <strong>E-mail:</strong><br>
+                            <span class="text-muted">{{ config.email_address }}</span>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <strong>Configurações:</strong><br>
+                            <span class="badge bg-{{ 'success' if config.is_active else 'warning' }} me-1">
+                                {{ 'Ativa' if config.is_active else 'Inativa' }}
+                            </span>
+                            <span class="badge bg-info me-1">
+                                {% if config.use_tls %}TLS{% else %}No TLS{% endif %}
+                            </span>
+                            <span class="badge bg-info me-1">
+                                {% if config.use_ssl %}SSL{% else %}No SSL{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-12">
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>
+                                Criado em {{ config.created_at.strftime('%d/%m/%Y às %H:%M') }}
+                                {% if config.updated_at != config.created_at %}
+                                <br>
+                                <i class="fas fa-edit me-1"></i>
+                                Atualizado em {{ config.updated_at.strftime('%d/%m/%Y às %H:%M') }}
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+<!-- Usuários sem configuração -->
+{% if users_without_config %}
+    <div class="mt-4">
+        <h4><i class="fas fa-user-plus me-2"></i>Usuários sem Configuração de E-mail</h4>
+        <div class="row">
+            {% for user in users_without_config %}
+            <div class="col-md-4 col-sm-6 col-12 mb-3">
+                <div class="card border-warning">
+                    <div class="card-body text-center">
+                        <div class="user-avatar mx-auto mb-2" style="background: linear-gradient(45deg, #ffc107, #fd7e14);">
+                            {{ user.nome_completo.split()[0][0] }}{% if user.nome_completo.split()|length > 1 %}{{ user.nome_completo.split()[1][0] }}{% endif %}
+                        </div>
+                        <h6 class="card-title">{{ user.nome_completo }}</h6>
+                        <p class="card-text text-muted small">{{ user.cargo or 'Sem cargo' }}</p>
+                        <a href="{{ url_for('admin_user_email_config_new') }}?user_id={{ user.id }}" 
+                           class="btn btn-sm btn-warning">
+                            <i class="fas fa-plus me-1"></i>Configurar E-mail
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+<!-- Estado vazio -->
+{% if not configs and not users_without_config %}
+    <div class="text-center py-5">
+        <i class="fas fa-users-cog fa-4x text-muted mb-3"></i>
+        <h4>Nenhum usuário ativo encontrado</h4>
+        <p class="text-muted mb-4">Não há usuários ativos no sistema que possam ter configurações de e-mail</p>
+        <a href="{{ url_for('users_list') }}" class="btn btn-primary">
+            <i class="fas fa-users me-2"></i>Gerenciar Usuários
+        </a>
+    </div>
+{% endif %}
+
+<!-- Cards informativos -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="alert alert-info">
+            <h6><i class="fas fa-info-circle me-2"></i>Como funciona o Item 34 - E-mails por Usuário:</h6>
+            <ul class="mb-0">
+                <li><strong>Envio pelo usuário que preencheu:</strong> Quando um relatório for criado, será enviado usando a configuração SMTP do usuário que o preencheu</li>
+                <li><strong>Envio pelo aprovador:</strong> Quando um relatório for aprovado, será enviado usando a configuração SMTP do aprovador</li>
+                <li><strong>Cópia automática (CC):</strong> Sempre será enviada uma cópia para o outro usuário envolvido (preenchedor ou aprovador)</li>
+                <li><strong>Fallback automático:</strong> Se o usuário não tiver configuração própria, será usado o e-mail padrão do sistema</li>
+                <li><strong>Logs detalhados:</strong> O sistema registra qual conta foi usada para cada envio</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <i class="fas fa-user-check fa-2x text-success mb-2"></i>
+                <h6>Configuração Pessoal</h6>
+                <small class="text-muted">Usuário usa sua própria<br>configuração SMTP</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <i class="fas fa-share fa-2x text-primary mb-2"></i>
+                <h6>Cópia Automática (CC)</h6>
+                <small class="text-muted">Outro usuário recebe<br>cópia automaticamente</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <i class="fas fa-undo fa-2x text-warning mb-2"></i>
+                <h6>Fallback Sistema</h6>
+                <small class="text-muted">Usa e-mail padrão se<br>não tiver configuração</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estatísticas -->
+<div class="row mt-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h3>{{ configs|length }}</h3>
+                <p class="mb-0">Configurações Ativas</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h3>{{ users_without_config|length }}</h3>
+                <p class="mb-0">Usuários sem Config</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h3>{{ (configs|length + users_without_config|length) }}</h3>
+                <p class="mb-0">Total de Usuários</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h3>{{ "%.0f"|format((configs|length / (configs|length + users_without_config|length) * 100) if (configs|length + users_without_config|length) > 0 else 0) }}%</h3>
+                <p class="mb-0">Cobertura</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

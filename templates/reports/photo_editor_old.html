@@ -1,0 +1,889 @@
+{% extends "base.html" %}
+
+{% block title %}Editor de Fotos - Relatório{% endblock %}
+
+{% block extra_css %}
+<style>
+#photoCanvas {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    background: white;
+    cursor: crosshair;
+}
+
+.toolbar {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #dee2e6;
+}
+
+.tool-group {
+    margin-bottom: 15px;
+}
+
+.tool-btn {
+    margin-right: 10px;
+    margin-bottom: 5px;
+}
+
+.tool-btn.active {
+    background-color: #0d6efd !important;
+    color: white !important;
+}
+
+.color-picker {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.size-slider {
+    width: 150px;
+}
+
+#preview-container {
+    max-height: 80vh;
+    overflow: auto;
+    text-align: center;
+}
+
+.annotation-info {
+    background: #e3f2fd;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3><i class="fas fa-edit"></i> Editor de Fotos</h3>
+                <div>
+                    <button onclick="saveAnnotatedPhoto()" class="btn btn-success me-2">
+                        <i class="fas fa-save"></i> Salvar Anotações
+                    </button>
+                    <button onclick="window.close()" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Barra de Ferramentas -->
+        <div class="col-md-3">
+            <div class="toolbar">
+                <h5><i class="fas fa-tools"></i> Ferramentas</h5>
+                
+                <!-- Ferramentas de Desenho -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Ferramentas:</label><br>
+                    <button type="button" class="btn btn-outline-primary tool-btn active" data-tool="pen">
+                        <i class="fas fa-pen"></i> Pincel
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="arrow">
+                        <i class="fas fa-arrow-right"></i> Seta
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="circle">
+                        <i class="fas fa-circle"></i> Círculo
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="rectangle">
+                        <i class="fas fa-square"></i> Retângulo
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="text">
+                        <i class="fas fa-font"></i> Texto
+                    </button>
+                </div>
+
+                <!-- Cores -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Cor:</label><br>
+                    <input type="color" id="colorPicker" class="color-picker" value="#ff0000">
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-danger me-1" onclick="setColor('#ff0000')">Vermelho</button>
+                        <button type="button" class="btn btn-sm btn-warning me-1" onclick="setColor('#ffc107')">Amarelo</button>
+                        <button type="button" class="btn btn-sm btn-success me-1" onclick="setColor('#28a745')">Verde</button>
+                        <button type="button" class="btn btn-sm btn-primary me-1" onclick="setColor('#007bff')">Azul</button>
+                        <button type="button" class="btn btn-sm btn-dark me-1" onclick="setColor('#000000')">Preto</button>
+                    </div>
+                </div>
+
+                <!-- Tamanho -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Tamanho:</label><br>
+                    <input type="range" id="sizeSlider" class="size-slider" min="1" max="20" value="3">
+                    <span id="sizeDisplay">3px</span>
+                </div>
+
+                <!-- Ações -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Ações:</label><br>
+                    <button type="button" class="btn btn-outline-warning tool-btn" onclick="undoLastAction()">
+                        <i class="fas fa-undo"></i> Desfazer
+                    </button>
+                    <button type="button" class="btn btn-outline-danger tool-btn" onclick="clearCanvas()">
+                        <i class="fas fa-trash"></i> Limpar
+                    </button>
+                </div>
+
+                <!-- Informações da Foto -->
+                <div class="annotation-info">
+                    <h6><i class="fas fa-info-circle"></i> Informações</h6>
+                    <div class="mb-3">
+                        <label class="form-label">Legenda:</label>
+                        <input type="text" id="photoCaption" class="form-control" placeholder="Digite a legenda da foto...">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Categoria:</label>
+                        <select id="photoCategory" class="form-control">
+                            <option value="Fundação">Fundação</option>
+                            <option value="Estrutura">Estrutura</option>
+                            <option value="Alvenaria">Alvenaria</option>
+                            <option value="Instalações">Instalações</option>
+                            <option value="Cobertura">Cobertura</option>
+                            <option value="Acabamento">Acabamento</option>
+                            <option value="Problema">Problema</option>
+                            <option value="Geral">Vista Geral</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição:</label>
+                        <textarea id="photoDescription" class="form-control" rows="3" placeholder="Descrição detalhada..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas de Edição -->
+        <div class="col-md-9">
+            <div id="preview-container">
+                <canvas id="photoCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para entrada de texto -->
+<div class="modal fade" id="textModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Texto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Texto:</label>
+                    <input type="text" id="textInput" class="form-control" placeholder="Digite o texto...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tamanho da Fonte:</label>
+                    <select id="fontSize" class="form-control">
+                        <option value="12">12px</option>
+                        <option value="16" selected>16px</option>
+                        <option value="20">20px</option>
+                        <option value="24">24px</option>
+                        <option value="32">32px</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="addTextToCanvas()">Adicionar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variáveis globais
+let canvas, ctx;
+let isDrawing = false;
+let currentTool = 'pen';
+let currentColor = '#ff0000';
+let currentSize = 3;
+let lastX = 0;
+let lastY = 0;
+let startX = 0;
+let startY = 0;
+let originalImageData;
+let actions = [];
+let currentAction = [];
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCanvas();
+    loadImageFromUrlOrStorage();
+    setupEventListeners();
+});
+
+function loadImageFromUrlOrStorage() {
+    // Primeiro tentar obter do sessionStorage
+    const storedData = sessionStorage.getItem('photoEditorData');
+    if (storedData) {
+        try {
+            const photoData = JSON.parse(storedData);
+            if (photoData.imageData) {
+                loadImageToCanvas(photoData.imageData);
+                
+                // Preencher campos se disponíveis
+                if (photoData.caption) {
+                    document.getElementById('photoCaption').value = photoData.caption;
+                }
+                if (photoData.category) {
+                    document.getElementById('photoCategory').value = photoData.category;
+                }
+                return;
+            }
+        } catch (e) {
+            console.warn('Erro ao carregar dados do sessionStorage:', e);
+        }
+    }
+    
+    // Fallback para URL params (método antigo)
+    loadImageFromUrl();
+}
+
+function loadImageToCanvas(imageSrc) {
+    if (!imageSrc) {
+        console.warn('ImageSrc está vazio');
+        return;
+    }
+    
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = function() {
+        // Ajustar canvas para o tamanho da imagem
+        const maxWidth = 800;
+        const maxHeight = 600;
+        let { width, height } = img;
+        
+        // Redimensionar se necessário
+        if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+        }
+        if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Desenhar imagem no canvas
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Salvar estado original
+        originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        console.log('Imagem carregada com sucesso no canvas');
+    };
+    
+    img.onerror = function() {
+        console.error('Erro ao carregar imagem:', imageSrc);
+        alert('Erro ao carregar a imagem. Verifique se o arquivo é válido.');
+    };
+    
+    img.src = imageSrc;
+}
+
+function initializeCanvas() {
+    canvas = document.getElementById('photoCanvas');
+    ctx = canvas.getContext('2d');
+    
+    // Configurações do canvas
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+}
+
+function loadImageFromUrl() {
+    // Obter URL da imagem dos parâmetros
+    const urlParams = new URLSearchParams(window.location.search);
+    const imageUrl = urlParams.get('image');
+    const caption = urlParams.get('caption');
+    const category = urlParams.get('category');
+    const description = urlParams.get('description');
+    
+    if (imageUrl) {
+        const img = new Image();
+        img.onload = function() {
+            // Ajustar tamanho do canvas
+            const maxWidth = 800;
+            const maxHeight = 600;
+            let { width, height } = img;
+            
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
+            if (height > maxHeight) {
+                width = (width * maxHeight) / height;
+                height = maxHeight;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Desenhar imagem no canvas
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Salvar estado original
+            originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        };
+        img.src = imageUrl;
+    }
+    
+    // Preencher informações se disponíveis
+    if (caption) document.getElementById('photoCaption').value = decodeURIComponent(caption);
+    if (category) document.getElementById('photoCategory').value = decodeURIComponent(category);
+    if (description) document.getElementById('photoDescription').value = decodeURIComponent(description);
+}
+
+function setupEventListeners() {
+    // Ferramentas
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentTool = this.dataset.tool;
+            
+            if (currentTool === 'text') {
+                canvas.style.cursor = 'text';
+            } else {
+                canvas.style.cursor = 'crosshair';
+            }
+            
+            console.log('Ferramenta selecionada:', currentTool);
+        });
+    });
+    
+    // Cor
+    document.getElementById('colorPicker').addEventListener('change', function() {
+        currentColor = this.value;
+        console.log('Cor alterada para:', currentColor);
+    });
+    
+    // Tamanho
+    document.getElementById('brushSize').addEventListener('input', function() {
+        currentSize = parseInt(this.value);
+        console.log('Tamanho alterado para:', currentSize);
+    });
+    
+    // Canvas Events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    
+    // Touch events para dispositivos móveis
+    canvas.addEventListener('touchstart', handleTouch);
+    canvas.addEventListener('touchmove', handleTouch);
+    canvas.addEventListener('touchend', handleTouch);
+    
+    // Inicializar com primeira ferramenta selecionada
+    document.querySelector('.tool-btn[data-tool="pen"]').classList.add('active');
+    
+    // Canvas Events
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    
+    // Touch events para dispositivos móveis
+    canvas.addEventListener('touchstart', handleTouch);
+    canvas.addEventListener('touchmove', handleTouch);
+    canvas.addEventListener('touchend', handleTouch);
+    
+
+}
+
+function startDrawing(e) {
+    if (currentTool === 'text') {
+        handleTextTool(e);
+        return;
+    }
+    
+    isDrawing = true;
+    const [x, y] = getMousePos(e);
+    lastX = x;
+    lastY = y;
+    startX = x;
+    startY = y;
+    
+    if (currentTool === 'pen') {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        currentAction = [];
+    }
+    
+    console.log('Iniciando desenho:', currentTool, 'em', x, y);
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    
+    const [x, y] = getMousePos(e);
+    
+    if (currentTool === 'pen') {
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = currentSize;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        
+        currentAction.push({
+            tool: 'pen',
+            x: x,
+            y: y,
+            color: currentColor,
+            size: currentSize
+        });
+    } else if (currentTool === 'arrow') {
+        // Redesenhar canvas e mostrar preview da seta
+        redrawCanvas();
+        drawArrow(startX, startY, x, y);
+    } else if (currentTool === 'circle') {
+        // Redesenhar canvas e mostrar preview do círculo
+        redrawCanvas();
+        drawCircle(startX, startY, x, y);
+    } else if (currentTool === 'rectangle') {
+        // Redesenhar canvas e mostrar preview do retângulo
+        redrawCanvas();
+        drawRectangle(startX, startY, x, y);
+    }
+}
+
+function stopDrawing(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+    
+    const [x, y] = getMousePos(e);
+    
+    if (currentTool === 'pen' && currentAction.length > 0) {
+        actions.push(currentAction);
+    } else if (currentTool === 'arrow') {
+        actions.push([{
+            tool: 'arrow',
+            startX: startX,
+            startY: startY,
+            endX: x,
+            endY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    } else if (currentTool === 'circle') {
+        actions.push([{
+            tool: 'circle',
+            centerX: startX,
+            centerY: startY,
+            edgeX: x,
+            edgeY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    } else if (currentTool === 'rectangle') {
+        actions.push([{
+            tool: 'rectangle',
+            startX: startX,
+            startY: startY,
+            endX: x,
+            endY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    }
+    
+    console.log('Finalizando desenho. Total de ações:', actions.length);
+}
+
+function oldStartDrawing(e) {
+    if (currentTool === 'pen') {
+        ctx.beginPath();
+        ctx.moveTo(lastX, lastY);
+    }
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    
+    const [currentX, currentY] = getMousePos(e);
+    
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    
+    if (currentTool === 'pen') {
+        ctx.lineTo(currentX, currentY);
+        ctx.stroke();
+        currentAction.push({
+            tool: 'pen',
+            x: currentX,
+            y: currentY,
+            color: currentColor,
+            size: currentSize
+        });
+    }
+    
+    [lastX, lastY] = [currentX, currentY];
+}
+
+function stopDrawing(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+    
+    const [currentX, currentY] = getMousePos(e);
+    
+    if (currentTool === 'arrow') {
+        drawArrow(lastX, lastY, currentX, currentY);
+    } else if (currentTool === 'circle') {
+        drawCircle(lastX, lastY, currentX, currentY);
+    } else if (currentTool === 'rectangle') {
+        drawRectangle(lastX, lastY, currentX, currentY);
+    }
+    
+    if (currentAction.length > 0) {
+        actions.push(currentAction);
+        currentAction = [];
+    }
+}
+
+function drawArrow(fromX, fromY, toX, toY) {
+    const headLength = 15;
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    ctx.fillStyle = currentColor;
+    
+    // Linha principal
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    
+    // Ponta da seta
+    ctx.beginPath();
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
+}
+
+function startDrawing(e) {
+    if (currentTool === 'text') {
+        handleTextTool(e);
+        return;
+    }
+    
+    isDrawing = true;
+    const [x, y] = getMousePos(e);
+    lastX = x;
+    lastY = y;
+    
+    if (currentTool === 'pen') {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        currentAction = [];
+    }
+    
+    startX = x;
+    startY = y;
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    
+    const [x, y] = getMousePos(e);
+    
+    if (currentTool === 'pen') {
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = currentSize;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        
+        currentAction.push({
+            tool: 'pen',
+            x: x,
+            y: y,
+            color: currentColor,
+            size: currentSize
+        });
+    } else if (currentTool === 'arrow') {
+        // Redesenhar canvas e mostrar preview da seta
+        redrawCanvas();
+        drawArrow(startX, startY, x, y);
+    } else if (currentTool === 'circle') {
+        // Redesenhar canvas e mostrar preview do círculo
+        redrawCanvas();
+        drawCircle(startX, startY, x, y);
+    } else if (currentTool === 'rectangle') {
+        // Redesenhar canvas e mostrar preview do retângulo
+        redrawCanvas();
+        drawRectangle(startX, startY, x, y);
+    }
+}
+
+function stopDrawing(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+    
+    const [x, y] = getMousePos(e);
+    
+    if (currentTool === 'pen' && currentAction.length > 0) {
+        actions.push(currentAction);
+    } else if (currentTool === 'arrow') {
+        actions.push([{
+            tool: 'arrow',
+            startX: startX,
+            startY: startY,
+            endX: x,
+            endY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    } else if (currentTool === 'circle') {
+        actions.push([{
+            tool: 'circle',
+            centerX: startX,
+            centerY: startY,
+            edgeX: x,
+            edgeY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    } else if (currentTool === 'rectangle') {
+        actions.push([{
+            tool: 'rectangle',
+            startX: startX,
+            startY: startY,
+            endX: x,
+            endY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    }
+}
+
+function drawArrow(fromX, fromY, toX, toY) {
+    const headLength = 15;
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    ctx.beginPath();
+    
+    // Linha principal
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    
+    // Ponta da seta
+    ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+    
+    ctx.stroke();
+}
+
+function drawCircle(centerX, centerY, edgeX, edgeY) {
+    const radius = Math.sqrt(Math.pow(edgeX - centerX, 2) + Math.pow(edgeY - centerY, 2));
+    
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    ctx.stroke();
+}
+
+function drawRectangle(startX, startY, endX, endY) {
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    ctx.beginPath();
+    ctx.rect(startX, startY, endX - startX, endY - startY);
+    ctx.stroke();
+}
+
+function handleTextTool(e) {
+    const [x, y] = getMousePos(e);
+    const modal = new bootstrap.Modal(document.getElementById('textModal'));
+    
+    // Armazenar posição para uso posterior
+    window.textPosition = { x, y };
+    modal.show();
+}
+
+function addTextToCanvas() {
+    const text = document.getElementById('textInput').value;
+    const fontSize = document.getElementById('fontSize').value;
+    const { x, y } = window.textPosition;
+    
+    if (text.trim()) {
+        ctx.fillStyle = currentColor;
+        ctx.font = `${fontSize}px Arial`;
+        ctx.fillText(text, x, y);
+        
+        actions.push([{
+            tool: 'text',
+            text: text,
+            x: x,
+            y: y,
+            color: currentColor,
+            fontSize: fontSize
+        }]);
+    }
+    
+    // Fechar modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('textModal'));
+    modal.hide();
+    
+    // Limpar campo
+    document.getElementById('textInput').value = '';
+}
+
+function getMousePos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    return [
+        (e.clientX - rect.left) * scaleX,
+        (e.clientY - rect.top) * scaleY
+    ];
+}
+
+function handleTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 
+                                    e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+    });
+    canvas.dispatchEvent(mouseEvent);
+}
+
+function setColor(color) {
+    currentColor = color;
+    document.getElementById('colorPicker').value = color;
+}
+
+function undoLastAction() {
+    if (actions.length > 0) {
+        actions.pop();
+        redrawCanvas();
+        console.log('Última ação desfeita. Ações restantes:', actions.length);
+    } else {
+        console.log('Nenhuma ação para desfazer');
+    }
+}
+
+function clearCanvas() {
+    if (confirm('Tem certeza que deseja limpar todas as anotações?')) {
+        actions = [];
+        redrawCanvas();
+    }
+}
+
+function redrawCanvas() {
+    // Restaurar imagem original
+    ctx.putImageData(originalImageData, 0, 0);
+    
+    // Redesenhar todas as ações
+    actions.forEach(action => {
+        if (action.length > 0) {
+            const firstStep = action[0];
+            
+            if (firstStep.tool === 'pen') {
+                ctx.strokeStyle = firstStep.color;
+                ctx.lineWidth = firstStep.size;
+                ctx.beginPath();
+                ctx.moveTo(firstStep.x, firstStep.y);
+                
+                action.forEach(step => {
+                    ctx.lineTo(step.x, step.y);
+                });
+                ctx.stroke();
+                
+            } else if (firstStep.tool === 'arrow') {
+                drawArrow(firstStep.startX, firstStep.startY, firstStep.endX, firstStep.endY);
+                
+            } else if (firstStep.tool === 'circle') {
+                const oldColor = currentColor;
+                const oldSize = currentSize;
+                currentColor = firstStep.color;
+                currentSize = firstStep.size;
+                drawCircle(firstStep.centerX, firstStep.centerY, firstStep.edgeX, firstStep.edgeY);
+                currentColor = oldColor;
+                currentSize = oldSize;
+                
+            } else if (firstStep.tool === 'rectangle') {
+                const oldColor = currentColor;
+                const oldSize = currentSize;
+                currentColor = firstStep.color;
+                currentSize = firstStep.size;
+                drawRectangle(firstStep.startX, firstStep.startY, firstStep.endX, firstStep.endY);
+                currentColor = oldColor;
+                currentSize = oldSize;
+                
+            } else if (firstStep.tool === 'text') {
+                ctx.fillStyle = firstStep.color;
+                ctx.font = `${firstStep.fontSize}px Arial`;
+                ctx.fillText(firstStep.text, firstStep.x, firstStep.y);
+            }
+        }
+    });
+}
+
+function saveAnnotatedPhoto() {
+    // Capturar dados da imagem anotada com compressão
+    const imageData = canvas.toDataURL('image/jpeg', 0.7); // Comprimir para reduzir tamanho
+    const caption = document.getElementById('photoCaption').value;
+    const category = document.getElementById('photoCategory').value;
+    const description = document.getElementById('photoDescription').value;
+    
+    // Obter photoId do sessionStorage ou URL
+    let photoId = null;
+    const storedData = sessionStorage.getItem('photoEditorData');
+    if (storedData) {
+        try {
+            const photoData = JSON.parse(storedData);
+            photoId = photoData.photoId;
+        } catch (e) {
+            console.warn('Erro ao obter photoId do sessionStorage:', e);
+        }
+    }
+    
+    if (!photoId) {
+        photoId = new URLSearchParams(window.location.search).get('photoId');
+    }
+    
+    // Enviar dados para a janela pai usando postMessage
+    if (window.opener) {
+        window.opener.postMessage({
+            type: 'photo-edited',
+            photoId: photoId,
+            imageData: imageData,
+            caption: caption,
+            category: category,
+            description: description,
+            annotations: actions
+        }, '*');
+        
+        // Limpar sessionStorage
+        sessionStorage.removeItem('photoEditorData');
+        window.close();
+    } else {
+        alert('Erro: Janela pai não encontrada.');
+    }
+}
+</script>
+{% endblock %}

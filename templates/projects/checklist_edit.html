@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Checklist - {{ project.nome }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-edit me-2"></i>
+                Editar Checklist - {{ project.nome }}
+                <small class="text-muted">({{ project.numero }})</small>
+            </h1>
+            <div>
+                <a href="{{ url_for('project_checklist_view', project_id=project.id) }}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-eye me-2"></i>Ver Checklist
+                </a>
+                <a href="{{ url_for('project_view', project_id=project.id) }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar ao Projeto
+                </a>
+            </div>
+        </div>
+
+        <!-- Add New Item -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-plus me-2"></i>Adicionar Novo Item
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="addItemForm" onsubmit="addItem(event)">
+                    <div class="row">
+                        <div class="col-md-9">
+                            <input type="text" class="form-control" id="newItemText" placeholder="Digite o texto do novo item do checklist" required>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-plus me-2"></i>Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Current Items -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Itens do Checklist ({{ checklist_items|length }})
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if checklist_items %}
+                <div id="checklistItems">
+                    {% for item in checklist_items %}
+                    <div class="card mb-2" data-item-id="{{ item.id }}">
+                        <div class="card-body py-2">
+                            <div class="row align-items-center">
+                                <div class="col-1">
+                                    <span class="badge bg-primary">{{ item.ordem }}</span>
+                                </div>
+                                <div class="col-8">
+                                    <span class="item-text">{{ item.texto }}</span>
+                                    <input type="text" class="form-control d-none item-edit-input" value="{{ item.texto }}">
+                                </div>
+                                <div class="col-3 text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 btn-edit" onclick="editItem({{ item.id }})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-success d-none btn-save" onclick="saveItem({{ item.id }})">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary d-none btn-cancel" onclick="cancelEdit({{ item.id }})">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger btn-delete" onclick="deleteItem({{ item.id }})">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum item no checklist</h5>
+                    <p class="text-muted">Adicione itens usando o formulário acima.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Help -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-lightbulb me-2"></i>Dicas:</h6>
+                    <ul class="mb-0">
+                        <li>Use textos claros e objetivos para cada item do checklist</li>
+                        <li>A ordem dos itens será mantida conforme aparecem aqui</li>
+                        <li>O checklist não aparecerá nos PDFs gerados, apenas na visualização web</li>
+                        <li>As mudanças são aplicadas imediatamente aos novos relatórios</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function addItem(event) {
+    event.preventDefault();
+    const texto = document.getElementById('newItemText').value.trim();
+    
+    if (!texto) {
+        alert('Digite o texto do item');
+        return;
+    }
+    
+    fetch(`/projects/{{ project.id }}/checklist/items`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            texto: texto
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Reload to show new item
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Erro ao adicionar item');
+    });
+}
+
+function editItem(itemId) {
+    const card = document.querySelector(`[data-item-id="${itemId}"]`);
+    const textSpan = card.querySelector('.item-text');
+    const editInput = card.querySelector('.item-edit-input');
+    const editBtn = card.querySelector('.btn-edit');
+    const saveBtn = card.querySelector('.btn-save');
+    const cancelBtn = card.querySelector('.btn-cancel');
+    const deleteBtn = card.querySelector('.btn-delete');
+    
+    textSpan.classList.add('d-none');
+    editInput.classList.remove('d-none');
+    editBtn.classList.add('d-none');
+    saveBtn.classList.remove('d-none');
+    cancelBtn.classList.remove('d-none');
+    deleteBtn.classList.add('d-none');
+    
+    editInput.focus();
+}
+
+function saveItem(itemId) {
+    const card = document.querySelector(`[data-item-id="${itemId}"]`);
+    const editInput = card.querySelector('.item-edit-input');
+    const texto = editInput.value.trim();
+    
+    if (!texto) {
+        alert('Digite o texto do item');
+        return;
+    }
+    
+    fetch(`/projects/{{ project.id }}/checklist/items/${itemId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            texto: texto
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Reload to show updated text
+        } else {
+            alert('Erro: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Erro ao salvar item');
+    });
+}
+
+function cancelEdit(itemId) {
+    const card = document.querySelector(`[data-item-id="${itemId}"]`);
+    const textSpan = card.querySelector('.item-text');
+    const editInput = card.querySelector('.item-edit-input');
+    const editBtn = card.querySelector('.btn-edit');
+    const saveBtn = card.querySelector('.btn-save');
+    const cancelBtn = card.querySelector('.btn-cancel');
+    const deleteBtn = card.querySelector('.btn-delete');
+    
+    textSpan.classList.remove('d-none');
+    editInput.classList.add('d-none');
+    editBtn.classList.remove('d-none');
+    saveBtn.classList.add('d-none');
+    cancelBtn.classList.add('d-none');
+    deleteBtn.classList.remove('d-none');
+    
+    // Reset input value
+    editInput.value = textSpan.textContent;
+}
+
+function deleteItem(itemId) {
+    if (confirm('Tem certeza que deseja remover este item do checklist?')) {
+        fetch(`/projects/{{ project.id }}/checklist/items/${itemId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload(); // Reload to remove item
+            } else {
+                alert('Erro: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erro ao remover item');
+        });
+    }
+}
+</script>
+{% endblock %}

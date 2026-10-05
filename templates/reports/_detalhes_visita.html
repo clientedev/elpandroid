@@ -1,0 +1,170 @@
+<!-- Bloco de Detalhes da Visita Unificado -->
+<hr class="my-4" style="border-top: 2px solid #e3e6f0;">
+<h5 class="mb-4 fw-bold" style="color: #2c3e50;">
+    <i class="fas fa-clipboard-list me-2" style="color: #4e73df;"></i>Detalhes da Visita
+</h5>
+
+<!-- Card: Acompanhantes -->
+<div class="card mb-3 shadow-sm border-0" style="border-left: 4px solid #4e73df !important;">
+    <div class="card-body">
+        <h6 class="card-title mb-3 fw-bold text-primary">
+            <i class="fas fa-users me-2"></i>Acompanhantes da Visita
+        </h6>
+        {% if acompanhantes and acompanhantes|length > 0 %}
+        <div class="d-flex flex-wrap gap-2">
+            {% for acomp in acompanhantes %}
+            <div class="badge bg-light text-dark border px-3 py-2" 
+                 style="font-size: 0.9rem; font-weight: normal; border-radius: 20px;">
+                <i class="fas fa-user-circle me-1" style="color: #4e73df;"></i>
+                {% if acomp is mapping %}
+                    <strong>{{ acomp.get('nome', acomp.get('nome_funcionario', acomp.get('name', 'Não informado'))) }}</strong>
+                    {% if acomp.get('funcao') or acomp.get('cargo') %}
+                    <span class="text-muted ms-1">- {{ acomp.get('funcao') or acomp.get('cargo') }}</span>
+                    {% endif %}
+                {% else %}
+                    <strong>{{ acomp }}</strong>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% elif acompanhantes_formatados and acompanhantes_formatados|length > 0 %}
+        <!-- Suporte para variável acompanhantes_formatados usada no review.html -->
+        <div class="d-flex flex-wrap gap-2">
+            {% for acomp in acompanhantes_formatados %}
+            <div class="badge bg-light text-dark border px-3 py-2" 
+                 style="font-size: 0.9rem; font-weight: normal; border-radius: 20px;">
+                <i class="fas fa-user-circle me-1" style="color: #4e73df;"></i>
+                <strong>{{ acomp.nome|default('Sem nome') }}</strong>
+                {% if acomp.funcao %}
+                <span class="text-muted ms-1">- {{ acomp.funcao }}</span>
+                {% endif %}
+                {% if acomp.origem %}
+                <span class="text-muted ms-1">({{ acomp.origem }})</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted mb-0 fst-italic">
+            <i class="fas fa-info-circle me-1"></i>Não preenchido
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Card: Checklist -->
+<div class="card mb-3 shadow-sm border-0" style="border-left: 4px solid #1cc88a !important;">
+    <div class="card-body">
+        <h6 class="card-title mb-3 fw-bold text-success">
+            <i class="fas fa-check-square me-2"></i>Checklist Selecionado
+        </h6>
+        {% if checklist %}
+            {% if checklist is mapping %}
+                {% set items = checklist.get('items', []) %}
+            {% else %}
+                {% set items = checklist %}
+            {% endif %}
+            
+            {% if items and items|length > 0 %}
+            {% set has_selected = [] %}
+            <div class="checklist-container">
+                {% for item in items %}
+                    {% if item is mapping %}
+                        {% set concluido_val = item.get('concluido', False) %}
+                        {% set checked_val = item.get('checked', False) %}
+                        {% set completed_val = item.get('completed', False) %}
+                        {% set selecionado_val = item.get('selecionado', False) %}
+                        {% set true_values = [true, 'true', 'True', 'TRUE', '1', 1, 2, 3, 4, 5, 6, 7, 8, 9, '2', '3', '4', '5', '01', 'yes', 'Yes', 'YES', 'y', 'Y', 't', 'T', 'sim', 'Sim', 'SIM', 's', 'S', 'ok', 'OK', 'checked', 'selected', 'ativo', 'active'] %}
+                        {% set is_selected = (concluido_val in true_values) or (checked_val in true_values) or (completed_val in true_values) or (selecionado_val in true_values) %}
+                    {% else %}
+                        {% set is_selected = false %}
+                    {% endif %}
+                    
+                    {% if is_selected %}
+                        {% if has_selected.append(1) %}{% endif %}
+                        <div class="checklist-item p-3 mb-2 rounded" 
+                             style="background: #d1f2eb; border-left: 3px solid #1cc88a;">
+                            {% if item is mapping %}
+                                <div class="d-flex align-items-start">
+                                    <i class="fas fa-check-circle me-2 mt-1" 
+                                       style="color: #1cc88a; font-size: 1.1rem;"></i>
+                                    <div class="flex-grow-1">
+                                        <strong style="color: #5a5c69;">{{ item.get('pergunta', item.get('texto', item.get('descricao', 'Item sem descrição'))) }}</strong>
+                                        {% if item.get('resposta') or item.get('observacao') or item.get('observations') %}
+                                        <div class="mt-1 text-muted" style="font-size: 0.9rem; padding-left: 1.5rem;">
+                                            {{ item.get('resposta', item.get('observacao', item.get('observations', ''))) }}
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% else %}
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-check-circle me-2" style="color: #1cc88a; font-size: 1.1rem;"></i>
+                                    <strong style="color: #5a5c69;">{{ item }}</strong>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% if has_selected|length == 0 %}
+            <p class="text-muted mb-0 fst-italic">
+                <i class="fas fa-info-circle me-1"></i>Nenhum item selecionado no checklist
+            </p>
+            {% endif %}
+            {% else %}
+            <p class="text-muted mb-0 fst-italic">
+                <i class="fas fa-info-circle me-1"></i>Não preenchido
+            </p>
+            {% endif %}
+        {% else %}
+        <p class="text-muted mb-0 fst-italic">
+            <i class="fas fa-info-circle me-1"></i>Não preenchido
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Card: Observações Finais -->
+<div class="card mb-3 shadow-sm border-0" style="border-left: 4px solid #f6c23e !important;">
+    <div class="card-body">
+        <h6 class="card-title mb-3 fw-bold text-warning">
+            <i class="fas fa-comment-dots me-2"></i>Observações Gerais
+        </h6>
+        {% set obs_finais = report.observacoes_finais if report else relatorio.observacoes_finais %}
+        {% set obs_finais_clean = (obs_finais | string).split(' [offline_id:')[0] if obs_finais else '' %}
+        
+        {% if obs_finais_clean and obs_finais_clean.strip() != '' %}
+        <div class="p-3 rounded" style="background: #fff3cd; border: 1px solid #ffeaa7;">
+            <div style="color: #856404;">{{ obs_finais_clean|safe }}</div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0 fst-italic">
+            <i class="fas fa-info-circle me-1"></i>Não preenchido
+        </p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Card: Lembrete Próxima Visita -->
+{% set rel_obj = report if report is defined and report else relatorio %}
+{% if rel_obj and rel_obj.lembrete_proxima_visita %}
+<div class="card mb-3 shadow-sm border-0" style="border-left: 4px solid #e74a3b !important;">
+    <div class="card-body">
+        <h6 class="card-title mb-3 fw-bold" style="color: #e74a3b;">
+            <i class="fas fa-bell me-2"></i>Lembrete para Próxima Visita
+        </h6>
+        <div class="p-3 rounded" style="background: #fce4ec; border: 1px solid #f8bbd0;">
+            <div style="color: #c62828;">
+                <i class="fas fa-calendar-alt me-2"></i>
+                {% if rel_obj.lembrete_proxima_visita is string %}
+                    {{ rel_obj.lembrete_proxima_visita }}
+                {% else %}
+                    {{ rel_obj.lembrete_proxima_visita.strftime('%d/%m/%Y') if rel_obj.lembrete_proxima_visita else '' }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+

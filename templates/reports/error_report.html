@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Erro ao carregar relatório{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erro ao carregar relatório
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-times-circle me-2"></i>Detalhes do erro:</h5>
+                        <p class="mb-0">{{ message }}</p>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <p class="text-muted">
+                            <i class="fas fa-info-circle me-2"></i>
+                            O relatório solicitado não pôde ser carregado. Por favor, verifique se o relatório existe ou tente novamente mais tarde.
+                        </p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ url_for('reports') }}" class="btn btn-primary">
+                        <i class="fas fa-arrow-left me-2"></i>
+                        Voltar à lista de relatórios
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary ms-2">
+                        <i class="fas fa-home me-2"></i>
+                        Ir para Início
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

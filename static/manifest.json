@@ -1,0 +1,115 @@
+{
+    "name": "ELP Consultoria - Sistema de Relatórios v2.1",
+    "short_name": "ELP Relatórios", 
+    "description": "Sistema profissional unificado de relatórios e gestão de obras - ELP Consultoria e Engenharia",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#343a40",
+    "theme_color": "#20c1e8",
+    "orientation": "any",
+    "display_override": ["window-controls-overlay", "standalone"],
+    "scope": "/",
+    "icons": [
+        {
+            "src": "/static/icons/icon-72x72.png",
+            "sizes": "72x72",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-96x96.png",
+            "sizes": "96x96",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-128x128.png",
+            "sizes": "128x128",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-144x144.png",
+            "sizes": "144x144",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-152x152.png",
+            "sizes": "152x152",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-384x384.png",
+            "sizes": "384x384",
+            "type": "image/png",
+            "purpose": "maskable any"
+        },
+        {
+            "src": "/static/icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable any"
+        }
+    ],
+    "categories": ["productivity", "business"],
+    "screenshots": [
+        {
+            "src": "/static/screenshots/desktop.png",
+            "sizes": "1280x720",
+            "type": "image/png",
+            "form_factor": "wide"
+        },
+        {
+            "src": "/static/screenshots/mobile.png",
+            "sizes": "360x640",
+            "type": "image/png",
+            "form_factor": "narrow"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Novo Relatório",
+            "short_name": "Relatório",
+            "description": "Criar novo relatório de obra",
+            "url": "/reports/new",
+            "icons": [
+                {
+                    "src": "/static/icons/shortcut-report.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Nova Visita",
+            "short_name": "Visita",
+            "description": "Agendar nova visita técnica",
+            "url": "/visits/new",
+            "icons": [
+                {
+                    "src": "/static/icons/shortcut-visit.png",
+                    "sizes": "96x96"
+                }
+            ]
+        },
+        {
+            "name": "Projetos",
+            "short_name": "Projetos",
+            "description": "Gerenciar projetos",
+            "url": "/projects",
+            "icons": [
+                {
+                    "src": "/static/icons/shortcut-project.png",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ]
+}

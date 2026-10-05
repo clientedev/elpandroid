@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}E-mails do Cliente - {{ projeto.nome }} - ELP Consultoria e Engenharia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-2">
+                    <i class="fas fa-envelope me-2" style="color: var(--elp-cyan);"></i>
+                    E-mails do Cliente
+                </h1>
+                <p class="text-muted mb-0">
+                    <strong>Projeto:</strong> {{ projeto.numero }} - {{ projeto.nome }}
+                </p>
+            </div>
+            <div>
+                <a href="{{ url_for('novo_email_cliente', projeto_id=projeto.id) }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Novo E-mail
+                </a>
+                <a href="{{ url_for('project_view', project_id=projeto.id) }}" class="btn btn-outline-secondary ms-2">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar ao Projeto
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estatísticas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Total de E-mails</h5>
+                        <h2 class="mb-0">{{ emails|length }}</h2>
+                    </div>
+                    <i class="fas fa-envelope fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Recebem Relatórios</h5>
+                        <h2 class="mb-0">{{ emails|selectattr("receber_relatorios")|list|length }}</h2>
+                    </div>
+                    <i class="fas fa-file-pdf fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Notificações Ativas</h5>
+                        <h2 class="mb-0">{{ emails|selectattr("receber_notificacoes")|list|length }}</h2>
+                    </div>
+                    <i class="fas fa-bell fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de E-mails -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Lista de E-mails de Clientes
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if emails %}
+                    <!-- Layout Desktop: Tabela -->
+                    <div class="d-none d-lg-block">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Contato</th>
+                                        <th>E-mail</th>
+                                        <th>Telefone</th>
+                                        <th>Empresa/Cargo</th>
+                                        <th>Status</th>
+                                        <th>Configurações</th>
+                                        <th width="150">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for email in emails %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ email.nome_contato }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if email.email %}
+                                                <a href="mailto:{{ email.email }}" class="text-decoration-none">
+                                                    {{ email.email }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if email.telefone %}
+                                                <a href="tel:{{ email.telefone }}" class="text-decoration-none">
+                                                    <i class="fas fa-phone fa-sm me-1"></i>{{ email.telefone }}
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if email.empresa %}
+                                                <strong>{{ email.empresa }}</strong><br>
+                                            {% endif %}
+                                            {% if email.cargo %}
+                                                <small class="text-muted">{{ email.cargo }}</small>
+                                            {% endif %}
+                                            {% if not email.empresa and not email.cargo %}
+                                                <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-check fa-sm"></i> Ativo
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex flex-column gap-1">
+                                                {% if email.receber_relatorios %}
+                                                    <span class="badge bg-info">
+                                                        <i class="fas fa-file-pdf fa-sm"></i> Relatórios
+                                                    </span>
+                                                {% endif %}
+                                                {% if email.receber_notificacoes %}
+                                                    <span class="badge bg-secondary">
+                                                        <i class="fas fa-bell fa-sm"></i> Notificações
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{{ url_for('editar_email_cliente', email_id=email.id) }}" 
+                                                   class="btn btn-sm btn-outline-primary" 
+                                                   title="Editar">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <button type="button" 
+                                                        class="btn btn-sm btn-outline-danger" 
+                                                        onclick="confirmarRemocao({{ email.id }}, '{{ email.email }}')"
+                                                        title="Remover">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Layout Mobile: Cards Verticais -->
+                    <div class="d-lg-none">
+                        {% for email in emails %}
+                        <div class="card mb-3">
+                            <div class="card-body py-3">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <h6 class="card-title mb-1">
+                                            <strong>{{ email.nome_contato }}</strong>
+                                        </h6>
+                                        <small class="text-muted">
+                                            <i class="fas fa-envelope me-1"></i>
+                                            {% if email.email %}
+                                                <a href="mailto:{{ email.email }}" class="text-decoration-none">{{ email.email }}</a>
+                                            {% else %}
+                                                <span class="text-muted">Sem e-mail</span>
+                                            {% endif %}
+                                        </small>
+                                        {% if email.telefone %}
+                                        <br>
+                                        <small class="text-muted">
+                                            <i class="fas fa-phone me-1"></i>
+                                            <a href="tel:{{ email.telefone }}" class="text-decoration-none">{{ email.telefone }}</a>
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check fa-sm"></i> Ativo
+                                        </span>
+                                    </div>
+                                </div>
+                                {% if email.empresa or email.cargo %}
+                                <div class="mb-2">
+                                    {% if email.empresa %}
+                                        <small><strong>{{ email.empresa }}</strong></small>
+                                    {% endif %}
+                                    {% if email.cargo %}
+                                        <br><small class="text-muted">{{ email.cargo }}</small>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                <div class="d-flex gap-2 mb-2">
+                                    {% if email.receber_relatorios %}
+                                        <span class="badge bg-info">
+                                            <i class="fas fa-file-pdf fa-sm"></i> Relatórios
+                                        </span>
+                                    {% endif %}
+                                    {% if email.receber_notificacoes %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-bell fa-sm"></i> Notificações
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <a href="{{ url_for('editar_email_cliente', email_id=email.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit me-1"></i>Editar
+                                    </a>
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-danger" 
+                                            onclick="confirmarRemocao({{ email.id }}, '{{ email.email }}')">
+                                        <i class="fas fa-trash me-1"></i>Remover
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-envelope fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum e-mail cadastrado</h5>
+                        <p class="text-muted">Adicione e-mails de clientes para este projeto.</p>
+                        <a href="{{ url_for('novo_email_cliente', projeto_id=projeto.id) }}" class="btn btn-primary">
+                            <i class="fas fa-plus me-2"></i>Adicionar Primeiro E-mail
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação de Remoção -->
+<div class="modal fade" id="removeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Remoção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja remover o e-mail <strong id="emailToRemove"></strong>?</p>
+                <p class="text-muted small">O e-mail será desativado e não receberá mais comunicações.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" id="removeForm" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i>Remover E-mail
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function confirmarRemocao(emailId, emailAddress) {
+    document.getElementById('emailToRemove').textContent = emailAddress;
+    document.getElementById('removeForm').action = '/emails/' + emailId + '/remover';
+    
+    var removeModal = new bootstrap.Modal(document.getElementById('removeModal'));
+    removeModal.show();
+}
+</script>
+{% endblock %}

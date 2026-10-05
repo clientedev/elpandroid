@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block title %}Administração de E-mails - ELP Consultoria e Engenharia{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="mb-2">
+                    <i class="fas fa-cogs me-2" style="color: var(--elp-cyan);"></i>
+                    Administração de E-mails de Clientes
+                </h1>
+                <p class="text-muted mb-0">Gerenciar todos os e-mails de clientes do sistema</p>
+            </div>
+            <div>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar ao Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estatísticas Gerais -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Total de E-mails</h5>
+                        <h2 class="mb-0">{{ total_emails }}</h2>
+                    </div>
+                    <i class="fas fa-envelope fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Projetos com E-mails</h5>
+                        <h2 class="mb-0">{{ projetos|length }}</h2>
+                    </div>
+                    <i class="fas fa-building fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title">Sem E-mails</h5>
+                        <h2 class="mb-0">{{ projetos_sem_email }}</h2>
+                    </div>
+                    <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>Filtros de Pesquisa
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label for="filterProject" class="form-label">Filtrar por Projeto:</label>
+                        <input type="text" id="filterProject" class="form-control" placeholder="Digite o nome ou número do projeto">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filterEmail" class="form-label">Filtrar por E-mail:</label>
+                        <input type="text" id="filterEmail" class="form-control" placeholder="Digite o e-mail">
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filterStatus" class="form-label">Filtrar por Status:</label>
+                        <select id="filterStatus" class="form-select">
+                            <option value="">Todos</option>
+                            <option value="relatorios">Recebem Relatórios</option>
+                            <option value="notificacoes">Recebem Notificações</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12 text-end">
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times me-2"></i>Limpar Filtros
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Projetos e E-mails -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-list me-2"></i>E-mails por Projeto
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if projetos %}
+                    <div id="projectsAccordion" class="accordion">
+                        {% for projeto in projetos %}
+                        <div class="accordion-item project-item" data-project-name="{{ projeto.nome.lower() }}" data-project-number="{{ projeto.numero.lower() }}">
+                            <h2 class="accordion-header" id="heading{{ loop.index }}">
+                                <button class="accordion-button collapsed" type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#collapse{{ loop.index }}" 
+                                        aria-expanded="false" 
+                                        aria-controls="collapse{{ loop.index }}">
+                                    <div class="w-100 d-flex justify-content-between align-items-center me-3">
+                                        <div>
+                                            <strong>{{ projeto.numero }}</strong> - {{ projeto.nome }}
+                                            <small class="text-muted d-block">{{ projeto.emails_clientes|length }} e-mail(s) cadastrado(s)</small>
+                                        </div>
+                                        <div>
+                                            <span class="badge bg-primary">{{ projeto.emails_clientes|length }} e-mail(s)</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </h2>
+                            <div id="collapse{{ loop.index }}" 
+                                 class="accordion-collapse collapse" 
+                                 aria-labelledby="heading{{ loop.index }}" 
+                                 data-bs-parent="#projectsAccordion">
+                                <div class="accordion-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="mb-0">E-mails do Projeto</h6>
+                                        <a href="{{ url_for('novo_email_cliente', projeto_id=projeto.id) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-plus me-2"></i>Novo E-mail
+                                        </a>
+                                    </div>
+                                    
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>Contato</th>
+                                                    <th>E-mail</th>
+                                                    <th>Empresa/Cargo</th>
+                                                    <th>Configurações</th>
+                                                    <th width="120">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for email in projeto.emails_clientes %}
+                                                {% if email.ativo %}
+                                                <tr class="email-row" 
+                                                    data-email="{{ email.email.lower() }}"
+                                                    data-relatorios="{{ 'true' if email.receber_relatorios else 'false' }}"
+                                                    data-notificacoes="{{ 'true' if email.receber_notificacoes else 'false' }}">
+                                                    <td>
+                                                        <strong>{{ email.nome_contato }}</strong>
+                                                    </td>
+                                                    <td>
+                                                        <a href="mailto:{{ email.email }}" class="text-decoration-none">
+                                                            {{ email.email }}
+                                                        </a>
+                                                    </td>
+                                                    <td>
+                                                        {% if email.empresa %}
+                                                            <strong>{{ email.empresa }}</strong><br>
+                                                        {% endif %}
+                                                        {% if email.cargo %}
+                                                            <small class="text-muted">{{ email.cargo }}</small>
+                                                        {% endif %}
+                                                        {% if not email.empresa and not email.cargo %}
+                                                            <span class="text-muted">-</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <div class="d-flex flex-wrap gap-1">
+                                                            {% if email.receber_relatorios %}
+                                                                <span class="badge bg-info">
+                                                                    <i class="fas fa-file-pdf fa-sm"></i> Relatórios
+                                                                </span>
+                                                            {% endif %}
+                                                            {% if email.receber_notificacoes %}
+                                                                <span class="badge bg-secondary">
+                                                                    <i class="fas fa-bell fa-sm"></i> Notificações
+                                                                </span>
+                                                            {% endif %}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <a href="{{ url_for('editar_email_cliente', email_id=email.id) }}" 
+                                                               class="btn btn-outline-primary" 
+                                                               title="Editar">
+                                                                <i class="fas fa-edit"></i>
+                                                            </a>
+                                                            <button type="button" 
+                                                                    class="btn btn-outline-danger" 
+                                                                    onclick="confirmarRemocao({{ email.id }}, '{{ email.email }}')"
+                                                                    title="Remover">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-envelope fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum projeto com e-mails cadastrados</h5>
+                        <p class="text-muted">Os projetos aparecerão aqui quando tiverem e-mails de clientes cadastrados.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação de Remoção -->
+<div class="modal fade" id="removeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmar Remoção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza que deseja remover o e-mail <strong id="emailToRemove"></strong>?</p>
+                <p class="text-muted small">O e-mail será desativado e não receberá mais comunicações.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" id="removeForm" style="display: inline;">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-2"></i>Remover E-mail
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Filtros em tempo real
+document.addEventListener('DOMContentLoaded', function() {
+    const filterProject = document.getElementById('filterProject');
+    const filterEmail = document.getElementById('filterEmail');
+    const filterStatus = document.getElementById('filterStatus');
+    
+    function applyFilters() {
+        const projectText = filterProject.value.toLowerCase();
+        const emailText = filterEmail.value.toLowerCase();
+        const statusFilter = filterStatus.value;
+        
+        const projectItems = document.querySelectorAll('.project-item');
+        
+        projectItems.forEach(function(projectItem) {
+            const projectName = projectItem.dataset.projectName;
+            const projectNumber = projectItem.dataset.projectNumber;
+            const emailRows = projectItem.querySelectorAll('.email-row');
+            
+            let projectMatches = !projectText || 
+                                projectName.includes(projectText) || 
+                                projectNumber.includes(projectText);
+            
+            let hasVisibleEmails = false;
+            
+            emailRows.forEach(function(emailRow) {
+                const email = emailRow.dataset.email;
+                const receivesReports = emailRow.dataset.relatorios === 'true';
+                const receivesNotifications = emailRow.dataset.notificacoes === 'true';
+                
+                let emailMatches = !emailText || email.includes(emailText);
+                
+                let statusMatches = true;
+                if (statusFilter === 'relatorios') {
+                    statusMatches = receivesReports;
+                } else if (statusFilter === 'notificacoes') {
+                    statusMatches = receivesNotifications;
+                }
+                
+                const shouldShow = emailMatches && statusMatches;
+                emailRow.style.display = shouldShow ? '' : 'none';
+                
+                if (shouldShow) {
+                    hasVisibleEmails = true;
+                }
+            });
+            
+            const shouldShowProject = projectMatches && hasVisibleEmails;
+            projectItem.style.display = shouldShowProject ? '' : 'none';
+        });
+    }
+    
+    filterProject.addEventListener('input', applyFilters);
+    filterEmail.addEventListener('input', applyFilters);
+    filterStatus.addEventListener('change', applyFilters);
+});
+
+function clearFilters() {
+    document.getElementById('filterProject').value = '';
+    document.getElementById('filterEmail').value = '';
+    document.getElementById('filterStatus').value = '';
+    
+    // Mostrar todos os itens
+    document.querySelectorAll('.project-item').forEach(function(item) {
+        item.style.display = '';
+    });
+    
+    document.querySelectorAll('.email-row').forEach(function(row) {
+        row.style.display = '';
+    });
+}
+
+function confirmarRemocao(emailId, emailAddress) {
+    document.getElementById('emailToRemove').textContent = emailAddress;
+    document.getElementById('removeForm').action = '/emails/' + emailId + '/remover';
+    
+    var removeModal = new bootstrap.Modal(document.getElementById('removeModal'));
+    removeModal.show();
+}
+</script>
+{% endblock %}

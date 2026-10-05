@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Checklist - {{ project.nome }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="fas fa-tasks me-2"></i>
+                Checklist - {{ project.nome }}
+                <small class="text-muted">({{ project.numero }})</small>
+            </h1>
+            <div>
+                {% if checklist_config.tipo_checklist == 'personalizado' %}
+                <a href="{{ url_for('project_checklist_edit', project_id=project.id) }}" class="btn btn-primary me-2">
+                    <i class="fas fa-edit me-2"></i>Editar Checklist
+                </a>
+                {% endif %}
+                <a href="{{ url_for('project_view', project_id=project.id) }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Voltar ao Projeto
+                </a>
+            </div>
+        </div>
+
+        <!-- Current Configuration -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Configuração Atual
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        {% if checklist_config.tipo_checklist == 'padrao' %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-list me-2"></i>
+                            <strong>Checklist Padrão</strong><br>
+                            Este projeto está usando o checklist padrão do sistema.
+                        </div>
+                        {% else %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-edit me-2"></i>
+                            <strong>Checklist Personalizado</strong><br>
+                            Este projeto tem um checklist personalizado específico.
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Total de itens:</strong> {{ checklist_items|length }}</p>
+                        {% if checklist_config.criador %}<p><strong>Criado por:</strong> {{ checklist_config.criador.nome_completo }}</p>{% endif %}
+                        {% if checklist_config.created_at %}<p><strong>Criado em:</strong> {{ checklist_config.created_at.strftime('%d/%m/%Y %H:%M') }}</p>{% endif %}
+                        {% if checklist_config.updated_at and checklist_config.created_at and checklist_config.updated_at != checklist_config.created_at %}
+                        <p><strong>Última atualização:</strong> {{ checklist_config.updated_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Checklist Items -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-check-square me-2"></i>Itens do Checklist
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if checklist_items %}
+                <div class="list-group">
+                    {% for item in checklist_items %}
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-center">
+                            <div class="me-3 flex-shrink-0">
+                                <span class="badge bg-primary rounded-pill">{{ item.ordem }}</span>
+                            </div>
+                            <div class="flex-grow-1">
+                                <p class="mb-0">{{ item.texto }}</p>
+                            </div>
+                            {% if item.concluido is defined %}
+                            <div class="ms-2 flex-shrink-0">
+                                {% if item.concluido %}
+                                    <span class="badge bg-success"><i class="fas fa-check me-1"></i>Concluído</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Pendente</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum item de checklist encontrado</h5>
+                    <p class="text-muted">Configure o tipo de checklist para este projeto.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Configuration Options -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="fas fa-tools me-2"></i>Opções de Configuração
+                        </h6>
+                        <div class="d-grid gap-2 d-md-flex">
+                            <button type="button" class="btn btn-outline-primary" onclick="configureChecklist('padrao')">
+                                <i class="fas fa-list me-2"></i>Usar Checklist Padrão
+                            </button>
+                            <button type="button" class="btn btn-outline-success" onclick="configureChecklist('personalizado')">
+                                <i class="fas fa-edit me-2"></i>Criar Checklist Personalizado
+                            </button>
+                        </div>
+                        <small class="text-muted mt-2 d-block">
+                            <i class="fas fa-info-circle"></i>
+                            Importante: O checklist não aparece nos PDFs gerados, apenas na visualização web dos relatórios.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function configureChecklist(tipo) {
+    const currentType = '{{ checklist_config.tipo_checklist }}';
+    if (tipo === currentType) {
+        alert('Este projeto já está configurado para usar checklist ' + (tipo === 'padrao' ? 'padrão' : 'personalizado'));
+        return;
+    }
+    
+    if (confirm(`Deseja alterar este projeto para usar checklist ${tipo === 'padrao' ? 'padrão' : 'personalizado'}?`)) {
+        fetch(`/projects/{{ project.id }}/checklist/config`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tipo_checklist: tipo
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                if (data.redirect) {
+                    window.location.href = data.redirect;
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert('Erro: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erro ao configurar checklist');
+        });
+    }
+}
+</script>
+{% endblock %}

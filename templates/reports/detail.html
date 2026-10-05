@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório {{ relatorio.numero }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-file-alt"></i> {{ relatorio.titulo }}</h3>
+                    <div>
+                        <span class="badge 
+                            {% if relatorio.status == 'Aprovado' %}bg-success
+                            {% elif relatorio.status == 'Rejeitado' %}bg-danger
+                            {% elif relatorio.status == 'Aguardando Aprovação' %}bg-warning
+                            {% else %}bg-secondary{% endif %}">
+                            {{ relatorio.status }}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <strong>Número:</strong> {{ relatorio.numero }}<br>
+                            <strong>Obra:</strong> {{ relatorio.projeto.nome if relatorio.projeto else '-' }}<br>
+                            <strong>Autor:</strong> {{ relatorio.autor.nome_completo if relatorio.autor else '-' }}
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Data:</strong> {{ relatorio.data_relatorio.strftime('%d/%m/%Y') if relatorio.data_relatorio else '-' }}<br>
+                            <strong>Status:</strong> {{ relatorio.status }}<br>
+                            {% if relatorio.aprovador %}
+                                <strong>Aprovador:</strong> {{ relatorio.aprovador.nome_completo }}
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if relatorio.conteudo %}
+                        <div class="mb-4">
+                            <h5>Conteúdo do Relatório</h5>
+                            <div class="bg-light p-3 rounded">
+                                {{ relatorio.conteudo|nl2br }}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if relatorio.acompanhantes %}
+                        <div class="mb-4">
+                            <h5><i class="fas fa-user-friends me-2"></i>Acompanhantes da Visita</h5>
+                            <div class="list-group">
+                                {% for acomp in relatorio.acompanhantes %}
+                                <div class="list-group-item">
+                                    <div class="d-flex align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <i class="fas fa-user me-2 text-primary"></i>
+                                                <strong>{{ acomp.nome }}</strong>
+                                            </h6>
+                                            {% if acomp.funcao %}
+                                            <p class="mb-1 text-muted">
+                                                <small><i class="fas fa-briefcase me-1"></i>{{ acomp.funcao }}</small>
+                                            </p>
+                                            {% endif %}
+                                            <p class="mb-0">
+                                                <span class="badge bg-{{ 'info' if 'Funcionário' in acomp.origem else 'success' }}">
+                                                    {{ acomp.origem }}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if relatorio.checklist_data %}
+                        <div class="mb-4">
+                            <h5>Checklist da Obra</h5>
+                            <div id="checklistDisplay">
+                                <!-- Checklist será carregado via JavaScript -->
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if relatorio.fotos %}
+                        <div class="mb-4">
+                            <h5>Fotos do Relatório ({{ relatorio.fotos|length }})</h5>
+                            <div class="row photo-gallery">
+                                {% for foto in relatorio.fotos %}
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card photo-container">
+                                            <img src="{{ url_for('get_imagem', id=foto.id) }}" 
+                                                 class="card-img-top" 
+                                                 style="height: 200px !important; object-fit: cover !important; width: 100% !important;" 
+                                                 alt="{{ foto.legenda }}">
+                                            <div class="card-body p-2">
+                                                <small class="card-title">{{ foto.legenda }}</small>
+                                                {% if foto.tipo_servico %}
+                                                    <br><span class="badge bg-info">{{ foto.tipo_servico }}</span>
+                                                {% endif %}
+                                                {% if foto.descricao %}
+                                                    <p class="card-text small">{{ foto.descricao }}</p>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-12">
+                            <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Voltar
+                            </a>
+                            {% if current_user.is_master or relatorio.autor_id == current_user.id %}
+                                <a href="#" class="btn btn-primary ms-2">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                            {% endif %}
+                            {% if relatorio.status in ['Aprovado', 'Finalizado'] %}
+                                <a href="#" class="btn btn-success ms-2">
+                                    <i class="fas fa-file-pdf"></i> Gerar PDF
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Carregar e exibir checklist - mostra apenas itens selecionados/concluídos
+document.addEventListener('DOMContentLoaded', function() {
+    const checklistData = {{ relatorio.checklist_data|safe if relatorio.checklist_data else '[]' }};
+    const checklistDisplay = document.getElementById('checklistDisplay');
+    
+    // Função robusta para normalizar booleanos - suporta todos os formatos comuns
+    const isTrue = (val) => {
+        // Valores explicitamente falsos
+        if (val === false || val === 0 || val === null || val === undefined || val === '') return false;
+        // Valores explicitamente verdadeiros
+        if (val === true || val === 1) return true;
+        // Strings - verificar se é explicitamente falso primeiro
+        if (typeof val === 'string') {
+            const lower = val.toLowerCase().trim();
+            // Retorna false para valores explicitamente negativos
+            if (['false', '0', 'no', 'n', 'f', 'nao', 'não', 'nenhum', 'none', ''].includes(lower)) return false;
+            // Retorna true para valores positivos (inclui todas as variantes)
+            if (['true', '1', 'yes', 'y', 't', 'sim', 's', 'ok', 'checked', 'selected', 'ativo', 'active'].includes(lower)) return true;
+            // Se é numérico não-zero, é true
+            if (!isNaN(Number(lower)) && Number(lower) !== 0) return true;
+        }
+        // Números não-zero são true
+        if (typeof val === 'number' && val !== 0) return true;
+        return false;
+    };
+    
+    if (checklistData && checklistData.length > 0) {
+        // Filtrar apenas itens selecionados - normalizando valores booleanos
+        const selectedItems = checklistData.filter(item => 
+            isTrue(item.completed) || isTrue(item.checked) || 
+            isTrue(item.concluido) || isTrue(item.selecionado)
+        );
+        
+        if (selectedItems.length > 0) {
+            let html = '<div class="list-group">';
+            selectedItems.forEach(item => {
+                const itemText = item.item || item.texto || item.pergunta || 'Item sem descrição';
+                const observation = item.observations || item.observacao || item.resposta || '';
+                
+                html += `
+                    <div class="list-group-item list-group-item-success">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">
+                                <i class="fas fa-check-circle text-success"></i> ${itemText}
+                            </h6>
+                            <small class="text-success">Selecionado</small>
+                        </div>
+                        ${observation ? `<p class="mb-1 text-muted">${observation}</p>` : ''}
+                    </div>
+                `;
+            });
+            html += '</div>';
+            checklistDisplay.innerHTML = html;
+        } else {
+            checklistDisplay.innerHTML = '<p class="text-muted">Nenhum item selecionado no checklist.</p>';
+        }
+    } else {
+        checklistDisplay.innerHTML = '<p class="text-muted">Nenhum checklist disponível.</p>';
+    }
+});
+</script>
+{% endblock %}

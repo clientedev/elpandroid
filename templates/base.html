@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="screen-orientation" content="portrait">
+    <meta name="x5-orientation" content="portrait">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}ELP Consultoria e Engenharia - Sistema de Relatórios{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/mobile-accessibility.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/desktop-navbar-fix.css') }}" rel="stylesheet">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#20c1e8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+    <style>
+        /* Estilos para imagens com erro */
+        .image-error {
+            background: #f8f9fa;
+            border: 2px dashed #ffc107 !important;
+            opacity: 0.7 !important;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .image-error:hover {
+            opacity: 0.9;
+            border-color: #fd7e14 !important;
+        }
+
+        /* Placeholder para imagens carregando */
+        img[src*="no-image"] {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            opacity: 0.8;
+        }
+
+        /* Melhorar visualização de imagens em relatórios */
+        .foto-relatorio img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .foto-relatorio .image-error {
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+        }
+    </style>
+
+    <meta name="apple-mobile-web-app-title" content="ELP Relatórios">
+    <meta name="msapplication-TileColor" content="#343a40">
+    <meta name="msapplication-config" content="{{ url_for('static', filename='browserconfig.xml') }}">
+
+    <!-- PWA Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="{{ url_for('static', filename='icons/icon-152x152.png') }}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
+    <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='icons/icon-512x512.png') }}">
+
+    <!-- OFFLINE PWA: Variável de autenticação para o Offline Manager -->
+    <script>
+        window.ELP_USER_LOGGED_IN = {{ 'true' if current_user.is_authenticated else 'false' }};
+        window.ELP_USER_ID = {{ current_user.id if current_user.is_authenticated else 'null' }};
+    </script>
+
+    <!-- Image Error Handler - DEVE SER CARREGADO PRIMEIRO -->
+    <script src="{{ url_for('static', filename='js/image-error-handler.js') }}"></script>
+
+    <!-- Mobile Utilities -->
+    <script src="{{ url_for('static', filename='js/mobile-utils.js') }}" defer></script>
+
+    <!-- Sistema de Geolocalização Avançado - DEVE SER CARREGADO ANTES DO MAIN.JS -->
+    <script src="{{ url_for('static', filename='js/geolocation-enhanced.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
+
+    <!-- Sistema de Notificações Internas -->
+    <script src="{{ url_for('static', filename='js/notifications-manager.js') }}"></script>
+
+    <!-- OFFLINE PWA MANAGER — Service Worker + IndexedDB + Sync -->
+    <script src="{{ url_for('static', filename='js/offline-manager.js') }}"></script>
+
+
+
+    <!-- Mobile Touch Fix - Elimina vibração e melhora precisão -->
+
+    <!-- OneSignal SDK - Load and initialize -->
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+
+        // Helper to save player ID with retry logic
+        async function savePlayerIdWithRetry(playerId, maxRetries = 3) {
+            if (!navigator.onLine) {
+                console.log('📡 [Offline] Inscrição OneSignal adiada (modo offline)');
+                return false;
+            }
+            console.log('💾 Attempting to save player ID:', playerId);
+
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    console.log(`📤 Save attempt ${attempt}/${maxRetries}`);
+
+                    const response = await fetch('/api/onesignal/subscribe', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ player_id: playerId })
+                    });
+
+                    console.log(`📥 Response status: ${response.status}`);
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('✅✅✅ PLAYER ID SAVED SUCCESSFULLY ✅✅✅');
+                        console.log('Response:', data);
+                        return true;
+                    } else {
+                        const errorText = await response.text();
+                        console.error(`❌ Save failed (${response.status}):`, errorText);
+
+                        if (attempt < maxRetries) {
+                            console.log(`⏳ Retrying in ${attempt} second(s)...`);
+                            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+                        }
+                    }
+                } catch (error) {
+                    console.error(`❌ Network error on attempt ${attempt}:`, error);
+
+                    if (attempt < maxRetries) {
+                        console.log(`⏳ Retrying in ${attempt} second(s)...`);
+                        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+                    }
+                }
+            }
+
+            console.error('❌❌❌ FAILED TO SAVE PLAYER ID AFTER ALL RETRIES ❌❌❌');
+            return false;
+        }
+
+        OneSignalDeferred.push(async function (OneSignal) {
+            try {
+                if (!navigator.onLine) {
+                    console.warn('📵 Offline Mode: Skipping OneSignal setup to prevent errors');
+                    return;
+                }
+
+                console.log('==========================================');
+                console.log('🚀 ONESIGNAL INITIALIZATION STARTING');
+                console.log('Device:', navigator.userAgent);
+                console.log('==========================================');
+
+                await OneSignal.init({
+                    appId: "{{ config.get('ONESIGNAL_APP_ID', 'f024f50f-ac90-4120-99d7-ffc788cfa094') }}",
+
+                    // Mobile PWA compatibility
+                    allowLocalhostAsSecureOrigin: true,
+                    autoRegister: true,
+                    autoResubscribe: true,
+
+                    // Disable OneSignal UI
+                    notifyButton: { enable: false },
+
+                    // Prompt settings
+                    promptOptions: {
+                        slidedown: {
+                            enabled: false  // We handle permission manually
+                        }
+                    }
+                });
+
+                console.log('✅ OneSignal initialized');
+
+                // Listen for subscription changes
+                OneSignal.User.PushSubscription.addEventListener('change', async function (change) {
+                    console.log('🔄🔄🔄 SUBSCRIPTION CHANGED EVENT 🔄🔄🔄');
+                    console.log('Change:', change);
+
+                    const newId = await OneSignal.User.PushSubscription.id;
+                    if (newId) {
+                        console.log('📱 New player ID detected:', newId);
+                        await savePlayerIdWithRetry(newId);
+                    }
+                });
+
+                // Handle notification clicks
+                OneSignal.Notifications.addEventListener('click', function (event) {
+                    console.log('🔔 Notification clicked');
+                    const url = event.notification.url || event.notification.launchURL || '/';
+                    if (url) {
+                        window.location.href = url;
+                    }
+                });
+
+                // Check and request permission
+                const hasPermission = await OneSignal.Notifications.permission;
+                console.log('🔔 Current permission:', hasPermission);
+
+                // Se o usuário bloqueou explicitamente, não adianta tentar novamente
+                if (window.Notification && window.Notification.permission === 'denied') {
+                    console.warn('🚫 OneSignal: Permissão bloqueada pelo usuário. Encerrando tentativa de subscrição.');
+                    return;
+                }
+
+                if (!hasPermission) {
+                    console.log('📱 Requesting notification permission...');
+                    try {
+                        const granted = await OneSignal.Notifications.requestPermission();
+                        console.log('📱 Permission result:', granted);
+
+                        if (!granted) {
+                            console.warn('⚠️ User denied notification permission');
+                            return; // Stop here if they just denied it
+                        }
+                    } catch (error) {
+                        console.error('❌ Permission request failed:', error);
+                    }
+                } else {
+                    console.log('✅ Already has permission');
+                }
+
+                // Wait a bit for subscription to complete
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Check if we have a player ID
+                const playerId = await OneSignal.User.PushSubscription.id;
+                const isOptedIn = await OneSignal.User.PushSubscription.optedIn;
+
+                console.log('==========================================');
+                console.log('📊 SUBSCRIPTION STATUS:');
+                console.log('Player ID:', playerId);
+                console.log('Opted In:', isOptedIn);
+                console.log('Has Permission:', hasPermission);
+                console.log('==========================================');
+
+                if (playerId) {
+                    console.log('✅ Player ID exists, saving...');
+                    const saved = await savePlayerIdWithRetry(playerId);
+
+                    if (saved) {
+                        console.log('🎉🎉🎉 SETUP COMPLETE - READY TO RECEIVE NOTIFICATIONS 🎉🎉🎉');
+                    } else {
+                        console.error('❌ CRITICAL: Player ID exists but could not be saved to server');
+                    }
+                } else {
+                    console.warn('⚠️⚠️⚠️ NO PLAYER ID YET ⚠️⚠️⚠️');
+                    console.warn('This usually means:');
+                    console.warn('1. Permission was denied');
+                    console.warn('2. Service worker failed to register');
+                    console.warn('3. Browser/PWA needs to be reinstalled');
+
+                    // Try to force subscription one more time
+                    console.log('🔄 Attempting to force subscription...');
+                    try {
+                        if (!hasPermission) {
+                            await OneSignal.Notifications.requestPermission();
+                        }
+
+                        // Wait and check again
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        const retryId = await OneSignal.User.PushSubscription.id;
+
+                        if (retryId) {
+                            console.log('✅ Player ID obtained on retry:', retryId);
+                            await savePlayerIdWithRetry(retryId);
+                        } else {
+                            console.error('❌ Still no player ID after retry');
+                        }
+                    } catch (error) {
+                        console.error('❌ Force subscription failed:', error);
+                    }
+                }
+
+                // Make available globally for test button
+                window.OneSignal = OneSignal;
+
+            } catch (error) {
+                console.error('==========================================');
+                console.error('❌❌❌ CRITICAL ERROR INITIALIZING ONESIGNAL ❌❌❌');
+                console.error('Error:', error);
+                console.error('Stack:', error.stack);
+                console.error('==========================================');
+            }
+        });
+    </script>
+
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <!-- Navigation - Desktop Optimized -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3 px-4 shadow-sm" id="navbarELP"
+        style="background-color: var(--elp-dark);">
+        <div class="container-fluid">
+            <!-- LOGO -->
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='logo_elp_navbar.png') }}" alt="ELP Logo" width="90"
+                    height="auto" class="me-2">
+                <span class="logo-text fw-bold text-white d-none d-lg-inline">ELP</span>
+            </a>
+
+            {% if current_user.is_authenticated %}
+            <!-- Ícone de notificações e botão hambúrguer (mobile) -->
+            <div class="d-flex align-items-center gap-2 ms-auto order-lg-2">
+                <!-- Ícone de Notificações - visível sempre -->
+                <a class="nav-link position-relative d-lg-none" href="#" id="notificationBellMobile"
+                    style="cursor: pointer;">
+                    <i class="fas fa-bell fs-5 text-white"></i>
+                    <span id="notificationBadgeMobile"
+                        class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                        style="display: none; font-size: 0.65rem;">
+                        0
+                    </span>
+                </a>
+                <!-- Botão hambúrguer -->
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
+                    aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+            </div>
+
+            <!-- ITENS DA NAVBAR -->
+            <div class="collapse navbar-collapse order-lg-1" id="navbarContent">
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home"></i> Dashboard
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('projects_list') }}">
+                            <i class="fas fa-hard-hat"></i> Obras
+                        </a>
+                    </li>
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="visitasDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-calendar-check"></i> Visitas
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="visitasDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('visit_new') }}">Nova Visita</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('visits_list') }}">Listar Visitas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('visits_calendar') }}">Calendário</a></li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="relatoriosDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-file-alt"></i> Relatórios
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="relatoriosDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('reports') }}">Listar Relatórios</a></li>
+                        </ul>
+                    </li>
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="expressDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-bolt"></i> Relatório Express
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="expressDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('new_express_report') }}">Criar novo relatório express</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('express_reports_list') }}">Listar relatórios express</a></li>
+                        </ul>
+                    </li>
+
+
+                    {% if current_user.is_master %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-cog"></i> Administração
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="adminDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('users_list') }}">Usuários</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_emails') }}">E-mails de Clientes</a>
+                            </li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_legendas') }}">Legendas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_aprovadores_padrao') }}">Aprovadores
+                                    Padrão</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_checklist_padrao') }}">Checklist
+                                    Padrão</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_drive_test') }}">Salvar Backup</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+
+                    {% if current_user.is_developer %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="devDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-code"></i> Desenvolvedor
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="devDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_legendas') }}">Gerenciar Legendas</a>
+                            </li>
+                            <li><a class="dropdown-item" href="{{ url_for('developer_checklist_padrao') }}">Checklist
+                                    Padrão</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                </ul>
+
+                <!-- PERFIL E NOTIFICAÇÕES -->
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle"></i> {{ current_user.nome_completo }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                            <li><span class="dropdown-item-text">{{ current_user.cargo or 'Usuário' }}</span></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="{{ url_for('install_guide') }}">Instalar App no
+                                    Celular</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">Sair</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item d-none d-lg-block">
+                        <a class="nav-link position-relative" href="#" id="notificationBell" style="cursor: pointer;">
+                            <i class="fas fa-bell"></i>
+                            <span id="notificationBadge"
+                                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                style="display: none; font-size: 0.65rem;">
+                                0
+                            </span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Drawer de Notificações -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="notificationsDrawer"
+        aria-labelledby="notificationsDrawerLabel">
+        <div class="offcanvas-header bg-primary text-white">
+            <h5 class="offcanvas-title" id="notificationsDrawerLabel">
+                <i class="fas fa-bell me-2"></i>Notificações
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
+                aria-label="Fechar"></button>
+        </div>
+        <div class="offcanvas-body p-0">
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                <small class="text-muted">
+                    <span id="unreadCount">0</span> não lidas
+                </small>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-success d-none" id="testNotificationBtn"
+                        title="Testar notificação push">
+                        <i class="fas fa-bell me-1"></i>Testar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="markAllReadBtn" title="Marcar todas como lidas">
+                        <i class="fas fa-check-double"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="clearNotificationsBtn" title="Limpar notificações">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="notificationsList" class="list-group list-group-flush">
+                <div class="text-center py-5 text-muted">
+                    <i class="fas fa-bell-slash fa-3x mb-3 d-block"></i>
+                    <p>Nenhuma notificação</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    <div class="container mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
+            role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mt-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Offline Indicator -->
+    <div id="offlineIndicator" style="display: none; z-index: 9999;"></div>
+
+
+    <!-- OneSignal Test Notification Script -->
+    {% if current_user.is_authenticated %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const testNotificationBtn = document.getElementById('testNotificationBtn');
+
+            if (testNotificationBtn) {
+                testNotificationBtn.addEventListener('click', async () => {
+                    try {
+                        // Show loading state
+                        testNotificationBtn.disabled = true;
+                        testNotificationBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Enviando...';
+
+                        const response = await fetch('/api/onesignal/test-notification', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        // Reset button
+                        testNotificationBtn.disabled = false;
+                        testNotificationBtn.innerHTML = '<i class="fas fa-bell me-1"></i>Testar';
+
+                        if (data.success) {
+                            showToast(data.message || 'Notificação de teste enviada!', 'success');
+                        } else {
+                            showToast(data.message || 'Erro ao enviar notificação de teste', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error sending test notification:', error);
+                        testNotificationBtn.disabled = false;
+                        testNotificationBtn.innerHTML = '<i class="fas fa-bell me-1"></i>Testar';
+                        showToast('Erro ao enviar notificação de teste', 'error');
+                    }
+                });
+            }
+        });
+    </script>
+    {% endif %}
+
+    <!-- Footer -->
+    <footer class="bg-light mt-5 py-3">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6 text-center text-md-start">
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">&copy; 2025 Sistema de Acompanhamento de
+                        Visitas em Obras</p>
+                </div>
+                <div class="col-md-6 text-center text-md-end">
+                    <p class="text-muted mb-0" style="font-size: 0.8rem;">
+                        Desenvolvido por <a href="https://www.gl-systems.pro/" target="_blank"
+                            class="text-decoration-none" style="color: inherit;">GL Systems</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/legendas-selector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/navbar-interactions.js') }}"></script>
+
+
+    <!-- Google Drive Backup Scripts -->
+    <script>
+        function forceBackupAll() {
+            if (confirm('Deseja fazer backup de todos os relatórios aprovados? Esta operação pode demorar alguns minutos.')) {
+                // Show loading indicator
+                const loadingToast = showToast('Iniciando backup de todos os relatórios...', 'info', 30000);
+
+                fetch('/admin/drive/backup-all', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Remove loading toast
+                        if (loadingToast) {
+                            bootstrap.Toast.getInstance(loadingToast).hide();
+                        }
+
+                        if (data.success) {
+                            showToast(data.message, 'success', 8000);
+                        } else {
+                            showToast(data.message || 'Erro no backup em lote', 'error', 8000);
+                        }
+                    })
+                    .catch(error => {
+                        // Remove loading toast
+                        if (loadingToast) {
+                            bootstrap.Toast.getInstance(loadingToast).hide();
+                        }
+
+                        console.error('Erro no backup:', error);
+                        showToast('Erro na comunicação com o servidor', 'error');
+                    });
+            }
+        }
+
+        function forceBackupReport(reportId) {
+            if (confirm('Deseja fazer backup deste relatório no Google Drive?')) {
+                // Show loading indicator
+                const loadingToast = showToast('Fazendo backup do relatório...', 'info', 10000);
+
+                fetch(`/admin/drive/force-backup/${reportId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Remove loading toast
+                        if (loadingToast) {
+                            bootstrap.Toast.getInstance(loadingToast).hide();
+                        }
+
+                        if (data.success) {
+                            showToast(data.message, 'success', 6000);
+                        } else {
+                            showToast(data.message || 'Erro no backup', 'error', 6000);
+                        }
+                    })
+                    .catch(error => {
+                        // Remove loading toast
+                        if (loadingToast) {
+                            bootstrap.Toast.getInstance(loadingToast).hide();
+                        }
+
+                        console.error('Erro no backup:', error);
+                        showToast('Erro na comunicação com o servidor', 'error');
+                    });
+            }
+        }
+
+        // Funções de diagnóstico de imagens
+        function diagnosticarImagens() {
+            const loadingToast = showToast('Analisando imagens no banco de dados...', 'info', 15000);
+
+            fetch('/admin/diagnostico-imagens')
+                .then(response => response.json())
+                .then(data => {
+                    if (loadingToast) {
+                        bootstrap.Toast.getInstance(loadingToast).hide();
+                    }
+
+                    if (data.error) {
+                        showToast(`Erro no diagnóstico: ${data.error}`, 'error');
+                    } else {
+                        const message = `📊 DIAGNÓSTICO COMPLETO:
+• Total no banco: ${data.total_banco} imagens
+• Existem fisicamente: ${data.existem_fisicamente}
+• Em attached_assets: ${data.em_attached_assets}
+• Perdidas: ${data.nao_existem_fisicamente}
+• Relatórios: ${data.fotos_normais}`;
+
+                        showToast(message, data.nao_existem_fisicamente > 0 ? 'warning' : 'success', 10000);
+
+                        if (data.arquivos_perdidos.length > 0) {
+                            console.log('🔍 ARQUIVOS PERDIDOS:', data.arquivos_perdidos);
+                        }
+                    }
+                })
+                .catch(error => {
+                    if (loadingToast) {
+                        bootstrap.Toast.getInstance(loadingToast).hide();
+                    }
+                    showToast('Erro na comunicação com o servidor', 'error');
+                    console.error('Erro no diagnóstico:', error);
+                });
+        }
+
+        function migrarAttachedAssets() {
+            if (confirm('Deseja migrar todos os arquivos de attached_assets para uploads? Esta operação pode demorar alguns minutos.')) {
+                const loadingToast = showToast('Migrando arquivos de attached_assets...', 'info', 30000);
+
+                fetch('/admin/migrar-attached-assets')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (loadingToast) {
+                            bootstrap.Toast.getInstance(loadingToast).hide();
+                        }
+
+                        if (data.error) {
+                            showToast(`Erro na migração: ${data.error}`, 'error');
+                        } else {
+                            showToast(data.message, data.total_erros > 0 ? 'warning' : 'success', 8000);
+                            console.log('📦 MIGRAÇÃO COMPLETA:', data);
+                        }
+                    })
+                    .catch(error => {
+                        if (loadingToast) {
+                            bootstrap.Toast.getInstance(loadingToast).hide();
+                        }
+                        showToast('Erro na comunicação com o servidor', 'error');
+                        console.error('Erro na migração:', error);
+                    });
+            }
+        }
+
+        // Toast notification system (if not already defined)
+        function showToast(message, type = 'info', duration = 5000) {
+            // Create toast container if it doesn't exist
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                toastContainer.style.zIndex = '9999';
+                document.body.appendChild(toastContainer);
+            }
+
+            const toastId = 'toast-' + Date.now();
+            const iconMap = {
+                success: 'fas fa-check-circle text-success',
+                error: 'fas fa-exclamation-triangle text-danger',
+                warning: 'fas fa-exclamation-circle text-warning',
+                info: 'fas fa-info-circle text-info'
+            };
+
+            const titleMap = {
+                success: 'Sucesso',
+                error: 'Erro',
+                warning: 'Atenção',
+                info: 'Informação'
+            };
+
+            const toastHtml = `
+            <div class="toast" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="toast-header">
+                    <i class="${iconMap[type]} me-2"></i>
+                    <strong class="me-auto">${titleMap[type]}</strong>
+                    <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+
+            const toastElement = document.getElementById(toastId);
+            const bsToast = new bootstrap.Toast(toastElement, {
+                autohide: duration > 0,
+                delay: duration
+            });
+
+            bsToast.show();
+
+            // Remove element after hiding
+            toastElement.addEventListener('hidden.bs.toast', function () {
+                toastElement.remove();
+            });
+
+            return toastElement;
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/fix-all-images.js') }}"></script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

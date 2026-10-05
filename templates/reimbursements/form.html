@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block title %}Solicitar Reembolso - ELP Consultoria{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-money-bill-wave"></i> Solicitar Reembolso</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('request_reimbursement') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        
+                        <!-- Informações Básicas -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label class="form-label" for="projeto_id">Projeto *</label>
+                                    <select name="projeto_id" id="projeto_id" class="form-control" required>
+                                        <option value="">Selecione um projeto</option>
+                                        {% for projeto in projetos %}
+                                        <option value="{{ projeto.id }}">{{ projeto.numero }} - {{ projeto.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group mb-3">
+                                    <label class="form-label" for="periodo_inicio">Data Início *</label>
+                                    <input type="date" name="periodo_inicio" id="periodo_inicio" class="form-control" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group mb-3">
+                                    <label class="form-label" for="periodo_fim">Data Fim *</label>
+                                    <input type="date" name="periodo_fim" id="periodo_fim" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Descrição -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="form-group mb-3">
+                                    <label class="form-label" for="descricao">Descrição das Despesas *</label>
+                                    <textarea name="descricao" id="descricao" class="form-control" rows="3" required 
+                                              placeholder="Descreva as despesas que serão reembolsadas..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Categorias de Despesas -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5><i class="fas fa-list"></i> Categorias de Despesas</h5>
+                                <div class="row" id="expense-categories">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">Transporte</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <label class="form-label">Combustível</label>
+                                                        <input type="number" name="transporte_combustivel" class="form-control" 
+                                                               step="0.01" min="0" placeholder="0,00">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label">Pedágio</label>
+                                                        <input type="number" name="transporte_pedagio" class="form-control" 
+                                                               step="0.01" min="0" placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">Alimentação</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-6">
+                                                        <label class="form-label">Refeições</label>
+                                                        <input type="number" name="alimentacao_refeicoes" class="form-control" 
+                                                               step="0.01" min="0" placeholder="0,00">
+                                                    </div>
+                                                    <div class="col-6">
+                                                        <label class="form-label">Lanches</label>
+                                                        <input type="number" name="alimentacao_lanches" class="form-control" 
+                                                               step="0.01" min="0" placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">Hospedagem</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-12">
+                                                        <label class="form-label">Hotel/Pousada</label>
+                                                        <input type="number" name="hospedagem_hotel" class="form-control" 
+                                                               step="0.01" min="0" placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0">Outros</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-12">
+                                                        <label class="form-label">Materiais/Outros</label>
+                                                        <input type="number" name="outros_materiais" class="form-control" 
+                                                               step="0.01" min="0" placeholder="0,00">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Total -->
+                        <div class="row mb-4">
+                            <div class="col-md-4 offset-md-8">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h5>Total Solicitado</h5>
+                                        <h3 class="text-primary" id="total-amount">R$ 0,00</h3>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Observações -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="form-group mb-3">
+                                    <label class="form-label" for="observacoes">Observações</label>
+                                    <textarea name="observacoes" id="observacoes" class="form-control" rows="3" 
+                                              placeholder="Informações adicionais sobre as despesas..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Anexos -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="form-group mb-3">
+                                    <label class="form-label" for="anexos">Anexar Comprovantes</label>
+                                    <input type="file" name="anexos" id="anexos" class="form-control" 
+                                           multiple accept=".pdf,.jpg,.jpeg,.png">
+                                    <div class="form-text">Anexe fotos dos recibos e notas fiscais. Formatos aceitos: PDF, JPG, PNG</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Botões -->
+                        <div class="row">
+                            <div class="col-12 text-end">
+                                <a href="{{ url_for('list_reimbursements') }}" class="btn btn-secondary me-2">
+                                    <i class="fas fa-times"></i> Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Solicitar Reembolso
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Calcular total automaticamente
+document.addEventListener('DOMContentLoaded', function() {
+    const expenseInputs = document.querySelectorAll('input[type="number"]');
+    const totalElement = document.getElementById('total-amount');
+    
+    function calculateTotal() {
+        let total = 0;
+        expenseInputs.forEach(input => {
+            const value = parseFloat(input.value) || 0;
+            total += value;
+        });
+        totalElement.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+    }
+    
+    expenseInputs.forEach(input => {
+        input.addEventListener('input', calculateTotal);
+    });
+    
+    calculateTotal();
+});
+</script>
+{% endblock %}

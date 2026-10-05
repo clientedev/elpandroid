@@ -1,0 +1,612 @@
+/**
+ * Fabric Photo Editor - Mobile-First Design
+ * Experiência profissional similar ao Figma
+ * =========================================
+ */
+
+/* Reset e base */
+.fabric-editor-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f5f5f5;
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Header com ferramentas principais */
+.fabric-editor-header {
+    background: white;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e1e5e9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.editor-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Área principal do editor */
+.fabric-editor-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Container do canvas */
+.canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #f8f9fa;
+    overflow: auto;
+    position: relative;
+}
+
+.canvas-wrapper {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    overflow: hidden;
+}
+
+#fabricCanvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Toolbar de ferramentas */
+.fabric-toolbar {
+    background: white;
+    border-top: 1px solid #e1e5e9;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+}
+
+/* Grupo de ferramentas */
+.tool-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tool-group-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+
+.tools-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Botões de ferramentas */
+.fabric-tool-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 52px;
+    min-height: 52px;
+    padding: 12px;
+    background: #f8f9fa;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    color: #4b5563;
+    font-size: 20px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.fabric-tool-btn:hover {
+    background: #e5e7eb;
+    transform: translateY(-1px);
+}
+
+.fabric-tool-btn:active {
+    transform: translateY(0);
+    background: #d1d5db;
+}
+
+.fabric-tool-btn.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.fabric-tool-btn .tool-label {
+    font-size: 10px;
+    margin-top: 4px;
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    opacity: 0.7;
+}
+
+/* Controles de propriedades */
+.property-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.property-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.property-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    min-width: 60px;
+}
+
+/* Seletor de cor moderno */
+.color-picker-container {
+    position: relative;
+}
+
+.color-button {
+    width: 48px;
+    height: 48px;
+    border: 3px solid white;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+    background: #ff0000;
+}
+
+.color-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.color-picker-popup {
+    position: absolute;
+    bottom: 60px;
+    left: 0;
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    border: 1px solid #e5e7eb;
+    display: none;
+    z-index: 1000;
+    min-width: 280px;
+}
+
+.color-picker-popup.active {
+    display: block;
+}
+
+.color-gradient {
+    width: 100%;
+    height: 120px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    background: linear-gradient(to bottom, 
+        transparent, black),
+        linear-gradient(to right, 
+        white, red, yellow, lime, cyan, blue, magenta, red);
+    cursor: crosshair;
+    position: relative;
+}
+
+.color-cursor {
+    width: 14px;
+    height: 14px;
+    border: 2px solid white;
+    border-radius: 50%;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 4px rgba(0,0,0,0.5);
+    pointer-events: none;
+}
+
+.hue-slider {
+    width: 100%;
+    height: 24px;
+    border-radius: 12px;
+    background: linear-gradient(to right, 
+        #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+    cursor: pointer;
+    position: relative;
+    margin-bottom: 12px;
+}
+
+.opacity-slider {
+    width: 100%;
+    height: 24px;
+    border-radius: 12px;
+    background: linear-gradient(45deg, 
+        #ccc 25%, transparent 25%), 
+        linear-gradient(-45deg, 
+        #ccc 25%, transparent 25%), 
+        linear-gradient(45deg, 
+        transparent 75%, #ccc 75%), 
+        linear-gradient(-45deg, 
+        transparent 75%, #ccc 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+    cursor: pointer;
+    position: relative;
+}
+
+.opacity-overlay {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    background: linear-gradient(to right, transparent, #ff0000);
+}
+
+.slider-thumb {
+    width: 20px;
+    height: 20px;
+    background: white;
+    border: 2px solid #333;
+    border-radius: 50%;
+    position: absolute;
+    top: 2px;
+    transform: translateX(-50%);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Controle de espessura */
+.stroke-width-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+}
+
+.stroke-slider {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #e5e7eb;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.stroke-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.stroke-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.stroke-preview {
+    width: 48px;
+    height: 48px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5e7eb;
+}
+
+.stroke-line {
+    background: currentColor;
+    height: 3px;
+    width: 32px;
+    border-radius: 2px;
+}
+
+.stroke-width-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    min-width: 32px;
+    text-align: center;
+}
+
+/* Botões de ação */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.action-btn {
+    flex: 1;
+    min-height: 48px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.action-btn.primary {
+    background: #10b981;
+    color: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.action-btn.primary:hover {
+    background: #059669;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.action-btn.secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.action-btn.secondary:hover {
+    background: #4b5563;
+}
+
+.action-btn.danger {
+    background: #ef4444;
+    color: white;
+}
+
+.action-btn.danger:hover {
+    background: #dc2626;
+}
+
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* Controles de histórico */
+.history-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.history-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: #f8f9fa;
+    border-radius: 8px;
+    color: #6b7280;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.history-btn:hover:not(:disabled) {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.history-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Controles de seleção */
+.selection-controls {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    padding: 12px;
+    display: none;
+}
+
+.selection-controls.active {
+    display: block;
+}
+
+/* Responsividade mobile */
+@media (max-width: 768px) {
+    .fabric-editor-container {
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height */
+    }
+    
+    .canvas-container {
+        padding: 12px;
+    }
+    
+    .fabric-toolbar {
+        padding: 12px;
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+    
+    .tools-row {
+        gap: 6px;
+    }
+    
+    .fabric-tool-btn {
+        min-width: 48px;
+        min-height: 48px;
+        padding: 10px;
+    }
+    
+    .color-picker-popup {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        border-radius: 16px 16px 0 0;
+        max-height: 50vh;
+        overflow-y: auto;
+    }
+    
+    .property-row {
+        flex-wrap: wrap;
+    }
+    
+    .property-label {
+        min-width: 100%;
+        margin-bottom: 4px;
+    }
+}
+
+/* MOBILE: Feedback táctil aprimorado - APENAS PARA FERRAMENTAS */
+.fabric-tool-btn.touching,
+.tool-btn.touching {
+    background: #2563eb !important;
+    color: white !important;
+    transform: scale(0.95) !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4) !important;
+    transition: all 0.1s ease !important;
+}
+
+/* Melhorias para toque */
+@media (pointer: coarse) {
+    .fabric-tool-btn {
+        min-width: 56px;
+        min-height: 56px;
+    }
+    
+    .color-button {
+        width: 56px;
+        height: 56px;
+    }
+    
+    .action-btn {
+        min-height: 52px;
+    }
+    
+    .history-btn {
+        width: 48px;
+        height: 48px;
+    }
+}
+
+/* Loading state */
+.fabric-editor-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    color: #6b7280;
+}
+
+.loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Animações suaves */
+.fabric-tool-btn,
+.action-btn,
+.color-button {
+    will-change: transform;
+}
+
+/* Scroll personalizado */
+.tools-row::-webkit-scrollbar {
+    height: 4px;
+}
+
+.tools-row::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 2px;
+}
+
+.tools-row::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 2px;
+}
+
+.tools-row::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Estados focados para acessibilidade */
+.fabric-tool-btn:focus,
+.action-btn:focus,
+.color-button:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+/* Otimizações de performance */
+.canvas-wrapper,
+.fabric-toolbar,
+.fabric-editor-header {
+    contain: layout style paint;
+}

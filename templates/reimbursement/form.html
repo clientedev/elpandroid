@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Nova Solicitação de Reembolso - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-money-bill-wave me-2"></i>
+            Nova Solicitação de Reembolso
+        </h1>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Instruções:</strong> Preencha os campos abaixo com os gastos realizados durante o período especificado. 
+                    O valor total será calculado automaticamente.
+                </div>
+                
+                <form method="POST" id="reimbursementForm">
+                    {{ form.hidden_tag() }}
+                    
+                    <!-- Period and Project -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.periodo_inicio.label(class="form-label") }}
+                                {{ form.periodo_inicio(class="form-control" + (" is-invalid" if form.periodo_inicio.errors else "")) }}
+                                {% for error in form.periodo_inicio.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.periodo_fim.label(class="form-label") }}
+                                {{ form.periodo_fim(class="form-control" + (" is-invalid" if form.periodo_fim.errors else "")) }}
+                                {% for error in form.periodo_fim.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                {{ form.projeto_id.label(class="form-label") }}
+                                {{ form.projeto_id(class="form-select") }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mileage Section -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-route me-2"></i>Quilometragem
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.quilometragem.label(class="form-label") }}
+                                        <div class="input-group">
+                                            {{ form.quilometragem(class="form-control", onchange="calculateTotal()") }}
+                                            <span class="input-group-text">km</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.valor_km.label(class="form-label") }}
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            {{ form.valor_km(class="form-control", onchange="calculateTotal()", value="0.50") }}
+                                        </div>
+                                        <small class="form-text text-muted">Valor padrão: R$ 0,50 por km</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Subtotal Quilometragem</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            <input type="text" class="form-control" id="subtotalKm" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Other Expenses Section -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-receipt me-2"></i>Outros Gastos
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.alimentacao.label(class="form-label") }}
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            {{ form.alimentacao(class="form-control", onchange="calculateTotal()") }}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.hospedagem.label(class="form-label") }}
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            {{ form.hospedagem(class="form-control", onchange="calculateTotal()") }}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.outros_gastos.label(class="form-label") }}
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            {{ form.outros_gastos(class="form-control", onchange="calculateTotal()") }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                {{ form.descricao_outros.label(class="form-label") }}
+                                {{ form.descricao_outros(class="form-control", rows="2") }}
+                                <small class="form-text text-muted">Detalhe o que está incluído em "Outros Gastos"</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Total and Observations -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-calculator me-2"></i>Total da Solicitação
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Valor Total</strong></label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">R$</span>
+                                            <input type="text" class="form-control form-control-lg fw-bold text-success" id="totalValue" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.observacoes.label(class="form-label") }}
+                                        {{ form.observacoes(class="form-control", rows="2") }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('reimbursements_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Criar Solicitação
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function calculateTotal() {
+    // Get values
+    const quilometragem = parseFloat(document.querySelector('input[name="quilometragem"]').value) || 0;
+    const valorKm = parseFloat(document.querySelector('input[name="valor_km"]').value) || 0;
+    const alimentacao = parseFloat(document.querySelector('input[name="alimentacao"]').value) || 0;
+    const hospedagem = parseFloat(document.querySelector('input[name="hospedagem"]').value) || 0;
+    const outrosGastos = parseFloat(document.querySelector('input[name="outros_gastos"]').value) || 0;
+    
+    // Calculate subtotals
+    const subtotalKm = quilometragem * valorKm;
+    
+    // Calculate total
+    const total = subtotalKm + alimentacao + hospedagem + outrosGastos;
+    
+    // Update displays
+    document.getElementById('subtotalKm').value = subtotalKm.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+    
+    document.getElementById('totalValue').value = total.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+// Initialize calculation on page load
+document.addEventListener('DOMContentLoaded', function() {
+    calculateTotal();
+    
+    // Add event listeners to all numeric inputs
+    const numericInputs = document.querySelectorAll('input[type="number"]');
+    numericInputs.forEach(input => {
+        input.addEventListener('input', calculateTotal);
+    });
+});
+</script>
+{% endblock %}

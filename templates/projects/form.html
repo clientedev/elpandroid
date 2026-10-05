@@ -1,0 +1,1587 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if project else 'Nova' }} Obra - Sistema de Acompanhamento de Visitas em Obras{% endblock
+%}
+
+{% block extra_css %}
+<style>
+    .obra-contatos {
+        margin-top: 20px;
+        border-radius: 10px;
+        background: #fff;
+    }
+
+    .card-contato {
+        background: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 18px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .card-contato .form-group {
+        margin-bottom: 10px;
+    }
+
+    .card-contato .form-group label {
+        font-size: 0.9em;
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 5px;
+    }
+
+    .card-contato input {
+        margin-bottom: 10px;
+    }
+
+    .card-contato .btn-excluir {
+        float: right;
+        margin-top: 5px;
+        margin-bottom: 5px;
+    }
+
+    /* Botões Subir/Descer do Checklist - touch-friendly */
+    .btn-order-item {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 44px !important;
+        height: 38px !important;
+        border-radius: 6px !important;
+        font-size: 0.9rem !important;
+        border: 1px solid #ced4da !important;
+        background-color: #f8f9fa !important;
+        color: #495057 !important;
+        cursor: pointer !important;
+        transition: background-color 0.15s !important;
+        padding: 0 !important;
+    }
+
+    .btn-order-item:hover:not([disabled]) {
+        background-color: #e2e6ea !important;
+    }
+
+    .btn-order-item[disabled],
+    .btn-order-item.disabled {
+        opacity: 0.35 !important;
+        pointer-events: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-{{ 'edit' if project else 'plus' }} me-2"></i>
+            {{ 'Editar' if project else 'Nova' }} Obra
+        </h1>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST"
+                    action="{{ url_for('project_edit', project_id=project.id) if project else url_for('project_new') }}"
+                    id="projectForm">
+                    {{ form.hidden_tag() }}
+
+                    {% if project %}
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Número da Obra</label>
+                            <input type="text" class="form-control" value="{{ project.numero }}" readonly>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="mb-3">
+                                {{ form.nome.label(class="form-label") }}
+                                {{ form.nome(class="form-control" + (" is-invalid" if form.nome.errors else "")) }}
+                                {% for error in form.nome.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="mb-3">
+                        {{ form.nome.label(class="form-label") }}
+                        {{ form.nome(class="form-control" + (" is-invalid" if form.nome.errors else "")) }}
+                        {% for error in form.nome.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                        <small class="form-text text-muted">O número da obra será gerado automaticamente.</small>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        {{ form.construtora.label(class="form-label") }}
+                        {{ form.construtora(class="form-control" + (" is-invalid" if form.construtora.errors else ""),
+                        placeholder="Nome da construtora responsável") }}
+                        {% for error in form.construtora.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.endereco.label(class="form-label") }}
+                        {{ form.endereco(class="form-control", rows="2", id="endereco") }}
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm"
+                                onclick="getGPSLocationAndAddress()"
+                                title="Capturar localização via GPS e preencher endereço">
+                                <i class="fas fa-location-crosshairs"></i> Capturar GPS + Endereço
+                            </button>
+                        </div>
+                        <small class="text-muted">
+                            <span id="locationStatus"></span>
+                        </small>
+                        <div id="addressPreview" class="mt-2" style="display: none;">
+                            <div class="alert alert-info">
+                                <strong>Endereço capturado:</strong>
+                                <div id="capturedAddress"></div>
+                            </div>
+                        </div>
+                        {{ form.latitude() }}
+                        {{ form.longitude() }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.responsavel_id.label(class="form-label") }}
+                        {{ form.responsavel_id(class="form-select" + (" is-invalid" if form.responsavel_id.errors else
+                        "")) }}
+                        {% for error in form.responsavel_id.errors %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Seção de Contatos da Obra -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <i class="bi bi-people"></i> Contatos da Obra
+                        </div>
+                        <div class="card-body">
+
+                            <div id="lista-contatos">
+                                {% for contato in contatos_existentes %}
+                                <div class="card-contato" data-id="{{ contato.id }}" data-index="{{ loop.index0 }}">
+                                    <div class="form-group">
+                                        <label>Nome</label>
+                                        <input type="text" name="contatos[{{ loop.index0 }}][nome]" class="form-control"
+                                            value="{{ contato.nome_contato }}" required>
+                                        <input type="hidden" name="contatos[{{ loop.index0 }}][id]"
+                                            value="{{ contato.id }}">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Cargo</label>
+                                        <select name="contatos[{{ loop.index0 }}][cargo_select]"
+                                            class="form-select cargo-select"
+                                            onchange="handleProjectCargoChange(this, {{ loop.index0 }})">
+                                            <option value="">Selecione um cargo...</option>
+                                            <option value="Engenheiro/a" {% if contato.cargo=='Engenheiro/a'
+                                                %}selected{% endif %}>Engenheiro/a</option>
+                                            <option value="Arquiteto/a" {% if contato.cargo=='Arquiteto/a' %}selected{%
+                                                endif %}>Arquiteto/a</option>
+                                            <option value="Analista" {% if contato.cargo=='Analista' %}selected{% endif
+                                                %}>Analista</option>
+                                            <option value="Assistente" {% if contato.cargo=='Assistente' %}selected{%
+                                                endif %}>Assistente</option>
+                                            <option value="Encarregado" {% if contato.cargo=='Encarregado' %}selected{%
+                                                endif %}>Encarregado</option>
+                                            <option value="Mestre" {% if contato.cargo=='Mestre' %}selected{% endif %}>
+                                                Mestre</option>
+                                            <option value="Estagiário/a" {% if contato.cargo=='Estagiário/a'
+                                                %}selected{% endif %}>Estagiário/a</option>
+                                            <option value="outro" {% if contato.cargo and contato.cargo not in
+                                                ['Engenheiro/a', 'Arquiteto/a' , 'Analista' , 'Assistente'
+                                                , 'Encarregado' , 'Mestre' , 'Estagiário/a' , '' ] %}selected{% endif
+                                                %}>Outro (adicionar novo)</option>
+                                        </select>
+                                        <div class="cargo-custom-container mt-2"
+                                            id="cargo_custom_container_{{ loop.index0 }}"
+                                            style="display: {% if contato.cargo and contato.cargo not in ['Engenheiro/a', 'Arquiteto/a', 'Analista', 'Assistente', 'Encarregado', 'Mestre', 'Estagiário/a', ''] %}block{% else %}none{% endif %};">
+                                            <input type="text" class="form-control cargo-custom-input"
+                                                placeholder="Digite o cargo personalizado"
+                                                value="{{ contato.cargo if contato.cargo and contato.cargo not in ['Engenheiro/a', 'Arquiteto/a', 'Analista', 'Assistente', 'Encarregado', 'Mestre', 'Estagiário/a', ''] else '' }}"
+                                                onchange="updateProjectCargoHidden(this, {{ loop.index0 }})">
+                                        </div>
+                                        <input type="hidden" name="contatos[{{ loop.index0 }}][cargo]"
+                                            class="cargo-hidden" id="cargo_hidden_{{ loop.index0 }}"
+                                            value="{{ contato.cargo or '' }}">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Empresa</label>
+                                        <input type="text" name="contatos[{{ loop.index0 }}][empresa]"
+                                            class="form-control" value="{{ contato.empresa or '' }}">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>E-mail (opcional)</label>
+                                        <input type="email" name="contatos[{{ loop.index0 }}][email]"
+                                            class="form-control" value="{{ contato.email or '' }}"
+                                            placeholder="email@exemplo.com">
+                                    </div>
+
+                                    <div class="form-group">
+                                        <label>Telefone (opcional)</label>
+                                        <input type="text" name="contatos[{{ loop.index0 }}][telefone]"
+                                            class="form-control" value="{{ contato.telefone or '' }}">
+                                    </div>
+
+                                    <button type="button" class="btn btn-danger btn-sm btn-excluir"
+                                        onclick="removerContato(this, {{ contato.id }})">
+                                        <i class="bi bi-trash"></i> Excluir
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <button type="button" class="btn btn-primary mt-2" id="addContatoBtn">
+                                <i class="bi bi-person-plus"></i> Adicionar Contato
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Seção de Categorias da Obra - Item 16 -->
+                    <div class="card mb-4 mt-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-tags me-2"></i>Categorias da Obra
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            {% if project %}
+                            <div id="categorias-container" class="mt-3"></div>
+                            <button type="button" id="btnAddCategoria" class="btn btn-outline-primary mt-2">+ Adicionar
+                                Categoria</button>
+                            {% else %}
+                            <div id="categorias-list">
+                                <!-- Categorias serão adicionadas aqui dinamicamente -->
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="adicionarCategoria()">
+                                <i class="fas fa-plus me-1"></i>Adicionar Categoria
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.numeracao_inicial.label(class="form-label") }}
+                                {{ form.numeracao_inicial(class="form-control", type="number", min="1") }}
+                                <small class="form-text text-muted">Primeiro número dos relatórios desta obra</small>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.status.label(class="form-label") }}
+                                {{ form.status(class="form-select") }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seção de Informações Técnicas - Expansível -->
+                    <div class="card border-info mb-3 mt-3">
+                        <div class="card-header bg-info text-white" id="headingTechInfo">
+                            <h6 class="mb-0">
+                                <button
+                                    class="btn btn-link text-white text-decoration-none collapsed w-100 text-start d-flex justify-content-between align-items-center tech-info-btn"
+                                    type="button" data-bs-toggle="collapse" data-bs-target="#collapseTechInfo"
+                                    aria-expanded="false" aria-controls="collapseTechInfo">
+                                    <span>
+                                        <i class="fas fa-cog me-2"></i>Informações Técnicas
+                                    </span>
+                                    <i class="fas fa-chevron-down elp-chevron-icon" id="techInfoChevron"></i>
+                                </button>
+                            </h6>
+                        </div>
+
+                        <div id="collapseTechInfo" class="collapse" aria-labelledby="headingTechInfo">
+                            <div class="card-body">
+
+                                <!-- Campo 1 -->
+                                <div class="mb-3">
+                                    {{ form.elementos_construtivos_base.label(class="form-label fw-bold") }}
+                                    {{ form.elementos_construtivos_base(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 2 -->
+                                <div class="mb-3">
+                                    {{ form.especificacao_chapisco_colante.label(class="form-label fw-bold") }}
+                                    {{ form.especificacao_chapisco_colante(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 3 -->
+                                <div class="mb-3">
+                                    {{ form.especificacao_chapisco_alvenaria.label(class="form-label fw-bold") }}
+                                    {{ form.especificacao_chapisco_alvenaria(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 4 -->
+                                <div class="mb-3">
+                                    {{ form.especificacao_argamassa_emboco.label(class="form-label fw-bold") }}
+                                    {{ form.especificacao_argamassa_emboco(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 5 -->
+                                <div class="mb-3">
+                                    {{ form.forma_aplicacao_argamassa.label(class="form-label fw-bold") }}
+                                    {{ form.forma_aplicacao_argamassa(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 6 -->
+                                <div class="mb-3">
+                                    {{ form.acabamentos_revestimento.label(class="form-label fw-bold") }}
+                                    {{ form.acabamentos_revestimento(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 7 -->
+                                <div class="mb-3">
+                                    {{ form.acabamento_peitoris.label(class="form-label fw-bold") }}
+                                    {{ form.acabamento_peitoris(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 8 -->
+                                <div class="mb-3">
+                                    {{ form.acabamento_muretas.label(class="form-label fw-bold") }}
+                                    {{ form.acabamento_muretas(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 9 -->
+                                <div class="mb-3">
+                                    {{ form.definicao_frisos_cor.label(class="form-label fw-bold") }}
+                                    {{ form.definicao_frisos_cor(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 10 -->
+                                <div class="mb-3">
+                                    {{ form.definicao_face_inferior_abas.label(class="form-label fw-bold") }}
+                                    {{ form.definicao_face_inferior_abas(class="form-control", rows="2") }}
+                                </div>
+
+                                <!-- Campo 11 -->
+                                <div class="mb-3">
+                                    {{ form.observacoes_projeto_fachada.label(class="form-label fw-bold") }}
+                                    {{ form.observacoes_projeto_fachada(class="form-control", rows="3") }}
+                                </div>
+
+                                <!-- Campo 12 -->
+                                <div class="mb-3">
+                                    {{ form.outras_observacoes.label(class="form-label fw-bold") }}
+                                    {{ form.outras_observacoes(class="form-control", rows="2") }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Checklist Configuration Section - Always visible -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card border-primary">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-check-square me-2"></i>Configuração do Checklist
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Checklist Type Selection -->
+                                    <div class="card bg-light mb-3">
+                                        <div class="card-body">
+                                            <h6 class="card-title">
+                                                <i class="fas fa-tools me-2"></i>Tipo de Checklist
+                                            </h6>
+                                            <div class="btn-group w-100" role="group" id="checklistTypeSelector">
+                                                <button type="button" class="btn btn-outline-primary"
+                                                    id="btnChecklistPadrao" onclick="selectChecklistType('padrao')">
+                                                    <i class="fas fa-list me-2"></i>Checklist Padrão
+                                                </button>
+                                                <button type="button" class="btn btn-outline-success"
+                                                    id="btnChecklistPersonalizado"
+                                                    onclick="selectChecklistType('personalizado')">
+                                                    <i class="fas fa-edit me-2"></i>Checklist Personalizado
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Standard Checklist Preview -->
+                                    <div id="checklistPadraoPreview" style="display: none;">
+                                        <h6><i class="fas fa-eye me-2"></i>Visualização do Checklist Padrão</h6>
+                                        {% if checklist_items_padrao %}
+                                        <div class="list-group mb-3">
+                                            {% for item in checklist_items_padrao %}
+                                            <div class="list-group-item">
+                                                <div class="d-flex align-items-start">
+                                                    <div class="me-3">
+                                                        <i class="fas fa-check text-primary mt-1"></i>
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <p class="mb-0">{{ item.texto }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            Nenhum item no checklist padrão encontrado.
+                                        </div>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Custom Checklist Editor -->
+                                    <div id="checklistPersonalizadoEditor" style="display: none;">
+                                        <h6><i class="fas fa-edit me-2"></i>Editor de Checklist Personalizado</h6>
+
+                                        <!-- Add New Item Form -->
+                                        <div class="card mb-3">
+                                            <div class="card-header bg-light">
+                                                <h6 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Adicionar Novo
+                                                    Item</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div id="addChecklistItemForm">
+                                                    <div class="row">
+                                                        <div class="col-md-9">
+                                                            <input type="text" class="form-control"
+                                                                id="newChecklistItemText"
+                                                                placeholder="Digite o texto do novo item do checklist">
+                                                        </div>
+                                                        <div class="col-md-3">
+                                                            <button type="button" class="btn btn-success w-100"
+                                                                onclick="addChecklistItem(event)">
+                                                                <i class="fas fa-plus me-2"></i>Adicionar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Custom Checklist Items List -->
+                                        <div id="customChecklistItems">
+                                            <!-- Items will be loaded here dynamically -->
+                                            <div class="text-center py-3" id="emptyChecklistMessage">
+                                                <i class="fas fa-clipboard-list fa-2x text-muted mb-2"></i>
+                                                <p class="text-muted">Nenhum item adicionado ainda. Use o formulário
+                                                    acima para adicionar itens.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Current Checklist Display (for editing existing projects) -->
+                                    {% if project and checklist_items %}
+                                    <div id="currentChecklistDisplay">
+                                        <h6><i class="fas fa-list me-2"></i>Checklist Atual ({{ config.tipo_checklist
+                                            }})</h6>
+                                        <div class="list-group mb-3">
+                                            {% for item in checklist_items %}
+                                            <div class="list-group-item">
+                                                <div class="d-flex align-items-start">
+                                                    <div class="me-3">
+                                                        <span class="badge bg-primary rounded-pill">{{ item.ordem
+                                                            }}</span>
+                                                    </div>
+                                                    <div class="flex-grow-1">
+                                                        <p class="mb-0">{{ item.texto }}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            Tipo atual: <strong>{{ 'Padrão' if config.tipo_checklist == 'padrao' else
+                                                'Personalizado' }}</strong>.
+                                            Use os botões acima para alterar.
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('projects_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>{{ 'Atualizar' if project else 'Cadastrar' }} Obra
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Map Modal -->
+<div class="modal fade" id="mapModal" tabindex="-1" aria-labelledby="mapModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mapModalLabel">Escolher Localização no Mapa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="map" style="height: 400px; width: 100%;"></div>
+                <div class="mt-3">
+                    <small class="text-muted">Clique no mapa para selecionar a localização da obra</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmMapLocation()">Confirmar
+                    Localização</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let map;
+let marker;
+let selectedLat = null;
+let selectedLng = null;
+
+// GPS Location capture with automatic address filling
+function getGPSLocationAndAddress() {
+    const statusElement = document.getElementById('locationStatus');
+    
+    if (!navigator.geolocation) {
+        statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> GPS não suportado neste navegador';
+        return;
+    }
+    
+    statusElement.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i> Capturando localização e endereço...';
+    
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            // Set coordinates in hidden fields
+            const latField = document.querySelector('input[name="latitude"]');
+            const lngField = document.querySelector('input[name="longitude"]');
+            if (latField) latField.value = lat;
+            if (lngField) lngField.value = lng;
+            
+            // Get address from coordinates and fill address field
+            reverseGeocodeAndFillAddress(lat, lng);
+            
+            statusElement.innerHTML = '<i class="fas fa-check-circle text-success"></i> Localização capturada! Obtendo endereço...';
+        },
+        function(error) {
+            let errorMsg = 'Erro ao capturar localização';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = 'Permissão negada para acessar localização';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = 'Localização não disponível';
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = 'Tempo limite excedido';
+                    break;
+            }
+            statusElement.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> ' + errorMsg;
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 600000
+        }
+    );
+}
+
+// Legacy function for compatibility
+function getGPSLocation() {
+    getGPSLocationAndAddress();
+}
+
+// Reverse geocoding to get address from coordinates and fill address field
+function reverseGeocodeAndFillAddress(lat, lng) {
+    // Use backend endpoint for consistent geocoding
+    fetch('/get_location', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        body: JSON.stringify({
+            latitude: lat,
+            longitude: lng
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const endereco = document.querySelector('textarea[name="endereco"]') || document.getElementById('endereco');
+            if (endereco) {
+                endereco.value = data.endereco;
+                
+                // Show address preview
+                const addressPreview = document.getElementById('addressPreview');
+                const capturedAddress = document.getElementById('capturedAddress');
+                if (addressPreview && capturedAddress) {
+                    addressPreview.style.display = 'block';
+                    capturedAddress.textContent = data.endereco;
+                }
+                
+                // Update status to show completion
+                const statusElement = document.getElementById('locationStatus');
+                if (statusElement) {
+                    statusElement.innerHTML = '<i class="fas fa-check-circle text-success"></i> Localização e endereço capturados com sucesso!';
+                }
+            }
+        } else {
+            console.log('Erro ao obter endereço do servidor');
+            
+            // Fallback to coordinates
+            const endereco = document.querySelector('textarea[name="endereco"]') || document.getElementById('endereco');
+            if (endereco) {
+                endereco.value = `Lat: ${lat}, Lng: ${lng}`;
+            }
+        }
+    })
+    .catch(error => {
+        console.log('Erro ao obter endereço:', error);
+        
+        // Fallback to coordinates
+        const endereco = document.querySelector('textarea[name="endereco"]') || document.getElementById('endereco');
+        if (endereco) {
+            endereco.value = `Lat: ${lat}, Lng: ${lng}`;
+        }
+    });
+}
+
+// Legacy function for compatibility
+function reverseGeocode(lat, lng) {
+    reverseGeocodeAndFillAddress(lat, lng);
+}
+
+// Initialize map
+function initMap() {
+    // Default center (São Paulo)
+    const defaultLat = -23.5505;
+    const defaultLng = -46.6333;
+    
+    map = L.map('map').setView([defaultLat, defaultLng], 13);
+    
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+    
+    // Click handler
+    map.on('click', function(e) {
+        const lat = e.latlng.lat;
+        const lng = e.latlng.lng;
+        
+        // Remove existing marker
+        if (marker) {
+            map.removeLayer(marker);
+        }
+        
+        // Add new marker
+        marker = L.marker([lat, lng]).addTo(map);
+        
+        selectedLat = lat;
+        selectedLng = lng;
+        
+        // Get address for this location and fill the address field
+        reverseGeocodeAndFillAddress(lat, lng);
+    });
+}
+
+// Open map modal
+function openMapModal() {
+    const mapModal = new bootstrap.Modal(document.getElementById('mapModal'));
+    mapModal.show();
+    
+    // Initialize map when modal is shown
+    document.getElementById('mapModal').addEventListener('shown.bs.modal', function () {
+        if (!map) {
+            initMap();
+        } else {
+            map.invalidateSize();
+        }
+        
+        // If we have existing coordinates, show them on map
+        const latField = document.querySelector('input[name="latitude"]');
+        const lngField = document.querySelector('input[name="longitude"]');
+        const lat = latField ? latField.value : '';
+        const lng = lngField ? lngField.value : '';
+        
+        if (lat && lng) {
+            const latFloat = parseFloat(lat);
+            const lngFloat = parseFloat(lng);
+            
+            map.setView([latFloat, lngFloat], 15);
+            
+            if (marker) {
+                map.removeLayer(marker);
+            }
+            marker = L.marker([latFloat, lngFloat]).addTo(map);
+            selectedLat = latFloat;
+            selectedLng = lngFloat;
+        }
+    });
+}
+
+// Confirm map location
+function confirmMapLocation() {
+    if (selectedLat && selectedLng) {
+        const latField = document.querySelector('input[name="latitude"]');
+        const lngField = document.querySelector('input[name="longitude"]');
+        if (latField) latField.value = selectedLat;
+        if (lngField) lngField.value = selectedLng;
+        
+        // Get address for this location and fill address field
+        reverseGeocodeAndFillAddress(selectedLat, selectedLng);
+        
+        const statusElement = document.getElementById('locationStatus');
+        statusElement.innerHTML = '<i class="fas fa-check-circle text-success"></i> Localização selecionada no mapa';
+        
+        // Close modal
+        const mapModal = bootstrap.Modal.getInstance(document.getElementById('mapModal'));
+        if (mapModal) {
+            mapModal.hide();
+        }
+    }
+}
+
+// Funções para gerenciar campo de cargo com opções pré-definidas
+function handleProjectCargoChange(select, index) {
+    const customContainer = document.getElementById(`cargo_custom_container_${index}`);
+    const cargoHidden = document.getElementById(`cargo_hidden_${index}`);
+    
+    if (select.value === 'outro') {
+        customContainer.style.display = 'block';
+        const customInput = customContainer.querySelector('.cargo-custom-input');
+        cargoHidden.value = customInput ? customInput.value : '';
+    } else {
+        customContainer.style.display = 'none';
+        cargoHidden.value = select.value;
+    }
+}
+
+function updateProjectCargoHidden(input, index) {
+    const cargoHidden = document.getElementById(`cargo_hidden_${index}`);
+    cargoHidden.value = input.value;
+}
+
+// Gestão de Contatos da Obra
+let categoriaCounter = 0;
+let contatosExcluidos = [];
+let contatoCounter = {{ contatos_existentes|length }};
+
+document.getElementById('addContatoBtn').addEventListener('click', function() {
+    const lista = document.getElementById('lista-contatos');
+    const novo = document.createElement('div');
+    novo.classList.add('card-contato');
+    novo.setAttribute('data-index', contatoCounter);
+    novo.innerHTML = `
+        <div class="form-group">
+            <label>Nome</label>
+            <input type="text" name="contatos[${contatoCounter}][nome]" class="form-control" required>
+        </div>
+        <div class="form-group">
+            <label>Cargo</label>
+            <select name="contatos[${contatoCounter}][cargo_select]" class="form-select cargo-select" onchange="handleProjectCargoChange(this, ${contatoCounter})">
+                <option value="">Selecione um cargo...</option>
+                <option value="Engenheiro/a">Engenheiro/a</option>
+                <option value="Arquiteto/a">Arquiteto/a</option>
+                <option value="Analista">Analista</option>
+                <option value="Assistente">Assistente</option>
+                <option value="Encarregado">Encarregado</option>
+                <option value="Mestre">Mestre</option>
+                <option value="Estagiário/a">Estagiário/a</option>
+                <option value="outro">Outro (adicionar novo)</option>
+            </select>
+            <div class="cargo-custom-container mt-2" id="cargo_custom_container_${contatoCounter}" style="display: none;">
+                <input type="text" class="form-control cargo-custom-input" placeholder="Digite o cargo personalizado" onchange="updateProjectCargoHidden(this, ${contatoCounter})">
+            </div>
+            <input type="hidden" name="contatos[${contatoCounter}][cargo]" class="cargo-hidden" id="cargo_hidden_${contatoCounter}" value="">
+        </div>
+        <div class="form-group">
+            <label>Empresa</label>
+            <input type="text" name="contatos[${contatoCounter}][empresa]" class="form-control">
+        </div>
+        <div class="form-group">
+            <label>E-mail (opcional)</label>
+            <input type="email" name="contatos[${contatoCounter}][email]" class="form-control" placeholder="email@exemplo.com">
+        </div>
+        <div class="form-group">
+            <label>Telefone (opcional)</label>
+            <input type="text" name="contatos[${contatoCounter}][telefone]" class="form-control">
+        </div>
+        <button type="button" class="btn btn-danger btn-sm btn-excluir" onclick="removerContato(this)">
+            <i class="bi bi-trash"></i> Excluir
+        </button>`;
+    lista.appendChild(novo);
+    contatoCounter++;
+});
+
+function removerContato(btn, contatoId) {
+    const card = btn.closest('.card-contato');
+    
+    // Se o contato tem ID (já existe no banco), marcar para exclusão
+    if (contatoId) {
+        contatosExcluidos.push(contatoId);
+        
+        // Adicionar campo hidden para enviar IDs dos contatos a serem excluídos
+        const form = document.getElementById('projectForm');
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'contatos_excluidos[]';
+        input.value = contatoId;
+        form.appendChild(input);
+    }
+    
+    // Remover o card da interface
+    card.remove();
+}
+
+// Função para remover e-mail
+function removerEmail(id) {
+    const emailDiv = document.getElementById(`email-${id}`);
+    if (emailDiv) {
+        emailDiv.remove();
+    }
+}
+
+// Função para adicionar categoria - Item 16
+function adicionarCategoria() {
+    categoriaCounter++;
+    const categoriasList = document.getElementById('categorias-list');
+    
+    const categoriaDiv = document.createElement('div');
+    categoriaDiv.className = 'border rounded p-3 mb-3';
+    categoriaDiv.id = `categoria-${categoriaCounter}`;
+    
+    categoriaDiv.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label">Nome da Categoria</label>
+                <input type="text" class="form-control" name="categorias[${categoriaCounter}][nome]" placeholder="Ex: Torre 1, Área Comum, etc." required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Ordem de Exibição</label>
+                <input type="number" class="form-control" name="categorias[${categoriaCounter}][ordem]" value="${categoriaCounter}" min="0">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="removerCategoria(${categoriaCounter})">
+                    <i class="fas fa-trash"></i> Remover
+                </button>
+            </div>
+        </div>
+    `;
+    
+    categoriasList.appendChild(categoriaDiv);
+}
+
+// Função para remover categoria
+function removerCategoria(id) {
+    const categoriaDiv = document.getElementById(`categoria-${id}`);
+    if (categoriaDiv) {
+        categoriaDiv.remove();
+    }
+}
+
+{% if project %}
+// Script de edição de categorias - conforme orientações do prompt
+const categoriasExistentes = {{ categorias|tojson|safe }};
+console.log("Categorias carregadas:", categoriasExistentes);
+
+const container = document.getElementById("categorias-container");
+
+// Função para renderizar as categorias
+function renderCategorias() {
+  container.innerHTML = "";
+  categoriasExistentes.forEach(cat => {
+    const card = document.createElement("div");
+    card.className = "card mb-3";
+    card.innerHTML = `
+      <div class="card-body">
+        <label>Nome da Categoria</label>
+        <input type="text" class="form-control nome-categoria" data-id="${cat.id}" value="${cat.nome || ''}">
+        <small class="text-muted d-block mt-1">Categoria vinculada ao projeto #${cat.project_id}</small>
+
+        <label class="mt-2">Ordem de Exibição</label>
+        <input type="number" class="form-control ordem-categoria" data-id="${cat.id}" value="${cat.ordem || 0}">
+
+        <div class="mt-3 d-flex gap-2">
+          <button type="button" class="btn btn-danger btn-delete" data-id="${cat.id}">🗑️ Excluir</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+renderCategorias();
+
+// Remover botão salvar e lidar com atualização via formulário principal
+container.addEventListener("input", (e) => {
+  if (e.target.classList.contains("nome-categoria") || e.target.classList.contains("ordem-categoria")) {
+    const id = e.target.dataset.id;
+    const cat = categoriasExistentes.find(c => c.id == id);
+    if (cat) {
+      if (e.target.classList.contains("nome-categoria")) cat.nome = e.target.value;
+      if (e.target.classList.contains("ordem-categoria")) cat.ordem = e.target.value;
+      updateCategoriasHiddenField();
+    }
+  }
+});
+
+// Garantir que os dados sejam atualizados antes da submissão
+document.getElementById('projectForm').addEventListener('submit', function(e) {
+  updateCategoriasHiddenField();
+});
+
+function updateCategoriasHiddenField() {
+  let hiddenField = document.getElementById('categoriasHidden');
+  if (!hiddenField) {
+    hiddenField = document.createElement('input');
+    hiddenField.type = 'hidden';
+    hiddenField.id = 'categoriasHidden';
+    hiddenField.name = 'categorias_json';
+    document.getElementById('projectForm').appendChild(hiddenField);
+  }
+  
+  // Sincronizar dados atuais dos inputs antes de salvar no JSON
+  categoriasExistentes.forEach(cat => {
+    const nomeInput = document.querySelector(`.nome-categoria[data-id='${cat.id}']`);
+    const ordemInput = document.querySelector(`.ordem-categoria[data-id='${cat.id}']`);
+    if (nomeInput) cat.nome = nomeInput.value;
+    if (ordemInput) cat.ordem = ordemInput.value;
+  });
+  
+  hiddenField.value = JSON.stringify(categoriasExistentes);
+}
+
+container.addEventListener("click", async (e) => {
+  if (e.target.classList.contains("btn-delete")) {
+    const id = e.target.dataset.id;
+    if (!confirm("Deseja realmente excluir esta categoria?")) return;
+
+    const res = await fetch(`/api/categorias/${id}/delete`, { method: "DELETE" });
+    const data = await res.json();
+    alert(data.message || "Categoria excluída!");
+    categoriasExistentes.splice(categoriasExistentes.findIndex(c => c.id == id), 1);
+    renderCategorias();
+  }
+});
+
+// Adicionar nova categoria (visualmente)
+document.getElementById("btnAddCategoria").addEventListener("click", () => {
+  const nova = {
+    id: Date.now(), // temporário até salvar
+    nome: "",
+    ordem: categoriasExistentes.length + 1,
+    project_id: {{ project.id }}
+  };
+  categoriasExistentes.push(nova);
+  renderCategorias();
+  updateCategoriasHiddenField();
+});
+{% endif %}
+
+// Aplicar normalização de endereços quando carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    
+    const enderecoField = document.querySelector('textarea[name="endereco"]') || document.getElementById('endereco');
+    
+    if (enderecoField && window.normalizeAddress) {
+        // Normalizar quando o usuário sair do campo
+        enderecoField.addEventListener('blur', function() {
+            const originalValue = this.value;
+            const normalizedValue = window.normalizeAddress(originalValue);
+            
+            if (originalValue !== normalizedValue) {
+                this.value = normalizedValue;
+                
+                // Mostrar feedback visual
+                const statusElement = document.getElementById('locationStatus');
+                if (statusElement) {
+                    statusElement.innerHTML = '<i class="fas fa-check text-success"></i> Endereço normalizado automaticamente';
+                    setTimeout(() => {
+                        statusElement.innerHTML = '';
+                    }, 3000);
+                }
+            }
+        });
+        
+    }
+});
+
+// Função para geocodificar endereço digitado para coordenadas
+function geocodeAddressToCoordinates() {
+    const enderecoField = document.querySelector('textarea[name="endereco"]') || document.getElementById('endereco');
+    const statusElement = document.getElementById('locationStatus');
+    
+    if (!enderecoField || !enderecoField.value.trim()) {
+        if (statusElement) {
+            statusElement.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Por favor, digite um endereço primeiro';
+        }
+        return;
+    }
+    
+    const originalAddress = enderecoField.value.trim();
+    const normalizedAddress = window.normalizeAddress ? window.normalizeAddress(originalAddress) : originalAddress;
+    
+    // Update field with normalized address if different
+    if (originalAddress !== normalizedAddress) {
+        enderecoField.value = normalizedAddress;
+    }
+    
+    if (statusElement) {
+        statusElement.innerHTML = '<i class="fas fa-spinner fa-spin text-primary"></i> Buscando coordenadas...';
+    }
+    
+    // Create a simple geocoding API call to backend
+    fetch('/api/geocode-address', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        body: JSON.stringify({
+            address: normalizedAddress
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.latitude && data.longitude) {
+            // Fill coordinate fields
+            const latField = document.querySelector('input[name="latitude"]');
+            const lngField = document.querySelector('input[name="longitude"]');
+            if (latField) latField.value = data.latitude;
+            if (lngField) lngField.value = data.longitude;
+            
+            if (statusElement) {
+                statusElement.innerHTML = '<i class="fas fa-check-circle text-success"></i> Coordenadas encontradas!';
+            }
+            
+            // Show address preview
+            const addressPreview = document.getElementById('addressPreview');
+            const capturedAddress = document.getElementById('capturedAddress');
+            if (addressPreview && capturedAddress) {
+                addressPreview.style.display = 'block';
+                capturedAddress.textContent = `Coords: ${data.latitude}, ${data.longitude}`;
+            }
+        } else {
+            if (statusElement) {
+                statusElement.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Não foi possível encontrar as coordenadas';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro no geocoding:', error);
+        if (statusElement) {
+            statusElement.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Erro de conexão';
+        }
+    });
+}
+
+// Checklist Configuration System
+let currentChecklistType = {% if project and checklist_config %}'{{ checklist_config.tipo_checklist }}'{% else %}'padrao'{% endif %};
+let customChecklistItems = [];
+const isNewProject = {% if project %}false{% else %}true{% endif %};
+
+// Standard checklist items for pre-loading when switching to personalized
+const standardChecklistItems = [
+    {% for item in checklist_items_padrao %}
+    { id: {{ loop.index }}, texto: {{ item.texto|tojson }}, ordem: {{ item.ordem }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+];
+
+// Initialize checklist on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize hidden fields ONLY for new projects (form submission)
+    // Existing projects use API-only updates (no form submission for checklists)
+    if (isNewProject) {
+        updateChecklistTypeHiddenField(currentChecklistType);
+        updateChecklistItemsHiddenField();
+    }
+    
+    if (!isNewProject) {
+        // Set initial button state for existing projects
+        updateChecklistTypeButtons(currentChecklistType);
+        selectChecklistType(currentChecklistType, true);
+        
+        // Load custom checklist items for existing projects with custom checklist
+        {% if project and checklist_config and checklist_config.tipo_checklist == 'personalizado' %}
+        loadCustomChecklistItems();
+        {% endif %}
+    } else {
+        // For new projects, allow both options
+        updateChecklistTypeButtons('padrao');
+        selectChecklistType('padrao');
+    }
+});
+
+async function selectChecklistType(tipo, isSkipSave = false) {
+    // If called from HTML button explicitly, isSkipSave might be the button element 'this'
+    const skipSave = (isSkipSave === true);
+    currentChecklistType = tipo;
+    
+    // Update button states
+    updateChecklistTypeButtons(tipo);
+    
+    // Show/hide appropriate sections
+    const padraoPreview = document.getElementById('checklistPadraoPreview');
+    const personalizadoEditor = document.getElementById('checklistPersonalizadoEditor');
+    const currentDisplay = document.getElementById('currentChecklistDisplay');
+    
+    if (tipo === 'padrao') {
+        padraoPreview.style.display = 'block';
+        personalizadoEditor.style.display = 'none';
+        if (currentDisplay) currentDisplay.style.display = 'none';
+        
+        // Clear custom items for new projects when switching to padrao
+        if (isNewProject) {
+            customChecklistItems = [];
+            updateChecklistItemsHiddenField();
+        }
+        
+        // Save configuration for existing projects
+        if (!isNewProject && !skipSave) {
+            await saveChecklistConfig('padrao');
+        }
+    } else {
+        padraoPreview.style.display = 'none';
+        personalizadoEditor.style.display = 'block';
+        if (currentDisplay) currentDisplay.style.display = 'none';
+        
+        // For new projects, pre-load standard checklist items if empty
+        if (isNewProject) {
+            if (customChecklistItems.length === 0 && standardChecklistItems.length > 0) {
+                customChecklistItems = JSON.parse(JSON.stringify(standardChecklistItems));
+                updateChecklistItemsHiddenField();
+            }
+            renderCustomChecklistItems();
+        }
+        
+        // Save configuration for existing projects and load items
+        if (!isNewProject) {
+            if (!skipSave) await saveChecklistConfig('personalizado');
+            loadCustomChecklistItems();
+        }
+    }
+    
+    // Update hidden field for form submission
+    updateChecklistTypeHiddenField(tipo);
+}
+
+function updateChecklistTypeButtons(tipo) {
+    const btnPadrao = document.getElementById('btnChecklistPadrao');
+    const btnPersonalizado = document.getElementById('btnChecklistPersonalizado');
+    
+    if (tipo === 'padrao') {
+        btnPadrao.classList.remove('btn-outline-primary');
+        btnPadrao.classList.add('btn-primary');
+        btnPersonalizado.classList.remove('btn-success');
+        btnPersonalizado.classList.add('btn-outline-success');
+    } else {
+        btnPadrao.classList.remove('btn-primary');
+        btnPadrao.classList.add('btn-outline-primary');
+        btnPersonalizado.classList.remove('btn-outline-success');
+        btnPersonalizado.classList.add('btn-success');
+    }
+}
+
+async function saveChecklistConfig(tipo) {
+    if (isNewProject) {
+        console.log('Skipping config save for new project');
+        return;
+    }
+    
+    {% if project %}
+    const projectId = {{ project.id }};
+    
+    try {
+        const response = await fetch(`/projects/${projectId}/checklist/config`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tipo_checklist: tipo
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            console.log('Checklist config saved:', data.message);
+        } else {
+            console.error('Error saving config:', data.error);
+            alert('Erro ao salvar configuração: ' + data.error);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Erro ao salvar configuração do checklist');
+    }
+    {% endif %}
+}
+
+function loadCustomChecklistItems() {
+    if (isNewProject) {
+        console.log('Skipping load for new project');
+        return;
+    }
+    
+    {% if project %}
+    const projectId = {{ project.id }};
+    
+    fetch(`/projects/${projectId}/checklist/items/list`, {
+        method: 'GET'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            customChecklistItems = data.items;
+            renderCustomChecklistItems();
+        }
+    })
+    .catch(error => {
+        console.error('Error loading items:', error);
+    });
+    {% endif %}
+}
+
+function addChecklistItem(event) {
+    if (event) event.preventDefault();
+    
+    const texto = document.getElementById('newChecklistItemText').value.trim();
+    
+    if (!texto) {
+        alert('Por favor, digite o texto do item');
+        return;
+    }
+    
+    if (isNewProject) {
+        // For new projects, store temporarily in memory
+        const newItem = {
+            id: Date.now(), // Temporary ID
+            texto: texto,
+            ordem: customChecklistItems.length + 1
+        };
+        customChecklistItems.push(newItem);
+        renderCustomChecklistItems();
+        updateChecklistItemsHiddenField();
+        document.getElementById('newChecklistItemText').value = '';
+    } else {
+        {% if project %}
+        // For existing projects, use API-only approach (immediate save to database)
+        const projectId = {{ project.id }};
+        
+        fetch(`/projects/${projectId}/checklist/items`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                texto: texto
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                customChecklistItems.push(data.item);
+                renderCustomChecklistItems();
+                document.getElementById('newChecklistItemText').value = '';
+            } else {
+                alert('Erro: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erro ao adicionar item');
+        });
+        {% endif %}
+    }
+}
+
+function editChecklistItem(itemId) {
+    const card = document.querySelector(`[data-checklist-item-id="${itemId}"]`);
+    const textSpan = card.querySelector('.item-text');
+    const editInput = card.querySelector('.item-edit-input');
+    const editBtn = card.querySelector('.btn-edit-item');
+    const saveBtn = card.querySelector('.btn-save-item');
+    const cancelBtn = card.querySelector('.btn-cancel-item');
+    const deleteBtn = card.querySelector('.btn-delete-item');
+    
+    textSpan.classList.add('d-none');
+    editInput.classList.remove('d-none');
+    editBtn.classList.add('d-none');
+    saveBtn.classList.remove('d-none');
+    cancelBtn.classList.remove('d-none');
+    deleteBtn.classList.add('d-none');
+    
+    editInput.focus();
+}
+
+function saveChecklistItem(itemId) {
+    const card = document.querySelector(`[data-checklist-item-id="${itemId}"]`);
+    const editInput = card.querySelector('.item-edit-input');
+    const texto = editInput.value.trim();
+    
+    if (!texto) {
+        alert('Digite o texto do item');
+        return;
+    }
+    
+    if (isNewProject) {
+        // For new projects, update in memory
+        const item = customChecklistItems.find(i => i.id === itemId);
+        if (item) {
+            item.texto = texto;
+            renderCustomChecklistItems();
+            updateChecklistItemsHiddenField();
+        }
+    } else {
+        {% if project %}
+        const projectId = {{ project.id }};
+        
+        fetch(`/projects/${projectId}/checklist/items/${itemId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                texto: texto
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const item = customChecklistItems.find(i => i.id === itemId);
+                if (item) item.texto = texto;
+                renderCustomChecklistItems();
+            } else {
+                alert('Erro: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erro ao salvar item');
+        });
+        {% endif %}
+    }
+}
+
+function cancelEditChecklistItem(itemId) {
+    renderCustomChecklistItems();
+}
+
+function deleteChecklistItem(itemId) {
+    if (!confirm('Tem certeza que deseja remover este item do checklist?')) {
+        return;
+    }
+    
+    if (isNewProject) {
+        // For new projects, remove from memory
+        customChecklistItems = customChecklistItems.filter(i => i.id !== itemId);
+        renderCustomChecklistItems();
+        updateChecklistItemsHiddenField();
+    } else {
+        {% if project %}
+        const projectId = {{ project.id }};
+        
+        fetch(`/projects/${projectId}/checklist/items/${itemId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                customChecklistItems = customChecklistItems.filter(i => i.id !== itemId);
+                renderCustomChecklistItems();
+            } else {
+                alert('Erro: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Erro ao remover item');
+        });
+        {% endif %}
+    }
+}
+
+function moveChecklistItemUp(itemId) {
+    const index = customChecklistItems.findIndex(i => i.id === itemId);
+    if (index > 0) {
+        // Swap with previous
+        const temp = customChecklistItems[index];
+        customChecklistItems[index] = customChecklistItems[index - 1];
+        customChecklistItems[index - 1] = temp;
+        
+        // Update order numbers
+        customChecklistItems.forEach((item, i) => item.ordem = i + 1);
+        
+        renderCustomChecklistItems();
+        if (isNewProject) {
+            updateChecklistItemsHiddenField();
+        } else {
+            saveReorderedItems();
+        }
+    }
+}
+
+function moveChecklistItemDown(itemId) {
+    const index = customChecklistItems.findIndex(i => i.id === itemId);
+    if (index >= 0 && index < customChecklistItems.length - 1) {
+        // Swap with next
+        const temp = customChecklistItems[index];
+        customChecklistItems[index] = customChecklistItems[index + 1];
+        customChecklistItems[index + 1] = temp;
+        
+        // Update order numbers
+        customChecklistItems.forEach((item, i) => item.ordem = i + 1);
+        
+        renderCustomChecklistItems();
+        if (isNewProject) {
+            updateChecklistItemsHiddenField();
+        } else {
+            saveReorderedItems();
+        }
+    }
+}
+
+function saveReorderedItems() {
+    {% if project %}
+    const projectId = {{ project.id }};
+    const orderData = customChecklistItems.map(item => ({ id: item.id, ordem: item.ordem }));
+    
+    fetch(`/projects/${projectId}/checklist/items/reorder`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ items: orderData })
+    })
+    .catch(error => {
+        console.error('Error reordering items:', error);
+    });
+    {% endif %}
+}
+
+
+function renderCustomChecklistItems() {
+    const container = document.getElementById('customChecklistItems');
+    const emptyMessage = document.getElementById('emptyChecklistMessage');
+    
+    if (!container) return;
+    
+    if (customChecklistItems.length === 0) {
+        if (emptyMessage) emptyMessage.style.display = 'block';
+        container.innerHTML = '';
+        return;
+    }
+    
+    if (emptyMessage) emptyMessage.style.display = 'none';
+    
+    let html = '';
+    customChecklistItems.forEach((item, index) => {
+        const isFirst = index === 0;
+        const isLast = index === customChecklistItems.length - 1;
+        
+        html += `
+            <div class="card mb-2" data-checklist-item-id="${item.id}">
+                <div class="card-body py-2">
+                    <div class="row align-items-center g-2">
+                        <div class="col-auto d-flex flex-column" style="gap:4px;">
+                            <button type="button" onclick="moveChecklistItemUp(${item.id})" title="Subir item" ${isFirst ? 'disabled' : ''}
+                                style="display:flex;align-items:center;justify-content:center;width:44px;height:38px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;color:#495057;cursor:pointer;font-size:0.85rem;${isFirst ? 'opacity:0.35;pointer-events:none;' : ''}">
+                                <i class="fas fa-chevron-up"></i>
+                            </button>
+                            <button type="button" onclick="moveChecklistItemDown(${item.id})" title="Descer item" ${isLast ? 'disabled' : ''}
+                                style="display:flex;align-items:center;justify-content:center;width:44px;height:38px;border:1px solid #ced4da;border-radius:6px;background:#f8f9fa;color:#495057;cursor:pointer;font-size:0.85rem;${isLast ? 'opacity:0.35;pointer-events:none;' : ''}">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="col">
+                            <span class="item-text">${item.texto}</span>
+                            <input type="text" class="form-control d-none item-edit-input" value="${item.texto}">
+                        </div>
+                        <div class="col-auto text-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary me-1 btn-edit-item" onclick="editChecklistItem(${item.id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success d-none btn-save-item" onclick="saveChecklistItem(${item.id})">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-secondary d-none btn-cancel-item" onclick="cancelEditChecklistItem(${item.id})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger btn-delete-item" onclick="deleteChecklistItem(${item.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Helper function to update hidden field with checklist type
+function updateChecklistTypeHiddenField(tipo) {
+    let hiddenField = document.getElementById('checklistTypeHidden');
+    if (!hiddenField) {
+        hiddenField = document.createElement('input');
+        hiddenField.type = 'hidden';
+        hiddenField.id = 'checklistTypeHidden';
+        hiddenField.name = 'checklist_tipo';
+        document.getElementById('projectForm').appendChild(hiddenField);
+    }
+    hiddenField.value = tipo;
+}
+
+// Chevron animation for Informações Técnicas
+document.addEventListener('DOMContentLoaded', function() {
+    var collapseEl = document.getElementById('collapseTechInfo');
+    var chevron = document.getElementById('techInfoChevron');
+    if (collapseEl && chevron) {
+        collapseEl.addEventListener('show.bs.collapse', function() {
+            chevron.classList.add('rotated');
+        });
+        collapseEl.addEventListener('hide.bs.collapse', function() {
+            chevron.classList.remove('rotated');
+        });
+    }
+});
+
+// Helper function to update hidden field with custom checklist items
+function updateChecklistItemsHiddenField() {
+    let hiddenField = document.getElementById('checklistItemsHidden');
+    if (!hiddenField) {
+        hiddenField = document.createElement('input');
+        hiddenField.type = 'hidden';
+        hiddenField.id = 'checklistItemsHidden';
+        hiddenField.name = 'checklist_items';
+        document.getElementById('projectForm').appendChild(hiddenField);
+    }
+    hiddenField.value = JSON.stringify(customChecklistItems);
+}
+</script>
+
+<!-- Load Leaflet CSS and JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Load Address Normalizer -->
+<script src="{{ url_for('static', filename='js/address-normalizer.js') }}"></script>
+
+{% endblock %}
+

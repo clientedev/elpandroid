@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }} - ELP Consultoria e Engenharia{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-envelope me-2"></i>{{ titulo }}
+                </h5>
+                <small class="text-muted">
+                    Projeto: {{ projeto.numero }} - {{ projeto.nome }}
+                </small>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="needs-validation" novalidate>
+                    {{ form.hidden_tag() }}
+                    
+                    <!-- E-mail -->
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label fw-bold") }}
+                        {{ form.email(class="form-control", placeholder="exemplo@empresa.com") }}
+                        <div class="form-text">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Campo opcional - Digite um e-mail válido se disponível
+                        </div>
+                        {% if form.email.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.email.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Nome do Contato -->
+                    <div class="mb-3">
+                        {{ form.nome_contato.label(class="form-label fw-bold") }}
+                        {{ form.nome_contato(class="form-control", placeholder="Nome completo do contato") }}
+                        {% if form.nome_contato.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.nome_contato.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="row">
+                        <!-- Cargo -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.cargo.label(class="form-label fw-bold") }}
+                                <select id="cargo_select" class="form-select" onchange="handleCargoChange(this)">
+                                    <option value="">Selecione um cargo...</option>
+                                    <option value="Engenheiro/a" {% if form.cargo.data == 'Engenheiro/a' %}selected{% endif %}>Engenheiro/a</option>
+                                    <option value="Arquiteto/a" {% if form.cargo.data == 'Arquiteto/a' %}selected{% endif %}>Arquiteto/a</option>
+                                    <option value="Analista" {% if form.cargo.data == 'Analista' %}selected{% endif %}>Analista</option>
+                                    <option value="Assistente" {% if form.cargo.data == 'Assistente' %}selected{% endif %}>Assistente</option>
+                                    <option value="Encarregado" {% if form.cargo.data == 'Encarregado' %}selected{% endif %}>Encarregado</option>
+                                    <option value="Mestre" {% if form.cargo.data == 'Mestre' %}selected{% endif %}>Mestre</option>
+                                    <option value="outro" {% if form.cargo.data and form.cargo.data not in ['Engenheiro/a', 'Arquiteto/a', 'Analista', 'Assistente', 'Encarregado', 'Mestre', ''] %}selected{% endif %}>Outro (adicionar novo)</option>
+                                </select>
+                                <div id="cargo_custom_container" class="mt-2" style="display: none;">
+                                    <input type="text" id="cargo_custom" class="form-control" placeholder="Digite o cargo personalizado" value="{{ form.cargo.data if form.cargo.data and form.cargo.data not in ['Engenheiro/a', 'Arquiteto/a', 'Analista', 'Assistente', 'Encarregado', 'Mestre', ''] else '' }}" onchange="updateCargoHidden(this.value)">
+                                </div>
+                                {{ form.cargo(type="hidden", id="cargo_hidden") }}
+                                {% if form.cargo.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.cargo.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Empresa -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.empresa.label(class="form-label fw-bold") }}
+                                {{ form.empresa(class="form-control", placeholder="Nome da empresa") }}
+                                {% if form.empresa.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.empresa.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Telefone -->
+                    <div class="mb-3">
+                        {{ form.telefone.label(class="form-label") }}
+                        {{ form.telefone(class="form-control", placeholder="Ex: (11) 98765-4321") }}
+                        <div class="form-text">
+                            <i class="fas fa-phone me-1"></i>
+                            Campo opcional - telefone de contato
+                        </div>
+                        {% if form.telefone.errors %}
+                            <div class="invalid-feedback d-block">
+                                {% for error in form.telefone.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Status e Configurações -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-cog me-2"></i>Configurações
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <!-- Status Ativo -->
+                                    <div class="mb-3">
+                                        <div class="form-check form-switch">
+                                            {{ form.ativo(class="form-check-input", checked=True) }}
+                                            {{ form.ativo.label(class="form-check-label fw-bold") }}
+                                        </div>
+                                        <div class="form-text">
+                                            <i class="fas fa-toggle-on me-1"></i>
+                                            E-mail ativo no sistema
+                                        </div>
+                                    </div>
+
+                                    <!-- Receber Relatórios -->
+                                    <div class="mb-3">
+                                        <div class="form-check form-switch">
+                                            {{ form.receber_relatorios(class="form-check-input", checked=True) }}
+                                            {{ form.receber_relatorios.label(class="form-check-label fw-bold") }}
+                                        </div>
+                                        <div class="form-text">
+                                            <i class="fas fa-file-pdf me-1"></i>
+                                            Receber relatórios de visitas por e-mail
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <!-- Receber Notificações -->
+                                    <div class="mb-3">
+                                        <div class="form-check form-switch">
+                                            {{ form.receber_notificacoes(class="form-check-input", checked=True) }}
+                                            {{ form.receber_notificacoes.label(class="form-check-label fw-bold") }}
+                                        </div>
+                                        <div class="form-text">
+                                            <i class="fas fa-bell me-1"></i>
+                                            Receber notificações do sistema
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botões de Ação -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('projeto_emails', projeto_id=projeto.id) }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-2"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Salvar E-mail
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function handleCargoChange(select) {
+    const customContainer = document.getElementById('cargo_custom_container');
+    const cargoHidden = document.getElementById('cargo_hidden');
+    
+    if (select.value === 'outro') {
+        customContainer.style.display = 'block';
+        cargoHidden.value = document.getElementById('cargo_custom').value || '';
+    } else {
+        customContainer.style.display = 'none';
+        cargoHidden.value = select.value;
+    }
+}
+
+function updateCargoHidden(value) {
+    document.getElementById('cargo_hidden').value = value;
+}
+
+// Validação do formulário
+document.addEventListener('DOMContentLoaded', function() {
+    const cargoSelect = document.getElementById('cargo_select');
+    const cargoHidden = document.getElementById('cargo_hidden');
+    const customContainer = document.getElementById('cargo_custom_container');
+    
+    if (cargoSelect && cargoHidden.value) {
+        const predefinedCargos = ['Engenheiro/a', 'Arquiteto/a', 'Analista', 'Assistente', 'Encarregado', 'Mestre', ''];
+        if (!predefinedCargos.includes(cargoHidden.value)) {
+            cargoSelect.value = 'outro';
+            customContainer.style.display = 'block';
+            document.getElementById('cargo_custom').value = cargoHidden.value;
+        } else if (cargoHidden.value) {
+            cargoSelect.value = cargoHidden.value;
+        }
+    }
+    const form = document.querySelector('.needs-validation');
+    const emailInput = document.querySelector('#email');
+    
+    // Validação em tempo real do e-mail
+    if (emailInput) {
+        emailInput.addEventListener('blur', function() {
+            const email = this.value.trim();
+            if (email) {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    this.setCustomValidity('Por favor, insira um e-mail válido');
+                } else {
+                    this.setCustomValidity('');
+                }
+            }
+        });
+    }
+    
+    // Validação no submit
+    form.addEventListener('submit', function(event) {
+        if (!form.checkValidity()) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,21 @@
+[phases.setup]
+nixPkgs = ["python310", "python310Packages.pip"]
+
+[phases.install]
+cmds = [
+  "mkdir -p uploads static/reports",
+  "apt-get update && apt-get install -y libgobject-2.0-0 libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libfontconfig1 libfreetype6 libgdk-pixbuf-2.0-0 libharfbuzz0b libfribidi0 libpng16-16 libjpeg62-turbo || echo 'Alguns pacotes podem não estar disponíveis, continuando...'"
+]
+
+[phases.build]
+cmds = [
+  "pip install --no-cache-dir --upgrade pip",
+  "pip install --no-cache-dir -r requirements.txt"
+]
+
+[start]
+cmd = "python main_production.py"
+
+[variables]
+PYTHONPATH = "/app"
+FLASK_ENV = "production"

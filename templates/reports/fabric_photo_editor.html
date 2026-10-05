@@ -1,0 +1,568 @@
+{% extends "base.html" %}
+
+{% block title %}Editor de Fotos Professional{% endblock %}
+
+{% block head %}
+<!-- Fabric.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+
+<!-- Editor styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/fabric-photo-editor.css') }}">
+
+<!-- Inter font para melhor UX -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Meta tags para mobile -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<style>
+/* Override do tema base para editor fullscreen */
+body {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.container-fluid {
+    padding: 0 !important;
+    height: 100vh;
+}
+
+/* Ícones Font Awesome */
+.fa {
+    font-size: inherit;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fabric-editor-container">
+    <!-- Header -->
+    <div class="fabric-editor-header">
+        <h1 class="editor-title">
+            <i class="fas fa-edit"></i>
+            Editor de Fotos
+        </h1>
+        
+        <div class="header-actions">
+            <button id="undo-btn" class="history-btn" title="Desfazer (Ctrl+Z)">
+                <i class="fas fa-undo"></i>
+            </button>
+            <button id="redo-btn" class="history-btn" title="Refazer (Ctrl+Y)">
+                <i class="fas fa-redo"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Área principal do editor -->
+    <div class="fabric-editor-main">
+        <!-- Loading -->
+        <div id="loading-indicator" class="fabric-editor-loading">
+            <div class="loading-spinner"></div>
+            <p>Carregando editor...</p>
+        </div>
+        
+        <!-- Container do canvas -->
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <canvas id="fabricCanvas"></canvas>
+            </div>
+        </div>
+        
+        <!-- Controles de seleção (aparecem quando há objeto selecionado) -->
+        <div id="selection-controls" class="selection-controls">
+            <div class="property-row">
+                <span class="property-label">Selecionado:</span>
+                <button class="action-btn secondary" onclick="duplicateSelected()">
+                    <i class="fas fa-copy"></i> Duplicar
+                </button>
+                <button class="action-btn danger" onclick="deleteSelected()">
+                    <i class="fas fa-trash"></i> Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toolbar de ferramentas -->
+    <div class="fabric-toolbar">
+        <!-- Ferramentas principais -->
+        <div class="tool-group">
+            <h4 class="tool-group-title">Ferramentas</h4>
+            <div class="tools-row">
+                <button class="fabric-tool-btn active" data-tool="select" title="Seleção">
+                    <i class="fas fa-mouse-pointer"></i>
+                </button>
+                <button class="fabric-tool-btn" data-tool="brush" title="Pincel">
+                    <i class="fas fa-paint-brush"></i>
+                </button>
+                <button class="fabric-tool-btn" data-tool="arrow" title="Seta">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <button class="fabric-tool-btn" data-tool="circle" title="Círculo">
+                    <i class="far fa-circle"></i>
+                </button>
+                <button class="fabric-tool-btn" data-tool="rectangle" title="Retângulo">
+                    <i class="far fa-square"></i>
+                </button>
+                <button class="fabric-tool-btn" data-tool="text" title="Texto">
+                    <i class="fas fa-font"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Propriedades -->
+        <div class="property-controls">
+            <!-- Cor -->
+            <div class="property-row">
+                <span class="property-label">Cor:</span>
+                <div class="color-picker-container">
+                    <button id="current-color" class="color-button" title="Escolher cor"></button>
+                    
+                    <!-- Color picker popup -->
+                    <div id="color-picker-popup" class="color-picker-popup">
+                        <div class="color-gradient" id="color-gradient">
+                            <div class="color-cursor" id="color-cursor"></div>
+                        </div>
+                        
+                        <div class="hue-slider" id="hue-slider">
+                            <div class="slider-thumb" id="hue-thumb"></div>
+                        </div>
+                        
+                        <div class="opacity-slider" id="opacity-slider">
+                            <div class="opacity-overlay" id="opacity-overlay"></div>
+                            <div class="slider-thumb" id="opacity-thumb"></div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <button class="action-btn primary" onclick="closeColorPicker()">OK</button>
+                            <button class="action-btn secondary" onclick="closeColorPicker()">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Espessura -->
+            <div class="property-row">
+                <span class="property-label">Espessura:</span>
+                <div class="stroke-width-container">
+                    <input type="range" id="stroke-width-slider" class="stroke-slider" 
+                           min="1" max="20" value="3" step="1">
+                    <div class="stroke-preview">
+                        <div class="stroke-line" id="stroke-preview-line"></div>
+                    </div>
+                    <span class="stroke-width-value" id="stroke-width-value">3px</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Ações -->
+        <div class="action-buttons">
+            <button class="action-btn secondary" onclick="clearCanvas()" title="Limpar tudo">
+                <i class="fas fa-broom"></i>
+                Limpar
+            </button>
+            
+            <button class="action-btn secondary" onclick="cancelEdit()" title="Cancelar edição">
+                <i class="fas fa-times"></i>
+                Cancelar
+            </button>
+            
+            <button class="action-btn primary" onclick="saveEdit()" title="Salvar anotações">
+                <i class="fas fa-check"></i>
+                Salvar
+            </button>
+        </div>
+        
+        <!-- Legenda -->
+        <div class="tool-group">
+            <h4 class="tool-group-title">Legenda</h4>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <select id="legend-category" class="form-select" style="flex: 1;">
+                    <option value="">Escolha uma categoria...</option>
+                </select>
+                <select id="predefined-legend" class="form-select" style="flex: 2;">
+                    <option value="">Escolha uma legenda...</option>
+                </select>
+            </div>
+            <!-- Campo de busca para filtrar legendas -->
+            <input type="text" id="legend-search" class="form-control" 
+                   placeholder="🔍 Digite para buscar legendas..." 
+                   style="margin-top: 8px;">
+            <input type="text" id="custom-legend" class="form-control" 
+                   placeholder="ou digite uma legenda personalizada..." 
+                   style="margin-top: 8px;">
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript do editor -->
+<script src="{{ url_for('static', filename='js/fabric-photo-editor.js') }}"></script>
+
+<script>
+// Variáveis globais
+let photoEditor = null;
+let currentPhotoId = '{{ photo_id }}';
+let imageUrl = '{{ image_url }}';
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Inicializando Fabric Photo Editor');
+    
+    // Remover loading após um breve delay
+    setTimeout(() => {
+        document.getElementById('loading-indicator').style.display = 'none';
+        initEditor();
+    }, 500);
+});
+
+async function initEditor() {
+    try {
+        // Criar instância do editor
+        photoEditor = new FabricPhotoEditor('fabricCanvas', imageUrl);
+        
+        // Configurar eventos dos controles
+        setupControls();
+        
+        // Carregar legendas predefinidas
+        await loadPredefinedLegends();
+        
+        console.log('✅ Editor inicializado com sucesso');
+        
+    } catch (error) {
+        console.error('❌ Erro ao inicializar editor:', error);
+        alert('Erro ao carregar o editor. Tente novamente.');
+    }
+}
+
+function setupControls() {
+    // Botões de ferramentas
+    document.querySelectorAll('[data-tool]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tool = this.dataset.tool;
+            photoEditor.setTool(tool);
+        });
+    });
+    
+    // Seletor de cor
+    document.getElementById('current-color').addEventListener('click', function() {
+        toggleColorPicker();
+    });
+    
+    // Slider de espessura
+    document.getElementById('stroke-width-slider').addEventListener('input', function() {
+        const width = parseInt(this.value);
+        photoEditor.setStrokeWidth(width);
+        updateStrokePreview(width);
+    });
+    
+    // Botões de histórico
+    document.getElementById('undo-btn').addEventListener('click', () => {
+        photoEditor.undo();
+    });
+    
+    document.getElementById('redo-btn').addEventListener('click', () => {
+        photoEditor.redo();
+    });
+    
+    // Seletor de categoria de legenda
+    document.getElementById('legend-category').addEventListener('change', function() {
+        loadLegendsForCategory(this.value);
+    });
+    
+    // Campo de busca de legendas
+    document.getElementById('legend-search').addEventListener('input', function() {
+        filterLegends(this.value);
+    });
+    
+    // Seletor de legenda predefinida - com funcionalidade aprimorada
+    document.getElementById('predefined-legend').addEventListener('change', function() {
+        if (this.value) {
+            const customField = document.getElementById('custom-legend');
+            const searchField = document.getElementById('legend-search');
+            
+            // Copiar legenda selecionada para o campo personalizado
+            customField.value = this.value;
+            
+            // Limpar campo de busca para próxima busca
+            searchField.value = '';
+            
+            // Resetar dropdown para estado inicial
+            this.selectedIndex = 0;
+            
+            console.log(`✅ Legenda selecionada: "${this.value}"`);
+        }
+    });
+}
+
+function toggleColorPicker() {
+    const popup = document.getElementById('color-picker-popup');
+    popup.classList.toggle('active');
+    
+    if (popup.classList.contains('active')) {
+        initColorPicker();
+    }
+}
+
+function closeColorPicker() {
+    document.getElementById('color-picker-popup').classList.remove('active');
+}
+
+function initColorPicker() {
+    // Implementar color picker interativo
+    const gradient = document.getElementById('color-gradient');
+    const cursor = document.getElementById('color-cursor');
+    
+    gradient.addEventListener('click', function(e) {
+        const rect = this.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Calcular cor baseada na posição
+        const hue = (x / rect.width) * 360;
+        const saturation = 100;
+        const lightness = 100 - (y / rect.height) * 100;
+        
+        const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+        
+        // Atualizar cor atual
+        photoEditor.setColor(color);
+        
+        // Atualizar posição do cursor
+        cursor.style.left = x + 'px';
+        cursor.style.top = y + 'px';
+        
+        // Atualizar botão de cor
+        document.getElementById('current-color').style.backgroundColor = color;
+    });
+}
+
+function updateStrokePreview(width) {
+    const preview = document.getElementById('stroke-preview-line');
+    const value = document.getElementById('stroke-width-value');
+    
+    preview.style.height = Math.max(2, width) + 'px';
+    value.textContent = width + 'px';
+}
+
+async function loadPredefinedLegends() {
+    try {
+        const response = await fetch('/api/legendas');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Agrupar legendas por categoria
+            const legendsByCategory = {};
+            const allLegends = []; // Array com todas as legendas para busca
+            
+            data.legendas.forEach(legenda => {
+                if (!legendsByCategory[legenda.categoria]) {
+                    legendsByCategory[legenda.categoria] = [];
+                }
+                legendsByCategory[legenda.categoria].push(legenda);
+                allLegends.push(legenda);
+            });
+            
+            // Preencher select de categorias
+            const categorySelect = document.getElementById('legend-category');
+            Object.keys(legendsByCategory).forEach(categoria => {
+                const option = document.createElement('option');
+                option.value = categoria;
+                option.textContent = categoria;
+                categorySelect.appendChild(option);
+            });
+            
+            // Armazenar para uso posterior
+            window.legendsByCategory = legendsByCategory;
+            window.allLegends = allLegends; // Para busca global
+        }
+    } catch (error) {
+        console.error('Erro ao carregar legendas:', error);
+    }
+}
+
+function loadLegendsForCategory(category) {
+    const legendSelect = document.getElementById('predefined-legend');
+    
+    // Limpar opções anteriores
+    legendSelect.innerHTML = '<option value="">Escolha uma legenda...</option>';
+    
+    if (category && window.legendsByCategory && window.legendsByCategory[category]) {
+        window.legendsByCategory[category].forEach(legenda => {
+            const option = document.createElement('option');
+            option.value = legenda.texto;
+            option.textContent = legenda.texto;
+            legendSelect.appendChild(option);
+        });
+    }
+}
+
+function filterLegends(searchTerm) {
+    const legendSelect = document.getElementById('predefined-legend');
+    const categorySelect = document.getElementById('legend-category');
+    
+    // Limpar seleções anteriores
+    legendSelect.innerHTML = '<option value="">Escolha uma legenda...</option>';
+    
+    if (!searchTerm.trim()) {
+        // Se não há busca, carregar legendas da categoria selecionada
+        loadLegendsForCategory(categorySelect.value);
+        return;
+    }
+    
+    // Buscar em todas as legendas
+    if (window.allLegends) {
+        const filteredLegends = window.allLegends.filter(legenda => 
+            legenda.texto.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        
+        // Agrupar por categoria para melhor organização
+        const filteredByCategory = {};
+        filteredLegends.forEach(legenda => {
+            if (!filteredByCategory[legenda.categoria]) {
+                filteredByCategory[legenda.categoria] = [];
+            }
+            filteredByCategory[legenda.categoria].push(legenda);
+        });
+        
+        // Adicionar legendas filtradas com separadores de categoria
+        Object.keys(filteredByCategory).forEach(categoria => {
+            // Adicionar separador de categoria se há mais de uma categoria
+            if (Object.keys(filteredByCategory).length > 1) {
+                const categoryHeader = document.createElement('option');
+                categoryHeader.value = '';
+                categoryHeader.textContent = `--- ${categoria} ---`;
+                categoryHeader.disabled = true;
+                categoryHeader.style.fontWeight = 'bold';
+                categoryHeader.style.backgroundColor = '#f0f0f0';
+                legendSelect.appendChild(categoryHeader);
+            }
+            
+            // Adicionar legendas da categoria
+            filteredByCategory[categoria].forEach(legenda => {
+                const option = document.createElement('option');
+                option.value = legenda.texto;
+                option.textContent = legenda.texto;
+                legendSelect.appendChild(option);
+            });
+        });
+        
+        // Se encontrou resultados, mostrar quantidade
+        const resultCount = filteredLegends.length;
+        if (resultCount === 0) {
+            const noResults = document.createElement('option');
+            noResults.value = '';
+            noResults.textContent = 'Nenhuma legenda encontrada';
+            noResults.disabled = true;
+            noResults.style.fontStyle = 'italic';
+            legendSelect.appendChild(noResults);
+        } else {
+            console.log(`🔍 Busca: "${searchTerm}" - ${resultCount} legenda(s) encontrada(s)`);
+        }
+    }
+}
+
+// Ações principais
+function clearCanvas() {
+    if (photoEditor) {
+        photoEditor.clear();
+    }
+}
+
+function duplicateSelected() {
+    if (photoEditor) {
+        photoEditor.copy();
+        photoEditor.paste();
+    }
+}
+
+function deleteSelected() {
+    if (photoEditor) {
+        photoEditor.deleteSelected();
+    }
+}
+
+function cancelEdit() {
+    if (confirm('Deseja cancelar a edição? Todas as anotações serão perdidas.')) {
+        window.history.back();
+    }
+}
+
+function saveEdit() {
+    if (!photoEditor) return;
+    
+    try {
+        // Obter dados da imagem editada
+        const imageData = photoEditor.getCanvasImage('image/jpeg', 0.9);
+        const legend = document.getElementById('custom-legend').value.trim();
+        
+        // Criar form para enviar dados
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = window.location.href;
+        
+        // Campo de imagem
+        const imageField = document.createElement('input');
+        imageField.type = 'hidden';
+        imageField.name = 'edited_image';
+        imageField.value = imageData;
+        form.appendChild(imageField);
+        
+        // Campo de legenda
+        if (legend) {
+            const legendField = document.createElement('input');
+            legendField.type = 'hidden';
+            legendField.name = 'legend';
+            legendField.value = legend;
+            form.appendChild(legendField);
+        }
+        
+        // Token CSRF
+        const csrfToken = document.querySelector('meta[name=csrf-token]');
+        if (csrfToken) {
+            const csrfField = document.createElement('input');
+            csrfField.type = 'hidden';
+            csrfField.name = 'csrf_token';
+            csrfField.value = csrfToken.getAttribute('content');
+            form.appendChild(csrfField);
+        }
+        
+        // Enviar formulário
+        document.body.appendChild(form);
+        form.submit();
+        
+        console.log('✅ Imagem salva com sucesso');
+        
+    } catch (error) {
+        console.error('❌ Erro ao salvar imagem:', error);
+        alert('Erro ao salvar imagem. Tente novamente.');
+    }
+}
+
+// Cleanup na saída
+window.addEventListener('beforeunload', function() {
+    if (photoEditor) {
+        photoEditor.destroy();
+    }
+});
+
+// Prevenção de zoom indesejado no mobile
+document.addEventListener('touchstart', function(e) {
+    if (e.touches.length > 1) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(e) {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+    }
+    lastTouchEnd = now;
+}, { passive: false });
+
+console.log('📱 Fabric Photo Editor - Mobile Optimized v2.0');
+</script>
+{% endblock %}

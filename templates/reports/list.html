@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios{% endblock %}
+
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3><i class="fas fa-file-alt me-2"></i>
+                        {% if request.args.get('hide_filters') == '1' and projeto_filter %}
+                        {% set ns = namespace(found=false) %}
+                        {% for p in projetos_list %}
+                        {% if p.id|string == projeto_filter %}
+                        Relatórios da Obra: {{ p.nome }}
+                        {% set ns.found = true %}
+                        {% endif %}
+                        {% endfor %}
+
+                        {% if not ns.found %}
+                        Relatórios Pendentes
+                        {% endif %}
+                        {% else %}
+                        Relatórios Pendentes
+                        {% endif %}
+                    </h3>
+                    <!-- Botão Novo Relatório ocultado conforme solicitação -->
+                </div>
+
+                {% if request.args.get('hide_filters') != '1' %}
+                <!-- Filtros Unificados -->
+                <div class="card-body border-bottom">
+                    <form method="GET" action="{{ url_for('reports') }}" id="reportFiltersForm">
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Busca Rápida</label>
+                                <input type="text" class="form-control" name="q" value="{{ search_query or '' }}"
+                                    placeholder="Digite o número, título ou projeto do relatório...">
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-search me-1"></i>Buscar
+                                    </button>
+                                    {% if search_query or status_filter or projeto_filter or autor_filter %}
+                                    <a href="{{ url_for('reports') }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times me-1"></i>Limpar Tudo
+                                    </a>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-secondary" data-bs-toggle="collapse"
+                                        data-bs-target="#filtrosAvancadosReports">
+                                        <i class="fas fa-filter me-1"></i>Filtros Avançados
+                                        {% if status_filter or projeto_filter or autor_filter %}
+                                        <span class="badge bg-warning text-dark ms-1">Ativos</span>
+                                        {% endif %}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filtros Avançados (Colapsáveis) -->
+                        <div class="collapse {% if status_filter or projeto_filter or autor_filter %}show{% endif %}"
+                            id="filtrosAvancadosReports">
+                            <div class="border-top mt-3 pt-3">
+                                <h6 class="mb-3"><i class="fas fa-filter me-2"></i>Filtros Avançados</h6>
+                                <div class="row g-3">
+                                    <div class="col-md-4 col-sm-6">
+                                        <label class="form-label small fw-bold">Status:</label>
+                                        <select class="form-select form-select-sm" name="status" id="filterStatus"
+                                            onchange="this.form.submit()">
+                                            <option value="">Todos os Status</option>
+                                            <option value="preenchimento" {% if status_filter=='preenchimento'
+                                                %}selected{% endif %}>Em preenchimento</option>
+
+                                            <option value="Rejeitado" {% if status_filter=='Rejeitado' %}selected{%
+                                                endif %}>Rejeitado</option>
+                                            <option value="Aguardando Aprovação" {% if
+                                                status_filter=='Aguardando Aprovação' %}selected{% endif %}>Aguardando
+                                                Aprovação</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 col-sm-6">
+                                        <label class="form-label small fw-bold">Obra:</label>
+                                        <select class="form-select form-select-sm" name="projeto_id" id="filterProjeto"
+                                            onchange="this.form.submit()">
+                                            <option value="">Todas as Obras</option>
+                                            {% if projetos_list %}
+                                            {% for projeto in projetos_list %}
+                                            <option value="{{ projeto.id }}" {% if projeto_filter==projeto.id|string
+                                                %}selected{% endif %}>{{ projeto.nome }}</option>
+                                            {% endfor %}
+                                            {% endif %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 col-sm-6">
+                                        <label class="form-label small fw-bold">Autor:</label>
+                                        <select class="form-select form-select-sm" name="autor_id" id="filterAutor"
+                                            onchange="this.form.submit()">
+                                            <option value="">Todos Autores</option>
+                                            {% if autores_list %}
+                                            {% for autor in autores_list %}
+                                            <option value="{{ autor.id }}" {% if autor_filter==autor.id|string
+                                                %}selected{% endif %}>{{ autor.nome_completo }}</option>
+                                            {% endfor %}
+                                            {% endif %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-12">
+                                        <small class="text-muted">
+                                            <strong>{{ relatorios.total if relatorios else 0 }}</strong> relatório(s)
+                                            encontrado(s)
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    {% if error %}
+                    <div class="alert alert-danger mb-3">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Erro ao carregar relatórios:</strong> {{ error }}
+                    </div>
+                    {% endif %}
+
+                    {% if fallback %}
+                    <div class="alert alert-warning mb-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Sistema em modo de recuperação. Algumas funcionalidades podem estar limitadas.
+                    </div>
+                    {% endif %}
+
+                    {% if relatorios and relatorios.items %}
+                    <!-- Layout de cards mobile-first sem rolagem horizontal -->
+                    <div class="mobile-reports-list" id="reportsTable">
+                        {% for report in relatorios.items %}
+                        {%
+                        set status_color = 'secondary'
+                        %}
+                        {% if report.status == 'preenchimento' %}
+                        {% set status_color = 'primary' %}
+                        {% set status_text = 'Em preenchimento' %}
+                        {% set target_url = url_for('report_edit', report_id=report.id) %}
+                        {% elif report.status == 'Aprovado' %}
+                        {% set status_color = 'success' %}
+                        {% set status_text = 'Aprovado' %}
+                        {% set target_url = url_for('report_edit', report_id=report.id) %}
+                        {% elif report.status == 'Rejeitado' %}
+                        {% set status_color = 'danger' %}
+                        {% set status_text = 'Rejeitado' %}
+                        {% set target_url = url_for('report_edit', report_id=report.id) %}
+                        {% elif report.status == 'Em edição' %}
+                        {% set status_color = 'danger' %}
+                        {% set status_text = 'Em edição' %}
+                        {% set target_url = url_for('report_edit', report_id=report.id) %}
+                        {% elif report.status == 'Aguardando Aprovação' or report.status == 'Aguardando Aprovacao' %}
+                        {% set status_color = 'warning' %}
+                        {% set status_text = 'Aguardando Aprovação' %}
+                        {% set target_url = url_for('review_report', report_id=report.id) %}
+                        {% else %}
+                        {% set status_text = report.status or 'Indefinido' %}
+                        {% set target_url = url_for('report_edit', report_id=report.id) %}
+                        {% endif %}
+
+                        <div class="report-card mb-3" data-status="{{ report.status or 'Indefinido' }}"
+                            data-projeto="{{ report.projeto.nome if report.projeto else 'Sem obra' }}"
+                            data-autor="{{ report.autor.nome_completo if report.autor else 'Sem autor' }}"
+                            data-search="{{ (report.numero + ' ' + (report.titulo or ''))|lower }}">
+
+                            <div class="card border-0 shadow-sm h-100 position-relative overflow-hidden"
+                                style="background: #fff; border-radius: 12px; transition: transform 0.2s, box-shadow 0.2s;">
+
+                                <!-- Link que cobre o card inteiro -->
+                                <a href="{{ target_url }}" class="text-decoration-none text-reset d-block p-3 h-100"
+                                    style="padding-right: 50px !important;">
+
+                                    <!-- Faixa lateral colorida indicando status -->
+                                    <div class="position-absolute top-0 start-0 bottom-0"
+                                        style="width: 6px; background-color: var(--bs-{{ status_color }});"></div>
+
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <!-- Número do Relatório -->
+                                        <span class="fw-bold text-primary" style="font-size: 0.95rem;">
+                                            {{ report.numero or 'N/A' }}
+                                        </span>
+
+                                        <!-- Badge de Status -->
+                                        <span
+                                            class="badge rounded-pill bg-{{ status_color }} bg-opacity-10 text-{{ status_color }} border border-{{ status_color }} border-opacity-25"
+                                            style="font-size: 0.7rem; padding: 0.35em 0.8em;">
+                                            {{ status_text }}
+                                        </span>
+                                    </div>
+
+                                    <!-- Título -->
+                                    <h6 class="card-title fw-bold text-dark mb-2 text-truncate"
+                                        style="font-size: 1rem; line-height: 1.4; max-width: 100%;">
+                                        {{ report.titulo or 'Sem título' }}
+                                    </h6>
+
+                                    <!-- Detalhes: Obra e Data -->
+                                    <div class="text-muted small mb-1">
+                                        <i class="fas fa-building me-1 opacity-50"></i>
+                                        {{ report.projeto.nome if report.projeto else 'Sem obra' }}
+                                        {% if report.data_relatorio %}
+                                        <span class="mx-1">•</span>
+                                        <span style="font-variant-numeric: tabular-nums;">{{
+                                            report.data_relatorio.strftime('%d/%m/%Y') }}</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Autor -->
+                                    <div class="text-muted small">
+                                        <i class="fas fa-user me-1 opacity-50"></i>
+                                        Por: {{ report.autor.nome_completo if report.autor else 'Sem autor' }}
+                                    </div>
+                                </a>
+
+
+
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Paginação -->
+                    {% if relatorios.pages > 1 %}
+                    <nav aria-label="Navegação de páginas">
+                        <ul class="pagination justify-content-center">
+                            {% if relatorios.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="{{ url_for('reports', page=relatorios.page-1, q=search_query or '', status=status_filter or '', projeto_id=projeto_filter or '', autor_id=autor_filter or '') }}">Anterior</a>
+                            </li>
+                            {% endif %}
+
+                            {% for page_num in relatorios.iter_pages() %}
+                            {% if page_num %}
+                            {% if page_num != relatorios.page %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="{{ url_for('reports', page=page_num, q=search_query or '', status=status_filter or '', projeto_id=projeto_filter or '', autor_id=autor_filter or '') }}">{{
+                                    page_num }}</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                            {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                            {% endif %}
+                            {% endfor %}
+
+                            {% if relatorios.has_next %}
+                            <li class="page-item">
+                                <a class="page-link"
+                                    href="{{ url_for('reports', page=relatorios.page+1, q=search_query or '', status=status_filter or '', projeto_id=projeto_filter or '', autor_id=autor_filter or '') }}">Próxima</a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-alt fa-4x text-muted mb-3"></i>
+                        <h4>Nenhum relatório encontrado</h4>
+                        <p class="text-muted">Crie seu primeiro relatório de obra clicando no botão acima.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const reportsList = document.getElementById('reportsTable');
+        if (reportsList) {
+            const reportCards = reportsList.querySelectorAll('.report-card');
+            console.log('Relatórios: encontrados', reportCards.length, 'cards na página atual');
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">{{ title }}</h4>
+                        <a href="{{ url_for('admin_legendas') }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Voltar
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <form method="POST" class="needs-validation" novalidate>
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.categoria.label(class="form-label") }}
+                            <select name="categoria" class="form-select{{ ' is-invalid' if form.categoria.errors else '' }}" required>
+                                <option value="">Selecione uma categoria...</option>
+                                {% for value, label in form.categoria.choices %}
+                                <option value="{{ value }}" {{ 'selected' if form.categoria.data == value else '' }}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            {% if form.categoria.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.categoria.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Selecione a categoria que melhor descreve esta legenda</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.texto.label(class="form-label") }}
+                            {{ form.texto(class="form-control" + (" is-invalid" if form.texto.errors else ""), 
+                                         placeholder="Digite o texto da legenda que aparecerá nos relatórios...") }}
+                            {% if form.texto.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.texto.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <span id="contadorCaracteres">0</span>/500 caracteres
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="form-check">
+                                {{ form.ativo(class="form-check-input") }}
+                                {{ form.ativo.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-text">Legendas inativas não aparecerão nas opções dos usuários</div>
+                        </div>
+                        
+                        <!-- Preview da Legenda -->
+                        <div class="mb-4">
+                            <label class="form-label">Preview</label>
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="d-flex">
+                                        <div class="me-3">
+                                            <div class="bg-light border rounded" style="width: 100px; height: 80px; display: flex; align-items: center; justify-content: center;">
+                                                <i class="fas fa-image text-muted"></i>
+                                            </div>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <div class="text-muted small">Legenda da foto:</div>
+                                            <div id="previewTexto" class="mt-1" style="font-size: 8pt; line-height: 1.1;">
+                                                {% if legenda %}{{ legenda.texto }}{% else %}Digite o texto da legenda acima para ver o preview...{% endif %}
+                                            </div>
+                                            <div class="text-muted small mt-2">
+                                                <i class="fas fa-folder"></i> 
+                                                <span id="previewCategoria">{{ form.categoria.data or 'Geral' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('admin_legendas') }}" class="btn btn-secondary me-md-2">Cancelar</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 
+                                {% if legenda %}Atualizar{% else %}Criar{% endif %} Legenda
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const textoField = document.getElementById('{{ form.texto.id }}');
+    const categoriaField = document.getElementById('{{ form.categoria.id }}');
+    const contadorCaracteres = document.getElementById('contadorCaracteres');
+    const previewTexto = document.getElementById('previewTexto');
+    const previewCategoria = document.getElementById('previewCategoria');
+    
+    // Contador de caracteres
+    function atualizarContador() {
+        const texto = textoField.value;
+        contadorCaracteres.textContent = texto.length;
+        
+        // Atualizar preview
+        if (texto.trim()) {
+            previewTexto.textContent = texto;
+            previewTexto.style.fontStyle = 'normal';
+        } else {
+            previewTexto.textContent = 'Digite o texto da legenda acima para ver o preview...';
+            previewTexto.style.fontStyle = 'italic';
+        }
+    }
+    
+    // Atualizar preview da categoria
+    function atualizarPreviewCategoria() {
+        previewCategoria.textContent = categoriaField.value;
+    }
+    
+    // Event listeners
+    textoField.addEventListener('input', atualizarContador);
+    categoriaField.addEventListener('change', atualizarPreviewCategoria);
+    
+    // Inicializar contador
+    atualizarContador();
+});
+</script>
+{% endblock %}

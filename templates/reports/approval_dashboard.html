@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Painel de Aprovação de Relatórios{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Relatórios Aguardando Aprovação
+                    </h5>
+                </div>
+                <div class="card-body">
+                    
+                    {% if relatorios %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Número</th>
+                                    <th>Título</th>
+                                    <th>Projeto</th>
+                                    <th>Autor</th>
+                                    <th>Data</th>
+                                    <th>Status</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for relatorio in relatorios %}
+                                <tr>
+                                    <td>{{ relatorio.numero }}</td>
+                                    <td>{{ relatorio.titulo }}</td>
+                                    <td>{{ relatorio.projeto.nome }}</td>
+                                    <td>{{ relatorio.autor.nome_completo if relatorio.autor else 'N/A' }}</td>
+                                    <td>{{ relatorio.data_relatorio.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        <span class="badge bg-warning">{{ relatorio.status }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('report_view', report_id=relatorio.id) }}" 
+                                               class="btn btn-sm btn-info">
+                                                <i class="fas fa-eye"></i> Visualizar
+                                            </a>
+                                            {% if current_user_is_aprovador(relatorio.projeto_id) %}
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-success"
+                                                    onclick="approveReport({{ relatorio.id }})">
+                                                <i class="fas fa-check"></i> Aprovar
+                                            </button>
+                                            <button type="button" 
+                                                    class="btn btn-sm btn-danger"
+                                                    onclick="rejectReport({{ relatorio.id }})">
+                                                <i class="fas fa-times"></i> Rejeitar
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Não há relatórios aguardando aprovação no momento.
+                    </div>
+                    {% endif %}
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Approval Modal -->
+<div class="modal fade" id="approvalModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="approvalModalTitle">Aprovação de Relatório</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="approvalForm" method="POST">
+                {{ csrf_token() }}
+                <div class="modal-body">
+                    <input type="hidden" id="reportId" name="report_id">
+                    <input type="hidden" id="approvalAction" name="action">
+                    
+                    <div class="mb-3">
+                        <label for="approvalComment" class="form-label">Comentários:</label>
+                        <textarea class="form-control" id="approvalComment" name="comment" rows="4"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="confirmApprovalBtn">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function approveReport(reportId) {
+    showApprovalModal(reportId, 'approve', 'Aprovar Relatório', 'success');
+}
+
+function rejectReport(reportId) {
+    showApprovalModal(reportId, 'reject', 'Rejeitar Relatório', 'danger');
+}
+
+function showApprovalModal(reportId, action, title, btnClass) {
+    document.getElementById('reportId').value = reportId;
+    document.getElementById('approvalAction').value = action;
+    document.getElementById('approvalModalTitle').textContent = title;
+    
+    const confirmBtn = document.getElementById('confirmApprovalBtn');
+    confirmBtn.className = `btn btn-${btnClass}`;
+    confirmBtn.textContent = action === 'approve' ? 'Aprovar' : 'Rejeitar';
+    
+    const modal = new bootstrap.Modal(document.getElementById('approvalModal'));
+    modal.show();
+}
+
+document.getElementById('approvalForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const reportId = formData.get('report_id');
+    const action = formData.get('action');
+    const comment = formData.get('comment');
+    
+    fetch(`/reports/${reportId}/approve`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            action: action,
+            comment: comment
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Erro ao processar aprovação.');
+    });
+});
+</script>
+{% endblock %}

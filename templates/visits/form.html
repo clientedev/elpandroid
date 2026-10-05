@@ -1,0 +1,721 @@
+{% extends "base.html" %}
+
+{% block title %}{% if action == 'edit' %}Editar{% elif action == 'realize' %}Realizar{% else %}Agendar{% endif %} Visita - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-{% if action == 'edit' %}edit{% elif action == 'realize' %}check{% else %}calendar-plus{% endif %} me-2"></i>
+            {% if action == 'edit' %}Editar{% elif action == 'realize' %}Realizar{% else %}Agendar{% endif %} Visita
+        </h1>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                {% if visit and action == 'realize' %}
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle me-2"></i>Informações da Visita</h6>
+                        <p class="mb-1"><strong>Projeto:</strong> {{ visit.projeto.nome }} ({{ visit.projeto.numero }})</p>
+                        <p class="mb-1"><strong>Data Agendada:</strong> {{ visit.data_agendada.strftime('%d/%m/%Y às %H:%M') }}</p>
+                        <p class="mb-0"><strong>Objetivo:</strong> {{ visit.objetivo }}</p>
+                    </div>
+                {% endif %}
+                
+                <form method="POST" action="{% if action == 'edit' %}{{ url_for('visit_edit', visit_id=visit.id) }}{% else %}{{ url_for('visit_new') }}{% endif %}" id="visitForm">
+                    {{ form.hidden_tag() }}
+                    
+                    {% if action != 'realize' %}
+                        <!-- Seleção de Projeto -->
+                        <div class="mb-3">
+                            {{ form.projeto_id.label(class="form-label") }}
+                            {{ form.projeto_id(class="form-select" + (" is-invalid" if form.projeto_id.errors else ""), id="projeto_id") }}
+                            {% for error in form.projeto_id.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Campo 'Outros' (aparece quando 'Outros' é selecionado) -->
+                        <div class="mb-3" id="projeto_outros_div" style="display: none;">
+                            {{ form.projeto_outros.label(class="form-label") }}
+                            {{ form.projeto_outros(class="form-control" + (" is-invalid" if form.projeto_outros.errors else ""), placeholder="Digite o nome do projeto") }}
+                            {% for error in form.projeto_outros.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Data e Hora de Início -->
+                        <div class="mb-3">
+                            {{ form.data_inicio.label(class="form-label") }}
+                            <input type="datetime-local" 
+                                   id="data_inicio" 
+                                   name="data_inicio" 
+                                   class="form-control{{ ' is-invalid' if form.data_inicio.errors else '' }}" 
+                                   value="{{ form_data.get('data_inicio') if form_data else (form.data_inicio.data if form.data_inicio.data else '') }}"
+                                   required>
+                            {% for error in form.data_inicio.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Data e Hora de Fim -->
+                        <div class="mb-3">
+                            {{ form.data_fim.label(class="form-label") }}
+                            <input type="datetime-local" 
+                                   id="data_fim" 
+                                   name="data_fim" 
+                                   class="form-control{{ ' is-invalid' if form.data_fim.errors else '' }}" 
+                                   value="{{ form_data.get('data_fim') if form_data else (form.data_fim.data if form.data_fim.data else '') }}"
+                                   required>
+                            {% for error in form.data_fim.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Observações (não obrigatório) -->
+                        <div class="mb-3">
+                            {{ form.observacoes.label(class="form-label") }}
+                            {{ form.observacoes(class="form-control" + (" is-invalid" if form.observacoes.errors else ""), rows="3", placeholder="Observações sobre a visita (opcional)") }}
+                            {% for error in form.observacoes.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Seleção do Responsável -->
+                        <div class="mb-3">
+                            {{ form.responsavel_id.label(class="form-label") }}
+                            {{ form.responsavel_id(class="form-select" + (" is-invalid" if form.responsavel_id.errors else ""), id="responsavel_id") }}
+                            {% for error in form.responsavel_id.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                            <div class="form-text">
+                                <i class="fas fa-info-circle"></i> Selecione o membro da equipe responsável por esta visita
+                            </div>
+                        </div>
+                        
+                        <!-- Seleção de Participantes -->
+                        <div class="mb-3">
+                            {{ form.participantes.label(class="form-label") }}
+                            
+                            <!-- Contador de selecionados -->
+                            <div id="participants-count" class="mb-2 text-center fw-bold">
+                                Nenhum participante selecionado
+                            </div>
+                            
+                            <!-- Container de participantes -->
+                            <div class="participant-container">
+                                {% for value, label in form.participantes.choices %}
+                                    {% if '(' in label and ')' in label %}
+                                        {% set participant_name = label.split('(')[0].strip() %}
+                                        {% set participant_role = label.split('(')[1].split(')')[0].strip() %}
+                                    {% else %}
+                                        {% set participant_name = label %}
+                                        {% set participant_role = 'Outros' %}
+                                    {% endif %}
+                                    
+                                    <div class="participant-card" data-user-id="{{ value }}" tabindex="0">
+                                        <input type="checkbox" 
+                                               class="participant-checkbox" 
+                                               name="participantes" 
+                                               value="{{ value }}"
+                                               id="participant_{{ value }}"
+                                               {% if form.participantes.data and (value|string) in form.participantes.data %}checked{% endif %}>
+                                        <div class="participant-content">
+                                            <i class="bi bi-person-circle participant-icon"></i>
+                                            <div class="participant-info">
+                                                <div class="participant-name">{{ participant_name }}</div>
+                                                <div class="participant-role">{{ participant_role }}</div>
+                                            </div>
+                                            <div class="participant-check-indicator">
+                                                <i class="fas fa-check"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% for error in form.participantes.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Item 31: Compromisso Pessoal -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ form.is_pessoal(class="form-check-input") }}
+                                {{ form.is_pessoal.label(class="form-check-label") }}
+                                <div class="form-text text-muted">
+                                    Marque se este é um compromisso pessoal (outros usuários verão apenas "Confidencial")
+                                </div>
+                            </div>
+                            {% for error in form.is_pessoal.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                    {% else %}
+                        <!-- Realize visit form -->
+                        <div class="mb-3">
+                            {{ form.atividades_realizadas.label(class="form-label") }}
+                            {{ form.atividades_realizadas(class="form-control" + (" is-invalid" if form.atividades_realizadas.errors else ""), rows="4") }}
+                            {% for error in form.atividades_realizadas.errors %}
+                                <div class="invalid-feedback">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.observacoes.label(class="form-label") }}
+                            {{ form.observacoes(class="form-control", rows="3") }}
+                        </div>
+                        
+                        <!-- GPS Location -->
+                        <div class="mb-3">
+                            <label class="form-label">Localização GPS</label>
+                            <div class="card border-secondary">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span>Capturar localização atual</span>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" id="getLocationBtn">
+                                            <i class="fas fa-map-marker-alt me-1"></i>Obter Localização
+                                        </button>
+                                    </div>
+                                    
+                                    {{ form.latitude() }}
+                                    {{ form.longitude() }}
+                                    
+                                    <div id="locationInfo" class="text-muted" style="display: none;">
+                                        <small>
+                                            <i class="fas fa-check-circle text-success me-1"></i>
+                                            Localização capturada com sucesso
+                                        </small>
+                                    </div>
+                                    
+                                    <div class="mt-2">
+                                        {{ form.endereco_gps.label(class="form-label") }}
+                                        {{ form.endereco_gps(class="form-control", readonly=True) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('visits_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-{% if action == 'edit' %}save{% elif action == 'realize' %}check{% else %}calendar-plus{% endif %} me-2"></i>
+                            {% if action == 'edit' %}Salvar Alterações{% elif action == 'realize' %}Confirmar Realização{% else %}Agendar Visita{% endif %}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* =================================
+   TEMÁTICA ELP - PARTICIPANTES
+   ================================= */
+
+.participant-container {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 12px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  gap: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.participant-card {
+  position: relative;
+  background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+  border: 2px solid #d1d5db;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  user-select: none;
+  overflow: hidden;
+}
+
+.participant-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, #374151, #6b7280);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.participant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  border-color: #9ca3af;
+}
+
+.participant-card:hover::before {
+  opacity: 1;
+}
+
+/* Estado Selecionado - Temática ELP */
+.participant-card.selected {
+  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+  border-color: #0891b2;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(8, 145, 178, 0.3);
+}
+
+.participant-card.selected::before {
+  background: linear-gradient(180deg, #fbbf24, #f59e0b);
+  opacity: 1;
+  width: 6px;
+}
+
+/* Conteúdo do Card */
+.participant-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.participant-icon {
+  font-size: 2.5rem;
+  color: #374151;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.participant-card.selected .participant-icon {
+  color: #fbbf24;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.participant-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.participant-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #111827;
+  margin-bottom: 4px;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.participant-card.selected .participant-name {
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.participant-role {
+  font-size: 0.9rem;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s ease;
+}
+
+.participant-card.selected .participant-role {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Indicador de Seleção */
+.participant-check-indicator {
+  width: 28px;
+  height: 28px;
+  background: #e5e7eb;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  flex-shrink: 0;
+}
+
+.participant-check-indicator i {
+  font-size: 0.9rem;
+  color: #9ca3af;
+  opacity: 0;
+  transform: scale(0) rotate(180deg);
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.participant-card.selected .participant-check-indicator {
+  background: #fbbf24;
+  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.3);
+}
+
+.participant-card.selected .participant-check-indicator i {
+  color: white;
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+/* Checkbox oculto */
+.participant-checkbox {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Contador de Participantes */
+#participants-count {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 12px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 2px solid rgba(251, 191, 36, 0.2);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+#participants-count.has-selections {
+  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+  color: white;
+  border-color: #0891b2;
+  box-shadow: 0 2px 8px rgba(8, 145, 178, 0.2);
+}
+
+/* Scrollbar Personalizada */
+.participant-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.participant-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.participant-container::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #0891b2, #0e7490);
+  border-radius: 4px;
+}
+
+.participant-container::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #0e7490, #155e75);
+}
+
+/* Responsividade Mobile */
+@media (max-width: 768px) {
+  .participant-card .participant-content {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+  
+  .participant-icon {
+    font-size: 2.2rem;
+  }
+  
+  .participant-name {
+    font-size: 1.05rem;
+  }
+  
+  .participant-role {
+    font-size: 0.85rem;
+  }
+  
+  #participants-count {
+    font-size: 1.1rem;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  
+  .participant-container {
+    max-height: 350px;
+    padding: 8px;
+  }
+  
+  .participant-check-indicator {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .participant-check-indicator i {
+    font-size: 0.8rem;
+  }
+}
+
+/* Animações de Entrada */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.participant-card {
+  animation: fadeInUp 0.3s ease forwards;
+}
+
+.participant-card:nth-child(1) { animation-delay: 0.1s; }
+.participant-card:nth-child(2) { animation-delay: 0.15s; }
+.participant-card:nth-child(3) { animation-delay: 0.2s; }
+.participant-card:nth-child(4) { animation-delay: 0.25s; }
+.participant-card:nth-child(5) { animation-delay: 0.3s; }
+
+/* Estados de Foco para Acessibilidade */
+.participant-card:focus {
+  outline: 3px solid rgba(8, 145, 178, 0.5);
+  outline-offset: 2px;
+}
+
+/* Checkbox Oculto */
+.participant-checkbox {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Handle 'Outros' project selection
+document.addEventListener('DOMContentLoaded', function() {
+    const projetoSelect = document.getElementById('projeto_id');
+    const projetoOutrosDiv = document.getElementById('projeto_outros_div');
+    
+    function toggleProjetoOutros() {
+        if (projetoSelect.value === '-1') {
+            projetoOutrosDiv.style.display = 'block';
+        } else {
+            projetoOutrosDiv.style.display = 'none';
+        }
+    }
+    
+    // Initial check
+    toggleProjetoOutros();
+    
+    // Listen for changes
+    projetoSelect.addEventListener('change', toggleProjetoOutros);
+    
+    // ========================================
+    // AUTO-CALCULAR HORÁRIO DE FIM (2 HORAS DEPOIS)
+    // ========================================
+    
+    const dataInicioInput = document.getElementById('data_inicio');
+    const dataFimInput = document.getElementById('data_fim');
+    
+    if (dataInicioInput && dataFimInput) {
+        // Função para formatar data no horário local do Brasil
+        function formatarDataLocal(date) {
+            const ano = date.getFullYear();
+            const mes = String(date.getMonth() + 1).padStart(2, '0');
+            const dia = String(date.getDate()).padStart(2, '0');
+            const hora = String(date.getHours()).padStart(2, '0');
+            const minuto = String(date.getMinutes()).padStart(2, '0');
+            return `${ano}-${mes}-${dia}T${hora}:${minuto}`;
+        }
+        
+        // Função para adicionar 2 horas ao horário de início
+        function calcularHorarioFim(dataInicio) {
+            if (!dataInicio) return '';
+            
+            try {
+                // Converter string para Date
+                const inicio = new Date(dataInicio);
+                
+                // Adicionar 2 horas (2 * 60 * 60 * 1000 milissegundos)
+                const fim = new Date(inicio.getTime() + (2 * 60 * 60 * 1000));
+                
+                return formatarDataLocal(fim);
+            } catch (error) {
+                console.error('Erro ao calcular horário de fim:', error);
+                return '';
+            }
+        }
+        
+        // Definir horário atual no campo de início (se vazio)
+        if (!dataInicioInput.value) {
+            const agora = new Date();
+            agora.setMinutes(0); // Arredondar para a hora exata
+            agora.setSeconds(0);
+            agora.setMilliseconds(0);
+            
+            const horarioAtual = formatarDataLocal(agora);
+            dataInicioInput.value = horarioAtual;
+            
+            // Calcular horário de fim automaticamente (agora + 2 horas)
+            const horarioFim = calcularHorarioFim(horarioAtual);
+            if (horarioFim) {
+                dataFimInput.value = horarioFim;
+                console.log('✅ Horário de início definido:', horarioAtual);
+                console.log('✅ Horário de fim calculado: +2 horas');
+            }
+        }
+        
+        // Evento: quando o usuário alterar o horário de início
+        dataInicioInput.addEventListener('change', function() {
+            const horarioFim = calcularHorarioFim(this.value);
+            if (horarioFim) {
+                dataFimInput.value = horarioFim;
+                console.log('✅ Horário de fim atualizado: +2 horas');
+            }
+        });
+        
+        // Se já houver um valor no campo de início ao carregar a página, calcular o fim
+        if (dataInicioInput.value && !dataFimInput.value) {
+            const horarioFim = calcularHorarioFim(dataInicioInput.value);
+            if (horarioFim) {
+                dataFimInput.value = horarioFim;
+                console.log('✅ Horário de fim inicial calculado: +2 horas');
+            }
+        }
+    }
+    
+    // ========================================
+    // SELEÇÃO DE PARTICIPANTES - ELP SYSTEM
+    // ========================================
+    
+    function updateParticipantSelection() {
+        const checkedBoxes = document.querySelectorAll('.participant-checkbox:checked');
+        const count = checkedBoxes.length;
+        
+        // Atualizar contador visual
+        const countElement = document.querySelector('#participants-count');
+        if (count === 0) {
+            countElement.textContent = 'Nenhum participante selecionado';
+            countElement.classList.remove('has-selections');
+        } else if (count === 1) {
+            countElement.textContent = '1 participante selecionado';
+            countElement.classList.add('has-selections');
+        } else {
+            countElement.textContent = `${count} participantes selecionados`;
+            countElement.classList.add('has-selections');
+        }
+        
+        // Atualizar estados visuais dos cards
+        document.querySelectorAll('.participant-card').forEach(card => {
+            const checkbox = card.querySelector('.participant-checkbox');
+            if (checkbox) {
+                if (checkbox.checked) {
+                    card.classList.add('selected');
+                    card.setAttribute('aria-selected', 'true');
+                } else {
+                    card.classList.remove('selected');
+                    card.setAttribute('aria-selected', 'false');
+                }
+            }
+        });
+    }
+    
+    function initializeParticipantSelection() {
+        const participantCards = document.querySelectorAll('.participant-card');
+        
+        participantCards.forEach(card => {
+            const checkbox = card.querySelector('.participant-checkbox');
+            if (!checkbox) return;
+            
+            // Evento de mudança do checkbox
+            checkbox.addEventListener('change', function() {
+                updateParticipantSelection();
+            });
+            
+            // Evento de clique no card
+            card.addEventListener('click', function(e) {
+                // Evitar duplo toggle se clicou no checkbox
+                if (e.target === checkbox) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                // Toggle do checkbox
+                checkbox.checked = !checkbox.checked;
+                
+                // Trigger change event
+                const changeEvent = new Event('change', { bubbles: true });
+                checkbox.dispatchEvent(changeEvent);
+            });
+            
+            // Suporte para tecla Enter/Space
+            card.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    checkbox.checked = !checkbox.checked;
+                    const changeEvent = new Event('change', { bubbles: true });
+                    checkbox.dispatchEvent(changeEvent);
+                }
+            });
+        });
+        
+        // Atualização inicial
+        updateParticipantSelection();
+    }
+    
+    // Inicializar após carregamento do DOM
+    initializeParticipantSelection();
+});
+</script>
+
+{% if action == 'realize' %}
+<script>
+// GPS Location functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const getLocationBtn = document.getElementById('getLocationBtn');
+    const latitudeField = document.querySelector('input[name="latitude"]');
+    const longitudeField = document.querySelector('input[name="longitude"]');
+    const enderecoField = document.querySelector('input[name="endereco_gps"]');
+    const locationInfo = document.getElementById('locationInfo');
+    
+    getLocationBtn.addEventListener('click', function() {
+        if (navigator.geolocation) {
+            getLocationBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Obtendo...';
+            getLocationBtn.disabled = true;
+            
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    latitudeField.value = lat;
+                    longitudeField.value = lng;
+                    enderecoField.value = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+                    
+                    locationInfo.style.display = 'block';
+                    getLocationBtn.innerHTML = '<i class="fas fa-check me-1"></i>Localização Obtida';
+                    getLocationBtn.classList.remove('btn-outline-primary');
+                    getLocationBtn.classList.add('btn-success');
+                },
+                function(error) {
+                    console.error('Erro ao obter localização:', error);
+                    alert('Erro ao obter localização. Verifique se o GPS está habilitado.');
+                    getLocationBtn.innerHTML = '<i class="fas fa-map-marker-alt me-1"></i>Tentar Novamente';
+                    getLocationBtn.disabled = false;
+                }
+            );
+        } else {
+            alert('Geolocalização não é suportada neste navegador.');
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

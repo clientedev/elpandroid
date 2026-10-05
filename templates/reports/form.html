@@ -1,0 +1,1255 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório de Obra{% endblock %}
+
+{% block extra_css %}
+<style>
+.checklist-item {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #ffc107;
+}
+
+.checklist-item.completed {
+    border-left-color: #28a745;
+    background-color: #d4edda;
+}
+
+.photo-preview {
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+
+/* Correções de responsividade para mobile */
+/* Checkbox fixes - garantir formato quadrado e tamanho adequado */
+.form-check-input {
+    width: 20px !important;
+    height: 20px !important;
+    margin-top: 0.1em !important;
+    margin-right: 12px !important;
+    flex-shrink: 0 !important;
+    border-radius: 4px !important;
+    border-width: 2px !important;
+}
+
+/* Container do checkbox e label */
+.form-check {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    margin-bottom: 12px !important;
+}
+
+/* Label do checkbox - quebra de linha adequada */
+.form-check-label {
+    flex: 1 !important;
+    line-height: 1.5 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    hyphens: auto !important;
+}
+
+/* Botões responsivos */
+.btn {
+    min-height: 44px !important;
+}
+
+/* Responsividade mobile específica */
+@media (max-width: 768px) {
+    .checklist-item {
+        padding: 12px;
+        margin-bottom: 12px;
+    }
+    
+    .form-check-input {
+        width: 22px !important;
+        height: 22px !important;
+        margin-right: 10px !important;
+    }
+    
+    .form-check {
+        gap: 10px !important;
+    }
+    
+    .form-check-label {
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    
+    /* Botões empilhados em mobile */
+    .btn-group-toggle {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    
+    .btn-group-toggle .btn {
+        width: 100% !important;
+        justify-content: flex-start !important;
+    }
+    
+    /* Ajustes para campos de formulário */
+    .form-control, .form-select {
+        min-height: 44px;
+        font-size: 16px; /* Previne zoom no iOS */
+    }
+    
+    /* Espaçamento consistente */
+    .card {
+        margin-bottom: 16px !important;
+    }
+    
+    .row .col-md-6 {
+        margin-bottom: 12px;
+    }
+}
+
+/* Responsividade para telas muito pequenas */
+@media (max-width: 576px) {
+    .checklist-item {
+        padding: 10px;
+    }
+    
+    .form-check-input {
+        width: 20px !important;
+        height: 20px !important;
+    }
+    
+    .form-check-label {
+        font-size: 13px;
+        line-height: 1.3;
+    }
+    
+    /* Textarea responsivo */
+    .form-control[rows] {
+        min-height: 80px;
+    }
+    
+    /* Botões de categoria em grid responsivo */
+    .btn-group-toggle {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+        gap: 8px !important;
+    }
+}
+
+/* Estilos para seletor de categorias (Copiado do Express Report) */
+.category-selector {
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+}
+
+/* Grid de categorias - sem rolagem horizontal */
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+}
+
+@media (min-width: 576px) {
+    .category-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (max-width: 576px) {
+    .category-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+}
+
+.category-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background: white;
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: none !important;
+    text-align: center;
+    min-height: 100px;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    touch-action: manipulation !important;
+}
+
+.category-option:hover {
+    border-color: #007bff;
+    background: #f8f9ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,123,255,0.15);
+}
+
+.category-option.selected {
+    border-color: #28a745;
+    background: #f8fff8;
+    color: #155724;
+    font-weight: 600;
+}
+
+.category-option.selected .category-icon {
+    color: #28a745;
+}
+
+.category-icon {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+    color: #6c757d;
+    transition: color 0.3s ease;
+}
+
+.category-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin: 0;
+}
+
+/* Responsivo mobile para categorias */
+@media (max-width: 768px) {
+    .category-option {
+        min-height: 80px;
+        padding: 1rem 0.5rem;
+    }
+    
+    .category-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .category-name {
+        font-size: 0.8rem;
+    }
+}
+
+/* Feedback táctil melhorado para categorias */
+.category-option.touching {
+    background: #007bff !important;
+    color: white !important;
+    transform: scale(0.95) !important;
+    transition: all 0.1s ease !important;
+}
+
+/* Garantir que checkboxes checked mantenham formato */
+.form-check-input:checked {
+    width: 20px !important;
+    height: 20px !important;
+}
+
+@media (max-width: 768px) {
+    .form-check-input:checked {
+        width: 22px !important;
+        height: 22px !important;
+    }
+}
+
+@media (max-width: 576px) {
+    .form-check-input:checked {
+        width: 20px !important;
+        height: 20px !important;
+    }
+}
+
+/* Chevron animation for collapsible cards */
+.card-header[data-bs-toggle="collapse"] .fa-chevron-down {
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+.card-header[data-bs-toggle="collapse"].collapsed-open .fa-chevron-down {
+    transform: rotate(180deg);
+}
+
+/* Smooth collapse transition */
+.collapse {
+    transition: none;
+}
+.collapsing {
+    transition: height 0.3s ease;
+}
+
+/* Botões de ação principais responsivos */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .action-buttons .btn {
+        width: 100%;
+        min-height: 50px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-file-alt"></i> Relatório de Obra</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="reportForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <!-- Informações Básicas -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="form-group">
+                                    <label class="form-label" for="projeto_id">Obra *</label>
+                                    <select name="projeto_id" id="projeto_id" class="form-control" required>
+                                        <option value="">Selecione uma obra</option>
+                                        {% for projeto in projetos %}
+                                        <option value="{{ projeto.id }}">{{ projeto.numero }} - {{ projeto.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">O título do relatório será gerado automaticamente como "Relatório Fotográfico - XXX"</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="aprovador_nome">Nome do Aprovador</label>
+                                    <input type="text" name="aprovador_nome" id="aprovador_nome" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label" for="data_relatorio">Data do Relatório</label>
+                                    <input type="date" name="data_relatorio" id="data_relatorio" class="form-control" value="{{ today }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Informações Técnicas da Obra (Novo - AJAX) -->
+                        <div class="card mb-4 border-0 shadow-sm">
+                            <div class="card-header elp-collapse-header-info p-0 d-flex"
+                                 data-bs-toggle="collapse" 
+                                 data-bs-target="#techInfoCollapse" 
+                                 style="cursor: pointer; border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-center w-100 py-3 px-4">
+                                    <h5 class="mb-0 text-white fw-semibold">
+                                        <i class="fas fa-cogs me-2"></i>Informações Técnicas
+                                    </h5>
+                                    <i class="fas fa-chevron-down elp-chevron-icon" id="formTechInfoChevron"></i>
+                                </div>
+                            </div>
+                            <div id="techInfoCollapse" class="collapse">
+                                <div class="card-body">
+                                    <p class="text-muted small mb-3">
+                                        <i class="fas fa-sync-alt me-1"></i> 
+                                        Estas informações são carregadas da obra selecionada. Edições aqui atualizam diretamente o cadastro da obra.
+                                    </p>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Elementos construtivos da base</label>
+                                                <input type="text" class="form-control tech-field" id="tech_elementos_construtivos_base" data-field="elementos_construtivos_base">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Especificação chapisco colante</label>
+                                                <input type="text" class="form-control tech-field" id="tech_especificacao_chapisco_colante" data-field="especificacao_chapisco_colante">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Especificação chapisco da alvenaria</label>
+                                                <input type="text" class="form-control tech-field" id="tech_especificacao_chapisco_alvenaria" data-field="especificacao_chapisco_alvenaria">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Especificação da argamassa de emboço</label>
+                                                <input type="text" class="form-control tech-field" id="tech_especificacao_argamassa_emboco" data-field="especificacao_argamassa_emboco">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Forma da aplicação da argamassa de emboço</label>
+                                                <input type="text" class="form-control tech-field" id="tech_forma_aplicacao_argamassa" data-field="forma_aplicacao_argamassa">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Acabamentos do revestimento</label>
+                                                <input type="text" class="form-control tech-field" id="tech_acabamentos_revestimento" data-field="acabamentos_revestimento">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Acabamento em peitoris de janela</label>
+                                                <input type="text" class="form-control tech-field" id="tech_acabamento_peitoris" data-field="acabamento_peitoris">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Acabamento em muretas de terraços</label>
+                                                <input type="text" class="form-control tech-field" id="tech_acabamento_muretas" data-field="acabamento_muretas">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Definição sobre frisos de mudança de cor de textura</label>
+                                                <input type="text" class="form-control tech-field" id="tech_definicao_frisos_cor" data-field="definicao_frisos_cor">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Definição sobre face inferior das abas (friso pingadeira ou caimento invertido)</label>
+                                                <input type="text" class="form-control tech-field" id="tech_definicao_face_inferior_abas" data-field="definicao_face_inferior_abas">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Caso haja projeto de fachada, especificar o projetista e fazer observações sobre procedimentos específicos ou divergências de orientações</label>
+                                                <textarea class="form-control tech-field" id="tech_observacoes_projeto_fachada" data-field="observacoes_projeto_fachada" rows="2"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-12">
+                                            <div class="form-group">
+                                                <label class="form-label fw-bold">Outras observações</label>
+                                                <textarea class="form-control tech-field" id="tech_outras_observacoes" data-field="outras_observacoes" rows="2"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="techSaveStatus" class="mt-2 text-end"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Checklist da Obra (Colapsável) -->
+                        <div class="card mb-4 border-0 shadow-sm">
+                            <div class="card-header elp-collapse-header-check p-0 d-flex" 
+                                 data-bs-toggle="collapse" 
+                                 data-bs-target="#checklistCollapse" 
+                                 style="cursor: pointer; border-radius: 8px;">
+                                <div class="d-flex justify-content-between align-items-center w-100 py-3 px-4">
+                                    <h5 class="mb-0 text-white fw-semibold"><i class="fas fa-tasks me-2"></i>Checklist da Obra</h5>
+                                    <i class="fas fa-chevron-down elp-chevron-icon" id="formChecklistChevron"></i>
+                                </div>
+                            </div>
+                            <div id="checklistCollapse" class="collapse">
+                                <div class="card-body">
+                                    <div id="checklistItems">
+                                        <div class="checklist-item mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="check_fundacao">
+                                                <label class="form-check-label fw-bold" for="check_fundacao">
+                                                    Fundação: Verificar escavação, armadura e concretagem
+                                                </label>
+                                            </div>
+                                            <textarea class="form-control mt-2" name="obs_fundacao" placeholder="Observações sobre fundação..." rows="2"></textarea>
+                                        </div>
+
+                                        <div class="checklist-item mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="check_estrutura">
+                                                <label class="form-check-label fw-bold" for="check_estrutura">
+                                                    Estrutura: Verificar pilares, vigas e lajes
+                                                </label>
+                                            </div>
+                                            <textarea class="form-control mt-2" name="obs_estrutura" placeholder="Observações sobre estrutura..." rows="2"></textarea>
+                                        </div>
+
+                                        <div class="checklist-item mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="check_alvenaria">
+                                                <label class="form-check-label fw-bold" for="check_alvenaria">
+                                                    Alvenaria: Verificar levante de paredes e esquadrias
+                                                </label>
+                                            </div>
+                                            <textarea class="form-control mt-2" name="obs_alvenaria" placeholder="Observações sobre alvenaria..." rows="2"></textarea>
+                                        </div>
+
+                                        <div class="checklist-item mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="check_instalacoes">
+                                                <label class="form-check-label fw-bold" for="check_instalacoes">
+                                                    Instalações: Verificar elétrica, hidráulica e sanitária
+                                                </label>
+                                            </div>
+                                            <textarea class="form-control mt-2" name="obs_instalacoes" placeholder="Observações sobre instalações..." rows="2"></textarea>
+                                        </div>
+
+                                        <div class="checklist-item mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="check_cobertura">
+                                                <label class="form-check-label fw-bold" for="check_cobertura">
+                                                    Cobertura: Verificar estrutura e telhas
+                                                </label>
+                                            </div>
+                                            <textarea class="form-control mt-2" name="obs_cobertura" placeholder="Observações sobre cobertura..." rows="2"></textarea>
+                                        </div>
+
+                                        <div class="checklist-item mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="check_acabamento">
+                                                <label class="form-check-label fw-bold" for="check_acabamento">
+                                                    Acabamento: Verificar revestimentos e pinturas
+                                                </label>
+                                            </div>
+                                            <textarea class="form-control mt-2" name="obs_acabamento" placeholder="Observações sobre acabamento..." rows="2"></textarea>
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="button" class="btn btn-outline-primary" onclick="addCustomChecklistItem()">
+                                        <i class="fas fa-plus"></i> Adicionar Item Personalizado
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Seleção de Funcionários e E-mails (Movido para baixo do Checklist) -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-users me-2"></i>Acompanhantes da Visita (Funcionários)
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="funcionarios-projeto">
+                                            <p class="text-muted">Selecione uma obra para ver os funcionários disponíveis</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-envelope me-2"></i>E-mails para Envio
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="emails-projeto">
+                                            <p class="text-muted">Selecione uma obra para ver os e-mails disponíveis</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upload de Fotos (Melhorado com grid como Express Report) -->
+                        <div class="card mb-4">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h5><i class="fas fa-camera"></i> Fotos <span class="badge bg-info ms-2" id="photoCount">(Até 200 fotos)</span></h5>
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="resetPhotoCategories()">
+                                        <i class="fas fa-undo"></i> Limpar Seleção
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Seletor de Categoria (Copiar do Express Report) -->
+                                <div class="mb-4">
+                                    <p class="mb-3 text-muted">Selecione a categoria antes de adicionar a foto:</p>
+                                    <div class="category-selector">
+                                        <div class="category-grid">
+                                            <div class="category-option" data-category="Fundação">
+                                                <i class="fas fa-hammer category-icon"></i>
+                                                <div class="category-name">Fundação</div>
+                                            </div>
+                                            <div class="category-option" data-category="Estrutura">
+                                                <i class="fas fa-building category-icon"></i>
+                                                <div class="category-name">Estrutura</div>
+                                            </div>
+                                            <div class="category-option" data-category="Alvenaria">
+                                                <i class="fas fa-layer-group category-icon"></i>
+                                                <div class="category-name">Alvenaria</div>
+                                            </div>
+                                            <div class="category-option" data-category="Instalações">
+                                                <i class="fas fa-plug category-icon"></i>
+                                                <div class="category-name">Instalações</div>
+                                            </div>
+                                            <div class="category-option" data-category="Cobertura">
+                                                <i class="fas fa-home category-icon"></i>
+                                                <div class="category-name">Cobertura</div>
+                                            </div>
+                                            <div class="category-option" data-category="Acabamento">
+                                                <i class="fas fa-paint-brush category-icon"></i>
+                                                <div class="category-name">Acabamento</div>
+                                            </div>
+                                            <div class="category-option" data-category="Problema">
+                                                <i class="fas fa-exclamation-triangle category-icon"></i>
+                                                <div class="category-name">Problema</div>
+                                            </div>
+                                            <div class="category-option" data-category="Vista Geral">
+                                                <i class="fas fa-eye category-icon"></i>
+                                                <div class="category-name">Vista Geral</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Upload de Fotos -->
+                                <div class="mb-3">
+                                    <input type="file" id="photoInput" name="photos" multiple accept="image/*" class="form-control">
+                                    <div class="form-text">Selecione uma categoria primeiro, depois escolha até 200 fotos (JPG, PNG) - Limite total: 3GB.</div>
+                                </div>
+
+                                <!-- Preview das Fotos -->
+                                <div id="photoPreview" class="row"></div>
+                            </div>
+                        </div>
+
+                        <!-- Conteúdo do Relatório -->
+                        <div class="mb-4">
+                            <div class="form-group">
+                                <label class="form-label" for="conteudo">Conteúdo do Relatório</label>
+                                <textarea name="conteudo" id="conteudo" class="form-control" rows="6" placeholder="Descreva detalhadamente as atividades realizadas, progresso da obra, problemas encontrados e próximos passos..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="action-buttons">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-save"></i> Concluir relatório
+                                    </button>
+                                    <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                                        <i class="fas fa-arrow-left"></i> Voltar
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variáveis globais
+let selectedPhotos = [];
+let selectedCategory = null;
+
+// Função para carregar funcionários e e-mails do projeto selecionado
+function carregarFuncionariosEmails() {
+    const projetoId = document.getElementById('projeto_id').value;
+    const funcionariosDiv = document.getElementById('funcionarios-projeto');
+    const emailsDiv = document.getElementById('emails-projeto');
+    
+    if (!projetoId) {
+        funcionariosDiv.innerHTML = '<p class="text-muted">Selecione uma obra para ver os funcionários disponíveis</p>';
+        emailsDiv.innerHTML = '<p class="text-muted">Selecione uma obra para ver os e-mails disponíveis</p>';
+        return;
+    }
+    
+    // Buscar funcionários e e-mails do projeto via AJAX
+    fetch(`/api/projeto/${projetoId}/funcionarios-emails`, {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Renderizar funcionários
+            let funcionariosHtml = '';
+            if (data.funcionarios && data.funcionarios.length > 0) {
+                data.funcionarios.forEach(func => {
+                    const checked = func.is_responsavel_principal ? 'checked' : '';
+                    funcionariosHtml += `
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="func_${func.id}" 
+                                   name="funcionarios_selecionados[]" value="${func.id}" ${checked}>
+                            <label class="form-check-label" for="func_${func.id}">
+                                <strong>${func.nome_funcionario}</strong><br>
+                                <small class="text-muted">${func.cargo || 'Sem cargo'} - ${func.empresa || 'Sem empresa'}</small>
+                                ${func.is_responsavel_principal ? '<span class="badge bg-primary">Principal</span>' : ''}
+                            </label>
+                        </div>
+                    `;
+                });
+            } else {
+                funcionariosHtml = '<p class="text-muted">Nenhum funcionário encontrado para esta obra</p>';
+            }
+            funcionariosDiv.innerHTML = funcionariosHtml;
+            
+            // Renderizar e-mails
+            let emailsHtml = '';
+            if (data.emails && data.emails.length > 0) {
+                data.emails.forEach(email => {
+                    emailsHtml += `
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="email_${email.id}" 
+                                   name="emails_selecionados[]" value="${email.id}">
+                            <label class="form-check-label" for="email_${email.id}">
+                                <strong>${email.email}</strong><br>
+                                <small class="text-muted">${email.nome_contato} - ${email.cargo || 'Sem cargo'}</small>
+                            </label>
+                        </div>
+                    `;
+                });
+            } else {
+                emailsHtml = '<p class="text-muted">Nenhum e-mail encontrado para esta obra</p>';
+            }
+            emailsDiv.innerHTML = emailsHtml;
+            
+            // Popular Informações Técnicas (Novo)
+            if (data.technical_info) {
+                document.querySelectorAll('.tech-field').forEach(field => {
+                    const fieldName = field.getAttribute('data-field');
+                    // Verificar se o campo existe no data e preencher
+                    if (fieldName && data.technical_info[fieldName] !== undefined) {
+                        field.value = data.technical_info[fieldName] || ''; // Garantir vazio se null
+                    }
+                });
+                
+                // Limpar status de salvamento anterior se houver
+                const statusDiv = document.getElementById('techSaveStatus');
+                if (statusDiv) statusDiv.innerHTML = '';
+            }
+        } else {
+            funcionariosDiv.innerHTML = '<p class="text-danger">Erro ao carregar funcionários</p>';
+            emailsDiv.innerHTML = '<p class="text-danger">Erro ao carregar e-mails</p>';
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        funcionariosDiv.innerHTML = '<p class="text-danger">Erro de conexão</p>';
+        emailsDiv.innerHTML = '<p class="text-danger">Erro de conexão</p>';
+    });
+}
+
+// Funções para seleção de categoria (Copiado e adaptado do Express Report)
+function selectPhotoCategory(category, element) {
+    // Remover seleção anterior
+    document.querySelectorAll('.category-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Selecionar nova categoria
+    element.classList.add('selected');
+    selectedCategory = category;
+    
+    console.log(`Categoria selecionada: ${category}`);
+    updatePhotoInput();
+}
+
+// Resetar seleção de categoria
+function resetPhotoCategories() {
+    selectedCategory = null;
+    document.querySelectorAll('.category-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Limpar input de fotos
+    const fileInput = document.getElementById('photoInput');
+    if (fileInput) {
+        fileInput.value = '';
+    }
+    
+    // Limpar preview
+    document.getElementById('photoPreview').innerHTML = '';
+    selectedPhotos = [];
+}
+
+// Handler para clique em categoria
+function handleCategoryClick(e) {
+    e.preventDefault();
+    const category = this.getAttribute('data-category');
+    selectPhotoCategory(category, this);
+}
+
+// Handler para touch em categoria - melhorado para mobile
+function handleCategoryTouch(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const category = this.getAttribute('data-category');
+    selectPhotoCategory(category, this);
+}
+
+// Função updatePhotoInput para habilitar/desabilitar upload
+function updatePhotoInput() {
+    const input = document.getElementById('photoInput');
+    if (selectedCategory) {
+        input.disabled = false;
+        input.title = `Upload fotos para categoria: ${selectedCategory}`;
+    } else {
+        input.disabled = true;
+        input.title = 'Selecione uma categoria primeiro';
+    }
+}
+
+// Função updatePhotoCounter para atualizar badge de contador
+function updatePhotoCounter() {
+    const counter = document.getElementById('photoCount');
+    if (counter && selectedPhotos) {
+        counter.textContent = `(${selectedPhotos.length}/200 fotos)`;
+    }
+}
+
+// Adicionar event listeners para categorias (similar ao Express Report)
+document.addEventListener('DOMContentLoaded', function() {
+    // Inicializar estado
+    updatePhotoInput();
+    updatePhotoCounter();
+    
+    // Adicionar event listener para o select do projeto
+    const projetoSelect = document.getElementById('projeto_id');
+    if (projetoSelect) {
+        projetoSelect.addEventListener('change', carregarFuncionariosEmails);
+        
+        // Se já houver um projeto selecionado (ex: Edição ou validação falhou), carregar dados imediatamente
+        if (projetoSelect.value) {
+            carregarFuncionariosEmails();
+        }
+    }
+    
+    // Monitorar upload de fotos
+    const photoInput = document.getElementById('photoInput');
+    if (photoInput) {
+        photoInput.addEventListener('change', function(e) {
+            if (!selectedCategory) {
+                alert('Por favor, selecione uma categoria primeiro.');
+                this.value = '';
+                return;
+            }
+            
+            handlePhotoSelection(e.target.files);
+        });
+    }
+    
+    // Adicionar event listeners para as categorias de foto
+    document.querySelectorAll('.category-option').forEach(option => {
+        // Remover eventos antigos para evitar duplicação
+        option.removeEventListener('click', handleCategoryClick);
+        option.removeEventListener('touchend', handleCategoryTouch);
+        
+        // Adicionar novos event listeners
+        option.addEventListener('click', handleCategoryClick);
+        option.addEventListener('touchend', handleCategoryTouch);
+    });
+
+    // Listeners para Auto-Save de Informações Técnicas
+    document.querySelectorAll('.tech-field').forEach(field => {
+        field.addEventListener('change', saveTechnicalInfo);
+    });
+
+    // Animação do chevron nas seções colapsáveis
+    (function() {
+        function setupChevron(collapseId, chevronId) {
+            var collapseEl = document.getElementById(collapseId);
+            var chevronEl = document.getElementById(chevronId);
+            if (!collapseEl || !chevronEl) return;
+            collapseEl.addEventListener('show.bs.collapse', function() {
+                chevronEl.classList.add('rotated');
+            });
+            collapseEl.addEventListener('hide.bs.collapse', function() {
+                chevronEl.classList.remove('rotated');
+            });
+        }
+        setupChevron('techInfoCollapse', 'formTechInfoChevron');
+        setupChevron('checklistCollapse', 'formChecklistChevron');
+    })();
+});
+
+// Função para salvar Informações Técnicas via AJAX
+function saveTechnicalInfo() {
+    const projetoId = document.getElementById('projeto_id').value;
+    if (!projetoId) return;
+
+    const data = {};
+    document.querySelectorAll('.tech-field').forEach(field => {
+        const fieldName = field.getAttribute('data-field');
+        if (fieldName) {
+            data[fieldName] = field.value;
+        }
+    });
+
+    const statusDiv = document.getElementById('techSaveStatus');
+    statusDiv.innerHTML = '<span class="text-warning"><i class="fas fa-sync fa-spin"></i> Salvando na obra...</span>';
+
+    fetch(`/api/projeto/${projetoId}/update_technical_info`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            statusDiv.innerHTML = '<span class="text-success fw-bold"><i class="fas fa-check"></i> Alterações salvas na obra!</span>';
+            setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
+        } else {
+            statusDiv.innerHTML = `<span class="text-danger">Erro ao salvar: ${result.error}</span>`;
+        }
+    })
+    .catch(error => {
+        console.error('Erro no auto-save:', error);
+        statusDiv.innerHTML = '<span class="text-danger">Erro de conexão ao salvar.</span>';
+    });
+}
+
+function handlePhotoSelection(files) {
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const photoId = addPhotoPreview(file, e.target.result, selectedCategory);
+                const photoDiv = document.getElementById(photoId);
+
+                // Detectar se é captura de câmera ou galeria
+                // Heurística: se o arquivo foi modificado nos últimos 30 segundos, provavelmente é câmera
+                const isCamera = (file.lastModified && (Date.now() - file.lastModified < 30000));
+                
+                if (isCamera) {
+                    console.log("📷 Captura de câmera detectada. Iniciando download...");
+                    // Funcionalidade extra: Download local imediato (apenas para câmera)
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = e.target.result;
+                    downloadLink.download = `foto_obra_${Date.now()}_${file.name}`;
+                    document.body.appendChild(downloadLink);
+                    downloadLink.click();
+                    document.body.removeChild(downloadLink);
+                } else {
+                    console.log("📁 Seleção de galeria detectada. Download ignorado.");
+                }
+
+                // Sempre registrar a foto em window.mobilePhotoData para suporte offline
+                if (!window.mobilePhotoData) window.mobilePhotoData = [];
+                window.mobilePhotoData.push({
+                    id: photoId,
+                    file: file,
+                    blob: file,
+                    category: selectedCategory,
+                    name: file.name,
+                    filename: file.name,
+                    previewUrl: e.target.result
+                });
+
+                // Se offline: salvar no dispositivo e não tentar o servidor
+                if (!navigator.onLine) {
+                    console.log("📴 Offline detectado: foto registrada localmente para envio posterior.");
+                    if (photoDiv) {
+                        const statusIndicator = document.createElement('div');
+                        statusIndicator.className = 'upload-status-indicator';
+                        statusIndicator.innerHTML = '<span class="badge bg-info text-dark"><i class="fas fa-save"></i> Salvo offline</span>';
+                        photoDiv.querySelector('.card-body').prepend(statusIndicator);
+                        setTimeout(() => statusIndicator.remove(), 3000);
+                    }
+                    return;
+                }
+
+                // Online: forçar salvamento imediato no sistema
+                console.log("🚀 Iniciando salvamento imediato no sistema...");
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('category', selectedCategory);
+                
+                // Mostrar indicador de progresso no card
+                if (photoDiv) {
+                    const statusIndicator = document.createElement('div');
+                    statusIndicator.className = 'upload-status-indicator';
+                    statusIndicator.innerHTML = '<span class="badge bg-warning text-dark"><i class="fas fa-sync fa-spin"></i> Salvando...</span>';
+                    photoDiv.querySelector('.card-body').prepend(statusIndicator);
+                }
+
+                fetch('/api/uploads/temp', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log("✅ Foto salva temporariamente:", data.temp_id);
+                        if (photoDiv) {
+                            photoDiv.setAttribute('data-temp-id', data.temp_id);
+                            const indicator = photoDiv.querySelector('.upload-status-indicator');
+                            if (indicator) {
+                                indicator.innerHTML = '<span class="badge bg-success"><i class="fas fa-check"></i> Salvo</span>';
+                                setTimeout(() => indicator.remove(), 2000);
+                            }
+                        }
+                    } else {
+                        throw new Error(data.error || 'Erro desconhecido');
+                    }
+                })
+                .catch(error => {
+                    console.error("❌ Erro no salvamento imediato:", error);
+                    if (photoDiv) {
+                        const indicator = photoDiv.querySelector('.upload-status-indicator');
+                        if (indicator) {
+                            indicator.innerHTML = '<span class="badge bg-danger"><i class="fas fa-exclamation-triangle"></i> Erro ao salvar</span>';
+                        }
+                    }
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+function addPhotoPreview(file, src, category) {
+    const photoId = 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const photoDiv = document.createElement('div');
+    photoDiv.className = 'col-md-4 mb-3';
+    photoDiv.id = photoId;
+    photoDiv.innerHTML = `
+        <div class="card">
+            <img src="${src}" class="card-img-top photo-preview" alt="Preview" style="cursor: pointer;" onclick="editPhoto('${photoId}', '${src}', '${category}')">
+            <div class="card-body p-2">
+                <!-- Seletor de Legendas -->
+                <select class="form-control form-control-sm mb-2" id="predefined_${photoId}" name="photo_caption_${photoId}" required>
+                    <option value="">Selecione uma legenda...</option>
+                </select>
+                <small class="text-muted d-block">Categoria: ${category}</small>
+                <div class="btn-group w-100 mt-2">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="editPhoto('${photoId}', '${src}', '${category}')">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removePhoto('${photoId}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('photoPreview').appendChild(photoDiv);
+    
+    // Armazenar informações da foto
+    selectedPhotos.push({
+        id: photoId,
+        file: file,
+        category: category,
+        element: photoDiv,
+        originalSrc: src
+    });
+    
+    // Carregar legendas pré-definidas para esta categoria
+    setTimeout(() => loadPredefinedCaptionsForPhoto(photoId, category), 100);
+    
+    // Atualizar contador de fotos
+    updatePhotoCounter();
+
+    return photoId;
+}
+
+function removePhoto(photoId) {
+    const photo = selectedPhotos.find(p => p.id === photoId);
+    if (photo) {
+        photo.element.remove();
+        selectedPhotos = selectedPhotos.filter(p => p.id !== photoId);
+        // Também remover de mobilePhotoData (usado pelo sistema offline)
+        if (window.mobilePhotoData) {
+            window.mobilePhotoData = window.mobilePhotoData.filter(p => p.id !== photoId);
+        }
+        // Atualizar contador após remover foto
+        updatePhotoCounter();
+    }
+}
+
+// Checklist functionality
+function addCustomChecklistItem() {
+    const checklistItems = document.getElementById('checklistItems');
+    const itemId = 'custom_' + Date.now();
+    
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'checklist-item mb-3';
+    itemDiv.innerHTML = `
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="${itemId}">
+            <input type="text" class="form-control d-inline-block fw-bold" style="width: 70%;" 
+                   name="custom_item_${itemId}" placeholder="Digite o item do checklist..." required>
+            <button type="button" class="btn btn-sm btn-outline-danger float-end" 
+                    onclick="this.parentElement.parentElement.remove()">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <textarea class="form-control mt-2" name="custom_obs_${itemId}" placeholder="Observações..." rows="2"></textarea>
+    `;
+    
+    checklistItems.appendChild(itemDiv);
+}
+
+// Marcar checklist como concluído
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('form-check-input') && e.target.type === 'checkbox') {
+        const item = e.target.closest('.checklist-item');
+        if (e.target.checked) {
+            item.classList.add('completed');
+        } else {
+            item.classList.remove('completed');
+        }
+    }
+});
+
+// Submissão do formulário
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+    // Não prevenir o comportamento padrão - usar submissão tradicional
+    
+    // Coletar dados do checklist
+    const checklistData = [];
+    document.querySelectorAll('.checklist-item').forEach(item => {
+        const checkbox = item.querySelector('.form-check-input[type="checkbox"]');
+        const label = item.querySelector('.form-check-label');
+        const customInput = item.querySelector('input[type="text"]');
+        const textarea = item.querySelector('textarea');
+        
+        if (checkbox) {
+            const itemText = label ? label.textContent.trim() : (customInput ? customInput.value : '');
+            if (itemText) {
+                checklistData.push({
+                    item: itemText,
+                    completed: checkbox.checked,
+                    observations: textarea ? textarea.value : ''
+                });
+            }
+        }
+    });
+    
+    // Adicionar dados do checklist ao formulário
+    const checklistInput = document.createElement('input');
+    checklistInput.type = 'hidden';
+    checklistInput.name = 'checklist_data';
+    checklistInput.value = JSON.stringify(checklistData);
+    this.appendChild(checklistInput);
+    
+    // Submeter usando formulário tradicional - sem preventDefault
+    return true;
+});
+
+// Função editPhoto - DESABILITADA
+function editPhoto(photoId, imageSrc, category) {
+    // Funcionalidade removida por solicitação do usuário
+    console.log('Edição de fotos desabilitada');
+    return;
+}
+
+function updatePhotoFromEditor(photoId, data) {
+    const photo = selectedPhotos.find(p => p.id === photoId);
+    if (!photo) return;
+    
+    // Atualizar imagem no preview
+    const img = photo.element.querySelector('.photo-preview');
+    if (img && data.imageData) {
+        img.src = data.imageData;
+        photo.annotatedSrc = data.imageData;
+        photo.annotationsData = data.annotations;
+    }
+    
+    // Atualizar campos
+    if (data.caption) {
+        const captionSelect = photo.element.querySelector(`select[name="photo_caption_${photoId}"]`);
+        if (captionSelect) captionSelect.value = data.caption;
+    }
+    
+    if (data.description) {
+        photo.description = data.description;
+    }
+    
+    // Adicionar indicador visual de foto editada
+    const card = photo.element.querySelector('.card');
+    if (card && !card.classList.contains('border-success')) {
+        card.classList.add('border-success', 'border-2');
+        const indicator = document.createElement('small');
+        indicator.className = 'text-success fw-bold';
+        indicator.innerHTML = '<i class="fas fa-check-circle"></i> Editada';
+        photo.element.querySelector('.card-body').appendChild(indicator);
+    }
+}
+
+// Carregar legendas pré-definidas para uma foto específica
+function loadPredefinedCaptionsForPhoto(photoId, category) {
+    console.log(`Carregando legendas para foto ${photoId}, categoria: ${category}`);
+    const mappedCategory = mapCategoryToLegenda(category);
+    console.log(`Categoria mapeada: ${mappedCategory}`);
+    
+    fetch(`/api/legendas?categoria=${mappedCategory}`)
+        .then(response => {
+            console.log('Resposta da API:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dados recebidos:', data);
+            const select = document.getElementById(`predefined_${photoId}`);
+            console.log('Select element:', select);
+            
+            if (select && data.success) {
+                // Limpar opções existentes exceto a primeira
+                select.innerHTML = '<option value="">Selecione uma legenda...</option>';
+                
+                data.legendas.forEach(legenda => {
+                    const option = document.createElement('option');
+                    option.value = legenda.texto;
+                    option.textContent = legenda.texto;
+                    select.appendChild(option);
+                });
+                
+                console.log(`${data.legendas.length} legendas carregadas para categoria ${mappedCategory}`);
+            } else {
+                console.error('Elemento select não encontrado ou dados inválidos');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar legendas:', error);
+        });
+}
+
+// Mapear categoria da foto para categoria da legenda
+function mapCategoryToLegenda(photoCategory) {
+    const mapping = {
+        'Fundação': 'Estrutural',
+        'Estrutura': 'Estrutural', 
+        'Alvenaria': 'Estrutural',
+        'Instalações': 'Elétrica',
+        'Cobertura': 'Impermeabilização',
+        'Acabamento': 'Acabamentos',
+        'Problema': 'Segurança',
+        'Geral': 'Geral'
+    };
+    return mapping[photoCategory] || 'Geral';
+}
+
+// Função selectPredefinedCaption não é mais necessária pois o select é o campo final
+
+// Inicializar
+document.addEventListener('DOMContentLoaded', function() {
+    updatePhotoInput();
+    
+    // Editor de fotos desabilitado
+});
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Scripts do editor de fotos removidos -->
+{% endblock %}
+
+<!-- Modal do editor removido -->
+
+{% endblock %}

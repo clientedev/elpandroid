@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Visitas - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+            <h1 class="mb-0">
+                <i class="fas fa-calendar-check me-2"></i>
+                Visitas
+            </h1>
+            <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-md-auto">
+                <a href="{{ url_for('visits_calendar') }}" class="btn btn-outline-info">
+                    <i class="fas fa-calendar-alt me-2"></i>Calendário
+                </a>
+                <a href="{{ url_for('reports_visits_monthly') }}" class="btn btn-outline-success">
+                    <i class="fas fa-file-chart-line me-2"></i>Relatórios
+                </a>
+                <a href="{{ url_for('visit_new') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Agendar Visita
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros e Busca -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white border-0 pt-3 pb-0">
+                <h6 class="text-muted mb-0"><i class="fas fa-filter me-2"></i>Filtrar Visitas</h6>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('visits_list') }}" id="filter-form" class="row g-3 align-items-end">
+                    
+                    <!-- Busca por texto -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-uppercase text-muted">🔍 Buscar por Obra ou Número</label>
+                        <input type="text" class="form-control" name="q" 
+                               value="{{ request.args.get('q', '') }}"
+                               placeholder="Ex: Ibirapuera, VIS-0035..."
+                               style="min-height: 44px;">
+                    </div>
+
+                    <!-- Filtro por Obra (dropdown) -->
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-uppercase text-muted">🏗️ Filtrar por Obra</label>
+                        <select class="form-select" name="projeto_id" style="min-height: 44px;">
+                            <option value="">Todas as obras</option>
+                            {% for proj in projetos %}
+                            <option value="{{ proj.id }}"
+                                {% if request.args.get('projeto_id') == proj.id|string %}selected{% endif %}>
+                                {{ proj.numero }} - {{ proj.nome }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Filtro por Status -->
+                    <div class="col-md-2">
+                        <label class="form-label fw-semibold small text-uppercase text-muted">📋 Status</label>
+                        <select class="form-select" name="status" style="min-height: 44px;">
+                            <option value="">Todos</option>
+                            <option value="Agendada"  {% if request.args.get('status') == 'Agendada'  %}selected{% endif %}>Agendada</option>
+                            <option value="Realizada" {% if request.args.get('status') == 'Realizada' %}selected{% endif %}>Realizada</option>
+                            <option value="Cancelada" {% if request.args.get('status') == 'Cancelada' %}selected{% endif %}>Cancelada</option>
+                        </select>
+                    </div>
+
+                    <!-- Botões -->
+                    <div class="col-md-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-fill" style="min-height: 44px;">
+                            <i class="fas fa-search me-1"></i>Buscar
+                        </button>
+                        {% if request.args.get('q') or request.args.get('status') or request.args.get('projeto_id') %}
+                        <a href="{{ url_for('visits_list') }}" class="btn btn-outline-secondary" 
+                           title="Limpar filtros" style="min-height: 44px;">
+                            <i class="fas fa-times"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+
+                </form>
+
+                <!-- Indicador de filtros ativos -->
+                {% if request.args.get('q') or request.args.get('status') or request.args.get('projeto_id') %}
+                <div class="mt-2 pt-2 border-top d-flex flex-wrap gap-2 align-items-center">
+                    <small class="text-muted">Filtros ativos:</small>
+                    {% if request.args.get('q') %}
+                    <span class="badge bg-primary">Busca: "{{ request.args.get('q') }}"</span>
+                    {% endif %}
+                    {% if request.args.get('status') %}
+                    <span class="badge bg-secondary">Status: {{ request.args.get('status') }}</span>
+                    {% endif %}
+                    {% if request.args.get('projeto_id') %}
+                    <span class="badge bg-info text-dark">Obra selecionada</span>
+                    {% endif %}
+                    <small class="text-muted ms-2">— {{ visits|length }} resultado(s) encontrado(s)</small>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Visitas -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if visits and visits|length > 0 %}
+                    <div class="mobile-visits-list">
+                        {% for visit in visits %}
+                        <div class="visit-card mb-3">
+                            <div class="card border-0 shadow-sm h-100" style="background: #f8f9fa;">
+                                <div class="card-body p-3">
+                                    <div class="row align-items-center">
+                                        <!-- Coluna principal com informações -->
+                                        <div class="col-8">
+                                            <!-- Número da visita -->
+                                            <div class="fw-bold text-primary mb-1" style="font-size: 0.9rem;">
+                                                <i class="fas fa-calendar-check me-1"></i>{{ visit.numero or 'N/A' }}
+                                            </div>
+
+                                            <!-- Nome da obra -->
+                                            <div class="fw-semibold text-dark mb-1" style="font-size: 0.95rem; line-height: 1.2;">
+                                                {% if visit.projeto_id and visit.projeto %}
+                                                    {{ visit.projeto.numero }} - {{ visit.projeto.nome }}
+                                                {% elif visit.projeto_outros %}
+                                                    {{ visit.projeto_outros }}
+                                                {% else %}
+                                                    Obra não especificada
+                                                {% endif %}
+                                            </div>
+
+                                            <!-- Data início -->
+                                            {% if visit.data_inicio %}
+                                            <div class="text-muted mb-1" style="font-size: 0.8rem;">
+                                                <i class="fas fa-clock me-1"></i>Início: {{ visit.data_inicio.strftime('%d/%m/%Y às %H:%M') }}
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Data fim -->
+                                            {% if visit.data_fim %}
+                                            <div class="text-muted mb-1" style="font-size: 0.8rem;">
+                                                <i class="fas fa-clock me-1"></i>Fim: {{ visit.data_fim.strftime('%d/%m/%Y às %H:%M') }}
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Data realizada -->
+                                            {% if visit.data_realizada %}
+                                            <div class="text-success mb-1" style="font-size: 0.8rem;">
+                                                <i class="fas fa-check me-1"></i>Realizada: {{ visit.data_realizada.strftime('%d/%m/%Y às %H:%M') }}
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Observações -->
+                                            {% if visit.observacoes %}
+                                            <div class="text-muted" style="font-size: 0.75rem;">
+                                                <i class="fas fa-sticky-note me-1"></i>{{ visit.observacoes[:50] }}{{ '...' if visit.observacoes|length > 50 else '' }}
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Responsável -->
+                                            <div class="text-muted" style="font-size: 0.75rem;">
+                                                <i class="fas fa-user me-1"></i>
+                                                {% if visit.responsavel and visit.responsavel.nome_completo %}
+                                                    {{ visit.responsavel.nome_completo }}
+                                                {% else %}
+                                                    Responsável não definido
+                                                {% endif %}
+                                            </div>
+                                        </div>
+
+                                        <!-- Coluna lateral com status e ações -->
+                                        <div class="col-4 text-end">
+                                            <!-- Status -->
+                                            <div class="mb-2">
+                                                {% set status = visit.status or 'Agendada' %}
+                                                {% if status != 'Realizada' and status != 'Cancelada' and visit.data_inicio and now and visit.data_inicio < now %}
+                                                    {% set status = 'Atrasada' %}
+                                                {% endif %}
+                                                
+                                                {% if status == 'Realizada' %}
+                                                    <span class="badge bg-success" style="font-size: 0.7rem;">{{ status }}</span>
+                                                {% elif status == 'Atrasada' %}
+                                                    <span class="badge bg-danger" style="font-size: 0.7rem;">{{ status }}</span>
+                                                {% elif status == 'Agendada' %}
+                                                    <span class="badge bg-warning" style="font-size: 0.7rem;">{{ status }}</span>
+                                                {% elif status == 'Cancelada' %}
+                                                    <span class="badge bg-danger" style="font-size: 0.7rem;">{{ status }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary" style="font-size: 0.7rem;">{{ status }}</span>
+                                                {% endif %}
+                                            </div>
+
+                                            <!-- Localização -->
+                                            {% if visit.latitude and visit.longitude %}
+                                            <div class="mb-2">
+                                                <a href="https://www.google.com/maps?q={{ visit.latitude }},{{ visit.longitude }}" target="_blank"
+                                                   class="btn btn-sm btn-outline-info" title="Ver no mapa">
+                                                    <i class="fas fa-map-marker-alt"></i>
+                                                </a>
+                                            </div>
+                                            {% endif %}
+
+                                            <!-- Ações -->
+                                            <div class="d-flex flex-column gap-1">
+                                                <!-- Botão Realizar (apenas agendadas/atrasadas) -->
+                                                {% if status == 'Agendada' or status == 'Atrasada' %}
+                                                    {% if visit.projeto_id %}
+                                                    <a href="{{ url_for('project_view', project_id=visit.projeto_id) }}"
+                                                       class="btn btn-sm btn-success"
+                                                       title="Realizar Visita">
+                                                        <i class="fas fa-check me-1"></i>Realizar
+                                                    </a>
+                                                    {% endif %}
+                                                    {% if status == 'Atrasada' %}
+                                                    <a href="{{ url_for('visit_edit', visit_id=visit.id) }}"
+                                                       class="btn btn-sm btn-warning text-dark mt-1"
+                                                       title="Remarcar Visita">
+                                                        <i class="fas fa-clock me-1"></i>Remarcar
+                                                    </a>
+                                                    {% endif %}
+                                                {% endif %}
+
+                                                <!-- Botão Ver Detalhes -->
+                                                <a href="{{ url_for('visit_view', visit_id=visit.id) }}"
+                                                   class="btn btn-sm btn-primary mt-1"
+                                                   title="Ver Detalhes">
+                                                    <i class="fas fa-eye me-1"></i>Ver
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-calendar-check fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma visita encontrada</h5>
+                        {% if request.args.get('q') %}
+                            <p class="text-muted">Nenhuma visita corresponde aos critérios de busca.</p>
+                            <a href="{{ url_for('visits_list') }}" class="btn btn-outline-secondary mb-3">
+                                <i class="fas fa-times me-2"></i>Limpar Busca
+                            </a>
+                        {% else %}
+                            <p class="text-muted">Comece agendando a primeira visita.</p>
+                        {% endif %}
+                        <div>
+                            <a href="{{ url_for('visit_new') }}" class="btn btn-primary" style="min-height: 44px;">
+                                <i class="fas fa-plus me-2"></i>Agendar Nova Visita
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.visit-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.visit-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+}
+
+@media (max-width: 768px) {
+    .visit-card .card-body {
+        padding: 1rem !important;
+    }
+
+    .visit-card .btn-sm {
+        min-height: 36px;
+        font-size: 0.8rem;
+    }
+}
+</style>
+{% endblock %}

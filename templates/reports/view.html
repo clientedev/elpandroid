@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}{{ report.titulo }} - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Mobile responsive header -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
+            <h1 class="mb-2 mb-md-0 fs-3 fs-md-1">
+                <i class="fas fa-file-alt me-2"></i>
+                <span class="d-block d-md-inline">Visualização do {{ report.titulo }}</span>
+                <small class="text-muted d-block d-md-inline">({{ report.numero }})</small>
+            </h1>
+            <!-- Mobile-first responsive buttons -->
+            <div class="d-flex flex-wrap gap-2" role="group">
+                <a href="{{ url_for('reports') }}" class="btn btn-secondary btn-sm btn-md-normal">
+                    <i class="fas fa-arrow-left me-1 me-md-2"></i><span class="d-none d-sm-inline">Voltar</span>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Data do Relatório no Topo da Página -->
+        <div class="mb-4">
+            <div class="alert alert-light border-0 mb-0 py-2">
+                <strong class="text-primary">
+                    <i class="fas fa-calendar-alt me-2"></i>Data: 
+                    {% if report.data_relatorio %}
+                        {{ report.data_relatorio|format_datetime_br('%d/%m/%Y') }}
+                    {% else %}
+                        {{ report.created_at|format_datetime_br('%d/%m/%Y') }}
+                    {% endif %}
+                </strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Status Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>Status Atual:</strong>
+                        {% if report.status == "Aprovado" %}
+                            <span class="badge bg-success fs-6">Aprovado</span>
+                        {% elif report.status == "Rejeitado" %}
+                            <span class="badge bg-danger fs-6">Rejeitado</span>
+                        {% elif report.status == 'Aguardando Aprovação' %}
+                            <span class="badge bg-warning fs-6">{{ report.status }}</span>
+                        {% elif report.status == 'Enviado' %}
+                            <span class="badge bg-success fs-6">{{ report.status }}</span>
+                        {% elif report.status == 'Finalizado' %}
+                            <span class="badge bg-primary fs-6">{{ report.status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary fs-6">{{ report.status }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Action buttons based on status -->
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if report.status == "Rejeitado" %}
+                            <div class="w-100">
+                                <div class="alert alert-danger mb-3">
+                                    <strong><i class="fas fa-exclamation-triangle me-1"></i>Motivo da rejeição:</strong> 
+                                    <br>{{ report.comentario_aprovacao or "Não informado" }}
+                                </div>
+                                {% if user_can_edit %}
+                                    <a href="{{ url_for('report_edit', report_id=report.id) }}" class="btn btn-warning">
+                                        <i class="fas fa-edit me-2"></i>Editar e Corrigir
+                                    </a>
+                                {% endif %}
+                            </div>
+                        {% elif report.status == "Aprovado" %}
+                            <a href="{{ url_for('generate_pdf_report', report_id=report.id) }}" class="btn btn-success" target="_blank">
+                                <i class="fas fa-file-pdf me-2"></i>Baixar PDF
+                            </a>
+                            {% if current_user.is_master %}
+                                <form method="POST" action="{{ url_for('report_send', report_id=report.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja enviar este relatório por email?')">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-info">
+                                        <i class="fas fa-paper-plane me-2"></i>Enviar por Email
+                                    </button>
+                                </form>
+                            {% endif %}
+                        {% elif report.status == 'preenchimento' or report.status == 'Aguardando Aprovação' or report.status == 'Em edição' %}
+                            <a href="{{ url_for('report_edit', report_id=report.id) }}" class="btn btn-primary">
+                                <i class="fas fa-edit me-2"></i>Editar Relatório
+                            </a>
+                        {% elif report.status == 'Rascunho' and report.autor_id == current_user.id %}
+                            <form method="POST" action="{{ url_for('report_submit_for_approval', report_id=report.id) }}" style="display: inline;" onsubmit="return confirm('Enviar relatório para aprovação?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-info">
+                                    <i class="fas fa-check-circle me-2"></i>Enviar para Aprovação
+                                </button>
+                            </form>
+                        {% elif report.status == 'Enviado' %}
+                            <span class="text-success">
+                                <i class="fas fa-check-circle me-1"></i>Relatório enviado em {{ report.data_envio.strftime('%d/%m/%Y às %H:%M') }}
+                            </span>
+                        {% else %}
+                            <span class="text-warning">
+                                <i class="fas fa-clock me-1"></i>{{ report.status }}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle me-2"></i>Informações do Relatório
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Obra:</strong> {{ report.projeto.nome }} ({{ report.projeto.numero }})</p>
+                        <p><strong>Autor:</strong> {{ report.autor.nome_completo }}</p>
+                        <p><strong>Data do Relatório:</strong> {{ report.data_relatorio|format_datetime_br('%d/%m/%Y') }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        {% if report.aprovador_nome %}
+                            <p><strong>Aprovador:</strong> {{ report.aprovador_nome }}</p>
+                        {% endif %}
+                        {% if report.visita %}
+                            <p><strong>Visita Relacionada:</strong> {{ report.visita.data_agendada.strftime('%d/%m/%Y às %H:%M') }}</p>
+                        {% endif %}
+                        <p><strong>Criado em:</strong> {{ report.created_at.strftime('%d/%m/%Y às %H:%M') }}</p>
+                        {% if report.envios %}
+                        <p><strong>Emails Enviados:</strong> <span class="badge bg-success">{{ report.envios|length }}</span></p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if report.conteudo %}
+                <div class="mt-3">
+                    <strong>Detalhes:</strong>
+                    <div class="mt-2 p-3 bg-light rounded">
+                        {{ report.conteudo.replace('\n', '<br>')|safe }}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% include 'reports/_detalhes_visita.html' %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Photos Gallery -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-images me-2"></i>Galeria de Fotos ({{ fotos|length }})
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if fotos %}
+                    <div class="row g-3 photo-gallery">
+                        {% for foto in fotos %}
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card photo-container">
+                                <img src="{{ url_for('get_imagem', id=foto.id) }}" 
+                                     class="card-img-top" 
+                                     style="height: 200px !important; object-fit: cover !important; width: 100% !important;" 
+                                     alt="{{ foto.titulo or 'Foto do relatório' }}">
+                                <div class="card-body p-2">
+                                    {% if foto.legenda %}
+                                        <h6 class="card-title small mb-1">{{ foto.legenda }}</h6>
+                                    {% elif foto.titulo %}
+                                        <h6 class="card-title small mb-1">{{ foto.titulo }}</h6>
+                                    {% endif %}
+                                    {% if foto.tipo_servico %}
+                                        <span class="badge bg-info mb-1" title="Categoria"><i class="fas fa-tag me-1"></i>{{ foto.tipo_servico }}</span>
+                                    {% endif %}
+                                    {% if foto.local %}
+                                        <span class="badge bg-secondary mb-1" title="Local"><i class="fas fa-map-marker-alt me-1"></i>{{ foto.local }}</span>
+                                    {% endif %}
+                                    {% if foto.descricao %}
+                                        <p class="card-text small text-muted mb-0">{{ foto.descricao }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Photo pagination info -->
+                    {% if fotos|length > 6 %}
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Layout para Relatório:</strong> As fotos serão organizadas automaticamente no relatório final com 2 fotos por página, identificadas por tipo de serviço.
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-images fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhuma imagem anexada</h5>
+                        <p class="text-muted">Este relatório não possui nenhuma imagem anexada.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Image modal functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const images = document.querySelectorAll('.card-img-top');
+    
+    images.forEach(img => {
+        img.style.cursor = 'pointer';
+        img.addEventListener('click', function() {
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.innerHTML = `
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Visualizar Foto</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <img src="${this.src}" class="img-fluid" alt="${this.alt}">
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+            
+            modal.addEventListener('hidden.bs.modal', function() {
+                document.body.removeChild(modal);
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+
+{% block title %}Salvar Backup no Google Drive{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-cloud-upload-alt me-2"></i>Salvar Backup no Google Drive
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% if not is_authenticated %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Autenticação necessária!</strong><br>
+                        Você precisa fazer login na sua conta Google para salvar backups.
+                    </div>
+                    
+                    <div class="text-center mb-4">
+                        <a href="{{ url_for('drive_oauth_start') }}" class="btn btn-lg btn-danger">
+                            <i class="fab fa-google me-2"></i>Fazer Login com Google
+                        </a>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>Conectado ao Google Drive!</strong><br>
+                        {{ connection_info }}
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Como funciona o backup:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Relatórios aprovados serão salvos na pasta <strong>"Relatorio"</strong></li>
+                            <li>Relatórios Express aprovados serão salvos na pasta <strong>"Relatorio Express"</strong></li>
+                            <li>Os PDFs são gerados automaticamente e enviados para o Google Drive</li>
+                        </ul>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-save me-2"></i>Salvar Backup de Todos os Relatórios</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">
+                                Clique no botão abaixo para salvar todos os relatórios aprovados no Google Drive.
+                                Esta operação pode demorar alguns minutos dependendo da quantidade de relatórios.
+                            </p>
+                            
+                            <button type="button" 
+                                    class="btn btn-success btn-lg" 
+                                    onclick="backupAllReports()"
+                                    {% if not is_authenticated %}disabled{% endif %}>
+                                <i class="fas fa-cloud-upload-alt me-2"></i>Salvar Backup Agora
+                            </button>
+                            
+                            {% if not is_authenticated %}
+                            <small class="text-muted d-block mt-2">
+                                Faça login com Google primeiro para habilitar esta funcionalidade.
+                            </small>
+                            {% endif %}
+                            
+                            <div id="backup-result" class="mt-3"></div>
+                            <div id="backup-progress" class="mt-3" style="display: none;">
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" 
+                                         style="width: 100%">
+                                        Processando backup...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-images me-2"></i>Salvar Backup de Todas as Fotos</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">
+                                Clique no botão abaixo para salvar TODAS as fotos do sistema no Google Drive, organizadas por obra e data.
+                                Esta operação pode demorar dependendo da quantidade de fotos.
+                            </p>
+                            <p class="text-muted">
+                                <strong>Organização:</strong> Backup Fotos / [Nome da Obra] / [Data - Tipo - Numero] / Fotos...
+                            </p>
+                            
+                            <button type="button" 
+                                    class="btn btn-info btn-lg" 
+                                    onclick="backupAllPhotos()"
+                                    {% if not is_authenticated %}disabled{% endif %}>
+                                <i class="fas fa-images me-2"></i>Salvar Backup de Fotos Agora
+                            </button>
+                            
+                            {% if not is_authenticated %}
+                            <small class="text-muted d-block mt-2">
+                                Faça login com Google primeiro para habilitar esta funcionalidade.
+                            </small>
+                            {% endif %}
+                            
+                            <div id="photos-backup-result" class="mt-3"></div>
+                            <div id="photos-backup-progress" class="mt-3" style="display: none;">
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" 
+                                         role="progressbar" 
+                                         style="width: 100%">
+                                        Processando backup de fotos...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-file-pdf me-2"></i>Relatórios Comuns</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-2">Destino: <strong>Relatorio/</strong></p>
+                                    <p class="mb-0">
+                                        <span class="badge bg-primary">{{ stats.relatorios_aprovados }} relatórios aprovados</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="fas fa-bolt me-2"></i>Relatórios Express</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted mb-2">Destino: <strong>Relatorio Express/</strong></p>
+                                    <p class="mb-0">
+                                        <span class="badge bg-warning text-dark">{{ stats.express_aprovados }} relatórios express aprovados</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                        </a>
+                        
+                        {% if is_authenticated %}
+                        <a href="{{ url_for('drive_oauth_logout') }}" class="btn btn-outline-danger">
+                            <i class="fas fa-sign-out-alt me-2"></i>Desconectar Google Drive
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function backupAllReports() {
+    const button = document.querySelector('button[onclick="backupAllReports()"]');
+    const resultDiv = document.getElementById('backup-result');
+    const progressDiv = document.getElementById('backup-progress');
+    
+    if (!confirm('Deseja fazer backup de todos os relatórios aprovados?\n\nOs PDFs serão salvos no Google Drive nas pastas:\n- Relatorio (para relatórios comuns)\n- Relatorio Express (para relatórios express)\n\nEsta operação pode demorar alguns minutos.')) {
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando backup...';
+    resultDiv.innerHTML = '';
+    progressDiv.style.display = 'block';
+
+    fetch('/admin/drive/backup-all-pdfs', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        progressDiv.style.display = 'none';
+        
+        if (data.success) {
+            let filesHtml = '';
+            
+            if (data.results && data.results.relatorios && data.results.relatorios.files) {
+                filesHtml += '<h6 class="mt-3">Relatórios salvos:</h6><ul class="list-unstyled">';
+                data.results.relatorios.files.forEach(file => {
+                    filesHtml += `<li><i class="fas fa-check text-success me-2"></i>${file.filename}</li>`;
+                });
+                filesHtml += '</ul>';
+            }
+            
+            if (data.results && data.results.express && data.results.express.files) {
+                filesHtml += '<h6 class="mt-3">Relatórios Express salvos:</h6><ul class="list-unstyled">';
+                data.results.express.files.forEach(file => {
+                    filesHtml += `<li><i class="fas fa-check text-success me-2"></i>${file.filename}</li>`;
+                });
+                filesHtml += '</ul>';
+            }
+            
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Backup concluído com sucesso!</strong><br>
+                    ${data.message}
+                    ${data.detalhes ? `<br><small class="text-muted">${data.detalhes}</small>` : ''}
+                    ${filesHtml}
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle me-2"></i>
+                    <strong>Erro no backup:</strong><br>
+                    ${data.message || data.error || 'Erro desconhecido'}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        progressDiv.style.display = 'none';
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Erro na comunicação:</strong><br>
+                Não foi possível conectar ao servidor. Tente novamente.
+            </div>
+        `;
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-cloud-upload-alt me-2"></i>Salvar Backup Agora';
+    });
+}
+
+function backupAllPhotos() {
+    const button = document.querySelector('button[onclick="backupAllPhotos()"]');
+    const resultDiv = document.getElementById('photos-backup-result');
+    const progressDiv = document.getElementById('photos-backup-progress');
+    
+    if (!confirm('Deseja fazer backup de TODAS as fotos do sistema?\n\nAs fotos serão organizadas por Obra e Data no Google Drive.\n\nEsta operação pode demorar vários minutos.')) {
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando fotos...';
+    resultDiv.innerHTML = '';
+    progressDiv.style.display = 'block';
+
+    fetch('/admin/drive/backup-photos', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        progressDiv.style.display = 'none';
+        
+        if (data.success) {
+            const photos = data.results.photos;
+            const totalMB = (photos.bytes / (1024 * 1024)).toFixed(2);
+            
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <strong>Backup de fotos concluído!</strong><br>
+                    ${data.message}<br>
+                    <hr>
+                    <ul class="mb-0">
+                        <li>Total de fotos processadas: ${photos.total}</li>
+                        <li>Fotos enviadas: ${photos.success}</li>
+                        <li>Fotos já existentes (puladas): ${photos.skipped}</li>
+                        <li>Erros: ${photos.failed}</li>
+                        <li>Total transferido: ${totalMB} MB</li>
+                    </ul>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-times-circle me-2"></i>
+                    <strong>Erro no backup de fotos:</strong><br>
+                    ${data.message || data.error || 'Erro desconhecido'}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        progressDiv.style.display = 'none';
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Erro na comunicação:</strong><br>
+                Não foi possível conectar ao servidor. Tente novamente.
+            </div>
+        `;
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-images me-2"></i>Salvar Backup de Fotos Agora';
+    });
+}
+</script>
+{% endblock %}

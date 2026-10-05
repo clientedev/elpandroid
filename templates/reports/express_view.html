@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Relatório Express - {{ relatorio.numero }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fas fa-bolt text-warning fs-4"></i>
+                            <h4 class="mb-0">{{ relatorio.numero }}</h4>
+                        </div>
+                        <div>
+                            {% if relatorio.status == 'Em preenchimento' %}
+                                <span class="badge bg-warning text-dark px-3 py-2">Em preenchimento</span>
+                            {% elif relatorio.status == 'Aprovado' %}
+                                <span class="badge bg-success px-3 py-2">Aprovado</span>
+                            {% elif relatorio.status == 'Rejeitado' %}
+                                <span class="badge bg-danger px-3 py-2">Rejeitado</span>
+                            {% elif relatorio.status == 'Aguardando Aprovação' %}
+                                <span class="badge bg-info px-3 py-2">Aguardando Aprovação</span>
+                            {% else %}
+                                <span class="badge bg-secondary px-3 py-2">{{ relatorio.status }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="p-3 rounded border bg-light">
+                                <h5 class="text-dark mb-3"><i class="fas fa-building me-2 text-primary"></i>Dados da Obra</h5>
+                                <div class="row text-dark">
+                                    <div class="col-md-6 mb-2">
+                                        <strong>Nome:</strong> {{ relatorio.obra_nome }}
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <strong>Cliente:</strong> {{ relatorio.obra_construtora or 'Não informado' }}
+                                    </div>
+                                    <div class="col-md-12 mb-2">
+                                        <strong>Endereço:</strong> {{ relatorio.obra_endereco or 'Não informado' }}
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <strong>Tipo:</strong> {{ relatorio.obra_tipo or 'Não informado' }}
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <strong>Responsável:</strong> {{ relatorio.obra_responsavel or 'Não informado' }}
+                                    </div>
+                                    <div class="col-md-4 mb-2">
+                                        <strong>Telefone:</strong> {{ relatorio.obra_telefone or 'Não informado' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="accordion" id="accordionTechnical">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="headingTechnical">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTechnical" aria-expanded="false" aria-controls="collapseTechnical">
+                                            <i class="fas fa-hammer me-2 text-primary"></i>Informações Técnicas da Obra
+                                        </button>
+                                    </h2>
+                                    <div id="collapseTechnical" class="accordion-collapse collapse" aria-labelledby="headingTechnical" data-bs-parent="#accordionTechnical">
+                                        <div class="accordion-body">
+                                            <div class="row">
+                                                {% set info = tech_info if tech_info is defined else {} %}
+                                                
+                                                {% set labels = {
+                                                    'elementos_construtivos_base': 'Elementos construtivos da base',
+                                                    'especificacao_chapisco_colante': 'Especificação chapisco colante',
+                                                    'especificacao_chapisco_alvenaria': 'Especificação chapisco da alvenaria',
+                                                    'especificacao_argamassa_emboco': 'Especificação da argamassa de emboço',
+                                                    'forma_aplicacao_argamassa': 'Forma da aplicação da argamassa de emboço',
+                                                    'acabamentos_revestimento': 'Acabamentos do revestimento',
+                                                    'acabamento_peitoris': 'Acabamento em peitoris de janela',
+                                                    'acabamento_muretas': 'Acabamento em muretas de terraços',
+                                                    'definicao_frisos_cor': 'Definição sobre frisos de mudança de cor de textura',
+                                                    'definicao_face_inferior_abas': 'Definição sobre face inferior de abas e varandas',
+                                                    'observacoes_projeto_fachada': 'Observações do projeto da fachada',
+                                                    'outras_observacoes': 'Outras observações'
+                                                } %}
+                                                
+                                                {% for key, label in labels.items() %}
+                                                <div class="col-md-6 mb-3">
+                                                    <strong>{{ label }}:</strong>
+                                                    <p class="mb-0 text-muted">{{ info[key] or 'Não informado' }}</p>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6 mb-3">
+                            <h5><i class="fas fa-file-alt me-2 text-primary"></i>Título</h5>
+                            <p class="mb-0">{{ relatorio.titulo }}</p>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <h5><i class="fas fa-calendar-alt me-2 text-primary"></i>Data</h5>
+                            <p class="mb-0">{{ relatorio.data_relatorio.strftime('%d/%m/%Y') if relatorio.data_relatorio else 'Não informada' }}</p>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <h5><i class="fas fa-user me-2 text-primary"></i>Autor</h5>
+                            <p class="mb-0">{{ relatorio.autor.nome_completo if relatorio.autor else 'Não informado' }}</p>
+                        </div>
+                    </div>
+
+                    {% if relatorio.acompanhantes %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-users me-2 text-primary"></i>Funcionários da Visita</h5>
+                            <div class="row">
+                                {% for acomp in relatorio.acompanhantes %}
+                                <div class="col-md-12 mb-2">
+                                    <div class="border rounded p-2 bg-light d-flex justify-content-between align-items-center">
+                                        <strong>{{ acomp.nome }}</strong>
+                                        <span class="text-muted">{{ acomp.cargo or '' }}</span>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if relatorio.conteudo %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-clipboard me-2 text-primary"></i>Observações Gerais</h5>
+                            <div class="border rounded p-3 bg-light">
+                                {{ relatorio.conteudo | nl2br | safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if relatorio.checklist_data %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-tasks me-2 text-primary"></i>Checklist</h5>
+                            <div class="border rounded p-3">
+                                {% set checklist = relatorio.checklist_data | from_json if relatorio.checklist_data else [] %}
+                                {% set has_checked = namespace(value=false) %}
+                                {% for item in checklist %}
+                                    {% if item.checked or item.completed %}
+                                        {% set has_checked.value = true %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if has_checked.value %}
+                                    {% for item in checklist %}
+                                        {% if item.checked or item.completed %}
+                                        <div class="mb-2 p-2 bg-success bg-opacity-10 border border-success rounded">
+                                            <div class="d-flex align-items-start">
+                                                <i class="fas fa-check-circle text-success me-2 mt-1"></i>
+                                                <div>
+                                                    <span class="fw-bold">{{ item.item | replace('_', ' ') | title }}</span>
+                                                    {% if item.observacao or item.observations %}
+                                                    <p class="mb-0 text-muted small mt-1">{{ item.observacao or item.observations }}</p>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted mb-0"><i class="fas fa-info-circle me-1"></i>Nenhum item do checklist foi selecionado.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if fotos %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5><i class="fas fa-camera me-2 text-primary"></i>Fotos ({{ fotos | length }})</h5>
+                            <div class="row">
+                                {% for foto in fotos %}
+                                <div class="col-12 mb-3">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="position-relative">
+
+                                            <span class="badge bg-primary position-absolute top-0 start-0 m-2" style="z-index: 10;">
+                                                Foto {{ loop.index }}
+                                            </span>
+                                            <img src="{{ foto.url }}" class="card-img-top" alt="Foto {{ loop.index }}" 
+                                                 style="height: 200px; object-fit: cover;"
+                                                 onerror="this.src='/static/images/placeholder.png'">
+                                        </div>
+                                        <div class="card-body p-2">
+                                            {% if foto.local %}
+                                            <div class="mb-1">
+                                                <small class="text-muted">
+                                                    <i class="fas fa-map-marker-alt text-warning me-1"></i>
+                                                    <strong>Local:</strong> {{ foto.local }}
+                                                </small>
+                                            </div>
+                                            {% endif %}
+                                            {% if foto.legenda %}
+                                            <div>
+                                                <small class="text-dark">
+                                                    <i class="fas fa-tag text-info me-1"></i>
+                                                    <strong>Legenda:</strong> {{ foto.legenda }}
+                                                </small>
+                                            </div>
+                                            {% else %}
+                                            <small class="text-muted"><em>Sem legenda</em></small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if relatorio.status == 'Rejeitado' and relatorio.comentario_aprovacao %}
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-circle me-2"></i>Motivo da Rejeição</h5>
+                        <p class="mb-0">{{ relatorio.comentario_aprovacao }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if relatorio.status == 'Aprovado' and relatorio.aprovador %}
+                    <div class="alert alert-success">
+                        <h5><i class="fas fa-check-circle me-2"></i>Aprovado</h5>
+                        <p class="mb-0">
+                            Aprovado por <strong>{{ relatorio.aprovador.nome_completo }}</strong>
+                            {% if relatorio.data_aprovacao %}
+                            em {{ relatorio.data_aprovacao.strftime('%d/%m/%Y às %H:%M') }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+
+                    <hr class="my-4">
+
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <a href="{{ url_for('express_reports_list') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Voltar
+                        </a>
+                        
+                        <div class="d-flex gap-2 flex-wrap">
+                            {% if relatorio.status != 'Aprovado' %}
+                            <a href="{{ url_for('edit_express_report', report_id=relatorio.id) }}" class="btn btn-primary">
+                                <i class="fas fa-edit me-1"></i>Editar Relatório
+                            </a>
+                            {% endif %}
+                            
+                            {% if relatorio.status == 'Aprovado' %}
+                            <a href="{{ url_for('duplicate_express_report', report_id=relatorio.id) }}" class="btn btn-info">
+                                <i class="fas fa-copy me-1"></i>Duplicar Relatório
+                            </a>
+                            <div class="btn-group">
+                                <a href="{{ url_for('generate_express_pdf', report_id=relatorio.id) }}" class="btn btn-success" target="_blank">
+                                    <i class="fas fa-file-pdf me-1"></i>Visualizar PDF
+                                </a>
+                                <a href="{{ url_for('download_express_pdf', report_id=relatorio.id) }}" class="btn btn-success">
+                                    <i class="fas fa-download me-1"></i>Baixar PDF
+                                </a>
+                            </div>
+                            {% endif %}
+                            
+                            {% if relatorio.status == 'Aguardando Aprovação' and pode_aprovar %}
+                            <form action="{{ url_for('approve_express_report', report_id=relatorio.id) }}" method="POST" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-check me-1"></i>Aprovar
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModalView">
+                                <i class="fas fa-times me-1"></i>Rejeitar
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if relatorio.status == 'Aguardando Aprovação' and pode_aprovar %}
+<div class="modal fade" id="rejectModalView" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('reject_express_report', report_id=relatorio.id) }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-times-circle text-danger me-2"></i>Rejeitar Relatório</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Você está rejeitando o relatório <strong>{{ relatorio.numero }}</strong>.</p>
+                    <div class="mb-3">
+                        <label class="form-label">Motivo da rejeição:</label>
+                        <textarea name="comentario_rejeicao" class="form-control" rows="3" 
+                                  placeholder="Descreva o motivo da rejeição..." required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-times me-1"></i>Confirmar Rejeição
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

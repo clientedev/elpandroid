@@ -1,0 +1,1026 @@
+{% extends "base.html" %}
+
+{% block title %}Editor de Fotos{% endblock %}
+
+{% block head %}
+<style>
+#preview-container {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f8f9fa;
+    text-align: center;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#photoCanvas {
+    max-width: 100%;
+    max-height: 600px;
+    border: 1px solid #ccc;
+    cursor: crosshair;
+    background: white;
+    /* Otimizações para mobile */
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.tool-group {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.tool-btn {
+    margin: 8px 4px;
+    min-width: 60px;
+    /* Melhorias para mobile - área de toque maior */
+    min-height: 50px;
+    padding: 12px 16px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+@media (max-width: 767.98px) {
+    .tool-btn {
+        margin: 6px 3px;
+        min-height: 56px; /* Maior área de toque no mobile */
+        min-width: 80px;
+        font-size: 14px;
+    }
+    
+    /* Canvas otimizado para mobile */
+    #photoCanvas {
+        max-height: 50vh;
+        width: 100%;
+        /* Melhorar precisão touch */
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        /* Adicionar feedback visual para touch */
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 2px solid #ddd;
+    }
+    
+    /* Melhorar área de controles em mobile */
+    .tool-group {
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    /* Ajustar slider para mobile */
+    #brushSize {
+        height: 8px;
+        -webkit-appearance: none;
+        background: #ddd;
+        border-radius: 5px;
+        outline: none;
+    }
+    
+    #brushSize::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #007bff;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    #brushSize::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #007bff;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+}
+
+.tool-btn.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.annotation-info {
+    background: #e8f4f8;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.color-preset {
+    width: 30px;
+    height: 30px;
+    border: 2px solid #ddd;
+    border-radius: 50%;
+    margin: 4px;
+    cursor: pointer;
+    display: inline-block;
+    /* Melhorias para mobile - área de toque maior */
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (max-width: 767.98px) {
+    .color-preset {
+        min-width: 50px;
+        min-height: 50px;
+        margin: 6px;
+        border-width: 3px;
+    }
+    
+    .color-preset:hover, .color-preset:active {
+        transform: scale(1.1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+}
+
+.color-preset:hover,
+.color-preset:focus {
+    border-color: #007bff;
+    transform: scale(1.1);
+}
+
+/* Media queries para mobile */
+@media (max-width: 768px) {
+    .tool-btn {
+        min-width: 50px;
+        min-height: 50px;
+        margin: 3px;
+        font-size: 14px;
+    }
+    
+    .color-preset {
+        min-width: 45px;
+        min-height: 45px;
+        margin: 3px;
+    }
+    
+    #preview-container {
+        min-height: 300px;
+        padding: 5px;
+    }
+    
+    .tool-group {
+        margin-bottom: 15px;
+        padding: 10px;
+    }
+    
+    /* Aumentar area de toque no mobile */
+    .btn {
+        min-height: 44px;
+        padding: 12px 16px;
+    }
+}
+
+/* Prevenir zoom duplo-toque no iOS */
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+    .tool-btn,
+    .color-preset,
+    .btn {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h3><i class="fas fa-edit"></i> Editor de Fotos</h3>
+                <div>
+                    <button onclick="saveAnnotatedPhoto()" class="btn btn-success me-2">
+                        <i class="fas fa-save"></i> Salvar Anotações
+                    </button>
+                    <button onclick="window.close()" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Painel de Ferramentas -->
+        <div class="col-md-3">
+            <div class="tools-panel">
+                <!-- Ferramentas de Desenho -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Ferramentas:</label><br>
+                    <button type="button" class="btn btn-outline-primary tool-btn active" data-tool="pen">
+                        <i class="fas fa-pen"></i> Pincel
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="arrow">
+                        <i class="fas fa-arrow-right"></i> Seta
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="circle">
+                        <i class="fas fa-circle"></i> Círculo
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="rectangle">
+                        <i class="fas fa-square"></i> Retângulo
+                    </button>
+                    <button type="button" class="btn btn-outline-primary tool-btn" data-tool="text">
+                        <i class="fas fa-font"></i> Texto
+                    </button>
+                </div>
+
+                <!-- Cores -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Cor:</label><br>
+                    <input type="color" id="colorPicker" value="#ff0000" class="form-control mb-2">
+                    <div>
+                        <span class="color-preset" style="background-color: #ff0000;" onclick="setColor('#ff0000')"></span>
+                        <span class="color-preset" style="background-color: #00ff00;" onclick="setColor('#00ff00')"></span>
+                        <span class="color-preset" style="background-color: #0000ff;" onclick="setColor('#0000ff')"></span>
+                        <span class="color-preset" style="background-color: #ffff00;" onclick="setColor('#ffff00')"></span>
+                        <span class="color-preset" style="background-color: #000000;" onclick="setColor('#000000')"></span>
+                    </div>
+                </div>
+
+                <!-- Tamanho -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Tamanho:</label>
+                    <input type="range" id="brushSize" min="1" max="20" value="3" class="form-control">
+                    <small class="text-muted">Tamanho: <span id="sizeDisplay">3px</span></small>
+                </div>
+
+                <!-- Ações -->
+                <div class="tool-group">
+                    <label class="form-label fw-bold">Ações:</label><br>
+                    <button type="button" class="btn btn-outline-warning tool-btn" onclick="undoLastAction()">
+                        <i class="fas fa-undo"></i> Desfazer
+                    </button>
+                    <button type="button" class="btn btn-outline-danger tool-btn" onclick="clearCanvas()">
+                        <i class="fas fa-trash"></i> Limpar
+                    </button>
+                </div>
+
+                <!-- Informações da Foto -->
+                <div class="annotation-info">
+                    <h6><i class="fas fa-info-circle"></i> Informações</h6>
+                    
+                    <!-- Seletor de Legendas Pré-definidas -->
+                    <div class="mb-3">
+                        <label class="form-label">Legenda Pré-definida:</label>
+                        <div class="row">
+                            <div class="col-8">
+                                <select id="predefinedCaptionSelect" class="form-control">
+                                    <option value="">Selecione uma legenda...</option>
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <select id="captionCategoryFilter" class="form-control">
+                                    <option value="all">Todas</option>
+                                    <option value="Geral">Geral</option>
+                                    <option value="Estrutural">Estrutural</option>
+                                    <option value="Hidráulica">Hidráulica</option>
+                                    <option value="Elétrica">Elétrica</option>
+                                    <option value="Acabamentos">Acabamentos</option>
+                                    <option value="Segurança">Segurança</option>
+                                    <option value="Fachada">Fachada</option>
+                                    <option value="Impermeabilização">Impermeabilização</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-text">Escolha uma legenda padrão ou digite uma personalizada abaixo</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Legenda Personalizada:</label>
+                        <textarea id="photoCaption" class="form-control" rows="2" placeholder="Digite uma legenda personalizada ou use uma pré-definida acima..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Categoria:</label>
+                        <select id="photoCategory" class="form-control">
+                            <option value="Geral">Geral</option>
+                            <option value="Estrutural">Estrutural</option>
+                            <option value="Hidráulica">Hidráulica</option>
+                            <option value="Elétrica">Elétrica</option>
+                            <option value="Acabamentos">Acabamentos</option>
+                            <option value="Segurança">Segurança</option>
+                            <option value="Fachada">Fachada</option>
+                            <option value="Impermeabilização">Impermeabilização</option>
+                            <option value="Problema">Problema</option>
+                            <option value="Geral">Vista Geral</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrição:</label>
+                        <textarea id="photoDescription" class="form-control" rows="3" placeholder="Descrição detalhada..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas de Edição -->
+        <div class="col-md-9">
+            <div id="preview-container">
+                <canvas id="photoCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para entrada de texto -->
+<div class="modal fade" id="textModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adicionar Texto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Texto:</label>
+                    <input type="text" id="textInput" class="form-control" placeholder="Digite o texto...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Tamanho da Fonte:</label>
+                    <select id="fontSize" class="form-control">
+                        <option value="12">12px</option>
+                        <option value="16" selected>16px</option>
+                        <option value="20">20px</option>
+                        <option value="24">24px</option>
+                        <option value="32">32px</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="addTextToCanvas()">Adicionar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variáveis globais
+let canvas, ctx;
+let isDrawing = false;
+let currentTool = 'pen';
+let currentColor = '#ff0000';
+let currentSize = 3;
+let startX = 0;
+let startY = 0;
+let originalImageData;
+let actions = [];
+let currentAction = [];
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCanvas();
+    loadImageFromUrlOrStorage();
+    setupEventListeners();
+    loadPredefinedCaptions();
+});
+
+function initializeCanvas() {
+    canvas = document.getElementById('photoCanvas');
+    ctx = canvas.getContext('2d');
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+}
+
+function loadImageFromUrlOrStorage() {
+    // Primeiro tentar obter do sessionStorage
+    const storedData = sessionStorage.getItem('photoEditorData');
+    if (storedData) {
+        try {
+            const photoData = JSON.parse(storedData);
+            if (photoData.imageData) {
+                loadImageToCanvas(photoData.imageData);
+                
+                // Preencher campos se disponíveis
+                if (photoData.caption) {
+                    document.getElementById('photoCaption').value = photoData.caption;
+                }
+                if (photoData.category) {
+                    document.getElementById('photoCategory').value = photoData.category;
+                }
+                return;
+            }
+        } catch (e) {
+            console.warn('Erro ao carregar dados do sessionStorage:', e);
+        }
+    }
+    
+    // Fallback para URL params
+    loadImageFromUrl();
+}
+
+function loadImageToCanvas(imageSrc) {
+    if (!imageSrc) {
+        console.warn('ImageSrc está vazio');
+        return;
+    }
+    
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = function() {
+        // Ajustar canvas para o tamanho da imagem
+        const maxWidth = 800;
+        const maxHeight = 600;
+        let { width, height } = img;
+        
+        // Redimensionar se necessário
+        if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+        }
+        if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Desenhar imagem no canvas
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Salvar estado original
+        originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        console.log('Imagem carregada com sucesso no canvas');
+    };
+    
+    img.onerror = function() {
+        console.error('Erro ao carregar imagem:', imageSrc);
+        alert('Erro ao carregar a imagem. Verifique se o arquivo é válido.');
+    };
+    
+    img.src = imageSrc;
+}
+
+function loadImageFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const imageUrl = urlParams.get('image');
+    const caption = urlParams.get('caption');
+    const category = urlParams.get('category');
+    
+    if (imageUrl) {
+        loadImageToCanvas(decodeURIComponent(imageUrl));
+    }
+    
+    // Preencher informações se disponíveis
+    if (caption) document.getElementById('photoCaption').value = decodeURIComponent(caption);
+    if (category) document.getElementById('photoCategory').value = decodeURIComponent(category);
+    
+    // Setup predefined captions listeners
+    setupCaptionListeners();
+}
+
+function setupEventListeners() {
+    // Ferramentas
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentTool = this.dataset.tool;
+            
+            canvas.style.cursor = currentTool === 'text' ? 'text' : 'crosshair';
+            console.log('Ferramenta selecionada:', currentTool);
+        });
+    });
+    
+    // Cor
+    document.getElementById('colorPicker').addEventListener('change', function() {
+        currentColor = this.value;
+    });
+    
+    // Tamanho
+    document.getElementById('brushSize').addEventListener('input', function() {
+        currentSize = parseInt(this.value);
+        document.getElementById('sizeDisplay').textContent = this.value + 'px';
+    });
+    
+    // Canvas Events para Desktop
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseout', stopDrawing);
+    
+    // Touch events para Mobile (com configurações otimizadas para máxima precisão)
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+    canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+    
+    // Prevenir zoom e scroll no mobile durante edição
+    canvas.addEventListener('gesturestart', e => e.preventDefault());
+    canvas.addEventListener('gesturechange', e => e.preventDefault());
+    canvas.addEventListener('gestureend', e => e.preventDefault());
+    
+    // Adicionar eventos específicos para iOS Safari
+    canvas.addEventListener('touchforcechange', e => e.preventDefault());
+    
+    // Prevenir context menu em toque longo
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    
+    // ELIMINAR COMPLETAMENTE VIBRAÇÃO E FEEDBACK INDESEJADO
+    document.body.style.touchAction = 'manipulation';
+    document.documentElement.style.touchAction = 'manipulation';
+    
+    // Prevenir zoom duplo-toque em iOS
+    let lastTouchEnd = 0;
+    canvas.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, false);
+}
+
+function startDrawing(e) {
+    if (currentTool === 'text') {
+        handleTextTool(e);
+        return;
+    }
+    
+    isDrawing = true;
+    const [x, y] = getMousePos(e);
+    startX = x;
+    startY = y;
+    
+    if (currentTool === 'pen') {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        currentAction = [];
+    }
+    
+    console.log('Iniciando desenho:', currentTool, 'em', x, y);
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    
+    const [x, y] = getMousePos(e);
+    
+    if (currentTool === 'pen') {
+        ctx.strokeStyle = currentColor;
+        ctx.lineWidth = currentSize;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+        
+        currentAction.push({
+            tool: 'pen',
+            x: x,
+            y: y,
+            color: currentColor,
+            size: currentSize
+        });
+    } else {
+        // Para outras ferramentas, redesenhar canvas com preview
+        redrawCanvas();
+        
+        // Desenhar preview da ferramenta atual
+        drawToolPreview(startX, startY, x, y);
+    }
+}
+
+function drawToolPreview(startX, startY, endX, endY) {
+    // Salvar contexto atual
+    ctx.save();
+    
+    // Configurar estilo para preview (mais transparente)
+    ctx.globalAlpha = 0.8;
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    
+    if (currentTool === 'arrow') {
+        drawArrow(startX, startY, endX, endY);
+    } else if (currentTool === 'circle') {
+        drawCircle(startX, startY, endX, endY);
+    } else if (currentTool === 'rectangle') {
+        drawRectangle(startX, startY, endX, endY);
+    }
+    
+    // Restaurar contexto
+    ctx.restore();
+}
+
+function stopDrawing(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+    
+    const [x, y] = getMousePos(e);
+    
+    if (currentTool === 'pen' && currentAction.length > 0) {
+        actions.push([...currentAction]);
+    } else if (currentTool === 'arrow') {
+        actions.push([{
+            tool: 'arrow',
+            startX: startX,
+            startY: startY,
+            endX: x,
+            endY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    } else if (currentTool === 'circle') {
+        actions.push([{
+            tool: 'circle',
+            centerX: startX,
+            centerY: startY,
+            radius: Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)),
+            color: currentColor,
+            size: currentSize
+        }]);
+    } else if (currentTool === 'rectangle') {
+        actions.push([{
+            tool: 'rectangle',
+            startX: startX,
+            startY: startY,
+            endX: x,
+            endY: y,
+            color: currentColor,
+            size: currentSize
+        }]);
+    }
+    
+    console.log('Finalizando desenho. Total de ações:', actions.length);
+}
+
+function drawArrow(fromX, fromY, toX, toY) {
+    // Otimizar tamanho da cabeça da seta baseado na linha e dispositivo
+    const lineLength = Math.sqrt(Math.pow(toX - fromX, 2) + Math.pow(toY - fromY, 2));
+    const isMobile = window.innerWidth <= 768;
+    
+    // Ajustar tamanho da cabeça da seta para mobile (proporcionalmente maior para melhor visibilidade)
+    let headLength = Math.max(10, Math.min(25, lineLength * 0.2));
+    if (isMobile) {
+        headLength = Math.max(12, Math.min(30, lineLength * 0.25));
+    }
+    
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    
+    // Linha principal
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    
+    // Ponta da seta - ângulo otimizado para mobile
+    const arrowAngle = Math.PI / 6; // 30 graus
+    ctx.lineTo(toX - headLength * Math.cos(angle - arrowAngle), toY - headLength * Math.sin(angle - arrowAngle));
+    ctx.moveTo(toX, toY);
+    ctx.lineTo(toX - headLength * Math.cos(angle + arrowAngle), toY - headLength * Math.sin(angle + arrowAngle));
+    
+    ctx.stroke();
+}
+
+function drawCircle(centerX, centerY, edgeX, edgeY) {
+    const radius = Math.sqrt(Math.pow(edgeX - centerX, 2) + Math.pow(edgeY - centerY, 2));
+    
+    // Garantir raio mínimo para visibilidade em mobile
+    const minRadius = window.innerWidth <= 768 ? 8 : 5;
+    const finalRadius = Math.max(minRadius, radius);
+    
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, finalRadius, 0, 2 * Math.PI);
+    ctx.stroke();
+}
+
+function drawRectangle(startX, startY, endX, endY) {
+    // Garantir dimensões mínimas para visibilidade em mobile
+    const minSize = window.innerWidth <= 768 ? 10 : 5;
+    const width = endX - startX;
+    const height = endY - startY;
+    
+    // Ajustar coordenadas se o retângulo for muito pequeno
+    if (Math.abs(width) < minSize) {
+        endX = startX + (width >= 0 ? minSize : -minSize);
+    }
+    if (Math.abs(height) < minSize) {
+        endY = startY + (height >= 0 ? minSize : -minSize);
+    }
+    
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = currentSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.rect(startX, startY, endX - startX, endY - startY);
+    ctx.stroke();
+}
+
+function handleTextTool(e) {
+    const [x, y] = getMousePos(e);
+    window.textPosition = { x, y };
+    
+    const modal = new bootstrap.Modal(document.getElementById('textModal'));
+    modal.show();
+}
+
+function addTextToCanvas() {
+    const text = document.getElementById('textInput').value;
+    const fontSize = document.getElementById('fontSize').value;
+    const { x, y } = window.textPosition;
+    
+    if (text.trim()) {
+        ctx.fillStyle = currentColor;
+        ctx.font = `${fontSize}px Arial`;
+        ctx.fillText(text, x, y);
+        
+        actions.push([{
+            tool: 'text',
+            text: text,
+            x: x,
+            y: y,
+            color: currentColor,
+            fontSize: fontSize
+        }]);
+    }
+    
+    // Fechar modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('textModal'));
+    modal.hide();
+    
+    // Limpar campo
+    document.getElementById('textInput').value = '';
+}
+
+function getMousePos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    // Para eventos touch, usar coordenadas do touch com precisão máxima
+    let clientX, clientY;
+    
+    if (e.touches && e.touches.length > 0) {
+        // Touch events - usar as coordenadas do primeiro toque
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    } else if (e.changedTouches && e.changedTouches.length > 0) {
+        // TouchEnd events - usar changedTouches
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+    } else {
+        // Mouse events
+        clientX = e.clientX;
+        clientY = e.clientY;
+    }
+    
+    // Calcular coordenadas precisas no canvas
+    const x = Math.round((clientX - rect.left) * scaleX);
+    const y = Math.round((clientY - rect.top) * scaleY);
+    
+    // Garantir que as coordenadas estão dentro dos limites do canvas
+    return [
+        Math.max(0, Math.min(canvas.width, x)),
+        Math.max(0, Math.min(canvas.height, y))
+    ];
+}
+
+// Touch Events Simplificados - Máxima Precisão
+function handleTouchStart(e) {
+    e.preventDefault();
+    if (e.touches.length !== 1) return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    
+    // Calcular coordenadas simples e precisas
+    const x = (touch.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (touch.clientY - rect.top) * (canvas.height / rect.height);
+    
+    // Criar evento simplificado
+    const simpleEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+    };
+    
+    startDrawing(simpleEvent);
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (e.touches.length !== 1 || !isDrawing) return;
+    
+    const touch = e.touches[0];
+    
+    // Evento simplificado
+    const simpleEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+    };
+    
+    draw(simpleEvent);
+}
+
+function handleTouchEnd(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const touch = e.changedTouches ? e.changedTouches[0] : null;
+    if (!touch) return;
+    
+    // Evento simplificado
+    const simpleEvent = {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+    };
+    
+    stopDrawing(simpleEvent);
+}
+
+function setColor(color) {
+    currentColor = color;
+    document.getElementById('colorPicker').value = color;
+}
+
+function undoLastAction() {
+    if (actions.length > 0) {
+        actions.pop();
+        redrawCanvas();
+        console.log('Última ação desfeita');
+    }
+}
+
+function clearCanvas() {
+    if (confirm('Tem certeza que deseja limpar todas as anotações?')) {
+        actions = [];
+        redrawCanvas();
+    }
+}
+
+function redrawCanvas() {
+    if (!originalImageData) return;
+    
+    // Restaurar imagem original
+    ctx.putImageData(originalImageData, 0, 0);
+    
+    // Redesenhar todas as ações
+    actions.forEach(action => {
+        if (action.length > 0) {
+            const firstStep = action[0];
+            
+            if (firstStep.tool === 'pen') {
+                ctx.strokeStyle = firstStep.color;
+                ctx.lineWidth = firstStep.size;
+                ctx.beginPath();
+                ctx.moveTo(firstStep.x, firstStep.y);
+                
+                action.forEach(step => {
+                    ctx.lineTo(step.x, step.y);
+                });
+                ctx.stroke();
+                
+            } else if (firstStep.tool === 'arrow') {
+                const oldColor = currentColor;
+                const oldSize = currentSize;
+                currentColor = firstStep.color;
+                currentSize = firstStep.size;
+                drawArrow(firstStep.startX, firstStep.startY, firstStep.endX, firstStep.endY);
+                currentColor = oldColor;
+                currentSize = oldSize;
+                
+            } else if (firstStep.tool === 'circle') {
+                ctx.strokeStyle = firstStep.color;
+                ctx.lineWidth = firstStep.size;
+                ctx.beginPath();
+                ctx.arc(firstStep.centerX, firstStep.centerY, firstStep.radius, 0, 2 * Math.PI);
+                ctx.stroke();
+                
+            } else if (firstStep.tool === 'rectangle') {
+                ctx.strokeStyle = firstStep.color;
+                ctx.lineWidth = firstStep.size;
+                ctx.beginPath();
+                ctx.rect(firstStep.startX, firstStep.startY, firstStep.endX - firstStep.startX, firstStep.endY - firstStep.startY);
+                ctx.stroke();
+                
+            } else if (firstStep.tool === 'text') {
+                ctx.fillStyle = firstStep.color;
+                ctx.font = `${firstStep.fontSize}px Arial`;
+                ctx.fillText(firstStep.text, firstStep.x, firstStep.y);
+            }
+        }
+    });
+}
+
+function saveAnnotatedPhoto() {
+    // Capturar dados da imagem anotada com compressão
+    const imageData = canvas.toDataURL('image/jpeg', 0.7);
+    const caption = document.getElementById('photoCaption').value;
+    const category = document.getElementById('photoCategory').value;
+    const description = document.getElementById('photoDescription').value;
+    
+    // Obter photoId do sessionStorage ou URL
+    let photoId = null;
+    const storedData = sessionStorage.getItem('photoEditorData');
+    if (storedData) {
+        try {
+            const photoData = JSON.parse(storedData);
+            photoId = photoData.photoId;
+        } catch (e) {
+            console.warn('Erro ao obter photoId do sessionStorage:', e);
+        }
+    }
+    
+    if (!photoId) {
+        photoId = new URLSearchParams(window.location.search).get('photoId');
+    }
+    
+    // Enviar dados para a janela pai usando postMessage
+    if (window.opener) {
+        window.opener.postMessage({
+            type: 'photo-edited',
+            photoId: photoId,
+            imageData: imageData,
+            caption: caption,
+            category: category,
+            description: description,
+            annotations: actions
+        }, '*');
+        
+        // Limpar sessionStorage
+        sessionStorage.removeItem('photoEditorData');
+        window.close();
+    } else {
+        alert('Erro: Janela pai não encontrada.');
+    }
+}
+
+// Carregar legendas pré-definidas
+function loadPredefinedCaptions(categoria = 'all') {
+    fetch(`/api/legendas?categoria=${categoria}`)
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('predefinedCaptionSelect');
+            select.innerHTML = '<option value="">Selecione uma legenda...</option>';
+            
+            if (data.success) {
+                data.legendas.forEach(legenda => {
+                    const option = document.createElement('option');
+                    option.value = legenda.texto;
+                    option.textContent = `${legenda.texto} (${legenda.categoria})`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar legendas:', error);
+        });
+}
+
+// Configurar listeners para legendas
+function setupCaptionListeners() {
+    // Filtro de categoria
+    document.getElementById('captionCategoryFilter').addEventListener('change', function() {
+        loadPredefinedCaptions(this.value);
+    });
+    
+    // Seleção de legenda pré-definida
+    document.getElementById('predefinedCaptionSelect').addEventListener('change', function() {
+        if (this.value) {
+            document.getElementById('photoCaption').value = this.value;
+        }
+    });
+}
+</script>
+{% endblock %}

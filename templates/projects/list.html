@@ -1,0 +1,563 @@
+{% extends "base.html" %}
+
+{% block title %}Obras - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .clickable-card {
+        transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+
+    .project-card:hover .clickable-card {
+        background-color: #e9ecef !important;
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>
+                <i class="fas fa-building me-2"></i>
+                {% if request.args.get('hide_filters') == '1' %}
+                Obras Ativas
+                {% elif status_filter == 'ativo' %}
+                Obras Ativas
+                {% elif status_filter == 'nao_iniciado' %}
+                Obras Não Iniciadas
+                {% elif status_filter == 'pausado' %}
+                Obras Pausadas
+                {% elif status_filter == 'concluido' %}
+                Obras Concluídas
+                {% else %}
+                Obras
+                {% endif %}
+            </h1>
+            <a href="{{ url_for('project_new') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Nova Obra
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Abas de Filtro por Status -->
+{% if request.args.get('hide_filters') != '1' %}
+<div class="row">
+    <div class="col-12">
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-lg-3">
+                <a class="d-block text-center nav-link py-3 px-2 fw-bold {% if status_filter == 'ativo' %}active{% endif %}"
+                    href="{{ url_for('projects_list', status='ativo', q=request.args.get('q', '')) }}" role="tab"
+                    style="{% if status_filter == 'ativo' %}background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important; color: white !important; border: none !important; box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);{% else %}background-color: #e8f5e9; color: #28a745; border: 2px solid #28a745 !important; font-weight: 600;{% endif %} border-radius: 8px; transition: all 0.3s ease;">
+                    <i class="fas fa-check-circle d-block mb-1"></i>
+                    <span style="font-size: 0.85rem;">Ativas</span>
+                </a>
+            </div>
+            <div class="col-6 col-lg-3">
+                <a class="d-block text-center nav-link py-3 px-2 fw-bold {% if status_filter == 'nao_iniciado' %}active{% endif %}"
+                    href="{{ url_for('projects_list', status='nao_iniciado', q=request.args.get('q', '')) }}" role="tab"
+                    style="{% if status_filter == 'nao_iniciado' %}background: linear-gradient(135deg, #6c757d 0%, #495057 100%) !important; color: white !important; border: none !important; box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);{% else %}background-color: #f8f9fa; color: #6c757d; border: 2px solid #6c757d !important; font-weight: 600;{% endif %} border-radius: 8px; transition: all 0.3s ease;">
+                    <i class="fas fa-clock d-block mb-1"></i>
+                    <span style="font-size: 0.85rem;">Não iniciadas</span>
+                </a>
+            </div>
+            <div class="col-6 col-lg-3">
+                <a class="d-block text-center nav-link py-3 px-2 fw-bold {% if status_filter == 'pausado' %}active{% endif %}"
+                    href="{{ url_for('projects_list', status='pausado', q=request.args.get('q', '')) }}" role="tab"
+                    style="{% if status_filter == 'pausado' %}background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%) !important; color: #000 !important; border: none !important; box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3);{% else %}background-color: #fff3cd; color: #856404; border: 2px solid #ffc107 !important; font-weight: 600;{% endif %} border-radius: 8px; transition: all 0.3s ease;">
+                    <i class="fas fa-pause-circle d-block mb-1"></i>
+                    <span style="font-size: 0.85rem;">Pausadas</span>
+                </a>
+            </div>
+            <div class="col-6 col-lg-3">
+                <a class="d-block text-center nav-link py-3 px-2 fw-bold {% if status_filter == 'concluido' %}active{% endif %}"
+                    href="{{ url_for('projects_list', status='concluido', q=request.args.get('q', '')) }}" role="tab"
+                    style="{% if status_filter == 'concluido' %}background: linear-gradient(135deg, #007bff 0%, #0056b3 100%) !important; color: white !important; border: none !important; box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);{% else %}background-color: #cfe2ff; color: #004085; border: 2px solid #007bff !important; font-weight: 600;{% endif %} border-radius: 8px; transition: all 0.3s ease;">
+                    <i class="fas fa-flag-checkered d-block mb-1"></i>
+                    <span style="font-size: 0.85rem;">Concluídas</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Busca Simples -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body py-3">
+                <form method="GET" action="{{ url_for('projects_list') }}">
+                    <!-- Hidden field to preserve status filter -->
+                    <input type="hidden" name="status" value="{{ status_filter }}">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold">🔍 Busca Rápida</label>
+                            <input type="text" class="form-control" name="q" value="{{ request.args.get('q', '') }}"
+                                placeholder="Digite o nome, número ou palavra-chave da obra...">
+                        </div>
+                        <div class="col-md-4">
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-1"></i>Buscar
+                                </button>
+                                {% if request.args.get('q') %}
+                                <a href="{{ url_for('projects_list', status=status_filter) }}"
+                                    class="btn btn-outline-secondary">
+                                    <i class="fas fa-times me-1"></i>Limpar
+                                </a>
+                                {% endif %}
+                                <button type="button" class="btn btn-secondary" data-bs-toggle="collapse"
+                                    data-bs-target="#filtrosAvancados">
+                                    <i class="fas fa-filter me-1"></i>Busca Avançada
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtros Avançados (Colapsáveis) -->
+<div class="collapse mb-4" id="filtrosAvancados">
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filtros Avançados</h6>
+        </div>
+        <div class="card-body py-3">
+            <div class="row g-3">
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label small fw-bold">Status:</label>
+                    <select class="form-select form-select-sm" id="filterStatus">
+                        <option value="">Todos os Status</option>
+                        <option value="Não iniciado">Não iniciado</option>
+                        <option value="Ativo">Ativo</option>
+                        <option value="Pausado">Pausado</option>
+                        <option value="Concluído">Concluído</option>
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label small fw-bold">Tipo de Obra:</label>
+                    <select class="form-select form-select-sm" id="filterTipo">
+                        <option value="">Todos os Tipos</option>
+                        <!-- Será preenchido dinamicamente -->
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label small fw-bold">Construtora:</label>
+                    <select class="form-select form-select-sm" id="filterConstrutora">
+                        <option value="">Todas Construtoras</option>
+                        <!-- Será preenchido dinamicamente -->
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label small fw-bold">Funcionário:</label>
+                    <select class="form-select form-select-sm" id="filterFuncionario">
+                        <option value="">Todos Funcionários</option>
+                        <!-- Será preenchido dinamicamente -->
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label small fw-bold">Responsável:</label>
+                    <select class="form-select form-select-sm" id="filterResponsavel">
+                        <option value="">Todos Responsáveis</option>
+                        <!-- Será preenchido dinamicamente -->
+                    </select>
+                </div>
+                <div class="col-md-2 col-sm-6">
+                    <label class="form-label small fw-bold">Pesquisar nos filtros:</label>
+                    <input type="text" class="form-control form-control-sm" id="searchProject"
+                        placeholder="Nome ou número da obra">
+                </div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-12">
+                    <button type="button" class="btn btn-outline-secondary btn-sm me-2" onclick="clearFilters()">
+                        <i class="fas fa-times"></i> Limpar Filtros Avançados
+                    </button>
+                    <small class="text-muted">
+                        <span id="filteredCount">{{ projects|length }}</span> obra(s) encontrada(s)
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                {% if projects %}
+                <!-- Indicador de ordenação por distância -->
+                <div id="sortingIndicator" class="alert alert-info d-none mb-3">
+                    <div class="d-flex align-items-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span>📍 Ordenando obras por distância...</span>
+                    </div>
+                </div>
+
+                <!-- Layout de cards mobile-first sem rolagem horizontal -->
+                <div class="mobile-projects-list" id="projectsTable">
+                    {% for project in projects %}
+                    <div class="project-card mb-2" data-status="{{ project.status }}"
+                        data-tipo="{{ project.tipo_obra if project.tipo_obra else '' }}"
+                        data-construtora="{{ project.construtora if project.construtora else '' }}"
+                        data-funcionario="{{ project.nome_funcionario if project.nome_funcionario else '' }}"
+                        data-responsavel="{{ project.responsavel.nome_completo if project.responsavel else '' }}"
+                        data-search="{{ (project.numero + ' ' + project.nome)|lower }}"
+                        data-lat="{{ project.latitude if project.latitude else '' }}"
+                        data-lon="{{ project.longitude if project.longitude else '' }}"
+                        onclick="window.location.href='{{ url_for('project_view', project_id=project.id) }}'"
+                        style="cursor: pointer;">
+
+                        <div class="card border-0 shadow-sm h-100 clickable-card"
+                            style="background: #f8f9fa; transition: all 0.2s ease;">
+                            <div class="card-body p-3">
+                                <div class="row align-items-center">
+                                    <!-- Coluna principal com informações -->
+                                    <div class="col-9">
+                                        <!-- Número do projeto -->
+                                        <div class="fw-bold text-primary mb-1" style="font-size: 0.9rem;">
+                                            {{ project.numero }}
+                                        </div>
+
+                                        <!-- Nome do projeto -->
+                                        <div class="fw-semibold text-dark mb-1"
+                                            style="font-size: 0.95rem; line-height: 1.2;">
+                                            {{ project.nome }}
+                                        </div>
+
+                                        <!-- Informações adicionais -->
+                                        <div class="text-muted" style="font-size: 0.8rem;">
+                                            {% if project.construtora %}{{ project.construtora }}{% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Coluna lateral com status -->
+                                    <div class="col-3 text-end">
+                                        <!-- Status -->
+                                        {% if project.status == 'Ativo' %}
+                                        <span class="badge bg-success" style="font-size: 0.75rem;">Ativo</span>
+                                        {% elif project.status == 'Pausado' %}
+                                        <span class="badge bg-warning text-dark"
+                                            style="font-size: 0.75rem;">Pausado</span>
+                                        {% elif project.status == 'Concluído' %}
+                                        <span class="badge bg-primary" style="font-size: 0.75rem;">Concluído</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary" style="font-size: 0.75rem;">{{ project.status
+                                            }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    {% if request.args.get('q') %}
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhum resultado encontrado para a busca: "{{ request.args.get('q') }}"</h5>
+                    <p class="text-muted">Tente usar palavras-chave diferentes ou verifique a ortografia.</p>
+                    <a href="{{ url_for('projects_list') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-2"></i>Limpar Busca
+                    </a>
+                    {% else %}
+                    <i class="fas fa-building fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">Nenhuma obra cadastrada</h5>
+                    <p class="text-muted">Comece cadastrando a primeira obra.</p>
+                    <a href="{{ url_for('project_new') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Cadastrar Primeira Obra
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const table = document.getElementById('projectsTable');
+        if (!table) return;
+
+        const projectCards = table.querySelectorAll('.project-card');
+
+        // Função para calcular distância usando fórmula de Haversine
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Raio da Terra em km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Tentar obter localização e ordenar projetos com espera por inicialização
+        async function sortProjectsByDistance() {
+            const indicator = document.getElementById('sortingIndicator');
+
+            try {
+                console.log('📍 Tentando obter localização para ordenar projetos...');
+
+                // Mostrar indicador
+                if (indicator) {
+                    indicator.classList.remove('d-none');
+                }
+
+                // Esperar até que window.geoLocation esteja disponível (max 5 segundos)
+                let retries = 0;
+                while (!window.geoLocation && retries < 10) {
+                    console.log('⏳ Aguardando inicialização do sistema de geolocalização...');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    retries++;
+                }
+
+                // Usar o sistema de geolocalização global se disponível
+                if (window.geoLocation) {
+                    const position = await window.geoLocation.getLocation({
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 300000, // Cache de 5 minutos
+                        showUI: false, // Não mostrar UI
+                        fallbackToIP: true,
+                        reverseGeocode: false
+                    });
+
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+
+                    console.log('✅ Localização obtida:', { userLat, userLon });
+
+                    // Calcular distância para cada projeto e adicionar badge de distância
+                    const projectsWithDistance = [];
+                    projectCards.forEach(card => {
+                        const lat = parseFloat(card.dataset.lat);
+                        const lon = parseFloat(card.dataset.lon);
+
+                        let distance = Infinity;
+                        if (!isNaN(lat) && !isNaN(lon)) {
+                            distance = calculateDistance(userLat, userLon, lat, lon);
+                        }
+
+                        projectsWithDistance.push({ card, distance });
+
+                        // Adicionar badge de distância no card
+                        if (distance !== Infinity) {
+                            const distanceText = distance < 1
+                                ? `${Math.round(distance * 1000)}m`
+                                : `${distance.toFixed(1)}km`;
+
+                            const badgeContainer = card.querySelector('.col-3.text-end');
+                            if (badgeContainer) {
+                                const distanceBadge = document.createElement('div');
+                                distanceBadge.className = 'text-muted mt-1';
+                                distanceBadge.style.fontSize = '0.7rem';
+                                distanceBadge.innerHTML = `<i class="fas fa-location-arrow me-1"></i>${distanceText}`;
+                                badgeContainer.appendChild(distanceBadge);
+                            }
+                        }
+                    });
+
+                    // Ordenar por distância
+                    projectsWithDistance.sort((a, b) => a.distance - b.distance);
+
+                    // Reordenar os cards no DOM
+                    const container = table;
+                    projectsWithDistance.forEach(({ card }) => {
+                        container.appendChild(card);
+                    });
+
+                    console.log('✅ Projetos ordenados por distância');
+
+                    // Ocultar indicador com mensagem de sucesso
+                    if (indicator) {
+                        indicator.classList.add('alert-success');
+                        indicator.classList.remove('alert-info');
+                        indicator.innerHTML = '<i class="fas fa-check-circle me-2"></i>Obras ordenadas por distância da sua localização';
+                        setTimeout(() => {
+                            indicator.classList.add('d-none');
+                        }, 3000);
+                    }
+                } else {
+                    console.log('⚠️ Sistema de geolocalização não disponível');
+                    if (indicator) {
+                        indicator.classList.add('d-none');
+                    }
+                }
+            } catch (error) {
+                console.log('⚠️ Não foi possível obter localização:', error.message);
+                // Ocultar indicador se falhou
+                if (indicator) {
+                    indicator.classList.add('d-none');
+                }
+            }
+        }
+
+        // Executar ordenação por distância
+        sortProjectsByDistance();
+
+        const rows = projectCards; // Compatibilidade com código existente
+        // Lista de projetos carregada
+
+        // Preencher filtros dinamicamente
+        fillFilterOptions();
+
+        // Configurar eventos dos filtros
+        setupFilters();
+
+        function fillFilterOptions() {
+            const tipoSet = new Set();
+            const construtoraSet = new Set();
+            const funcionarioSet = new Set();
+            const responsavelSet = new Set();
+
+            rows.forEach(row => {
+                const tipo = row.getAttribute('data-tipo');
+                const construtora = row.getAttribute('data-construtora');
+                const funcionario = row.getAttribute('data-funcionario');
+                const responsavel = row.getAttribute('data-responsavel');
+
+                if (tipo && tipo !== '' && tipo !== '-') tipoSet.add(tipo);
+                if (construtora && construtora !== '' && construtora !== '-') construtoraSet.add(construtora);
+                if (funcionario && funcionario !== '' && funcionario !== '-') funcionarioSet.add(funcionario);
+                if (responsavel && responsavel !== '' && responsavel !== '-') responsavelSet.add(responsavel);
+            });
+
+            // Filtros preenchidos dinamicamente
+
+            // Preencher select de tipos
+            const tipoSelect = document.getElementById('filterTipo');
+            if (tipoSelect) {
+                tipoSet.forEach(tipo => {
+                    const option = document.createElement('option');
+                    option.value = tipo;
+                    option.textContent = tipo;
+                    tipoSelect.appendChild(option);
+                });
+            }
+
+            // Preencher select de construtoras
+            const construtoraSelect = document.getElementById('filterConstrutora');
+            if (construtoraSelect) {
+                Array.from(construtoraSet).sort().forEach(construtora => {
+                    const option = document.createElement('option');
+                    option.value = construtora;
+                    option.textContent = construtora;
+                    construtoraSelect.appendChild(option);
+                });
+            }
+
+            // Preencher select de funcionários
+            const funcionarioSelect = document.getElementById('filterFuncionario');
+            if (funcionarioSelect) {
+                Array.from(funcionarioSet).sort().forEach(funcionario => {
+                    const option = document.createElement('option');
+                    option.value = funcionario;
+                    option.textContent = funcionario;
+                    funcionarioSelect.appendChild(option);
+                });
+            }
+
+            // Preencher select de responsáveis
+            const responsavelSelect = document.getElementById('filterResponsavel');
+            if (responsavelSelect) {
+                responsavelSet.forEach(responsavel => {
+                    const option = document.createElement('option');
+                    option.value = responsavel;
+                    option.textContent = responsavel;
+                    responsavelSelect.appendChild(option);
+                });
+            }
+        }
+
+        function setupFilters() {
+            const filterStatus = document.getElementById('filterStatus');
+            const filterTipo = document.getElementById('filterTipo');
+            const filterConstrutora = document.getElementById('filterConstrutora');
+            const filterFuncionario = document.getElementById('filterFuncionario');
+            const filterResponsavel = document.getElementById('filterResponsavel');
+            const searchInput = document.getElementById('searchProject');
+
+            [filterStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel].forEach(filter => {
+                if (filter) filter.addEventListener('change', applyFilters);
+            });
+
+            if (searchInput) searchInput.addEventListener('input', applyFilters);
+        }
+
+        function applyFilters() {
+            const statusFilter = document.getElementById('filterStatus')?.value || '';
+            const tipoFilter = document.getElementById('filterTipo')?.value || '';
+            const construtoraFilter = document.getElementById('filterConstrutora')?.value || '';
+            const funcionarioFilter = document.getElementById('filterFuncionario')?.value || '';
+            const responsavelFilter = document.getElementById('filterResponsavel')?.value || '';
+            const searchText = (document.getElementById('searchProject')?.value || '').toLowerCase();
+
+            console.log('Aplicando filtros:', { statusFilter, tipoFilter, construtoraFilter, funcionarioFilter, responsavelFilter, searchText });
+
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const status = row.getAttribute('data-status') || '';
+                const tipo = row.getAttribute('data-tipo') || '';
+                const construtora = row.getAttribute('data-construtora') || '';
+                const funcionario = row.getAttribute('data-funcionario') || '';
+                const responsavel = row.getAttribute('data-responsavel') || '';
+                const searchData = row.getAttribute('data-search') || '';
+
+                const statusMatch = !statusFilter || status === statusFilter;
+                const tipoMatch = !tipoFilter || tipo === tipoFilter;
+                const construtoraMatch = !construtoraFilter || construtora === construtoraFilter;
+                const funcionarioMatch = !funcionarioFilter || funcionario === funcionarioFilter;
+                const responsavelMatch = !responsavelFilter || responsavel === responsavelFilter;
+                const searchMatch = !searchText || searchData.includes(searchText);
+
+                if (statusMatch && tipoMatch && construtoraMatch && funcionarioMatch && responsavelMatch && searchMatch) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            const countElement = document.getElementById('filteredCount');
+            if (countElement) countElement.textContent = visibleCount;
+
+            console.log('Filtros aplicados. Visíveis:', visibleCount);
+        }
+
+        // Expor função global para o botão de limpar
+        window.clearFilters = function () {
+            console.log('Limpando filtros');
+
+            const filters = ['filterStatus', 'filterTipo', 'filterConstrutora', 'filterFuncionario', 'filterResponsavel', 'searchProject'];
+            filters.forEach(id => {
+                const element = document.getElementById(id);
+                if (element) element.value = '';
+            });
+
+            rows.forEach(row => {
+                row.style.display = '';
+            });
+
+            const countElement = document.getElementById('filteredCount');
+            if (countElement) countElement.textContent = rows.length;
+        };
+    });
+</script>
+{% endblock %}

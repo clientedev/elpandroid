@@ -1,0 +1,647 @@
+{% extends "base.html" %}
+
+{% block title %}Criar Relatório{% endblock %}
+
+{% block extra_css %}
+<style>
+.photo-upload-area {
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    background-color: #f8f9fa;
+    margin-bottom: 15px;
+}
+
+.photo-upload-area.dragover {
+    border-color: #007bff;
+    background-color: #e3f2fd;
+}
+
+.photo-preview {
+    max-width: 200px;
+    max-height: 150px;
+    margin: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.checklist-section {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.checklist-item {
+    background-color: white;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    border-left: 4px solid #ffc107;
+}
+
+.checklist-item.completed {
+    border-left-color: #28a745;
+}
+
+.service-type-selector {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.service-type-card {
+    padding: 15px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.service-type-card:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.service-type-card.selected {
+    border-color: #007bff;
+    background-color: #e3f2fd;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-file-alt"></i> Criar Novo Relatório de Obra</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" id="reportForm">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Informações Básicas do Relatório -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.titulo.label(class="form-label") }}
+                                    {{ form.titulo(class="form-control") }}
+                                    {% for error in form.titulo.errors %}
+                                        <div class="text-danger">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    {{ form.projeto_id.label(class="form-label") }}
+                                    {{ form.projeto_id(class="form-control") }}
+                                    {% for error in form.projeto_id.errors %}
+                                        <div class="text-danger">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Checklist da Obra -->
+                        <div class="checklist-section">
+                            <h4><i class="fas fa-tasks"></i> Checklist da Obra</h4>
+                            <div id="checklistItems">
+                                <!-- Checklist padrão de construção -->
+                                <div class="checklist-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="check_fundacao">
+                                        <label class="form-check-label" for="check_fundacao">
+                                            <strong>Fundação:</strong> Verificar escavação, armadura e concretagem
+                                        </label>
+                                    </div>
+                                    <textarea class="form-control mt-2" placeholder="Observações sobre fundação..." rows="2"></textarea>
+                                </div>
+
+                                <div class="checklist-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="check_estrutura">
+                                        <label class="form-check-label" for="check_estrutura">
+                                            <strong>Estrutura:</strong> Verificar pilares, vigas e lajes
+                                        </label>
+                                    </div>
+                                    <textarea class="form-control mt-2" placeholder="Observações sobre estrutura..." rows="2"></textarea>
+                                </div>
+
+                                <div class="checklist-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="check_alvenaria">
+                                        <label class="form-check-label" for="check_alvenaria">
+                                            <strong>Alvenaria:</strong> Verificar levante de paredes e esquadrias
+                                        </label>
+                                    </div>
+                                    <textarea class="form-control mt-2" placeholder="Observações sobre alvenaria..." rows="2"></textarea>
+                                </div>
+
+                                <div class="checklist-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="check_instalacoes">
+                                        <label class="form-check-label" for="check_instalacoes">
+                                            <strong>Instalações:</strong> Verificar elétrica, hidráulica e sanitária
+                                        </label>
+                                    </div>
+                                    <textarea class="form-control mt-2" placeholder="Observações sobre instalações..." rows="2"></textarea>
+                                </div>
+
+                                <div class="checklist-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="check_cobertura">
+                                        <label class="form-check-label" for="check_cobertura">
+                                            <strong>Cobertura:</strong> Verificar estrutura e telhas
+                                        </label>
+                                    </div>
+                                    <textarea class="form-control mt-2" placeholder="Observações sobre cobertura..." rows="2"></textarea>
+                                </div>
+
+                                <div class="checklist-item">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="check_acabamento">
+                                        <label class="form-check-label" for="check_acabamento">
+                                            <strong>Acabamento:</strong> Verificar revestimentos e pinturas
+                                        </label>
+                                    </div>
+                                    <textarea class="form-control mt-2" placeholder="Observações sobre acabamento..." rows="2"></textarea>
+                                </div>
+                            </div>
+                            
+                            <button type="button" class="btn btn-outline-primary mt-3" onclick="addChecklistItem()">
+                                <i class="fas fa-plus"></i> Adicionar Item Personalizado
+                            </button>
+                        </div>
+
+                        <!-- Upload de Fotos -->
+                        <div class="mb-4">
+                            <h4><i class="fas fa-camera"></i> Documentação Fotográfica</h4>
+                            
+                            <!-- Tipos de Serviço -->
+                            <div class="service-type-selector" id="serviceTypeSelector">
+                                <div class="service-type-card" data-type="fundacao">
+                                    <i class="fas fa-hammer"></i>
+                                    <div>Fundação</div>
+                                </div>
+                                <div class="service-type-card" data-type="estrutura">
+                                    <i class="fas fa-building"></i>
+                                    <div>Estrutura</div>
+                                </div>
+                                <div class="service-type-card" data-type="alvenaria">
+                                    <i class="fas fa-layer-group"></i>
+                                    <div>Alvenaria</div>
+                                </div>
+                                <div class="service-type-card" data-type="instalacoes">
+                                    <i class="fas fa-plug"></i>
+                                    <div>Instalações</div>
+                                </div>
+                                <div class="service-type-card" data-type="cobertura">
+                                    <i class="fas fa-home"></i>
+                                    <div>Cobertura</div>
+                                </div>
+                                <div class="service-type-card" data-type="acabamento">
+                                    <i class="fas fa-paint-brush"></i>
+                                    <div>Acabamento</div>
+                                </div>
+                                <div class="service-type-card" data-type="problema">
+                                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                                    <div>Problema</div>
+                                </div>
+                                <div class="service-type-card" data-type="geral">
+                                    <i class="fas fa-eye"></i>
+                                    <div>Vista Geral</div>
+                                </div>
+                            </div>
+
+                            <!-- Área de Upload -->
+                            <div class="photo-upload-area" id="photoUploadArea">
+                                <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                                <p>Arraste e solte as fotos aqui ou clique para selecionar</p>
+                                <small class="text-muted" style="font-size: 16px; font-weight: bold; color: #dc3545;">🔴 SUPORTA ATÉ 50 FOTOS (NOVO!) 🔴</small>
+                                <br><small class="text-muted">JPG, PNG (máx. 10MB cada)</small>
+                                <input type="file" id="photoInput" multiple accept="image/*" style="display: none;">
+                                <button type="button" class="btn btn-primary" onclick="document.getElementById('photoInput').click()">
+                                    <i class="fas fa-camera"></i> Selecionar Fotos
+                                </button>
+                            </div>
+
+                            <!-- Preview das Fotos -->
+                            <div id="photoPreview" class="mt-3"></div>
+                        </div>
+
+                        <!-- Conteúdo do Relatório -->
+                        <div class="mb-4">
+                            <div class="form-group">
+                                {{ form.conteudo.label(class="form-label") }}
+                                {{ form.conteudo(class="form-control", rows="6", placeholder="Descreva detalhadamente as atividades realizadas, progresso da obra, problemas encontrados e próximos passos...") }}
+                                {% for error in form.conteudo.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Botões de Ação -->
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success me-2">
+                                    <i class="fas fa-save"></i> Concluir relatório
+                                </button>
+                                <a href="{{ url_for('reports') }}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left"></i> Voltar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Estado do formulário  
+let selectedServiceType = null;
+let uploadedPhotos = [];
+let maxPhotos = 200;
+
+// Seleção do tipo de serviço
+document.getElementById('serviceTypeSelector').addEventListener('click', function(e) {
+    const card = e.target.closest('.service-type-card');
+    if (card) {
+        // Remove seleção anterior
+        document.querySelectorAll('.service-type-card').forEach(c => c.classList.remove('selected'));
+        // Adiciona nova seleção
+        card.classList.add('selected');
+        selectedServiceType = card.getAttribute('data-type');
+    }
+});
+
+// Upload de fotos
+const photoUploadArea = document.getElementById('photoUploadArea');
+const photoInput = document.getElementById('photoInput');
+const photoPreview = document.getElementById('photoPreview');
+
+// Drag and drop
+photoUploadArea.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    photoUploadArea.classList.add('dragover');
+});
+
+photoUploadArea.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    photoUploadArea.classList.remove('dragover');
+});
+
+photoUploadArea.addEventListener('drop', function(e) {
+    e.preventDefault();
+    photoUploadArea.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+});
+
+photoInput.addEventListener('change', function(e) {
+    handleFiles(e.target.files);
+});
+
+function handleFiles(files) {
+    if (!selectedServiceType) {
+        alert('Por favor, selecione o tipo de serviço antes de fazer upload das fotos.');
+        return;
+    }
+    
+    if (uploadedPhotos.length + files.length > maxPhotos) {
+        alert(`Limite máximo de ${maxPhotos} fotos. Você pode adicionar apenas ${maxPhotos - uploadedPhotos.length} fotos adicionais.`);
+        return;
+    }
+
+    Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                addPhotoPreview(file, e.target.result);
+                
+                // Funcionalidade extra: Download local imediato (sem confirmação extra, ao dar OK na seleção)
+                const downloadLink = document.createElement('a');
+                downloadLink.href = e.target.result;
+                downloadLink.download = `foto_obra_${Date.now()}_${file.name}`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+
+                // Forçar salvamento imediato no sistema (mesmo sem legenda preenchida)
+                // Se o sistema usa autosave, chamamos a função aqui
+                if (typeof triggerAutosave === 'function') {
+                    console.log("Forçando autosave para nova foto...");
+                    triggerAutosave();
+                } else {
+                    console.log("Foto pronta para salvamento, aguardando autosave padrão.");
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+function addPhotoPreview(file, src) {
+    const photoId = 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
+    const photoDiv = document.createElement('div');
+    photoDiv.className = 'card d-inline-block m-2';
+    photoDiv.style.width = '250px';
+    photoDiv.innerHTML = `
+        <img src="${src}" class="card-img-top photo-preview" alt="Preview">
+        <div class="card-body p-2">
+            <input type="text" class="form-control form-control-sm mb-2" placeholder="Legenda da foto..." 
+                   id="caption_${photoId}">
+            <small class="text-muted">Tipo: ${getServiceTypeName(selectedServiceType)}</small>
+            <button type="button" class="btn btn-sm btn-primary me-1" onclick="editPhoto('${photoId}')" title="Editar foto">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removePhoto('${photoId}')" title="Remover foto">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `;
+    
+    photoPreview.appendChild(photoDiv);
+    
+    // Armazenar informações da foto
+    uploadedPhotos.push({
+        id: photoId,
+        file: file,
+        src: src,
+        serviceType: selectedServiceType,
+        element: photoDiv
+    });
+    
+    // Atualizar contador de fotos
+    const photoCount = uploadedPhotos.length;
+    const photoUploadArea = document.getElementById('photoUploadArea');
+    const existingCounter = photoUploadArea.querySelector('.photo-counter');
+    if (existingCounter) {
+        existingCounter.remove();
+    }
+    
+    const counter = document.createElement('div');
+    counter.className = 'photo-counter mt-2';
+    counter.innerHTML = `<small class="text-info"><strong>Fotos adicionadas: ${photoCount}/50</strong></small>`;
+    photoUploadArea.appendChild(counter);
+}
+
+function removePhoto(photoId) {
+    const photo = uploadedPhotos.find(p => p.id === photoId);
+    if (photo) {
+        photo.element.remove();
+        uploadedPhotos = uploadedPhotos.filter(p => p.id !== photoId);
+    }
+}
+
+function getServiceTypeName(type) {
+    const names = {
+        'fundacao': 'Fundação',
+        'estrutura': 'Estrutura',
+        'alvenaria': 'Alvenaria',
+        'instalacoes': 'Instalações',
+        'cobertura': 'Cobertura',
+        'acabamento': 'Acabamento',
+        'problema': 'Problema',
+        'geral': 'Vista Geral'
+    };
+    return names[type] || type;
+}
+
+function editPhoto(photoId) {
+    const photo = uploadedPhotos.find(p => p.id === photoId);
+    if (photo) {
+        // Abrir editor de foto
+        openPhotoEditor(photo.src, photo.id);
+    }
+}
+
+function openPhotoEditor(src, photoId) {
+    // Criar modal para edição de foto
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'photoEditorModal';
+    modal.innerHTML = `
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Editor de Foto</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <canvas id="photoCanvas" style="max-width: 100%; border: 1px solid #ccc;"></canvas>
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-primary" onclick="saveEditedPhoto('${photoId}')">
+                            <i class="fas fa-save"></i> Salvar Alterações
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    const modalInstance = new bootstrap.Modal(modal);
+    modalInstance.show();
+    
+    // Carregar imagem no canvas
+    const canvas = document.getElementById('photoCanvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+    };
+    img.src = src;
+}
+
+function saveEditedPhoto(photoId) {
+    const canvas = document.getElementById('photoCanvas');
+    const editedData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Salvar dados editados
+    const photoIndex = uploadedPhotos.findIndex(p => p.id === photoId);
+    if (photoIndex !== -1) {
+        uploadedPhotos[photoIndex].editedData = editedData;
+    }
+    
+    // Fechar modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('photoEditorModal'));
+    modal.hide();
+    document.getElementById('photoEditorModal').remove();
+}
+
+// Função para enviar dados do formulário com fotos
+function submitFormWithPhotos() {
+    const form = document.querySelector('form');
+    const formData = new FormData(form);
+    
+    console.log(`Enviando relatório com ${uploadedPhotos.length} fotos`);
+    
+    // Adicionar todas as fotos ao FormData (até 50)
+    uploadedPhotos.forEach((photo, index) => {
+        if (photo.editedData) {
+            formData.append(`edited_photo_${index}`, photo.editedData);
+        } else {
+            formData.append(`photo_${index}`, photo.file);
+        }
+        
+        const caption = document.getElementById(`caption_${photo.id}`)?.value || `Foto ${index + 1}`;
+        formData.append(`photo_caption_${index}`, caption);
+        formData.append(`photo_category_${index}`, photo.serviceType);
+    });
+    
+    // Adicionar informação sobre o número total de fotos
+    formData.append('total_photos', uploadedPhotos.length);
+    
+    // Enviar formulário
+    fetch(form.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.text();
+        } else {
+            throw new Error('Erro no servidor');
+        }
+    })
+    .then(html => {
+        // Check if it's a redirect or success page
+        if (html.includes('Relatórios') || html.includes('success')) {
+            window.location.href = '/reports';
+        } else {
+            // Parse response to check for errors
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const alerts = doc.querySelectorAll('.alert-danger');
+            if (alerts.length > 0) {
+                alert('Erro: ' + alerts[0].textContent);
+            } else {
+                window.location.href = '/reports';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar relatório: ' + error.message);
+    });
+}
+
+// Modificar o envio do formulário
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitFormWithPhotos();
+        });
+    }
+});
+
+// Checklist
+function addChecklistItem() {
+    const checklistItems = document.getElementById('checklistItems');
+    const itemId = 'custom_' + Date.now();
+    
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'checklist-item';
+    itemDiv.innerHTML = `
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="${itemId}">
+            <input type="text" class="form-control d-inline-block" style="width: 70%;" 
+                   placeholder="Digite o item do checklist..." required>
+            <button type="button" class="btn btn-sm btn-outline-danger float-end" 
+                    onclick="this.parentElement.parentElement.remove()">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+        <textarea class="form-control mt-2" placeholder="Observações..." rows="2"></textarea>
+    `;
+    
+    checklistItems.appendChild(itemDiv);
+}
+
+// Marcar checklist como concluído
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('form-check-input')) {
+        const item = e.target.closest('.checklist-item');
+        if (e.target.checked) {
+            item.classList.add('completed');
+        } else {
+            item.classList.remove('completed');
+        }
+    }
+});
+
+// Submissão do formulário
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Coletar dados do checklist
+    const checklistData = [];
+    document.querySelectorAll('.checklist-item').forEach(item => {
+        const checkbox = item.querySelector('.form-check-input');
+        const label = item.querySelector('.form-check-label, input[type="text"]');
+        const textarea = item.querySelector('textarea');
+        
+        if (checkbox && label) {
+            checklistData.push({
+                item: label.textContent || label.value,
+                completed: checkbox.checked,
+                observations: textarea ? textarea.value : ''
+            });
+        }
+    });
+    
+    // Coletar dados das fotos
+    const photoData = uploadedPhotos.map(photo => ({
+        serviceType: photo.serviceType,
+        caption: document.getElementById(`caption_${photo.id}`).value,
+        file: photo.file
+    }));
+    
+    // Submeter formulário com dados adicionais
+    const formData = new FormData(this);
+    formData.append('checklist_data', JSON.stringify(checklistData));
+    
+    // Adicionar fotos (até 50)
+    console.log(`📸 PROCESSANDO ${photoData.length} FOTOS (limite 50)`);
+    photoData.forEach((photo, index) => {
+        if (index < 50) {  // Garantir limite de 50
+            formData.append(`photo_${index}`, photo.file);
+            formData.append(`photo_caption_${index}`, photo.caption || `Foto ${index + 1}`);
+            formData.append(`photo_category_${index}`, photo.serviceType || 'Geral');
+            console.log(`✓ Foto ${index + 1}: ${photo.file.name} (${photo.serviceType})`);
+        } else {
+            console.log(`⚠️ Foto ${index + 1} ignorada: excede limite de 50`);
+        }
+    });
+    formData.append('total_photos', photoData.length);
+    
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.redirect || "{{ url_for('reports') }}";
+        } else {
+            alert('Erro: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao salvar relatório.');
+    });
+});
+</script>
+{% endblock %}

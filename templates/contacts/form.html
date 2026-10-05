@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if contact else 'Novo' }} Contato - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="fas fa-{{ 'edit' if contact else 'user-plus' }} me-2"></i>
+            {{ 'Editar' if contact else 'Novo' }} Contato
+        </h1>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                {% if project %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Vinculando contato ao projeto:</strong> {{ project.nome }} ({{ project.numero }})
+                    </div>
+                {% endif %}
+                
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.nome.label(class="form-label") }}
+                        {{ form.nome(class="form-control" + (" is-invalid" if form.nome.errors else "")) }}
+                        {% for error in form.nome.errors %}
+                            <div class="invalid-feedback">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                                {% for error in form.email.errors %}
+                                    <div class="invalid-feedback">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.telefone.label(class="form-label") }}
+                                {{ form.telefone(class="form-control") }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.empresa.label(class="form-label") }}
+                                {{ form.empresa(class="form-control") }}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.cargo.label(class="form-label") }}
+                                {{ form.cargo(class="form-control") }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.observacoes.label(class="form-label") }}
+                        {{ form.observacoes(class="form-control", rows="3") }}
+                    </div>
+                    
+                    {% if project %}
+                    <!-- Project contact relationship fields -->
+                    <hr>
+                    <h5 class="mb-3">Relacionamento com o Projeto</h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tipo de Relacionamento</label>
+                                <input type="text" name="tipo_relacionamento" class="form-control" placeholder="Ex: Cliente, Fornecedor, Consultor">
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_aprovador" class="form-check-input" id="isAprovador">
+                                    <label class="form-check-label" for="isAprovador">
+                                        É Aprovador do Projeto
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="receber_relatorios" class="form-check-input" id="receberRelatorios">
+                                    <label class="form-check-label" for="receberRelatorios">
+                                        Receber Relatórios por Email
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('project_view', project_id=project.id) if project else url_for('contacts_list') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>Voltar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>{{ 'Atualizar' if contact else 'Cadastrar' }} Contato
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

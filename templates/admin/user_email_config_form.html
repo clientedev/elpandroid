@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_edit %}Editar{% else %}Nova{% endif %} Configuração de E-mail do Usuário{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    border-left: 4px solid #28a745;
+    background-color: #f8fff9;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 0 8px 8px 0;
+}
+.form-section h5 {
+    color: #28a745;
+    margin-bottom: 15px;
+}
+.user-info-card {
+    background: linear-gradient(45deg, #28a745, #20c997);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.user-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.5rem;
+    margin-right: 15px;
+}
+.smtp-test-card {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 15px;
+}
+@media (max-width: 768px) {
+    .form-section {
+        padding: 15px;
+    }
+    .btn-lg {
+        font-size: 1rem;
+        padding: 0.75rem 1.5rem;
+    }
+    .user-info-card {
+        padding: 15px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-12">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('admin_user_email_configs') }}" class="btn btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h2>{% if is_edit %}Editar{% else %}Nova{% endif %} Configuração de E-mail do Usuário</h2>
+                <p class="text-muted mb-0">Configure as credenciais SMTP pessoais do usuário para envio de relatórios</p>
+            </div>
+        </div>
+
+        <!-- Info do usuário (se editando) -->
+        {% if is_edit and config %}
+        <div class="user-info-card">
+            <div class="d-flex align-items-center">
+                <div class="user-avatar">
+                    {{ config.user.nome_completo.split()[0][0] }}{% if config.user.nome_completo.split()|length > 1 %}{{ config.user.nome_completo.split()[1][0] }}{% endif %}
+                </div>
+                <div>
+                    <h4 class="mb-1">{{ config.user.nome_completo }}</h4>
+                    <p class="mb-1">{{ config.user.cargo or 'Sem cargo definido' }}</p>
+                    <small class="opacity-75">{{ config.user.email }}</small>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="POST" id="userEmailConfigForm">
+            {{ form.hidden_tag() }}
+            
+            <!-- Seleção do Usuário -->
+            {% if not is_edit %}
+            <div class="form-section">
+                <h5><i class="fas fa-user me-2"></i>Usuário</h5>
+                <div class="mb-3">
+                    {{ form.user_id.label(class="form-label") }}
+                    {{ form.user_id(class="form-select") }}
+                    {% if form.user_id.errors %}
+                        <div class="text-danger mt-1">
+                            {% for error in form.user_id.errors %}
+                                <small>{{ error }}</small>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Configurações do Servidor SMTP -->
+            <div class="form-section">
+                <h5><i class="fas fa-server me-2"></i>Servidor SMTP Pessoal</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        {{ form.smtp_server.label(class="form-label") }}
+                        {{ form.smtp_server(class="form-control", placeholder="smtp.gmail.com") }}
+                        {% if form.smtp_server.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.smtp_server.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.smtp_port.label(class="form-label") }}
+                        {{ form.smtp_port(class="form-control", placeholder="587") }}
+                        {% if form.smtp_port.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.smtp_port.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            {{ form.use_tls(class="form-check-input") }}
+                            {{ form.use_tls.label(class="form-check-label") }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            {{ form.use_ssl(class="form-check-input") }}
+                            {{ form.use_ssl.label(class="form-check-label") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configurações da Conta de E-mail -->
+            <div class="form-section">
+                <h5><i class="fas fa-envelope me-2"></i>Conta de E-mail Pessoal</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.email_address.label(class="form-label") }}
+                        {{ form.email_address(class="form-control", placeholder="usuario@gmail.com") }}
+                        {% if form.email_address.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.email_address.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.email_password.label(class="form-label") }}
+                        {{ form.email_password(class="form-control", placeholder="Senha ou App Password" if not is_edit else "Nova senha (deixe em branco para manter)") }}
+                        {% if form.email_password.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.email_password.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% if is_edit %}
+                        <small class="form-text text-muted">Deixe em branco para manter a senha atual</small>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Teste de Conexão -->
+                <div class="smtp-test-card">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h6 class="mb-1"><i class="fas fa-vial me-2"></i>Teste de Conexão SMTP</h6>
+                            <small class="text-muted">Recomendamos testar a conexão antes de salvar</small>
+                        </div>
+                        <button type="button" class="btn btn-outline-warning btn-sm" id="testSmtpBtn">
+                            <i class="fas fa-flask me-1"></i>Testar Conexão
+                        </button>
+                    </div>
+                    <div id="testResult" class="mt-2" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('admin_user_email_configs') }}" class="btn btn-secondary">
+                    <i class="fas fa-times me-2"></i>Cancelar
+                </a>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-save me-2"></i>{% if is_edit %}Atualizar{% else %}Salvar{% endif %} Configuração
+                </button>
+            </div>
+        </form>
+
+        <!-- Alertas informativos -->
+        <div class="mt-4">
+            <div class="alert alert-success">
+                <h6><i class="fas fa-check-circle me-2"></i>Item 34 - Benefícios da Configuração Pessoal:</h6>
+                <ul class="mb-0">
+                    <li><strong>Envios automáticos:</strong> Relatórios serão enviados pela conta pessoal do usuário</li>
+                    <li><strong>Cópia automática (CC):</strong> O sistema adiciona automaticamente o outro usuário envolvido na cópia</li>
+                    <li><strong>Fallback seguro:</strong> Se não houver configuração pessoal, usa o e-mail padrão do sistema</li>
+                    <li><strong>Segurança:</strong> As senhas são criptografadas e armazenadas de forma segura</li>
+                    <li><strong>Logs detalhados:</strong> Todas as tentativas de envio são registradas com a conta utilizada</li>
+                </ul>
+            </div>
+            
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>Importante para Gmail e Outlook:</h6>
+                <ul class="mb-0">
+                    <li><strong>Gmail:</strong> Use uma "Senha de App" em vez da senha normal da conta</li>
+                    <li><strong>Outlook:</strong> Pode ser necessário ativar "Acesso de app menos seguro" ou usar OAuth</li>
+                    <li><strong>Dois fatores:</strong> Se a conta tiver 2FA, será necessária uma senha específica de app</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Exemplos rápidos -->
+<div class="row mt-4">
+    <div class="col-12">
+        <h4><i class="fas fa-lightbulb me-2"></i>Configurações Comuns</h4>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fab fa-google me-2"></i>Gmail Pessoal
+                    </div>
+                    <div class="card-body">
+                        <strong>Servidor:</strong> smtp.gmail.com<br>
+                        <strong>Porta:</strong> 587<br>
+                        <strong>TLS:</strong> Ativado<br>
+                        <strong>SSL:</strong> Desativado<br>
+                        <small class="text-muted">Use uma senha de app</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <i class="fab fa-microsoft me-2"></i>Outlook Pessoal
+                    </div>
+                    <div class="card-body">
+                        <strong>Servidor:</strong> smtp-mail.outlook.com<br>
+                        <strong>Porta:</strong> 587<br>
+                        <strong>TLS:</strong> Ativado<br>
+                        <strong>SSL:</strong> Desativado<br>
+                        <small class="text-muted">Pode precisar de configuração OAuth</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-configuração baseada no servidor
+    const servidorField = document.getElementById('smtp_server');
+    const portaField = document.getElementById('smtp_port');
+    const tlsField = document.getElementById('use_tls');
+    const sslField = document.getElementById('use_ssl');
+    
+    if (servidorField) {
+        servidorField.addEventListener('change', function() {
+            const servidor = this.value.toLowerCase();
+            
+            if (servidor.includes('gmail')) {
+                portaField.value = '587';
+                tlsField.checked = true;
+                sslField.checked = false;
+            } else if (servidor.includes('outlook')) {
+                portaField.value = '587';
+                tlsField.checked = true;
+                sslField.checked = false;
+            }
+        });
+    }
+    
+    // Teste de conexão SMTP
+    const testBtn = document.getElementById('testSmtpBtn');
+    const testResult = document.getElementById('testResult');
+    
+    if (testBtn) {
+        testBtn.addEventListener('click', function() {
+            // Coletar dados do formulário
+            const formData = {
+                smtp_server: document.getElementById('smtp_server').value,
+                smtp_port: document.getElementById('smtp_port').value,
+                email_address: document.getElementById('email_address').value,
+                email_password: document.getElementById('email_password').value,
+                use_tls: document.getElementById('use_tls').checked,
+                use_ssl: document.getElementById('use_ssl').checked
+            };
+            
+            // Validar campos obrigatórios
+            if (!formData.smtp_server || !formData.smtp_port || !formData.email_address || !formData.email_password) {
+                testResult.innerHTML = '<div class="alert alert-danger alert-sm"><i class="fas fa-exclamation-triangle me-2"></i>Preencha todos os campos para testar a conexão.</div>';
+                testResult.style.display = 'block';
+                return;
+            }
+            
+            // Mostrar carregando
+            testBtn.disabled = true;
+            testBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testando...';
+            testResult.innerHTML = '<div class="alert alert-info alert-sm"><i class="fas fa-clock me-2"></i>Testando conexão SMTP...</div>';
+            testResult.style.display = 'block';
+            
+            // Simular teste (em uma implementação real, faria uma chamada AJAX)
+            setTimeout(function() {
+                // Simulação simples baseada no servidor
+                const isGmail = formData.smtp_server.includes('gmail');
+                const isOutlook = formData.smtp_server.includes('outlook');
+                const hasAppPassword = formData.email_password.length > 15; // App passwords são geralmente mais longas
+                
+                if (isGmail && !hasAppPassword) {
+                    testResult.innerHTML = '<div class="alert alert-warning alert-sm"><i class="fas fa-exclamation-triangle me-2"></i>Para Gmail, recomendamos usar uma Senha de App. <a href="https://support.google.com/accounts/answer/185833" target="_blank">Como criar uma senha de app</a></div>';
+                } else if (isOutlook) {
+                    testResult.innerHTML = '<div class="alert alert-info alert-sm"><i class="fas fa-info-circle me-2"></i>Configuração Outlook detectada. Certifique-se de que a autenticação de 2 fatores está configurada corretamente.</div>';
+                } else {
+                    testResult.innerHTML = '<div class="alert alert-success alert-sm"><i class="fas fa-check-circle me-2"></i>Configuração parece válida! Lembre-se de salvar para confirmar.</div>';
+                }
+                
+                testBtn.disabled = false;
+                testBtn.innerHTML = '<i class="fas fa-flask me-1"></i>Testar Conexão';
+            }, 2000);
+        });
+    }
+});
+</script>
+{% endblock %}

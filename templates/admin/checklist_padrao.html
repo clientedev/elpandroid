@@ -1,0 +1,601 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Checklist Padrão{% endblock %}
+
+{% block extra_css %}
+<style>
+.sortable-handle {
+    cursor: move;
+    color: #6c757d;
+}
+.sortable-handle:hover {
+    color: #495057;
+}
+.checklist-item {
+    transition: all 0.3s ease;
+    border-left: 4px solid #007bff;
+}
+.checklist-item:hover {
+    background-color: #f8f9fa;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.edit-field {
+    border: 2px solid #28a745;
+    background-color: #f0fff4;
+}
+
+/* Toast Notifications */
+.toast-container {
+    position: fixed;
+    top: 120px; /* Entre navbar e conteúdo azul */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    max-width: 400px;
+    width: auto;
+}
+
+.toast-custom {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+    color: white;
+    margin-bottom: 10px;
+    animation: slideInDown 0.3s ease-out;
+}
+
+.toast-custom.toast-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.toast-custom.toast-error {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+}
+
+.toast-custom.toast-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+}
+
+.toast-custom .toast-header {
+    background: rgba(255,255,255,0.15);
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px 12px 0 0;
+}
+
+.toast-custom .toast-body {
+    padding: 15px;
+    font-weight: 500;
+}
+
+@keyframes slideInDown {
+    from {
+        transform: translate(-50%, -100%);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutUp {
+    from {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+    to {
+        transform: translate(-50%, -100%);
+        opacity: 0;
+    }
+}
+
+/* Mobile responsivity */
+@media (max-width: 768px) {
+    .btn-group .btn {
+        padding: 0.375rem 0.5rem;
+        font-size: 0.875rem;
+    }
+    .checklist-item {
+        margin-bottom: 1rem;
+    }
+    
+    .toast-container {
+        top: 110px; /* Entre navbar e cabeçalho azul - mobile */
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 90%;
+        width: auto;
+    }
+    
+    .toast-custom {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    
+    .toast-custom .toast-body {
+        padding: 12px;
+    }
+    
+    /* Adjust card layout for mobile */
+    .checklist-item .row {
+        margin: 0;
+    }
+    
+    .checklist-item .col-1 {
+        padding: 0 8px;
+        flex: 0 0 auto;
+        width: auto;
+    }
+    
+    .checklist-item .col-md-7 {
+        flex: 1;
+        padding: 0 8px;
+    }
+    
+    .checklist-item .col-md-2 {
+        flex: 0 0 auto;
+        width: auto;
+        padding: 0 4px;
+    }
+    
+    .card-header .btn-lg {
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+    }
+    
+    .card-header h3 {
+        font-size: 1.25rem;
+    }
+    
+    .card-header p {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .checklist-item .row {
+        flex-wrap: wrap;
+    }
+    
+    .checklist-item .col-md-2.col-sm-2 {
+        width: 100%;
+        margin-top: 10px;
+        text-align: center;
+    }
+    
+    .btn-group {
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h3 class="mb-0">
+                                <i class="fas fa-tasks me-2"></i>Checklist Padrão
+                            </h3>
+                            <p class="mb-0 mt-1 opacity-75">Gerencie os itens do checklist que aparecerão automaticamente nos relatórios</p>
+                        </div>
+                        <button class="btn btn-light btn-lg" onclick="adicionarNovoItem()">
+                            <i class="fas fa-plus me-2"></i>Adicionar Item
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if not checklist_items %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Nenhum item no checklist</h5>
+                        <p class="text-muted">Adicione o primeiro item para começar</p>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Informação:</strong> Arraste os itens para reordená-los. As mudanças são salvas automaticamente.
+                    </div>
+                    
+                    <div id="checklist-container">
+                        {% for item in checklist_items %}
+                        <div class="checklist-item card mb-3" data-id="{{ item.id }}">
+                            <div class="card-body py-3">
+                                <div class="row align-items-center">
+                                    <div class="col-1 text-center">
+                                        <i class="fas fa-grip-vertical sortable-handle"></i>
+                                    </div>
+                                    <div class="col-md-7 col-sm-6">
+                                        <span class="item-text" id="text-{{ item.id }}">{{ item.texto }}</span>
+                                        <div class="input-group d-none" id="edit-group-{{ item.id }}">
+                                            <input type="text" class="form-control edit-field" id="edit-{{ item.id }}" value="{{ item.texto }}">
+                                            <button class="btn btn-success" type="button" onclick="editarItem({{ item.id }})" title="Salvar edição">
+                                                <i class="fas fa-check"></i> OK
+                                            </button>
+                                            <button class="btn btn-outline-secondary" type="button" onclick="cancelarEdicao({{ item.id }})" title="Cancelar">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2 col-sm-3 text-center">
+                                        <small class="text-muted">Ordem: {{ item.ordem }}</small>
+                                    </div>
+                                    <div class="col-md-2 col-sm-2">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <button type="button" class="btn btn-outline-primary" onclick="editarItem({{ item.id }})" title="Editar">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" onclick="confirmarRemocao({{ item.id }}, '{{ item.texto|replace("'", "\\'") }}')" title="Remover">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para adicionar item -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>Adicionar Item ao Checklist
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addItemForm">
+                    <div class="mb-3">
+                        <label for="newItemText" class="form-label">Texto do Item</label>
+                        <input type="text" class="form-control" id="newItemText" placeholder="Digite o texto do item..." maxlength="500" required>
+                        <div class="form-text">Máximo 500 caracteres</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarNovoItem()">
+                    <i class="fas fa-save me-2"></i>Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmação de remoção -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirmar Remoção
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Tem certeza de que deseja remover este item do checklist?</p>
+                <div class="alert alert-warning">
+                    <strong id="itemToDelete"></strong>
+                </div>
+                <p class="text-muted">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-2"></i>Remover
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>/* Cache Buster: 1756604106 */
+let itemToDeleteId = null;
+
+// Sistema de Toast Notifications
+function showToast(message, type = 'success', duration = 4000) {
+    const toastContainer = document.querySelector('.toast-container');
+    const toastId = 'toast-' + Date.now();
+    
+    const iconMap = {
+        success: 'fas fa-check-circle',
+        error: 'fas fa-exclamation-triangle', 
+        warning: 'fas fa-exclamation-circle',
+        info: 'fas fa-info-circle'
+    };
+    
+    const titleMap = {
+        success: 'Sucesso',
+        error: 'Erro',
+        warning: 'Atenção',
+        info: 'Informação'
+    };
+    
+    const toastHtml = `
+        <div class="toast toast-custom toast-${type}" id="${toastId}" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="${iconMap[type]} me-2"></i>
+                <strong class="me-auto">${titleMap[type]}</strong>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${message}
+            </div>
+        </div>
+    `;
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    
+    const toastElement = document.getElementById(toastId);
+    const bsToast = new bootstrap.Toast(toastElement, {
+        autohide: true,
+        delay: duration
+    });
+    
+    bsToast.show();
+    
+    // Remove element after hiding
+    toastElement.addEventListener('hidden.bs.toast', function() {
+        toastElement.remove();
+    });
+}
+
+function adicionarNovoItem() {
+    // console.log('Abrindo modal adicionar');
+    document.getElementById('newItemText').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    modal.show();
+}
+
+function salvarNovoItem() {
+    // console.log('Salvando novo item');
+    const texto = document.getElementById('newItemText').value.trim();
+    
+    if (!texto) {
+        showToast('Digite o texto do item.', 'warning');
+        return;
+    }
+    
+    if (texto.length > 500) {
+        showToast('Máximo 500 caracteres.', 'warning');
+        return;
+    }
+    
+    fetch('/admin/checklist-padrao/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ texto: texto })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Item adicionado com sucesso!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showToast(data.error || 'Erro ao adicionar item', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showToast('Erro ao adicionar item', 'error');
+    });
+}
+
+function editarItem(itemId) {
+    // console.log('Editando item:', itemId);
+    
+    const textSpan = document.getElementById('text-' + itemId);
+    const editGroup = document.getElementById('edit-group-' + itemId);
+    const editInput = document.getElementById('edit-' + itemId);
+    
+    if (!textSpan || !editGroup || !editInput) {
+        console.error('Elementos não encontrados para item:', itemId);
+        showToast('Erro: elementos não encontrados', 'error');
+        return;
+    }
+    
+    if (editGroup.classList.contains('d-none')) {
+        // Entrar em modo de edição
+        textSpan.classList.add('d-none');
+        editGroup.classList.remove('d-none');
+        editInput.focus();
+        editInput.select();
+        // console.log('Modo de edição ativado para item:', itemId);
+    } else {
+        // Salvar edição
+        const novoTexto = editInput.value.trim();
+        
+        if (!novoTexto) {
+            showToast('Texto não pode estar vazio.', 'warning');
+            return;
+        }
+        
+        if (novoTexto.length > 500) {
+            showToast('Máximo 500 caracteres.', 'warning');
+            return;
+        }
+        
+        // console.log('Salvando edição para item:', itemId, 'novo texto:', novoTexto);
+        
+        fetch('/admin/checklist-padrao/edit/' + itemId, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ texto: novoTexto })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                textSpan.textContent = novoTexto;
+                textSpan.classList.remove('d-none');
+                editGroup.classList.add('d-none');
+                console.log('Item editado com sucesso');
+                showToast('Item editado com sucesso!', 'success');
+            } else {
+                showToast(data.error || 'Erro ao editar item', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showToast('Erro ao editar item', 'error');
+        });
+    }
+}
+
+function confirmarRemocao(itemId, itemText) {
+    console.log('Confirmando remoção do item:', itemId, itemText);
+    
+    itemToDeleteId = itemId;
+    document.getElementById('itemToDelete').textContent = itemText;
+    
+    const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    modal.show();
+    
+    // Configurar botão de confirmação
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+        removerItem(itemId);
+        modal.hide();
+    };
+}
+
+function removerItem(itemId) {
+    console.log('Removendo item:', itemId);
+    
+    fetch('/admin/checklist-padrao/delete/' + itemId, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const element = document.querySelector('[data-id="' + itemId + '"]');
+            if (element) {
+                element.style.animation = 'slideOutUp 0.3s ease-out';
+                setTimeout(() => {
+                    element.remove();
+                    if (document.querySelectorAll('.checklist-item').length === 0) {
+                        setTimeout(() => location.reload(), 500);
+                    }
+                }, 300);
+                console.log('Item removido com sucesso');
+                showToast('Item removido com sucesso!', 'success');
+            }
+        } else {
+            showToast(data.error || 'Erro ao remover item', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showToast('Erro ao remover item', 'error');
+    });
+}
+
+function salvarOrdem() {
+    console.log('Salvando nova ordem');
+    
+    const items = Array.from(document.querySelectorAll('.checklist-item')).map((item, index) => ({
+        id: parseInt(item.dataset.id),
+        ordem: index + 1
+    }));
+    
+    fetch('/admin/checklist-padrao/reorder', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ items: items })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            items.forEach((item, index) => {
+                const orderSpan = document.querySelector('[data-id="' + item.id + '"] .text-muted');
+                if (orderSpan) {
+                    orderSpan.textContent = 'Ordem: ' + (index + 1);
+                }
+            });
+            console.log('Ordem atualizada com sucesso');
+        }
+    })
+    .catch(error => console.error('Erro ao salvar ordem:', error));
+}
+
+// Inicializar quando a página carregar
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Sistema administrativo inicializado');
+    
+    const container = document.getElementById('checklist-container');
+    if (container) {
+        new Sortable(container, {
+            handle: '.sortable-handle',
+            animation: 150,
+            onEnd: salvarOrdem
+        });
+        console.log('Sortable inicializado');
+    }
+    
+    // Verificar se funções estão disponíveis
+    console.log('Funções JavaScript verificadas:', {
+        adicionarNovoItem: typeof adicionarNovoItem,
+        salvarNovoItem: typeof salvarNovoItem,
+        editarItem: typeof editarItem,
+        confirmarRemocao: typeof confirmarRemocao,
+        removerItem: typeof removerItem,
+        salvarOrdem: typeof salvarOrdem
+    });
+});
+
+function cancelarEdicao(itemId) {
+    const textSpan = document.getElementById('text-' + itemId);
+    const editGroup = document.getElementById('edit-group-' + itemId);
+    const editInput = document.getElementById('edit-' + itemId);
+    
+    if (editGroup && textSpan && editInput) {
+        editGroup.classList.add('d-none');
+        textSpan.classList.remove('d-none');
+        editInput.value = textSpan.textContent;
+    }
+}
+
+// Teclas de atalho
+document.addEventListener('keydown', function(e) {
+    if (e.target.classList.contains('edit-field')) {
+        if (e.key === 'Enter') {
+            const itemId = e.target.id.replace('edit-', '');
+            editarItem(itemId);
+        } else if (e.key === 'Escape') {
+            const itemId = e.target.id.replace('edit-', '');
+            cancelarEdicao(itemId);
+        }
+    }
+});
+</script>
+{% endblock %}

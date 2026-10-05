@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Aprovadores{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">⚙️ Sistema de Aprovadores</h1>
+            <p class="text-muted">Gerenciar Aprovador Global e Aprovadores Temporários por projeto</p>
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Aprovador Global (ÚNICO) -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-primary shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-crown"></i> Aprovador Global
+                        </h5>
+                        <small>Único responsável por aprovações em todo o sistema</small>
+                    </div>
+                    <span class="badge bg-light text-primary">ÚNICO</span>
+                </div>
+                <div class="card-body">
+                    {% if aprovador_global %}
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="me-3">
+                                        <i class="fas fa-user-tie fa-3x text-primary"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="mb-0">{{ aprovador_global.aprovador.nome_completo }}</h4>
+                                        <p class="text-muted mb-0">
+                                            <i class="fas fa-envelope"></i> {{ aprovador_global.aprovador.email }}
+                                        </p>
+                                        <small class="text-info">
+                                            <i class="fas fa-calendar"></i> Desde {{ aprovador_global.created_at.strftime('%d/%m/%Y') }}
+                                        </small>
+                                    </div>
+                                </div>
+                                {% if aprovador_global.observacoes %}
+                                    <div class="alert alert-info mb-0">
+                                        <strong>Observações:</strong> {{ aprovador_global.observacoes }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 text-md-end">
+                                {% if is_current_user_aprovador_global %}
+                                    <button type="button" class="btn btn-warning btn-lg" data-bs-toggle="modal" data-bs-target="#transferirGlobalModal">
+                                        <i class="fas fa-exchange-alt"></i> Transferir Aprovação Global
+                                    </button>
+                                {% else %}
+                                    <div class="alert alert-warning mb-0">
+                                        <i class="fas fa-info-circle"></i> Apenas o Aprovador Global pode transferir essa função
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-exclamation-triangle fa-4x mb-3 text-warning"></i>
+                            <h5>Nenhum Aprovador Global configurado!</h5>
+                            <p>O sistema necessita de um Aprovador Global para funcionar corretamente.</p>
+                            {% if current_user.is_master %}
+                                <button type="button" class="btn btn-primary mt-3" data-bs-toggle="modal" data-bs-target="#definirGlobalModal">
+                                    <i class="fas fa-plus"></i> Definir Aprovador Global
+                                </button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aprovadores Relatório Express -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-info shadow-sm">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-file-signature"></i> Aprovadores Relatório Express
+                        </h5>
+                        <small>Permissão específica para aprovar/reprovar Relatórios Express</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-check-circle"></i> Aprovadores Atuais</h6>
+                            {% if express_approvers %}
+                                <ul class="list-group mb-3">
+                                    {% for user in express_approvers %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <strong>{{ user.nome_completo }}</strong> <br>
+                                                <small class="text-muted">{{ user.email }}</small>
+                                            </div>
+                                            {% if is_current_user_aprovador_global %}
+                                                <form method="POST" action="{{ url_for('admin_toggle_express_approver') }}" class="d-inline">
+                                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                                                    <input type="hidden" name="action" value="revoke">
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                            onclick="return confirm('Remover permissão de {{ user.nome_completo }}?')">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <div class="alert alert-light border">
+                                    <i class="fas fa-info-circle"></i> Nenhum aprovador específico definido.
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 border-start">
+                            <h6><i class="fas fa-plus"></i> Adicionar Permissão</h6>
+                            {% if is_current_user_aprovador_global %}
+                                <form method="POST" action="{{ url_for('admin_toggle_express_approver') }}" class="mt-3">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="action" value="grant">
+                                    
+                                    <div class="mb-3">
+                                        <label for="express_user_select" class="form-label">Selecione o usuário:</label>
+                                        <div class="input-group">
+                                            <select class="form-select" id="express_user_select" name="user_id" required>
+                                                <option value="">Escolha um usuário...</option>
+                                                {% for user in all_users %}
+                                                    {% if not user.is_aprovador_express %}
+                                                        <option value="{{ user.id }}">{{ user.nome_completo }}</option>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="fas fa-plus"></i> Conceder
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            {% else %}
+                                <div class="alert alert-warning mt-3">
+                                    <i class="fas fa-lock"></i> Apenas o Aprovador Global pode gerenciar estas permissões.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aprovadores Temporários por Projeto -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-project-diagram"></i> Aprovadores Temporários
+                        </h5>
+                        <small>Aprovadores específicos para projetos individuais</small>
+                    </div>
+                    {% if is_current_user_aprovador_global %}
+                        <a href="{{ url_for('admin_aprovador_temporario_novo') }}" class="btn btn-light btn-sm">
+                            <i class="fas fa-plus"></i> Adicionar Temporário
+                        </a>
+                    {% else %}
+                        <button class="btn btn-light btn-sm" disabled 
+                                title="Somente o Aprovador Global pode realizar esta ação"
+                                data-bs-toggle="tooltip">
+                            <i class="fas fa-plus"></i> Adicionar Temporário
+                        </button>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if aprovadores_temporarios %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th><i class="fas fa-building"></i> Projeto</th>
+                                        <th><i class="fas fa-user"></i> Aprovador</th>
+                                        <th><i class="fas fa-calendar"></i> Criado em</th>
+                                        <th class="text-center"><i class="fas fa-cog"></i> Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for aprovador in aprovadores_temporarios %}
+                                        <tr>
+                                            <td>
+                                                <strong>{{ aprovador.projeto.nome }}</strong>
+                                                {% if aprovador.observacoes %}
+                                                    <br><small class="text-muted">{{ aprovador.observacoes }}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-user-check"></i> {{ aprovador.aprovador.nome_completo }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <small>{{ aprovador.created_at.strftime('%d/%m/%Y às %H:%M') }}</small>
+                                            </td>
+                                            <td class="text-center">
+                                                {% if is_current_user_aprovador_global %}
+                                                    <a href="{{ url_for('admin_aprovador_padrao_desativar', id=aprovador.id) }}" 
+                                                       class="btn btn-outline-danger btn-sm" 
+                                                       title="Remover Aprovador Temporário"
+                                                       onclick="return confirm('Tem certeza que deseja remover este Aprovador Temporário do projeto {{ aprovador.projeto.nome }}?')">
+                                                        <i class="fas fa-trash"></i> Remover
+                                                    </a>
+                                                {% else %}
+                                                    <button class="btn btn-outline-secondary btn-sm" disabled
+                                                            title="Somente o Aprovador Global pode realizar esta ação"
+                                                            data-bs-toggle="tooltip">
+                                                        <i class="fas fa-lock"></i> Sem permissão
+                                                    </button>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-5">
+                            <i class="fas fa-folder-open fa-4x mb-3"></i>
+                            <h5>Nenhum Aprovador Temporário configurado</h5>
+                            <p>Aprovadores temporários substituem o Aprovador Global para projetos específicos.</p>
+                            {% if is_current_user_aprovador_global %}
+                                <a href="{{ url_for('admin_aprovador_temporario_novo') }}" class="btn btn-success mt-3">
+                                    <i class="fas fa-plus"></i> Adicionar Primeiro Aprovador Temporário
+                                </a>
+                            {% else %}
+                                <p class="text-muted mt-3">
+                                    <i class="fas fa-lock"></i> Somente o Aprovador Global pode adicionar aprovadores temporários
+                                </p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informações sobre funcionamento -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-info">
+                <div class="card-header bg-light border-info">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-info-circle text-info"></i> Como funciona o sistema de aprovação
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6 class="text-primary"><i class="fas fa-crown"></i> Aprovador Global:</h6>
+                            <ul class="small">
+                                <li><strong>Único</strong> em todo o sistema</li>
+                                <li>Aprova todos os relatórios <strong>sem aprovador temporário</strong></li>
+                                <li>Pode <strong>transferir</strong> o título para outro usuário</li>
+                                <li>Pode <strong>definir</strong> aprovadores temporários</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-success"><i class="fas fa-project-diagram"></i> Aprovadores Temporários:</h6>
+                            <ul class="small">
+                                <li>Vinculados a <strong>projetos específicos</strong></li>
+                                <li><strong>Substituem</strong> o Aprovador Global para aquele projeto</li>
+                                <li>Podem ser <strong>removidos</strong> pelo Aprovador Global</li>
+                                <li>Um por projeto</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-warning"><i class="fas fa-route"></i> Prioridade de Aprovação:</h6>
+                            <ol class="small">
+                                <li><strong>Aprovador Temporário</strong> do projeto (se configurado)</li>
+                                <li><strong>Aprovador Global</strong> (se nenhum temporário)</li>
+                                <li>A aprovação é <strong>automática</strong> no formulário</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botão voltar -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar ao Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Transferir Aprovador Global -->
+<div class="modal fade" id="transferirGlobalModal" tabindex="-1" aria-labelledby="transferirGlobalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="transferirGlobalModalLabel">
+                    <i class="fas fa-exchange-alt"></i> Transferir Aprovação Global
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_transferir_aprovador_global') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        <strong>Atenção:</strong> Você está transferindo o título de Aprovador Global para outro usuário.
+                        Esta ação <strong>não pode ser desfeita</strong> sem a cooperação do novo aprovador.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="novo_aprovador_id" class="form-label">Novo Aprovador Global:</label>
+                        <select class="form-select" id="novo_aprovador_id" name="novo_aprovador_id" required>
+                            <option value="">Selecione um usuário...</option>
+                            {% for usuario in usuarios_master %}
+                                {% if not aprovador_global or usuario.id != aprovador_global.aprovador_id %}
+                                    <option value="{{ usuario.id }}">{{ usuario.nome_completo }} ({{ usuario.email }})</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="fas fa-exchange-alt"></i> Confirmar Transferência
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Definir Aprovador Global (primeira vez) -->
+<div class="modal fade" id="definirGlobalModal" tabindex="-1" aria-labelledby="definirGlobalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="definirGlobalModalLabel">
+                    <i class="fas fa-crown"></i> Definir Aprovador Global
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_transferir_aprovador_global') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Defina o primeiro Aprovador Global do sistema.
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="novo_aprovador_id_inicial" class="form-label">Aprovador Global:</label>
+                        <select class="form-select" id="novo_aprovador_id_inicial" name="novo_aprovador_id" required>
+                            <option value="">Selecione um usuário...</option>
+                            {% for usuario in usuarios_master %}
+                                <option value="{{ usuario.id }}">{{ usuario.nome_completo }} ({{ usuario.email }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Definir Aprovador Global
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-mobile {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+.card {
+    border-radius: 10px;
+}
+
+.card-header {
+    border-top-left-radius: 10px !important;
+    border-top-right-radius: 10px !important;
+}
+
+@media (max-width: 768px) {
+    .container-fluid {
+        padding: 10px;
+    }
+    
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .d-flex.justify-content-between .btn {
+        margin-top: 10px;
+        width: 100%;
+    }
+    
+    .text-md-end {
+        text-align: left !important;
+        margin-top: 15px;
+    }
+}
+</style>
+
+<script>
+// Ativar tooltips do Bootstrap
+document.addEventListener('DOMContentLoaded', function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+{% endblock %}

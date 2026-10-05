@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.form-section {
+    border-left: 4px solid #007bff;
+    background-color: #f8f9fa;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 0 8px 8px 0;
+}
+.form-section h5 {
+    color: #007bff;
+    margin-bottom: 15px;
+}
+.template-preview {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+}
+@media (max-width: 768px) {
+    .form-section {
+        padding: 15px;
+    }
+    .btn-lg {
+        font-size: 1rem;
+        padding: 0.75rem 1.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-12">
+        <div class="d-flex align-items-center mb-4">
+            <a href="{{ url_for('configuracao_email_list') }}" class="btn btn-outline-secondary me-3">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h2>{{ title }}</h2>
+                <p class="text-muted mb-0">Configure as credenciais SMTP para envio de relatórios</p>
+            </div>
+        </div>
+
+        <form method="POST" id="emailConfigForm">
+            {{ form.hidden_tag() }}
+            
+            <!-- Configurações Básicas -->
+            <div class="form-section">
+                <h5><i class="fas fa-cog me-2"></i>Configurações Básicas</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        {{ form.nome_configuracao.label(class="form-label") }}
+                        {{ form.nome_configuracao(class="form-control") }}
+                        {% if form.nome_configuracao.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.nome_configuracao.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check mt-4">
+                            {{ form.ativo(class="form-check-input") }}
+                            {{ form.ativo.label(class="form-check-label") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configurações do Servidor -->
+            <div class="form-section">
+                <h5><i class="fas fa-server me-2"></i>Servidor SMTP</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        {{ form.servidor_smtp.label(class="form-label") }}
+                        {{ form.servidor_smtp(class="form-control", placeholder="smtp.gmail.com") }}
+                        {% if form.servidor_smtp.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.servidor_smtp.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.porta_smtp.label(class="form-label") }}
+                        {{ form.porta_smtp(class="form-control", placeholder="587") }}
+                        {% if form.porta_smtp.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.porta_smtp.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            {{ form.use_tls(class="form-check-input") }}
+                            {{ form.use_tls.label(class="form-check-label") }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            {{ form.use_ssl(class="form-check-input") }}
+                            {{ form.use_ssl.label(class="form-check-label") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configurações do Remetente -->
+            <div class="form-section">
+                <h5><i class="fas fa-user me-2"></i>Dados do Remetente</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        {{ form.nome_remetente.label(class="form-label") }}
+                        {{ form.nome_remetente(class="form-control", placeholder="ELP Consultoria e Engenharia") }}
+                        {% if form.nome_remetente.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.nome_remetente.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.email_remetente.label(class="form-label") }}
+                        {{ form.email_remetente(class="form-control", placeholder="relatorios@elp.com.br") }}
+                        {% if form.email_remetente.errors %}
+                            <div class="text-danger mt-1">
+                                {% for error in form.email_remetente.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Templates de E-mail -->
+            <div class="form-section">
+                <h5><i class="fas fa-envelope me-2"></i>Templates de E-mail</h5>
+                <div class="mb-3">
+                    {{ form.template_assunto.label(class="form-label") }}
+                    {{ form.template_assunto(class="form-control") }}
+                    <small class="form-text text-muted">
+                        Variáveis disponíveis: {projeto_nome}, {data}
+                    </small>
+                </div>
+                <div class="mb-3">
+                    {{ form.template_corpo.label(class="form-label") }}
+                    {{ form.template_corpo(class="form-control", rows="8") }}
+                    <small class="form-text text-muted">
+                        Variáveis disponíveis: {nome_cliente}, {data_visita}, {projeto_nome}. Use HTML básico para formatação.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="{{ url_for('configuracao_email_list') }}" class="btn btn-secondary">
+                    <i class="fas fa-times me-2"></i>Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-save me-2"></i>Salvar Configuração
+                </button>
+            </div>
+        </form>
+
+        <!-- Alertas informativos -->
+        <div class="mt-4">
+            <div class="alert alert-warning">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>Importante:</h6>
+                <ul class="mb-0">
+                    <li>A senha do e-mail deve ser configurada via variável de ambiente <code>MAIL_PASSWORD</code></li>
+                    <li>Para Gmail, use uma "Senha de App" em vez da senha normal</li>
+                    <li>Apenas uma configuração pode estar ativa por vez</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Exemplos rápidos -->
+<div class="row mt-4">
+    <div class="col-12">
+        <h4>Configurações Comuns</h4>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fab fa-google me-2"></i>Gmail
+                    </div>
+                    <div class="card-body">
+                        <strong>Servidor:</strong> smtp.gmail.com<br>
+                        <strong>Porta:</strong> 587<br>
+                        <strong>TLS:</strong> Ativado<br>
+                        <strong>SSL:</strong> Desativado
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <i class="fab fa-microsoft me-2"></i>Outlook
+                    </div>
+                    <div class="card-body">
+                        <strong>Servidor:</strong> smtp-mail.outlook.com<br>
+                        <strong>Porta:</strong> 587<br>
+                        <strong>TLS:</strong> Ativado<br>
+                        <strong>SSL:</strong> Desativado
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Pré-definir alguns valores comuns
+    const servidorField = document.getElementById('servidor_smtp');
+    const portaField = document.getElementById('porta_smtp');
+    const tlsField = document.getElementById('use_tls');
+    const sslField = document.getElementById('use_ssl');
+    
+    servidorField.addEventListener('change', function() {
+        const servidor = this.value.toLowerCase();
+        
+        if (servidor.includes('gmail')) {
+            portaField.value = '587';
+            tlsField.checked = true;
+            sslField.checked = false;
+        } else if (servidor.includes('outlook')) {
+            portaField.value = '587';
+            tlsField.checked = true;
+            sslField.checked = false;
+        }
+    });
+});
+</script>
+{% endblock %}
