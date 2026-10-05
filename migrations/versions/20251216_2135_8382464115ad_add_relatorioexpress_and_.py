@@ -81,8 +81,11 @@ def upgrade() -> None:
             print(f"Column {col_name} might already exist: {e}")
     
     # Update obra_nome to not be nullable (set default for existing rows)
-    op.execute("UPDATE relatorios_express SET obra_nome = COALESCE(empresa_nome, 'Obra Express') WHERE obra_nome IS NULL")
-    op.execute("UPDATE relatorios_express SET titulo = 'Relatório Express' WHERE titulo IS NULL")
+    try:
+        op.execute("UPDATE relatorios_express SET obra_nome = COALESCE(empresa_nome, 'Obra Express') WHERE obra_nome IS NULL")
+        op.execute("UPDATE relatorios_express SET titulo = 'Relatório Express' WHERE titulo IS NULL")
+    except Exception as e:
+        print(f"Update relatorios_express notice: {e}")
 
 
 def downgrade() -> None:

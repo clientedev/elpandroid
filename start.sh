@@ -40,7 +40,6 @@ echo "🌐 Starting Gunicorn with: $BIND_ARGS..."
 exec gunicorn $BIND_ARGS \
               --workers=2 \
               --timeout=120 \
-              --preload \
               --access-logfile=- \
               --error-logfile=- \
               --log-level=info \
