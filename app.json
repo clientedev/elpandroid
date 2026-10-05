@@ -1,25 +1,39 @@
-{
+﻿{
   "expo": {
-    "name": "ObraFlowAndroid",
-    "slug": "ObraFlowAndroid",
+    "name": "ObraFlow",
+    "slug": "obraflow-android",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#1E293B"
+    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.obraflow.app",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#1E293B",
+        "foregroundImage": "./assets/android-icon-foreground.png"
       },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      "expo-sqlite",
+      "expo-sharing",
+      "expo-secure-store"
+    ]
   }
 }

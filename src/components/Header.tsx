@@ -1,0 +1,140 @@
+﻿import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../contexts/AuthContext';
+import { useNetwork } from '../contexts/NetworkContext';
+import { Colors, Shadows } from '../theme/colors';
+
+interface HeaderProps {
+  title: string;
+  subtitle?: string;
+  showBack?: boolean;
+  onBack?: () => void;
+  rightAction?: React.ReactNode;
+}
+
+export const Header: React.FC<HeaderProps> = ({ 
+  title, 
+  subtitle, 
+  showBack, 
+  onBack, 
+  rightAction 
+}) => {
+  const { user } = useAuth();
+  const { isOnline } = useNetwork();
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.left}>
+        {showBack && (
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+        )}
+        <View>
+          <Text style={styles.title}>{title}</Text>
+          {subtitle ? (
+            <Text style={styles.subtitle}>{subtitle}</Text>
+          ) : (
+            <View style={styles.statusIndicator}>
+              <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+              <Text style={styles.statusText}>{isOnline ? 'Online (Railway)' : 'Offline (Local)'}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.right}>
+        {rightAction ? (
+          rightAction
+        ) : (
+          <View style={styles.userBadge}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>
+                {user?.username ? user.username.substring(0, 2).toUpperCase() : 'OF'}
+              </Text>
+            </View>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    ...Shadows.sm,
+  },
+  left: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  backButton: {
+    padding: 4,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  onlineDot: {
+    backgroundColor: Colors.success,
+  },
+  offlineDot: {
+    backgroundColor: Colors.danger,
+  },
+  statusText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  right: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.primaryBackground,
+    borderWidth: 1.5,
+    borderColor: Colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+});
