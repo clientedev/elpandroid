@@ -3,6 +3,9 @@
 
 echo "🚀 RAILWAY DEPLOYMENT - Starting ELP Backend..."
 
+# Ensure necessary directories exist
+mkdir -p uploads static/reports uploads/ELP
+
 # Check and normalize DATABASE_URL
 if [ -z "$DATABASE_URL" ]; then
     if [ -n "$POSTGRESQL_URL" ]; then
@@ -22,13 +25,19 @@ else
     echo "⚠️ Warning: DATABASE_URL not set yet. Starting app in standalone mode."
 fi
 
-# Ensure PORT is defined (default to 5000 if not set by Railway)
+# Multi-port binding to support any Railway port configuration
 PORT="${PORT:-5000}"
-echo "🌐 Starting Gunicorn server on 0.0.0.0:${PORT}..."
+BIND_ARGS="--bind=0.0.0.0:${PORT}"
+if [ "$PORT" != "8081" ]; then
+    BIND_ARGS="$BIND_ARGS --bind=0.0.0.0:8081"
+fi
 
-exec gunicorn --bind="0.0.0.0:${PORT}" \
+echo "🌐 Starting Gunicorn with: $BIND_ARGS..."
+
+exec gunicorn $BIND_ARGS \
               --workers=2 \
               --timeout=120 \
+              --preload \
               --access-logfile=- \
               --error-logfile=- \
               --log-level=info \

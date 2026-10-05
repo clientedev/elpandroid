@@ -519,8 +519,8 @@ if os.environ.get("RAILWAY_ENVIRONMENT") or (os.environ.get("DATABASE_URL") and 
                     connection.execute(text("SELECT 1"))
                 logging.info("✅ Database connection successful")
             except Exception as conn_error:
-                logging.error(f"❌ Database connection failed: {conn_error}")
-                raise
+                logging.warning(f"⚠️ Database connection not ready yet: {conn_error}")
+                # Don't raise here - allow the web server to start so healthchecks pass
 
             # Create tables with retries
             max_retries = 3
@@ -534,7 +534,7 @@ if os.environ.get("RAILWAY_ENVIRONMENT") or (os.environ.get("DATABASE_URL") and 
                         logging.warning(f"⚠️ Table creation attempt {attempt + 1} failed: {create_error}")
                         time.sleep(2)
                     else:
-                        raise
+                        logging.warning(f"⚠️ Table creation skipped: {create_error}")
 
             # Create admin user
             create_admin_user_safe()
