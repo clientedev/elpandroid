@@ -24,9 +24,18 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
   // Migration: ensure base64 column exists in fotos_relatorio
   try {
     await db.execAsync('ALTER TABLE fotos_relatorio ADD COLUMN base64 TEXT;');
-  } catch {
-    // Column already exists
-  }
+  } catch {}
+
+  // Migration: ensure uuid and audit columns exist in relatorios
+  try {
+    await db.execAsync('ALTER TABLE relatorios ADD COLUMN uuid TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios ADD COLUMN data_criacao_local TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios ADD COLUMN data_sincronizacao TEXT;');
+  } catch {}
   
   // Seed initial legendas if empty
   const countRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM legendas_predefinidas');
@@ -185,8 +194,8 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       autor_id, autor_nome, aprovador_id, aprovador_nome, data_relatorio,
       data_aprovacao, conteudo, descricao, checklist_data, categoria, local,
       lembrete_proxima_visita, observacoes_finais, status, comentario_aprovacao,
-      acompanhantes, created_at, updated_at, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      acompanhantes, created_at, updated_at, uuid, data_criacao_local, data_sincronizacao, sync_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       r.id, r.numero, r.numero_projeto || null, r.titulo, r.projeto_id,
       r.projeto_nome || '', r.visita_id || null, r.autor_id, r.autor_nome || '',
@@ -195,8 +204,22 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       r.categoria || '', r.local || '', r.lembrete_proxima_visita || null,
       r.observacoes_finais || '', r.status || 'em_andamento', r.comentario_aprovacao || '',
       r.acompanhantes || '[]', r.created_at || new Date().toISOString(),
-      new Date().toISOString(), syncStatus
+      new Date().toISOString(), r.uuid || r.uuid_local || '',
+      r.data_criacao_local || r.created_at || new Date().toISOString(),
+      r.data_sincronizacao || null, syncStatus
     ]
+  );
+}
+
+export async function updateLocalRelatorioNumero(
+  id: number,
+  officialNumero: string,
+  syncedAt?: string
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE relatorios SET numero = ?, sync_status = "synced", data_sincronizacao = ?, updated_at = ? WHERE id = ?`,
+    [officialNumero, syncedAt || new Date().toISOString(), new Date().toISOString(), id]
   );
 }
 

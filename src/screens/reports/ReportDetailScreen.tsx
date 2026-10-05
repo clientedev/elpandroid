@@ -44,7 +44,23 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     }
   }
 
-  const isApprover = Boolean(user?.is_master || (user as any)?.is_aprovador || user?.is_aprovador_express);
+  const isAuthor = Boolean(user && relatorio && user.id === relatorio.autor_id);
+  const isMasterOrAdmin = Boolean(
+    user?.is_master || 
+    (user as any)?.is_admin || 
+    (user as any)?.role === 'admin' || 
+    (user as any)?.role === 'master' ||
+    user?.username?.toLowerCase() === 'admin'
+  );
+  const hasApproverPrivilege = Boolean(
+    isMasterOrAdmin || 
+    (user as any)?.is_aprovador || 
+    user?.is_aprovador_express || 
+    (user as any)?.role === 'aprovador'
+  );
+  // Master/Admin pode aprovar qualquer relatório; Aprovador comum não pode aprovar o próprio
+  const isApprover = isMasterOrAdmin || (hasApproverPrivilege && !isAuthor);
+
 
   async function handleExportPDF() {
     if (!relatorio) return;
@@ -224,6 +240,35 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
             ]}>
               <Text style={styles.statusPillText}>{relatorio.status === 'em_andamento' ? 'Rascunho' : relatorio.status}</Text>
             </View>
+          </View>
+
+          {/* Dados de Auditoria e Sincronização */}
+          <View style={{ backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, marginTop: 12, borderWidth: 1, borderColor: '#E2E8F0' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.primary, marginBottom: 6 }}>
+              REGISTRO DE AUDITORIA & NUMERAÇÃO
+            </Text>
+            <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 2 }}>
+              • <Text style={{ fontWeight: '600' }}>Número Oficial:</Text> {relatorio.numero?.startsWith('REL-') ? relatorio.numero : 'Pendente de Atribuição pelo Servidor'}
+            </Text>
+            {relatorio.uuid ? (
+              <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 2 }}>
+                • <Text style={{ fontWeight: '600' }}>UUID Local:</Text> {relatorio.uuid}
+              </Text>
+            ) : null}
+            {relatorio.data_criacao_local ? (
+              <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 2 }}>
+                • <Text style={{ fontWeight: '600' }}>Criado em:</Text> {new Date(relatorio.data_criacao_local).toLocaleString('pt-BR')}
+              </Text>
+            ) : null}
+            {relatorio.data_sincronizacao ? (
+              <Text style={{ fontSize: 11, color: '#16A34A', marginBottom: 2 }}>
+                • <Text style={{ fontWeight: '600' }}>Sincronizado em:</Text> {new Date(relatorio.data_sincronizacao).toLocaleString('pt-BR')}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 11, color: '#D97706', marginBottom: 2 }}>
+                • <Text style={{ fontWeight: '600' }}>Sincronização:</Text> Pendente (será enviado automaticamente quando online)
+              </Text>
+            )}
           </View>
 
           {relatorio.status === 'em_andamento' && (

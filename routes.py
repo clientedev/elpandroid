@@ -12355,13 +12355,15 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.5',
+        'version': '1.0.6',
+        'versionCode': 7,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.5: Sincronização persistente de fotos no banco Railway, organização de pastas locais no celular em ELP RELATORIOS por obra, logo no hero do app, cabeçalho rebaixado sem sobrepor status bar do Android e tela inicial com widgets personalizáveis.',
+        'notes': 'Atualização 1.0.6: Numeração sequencial atômica de relatórios (REL-XXXX) emitida com exclusividade pelo servidor sem risco de duplicação entre múltiplos usuários offline; idempotência e auditoria completa por UUID imutável; barra de abas inferior elevada para não sobrepor botões nativos do celular; sincronização contínua automática sem necessidade de clique; espelhamento de fotos em pastas públicas do celular (Pictures/ELP RELATORIOS); matriz de acesso RBAC revisada.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
+
 
 @app.route('/download/ELP.apk', methods=['GET'])
 def download_official_apk():
@@ -12677,7 +12679,7 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
 @app.route('/api/relatorios', methods=['GET', 'POST'])
 @csrf.exempt
 def api_relatorios_collection():
-    """Colecao de relatorios para mobile (sincronizacao bidirecional)"""
+    """Colecao de relatorios para mobile (sincronizacao bidirecional com numeracao sequencial atomica e idempotente)"""
     if request.method == 'POST':
         try:
             data = request.get_json(silent=True) or request.form or {}
@@ -12700,21 +12702,63 @@ def api_relatorios_collection():
                 except Exception:
                     visita_id = None
 
-            numero = (data.get('numero') or '').strip()
-            existing = Relatorio.query.filter_by(projeto_id=projeto_id, numero=numero).first() if numero else None
+            # UUID gerado offline no dispositivo móvel
+            rel_uuid = (data.get('uuid') or data.get('uuid_local') or '').strip()
+            data_criacao_local_raw = data.get('data_criacao_local')
+            data_criacao_local_dt = _parse_iso_date(data_criacao_local_raw, default=brazil_now())
+            numero_informado = (data.get('numero') or '').strip()
+
+            existing = None
+            # 1. Regra de idempotência estrita por UUID
+            if rel_uuid:
+                existing = Relatorio.query.filter_by(uuid=rel_uuid).first()
             
+            # Fallback de busca por numero se já foi informado e existente no projeto
+            if not existing and numero_informado and not numero_informado.startswith('OFF-') and not numero_informado.startswith('TEMP-'):
+                existing = Relatorio.query.filter_by(projeto_id=projeto_id, numero=numero_informado).first()
+
             if existing:
+                # O relatório já foi sincronizado antes ou já existe:
+                # IDEMPOTÊNCIA: Manter o número oficial inalterado! Jamais gerar outro número ou duplicar registro.
                 relatorio = existing
+                if not relatorio.uuid and rel_uuid:
+                    relatorio.uuid = rel_uuid
+                if not relatorio.data_criacao_local and data_criacao_local_dt:
+                    relatorio.data_criacao_local = data_criacao_local_dt
+                relatorio.data_sincronizacao = brazil_now()
+                current_app.logger.info(f"🔄 Relatório idempotente reutilizado: {relatorio.numero} (UUID: {relatorio.uuid})")
             else:
-                if not numero:
-                    total_rels = Relatorio.query.filter_by(projeto_id=projeto_id).count() + 1
-                    numero = f"REL-{total_rels:03d}"
+                # NOVO RELATÓRIO: Numeração atribuída exclusivamente pelo servidor
+                # Bloqueio de linha (row lock) no Projeto para garantir atomicidade em concorrência simultânea
+                try:
+                    projeto_obj = Projeto.query.with_for_update().filter_by(id=projeto_id).first()
+                except Exception as lock_err:
+                    current_app.logger.warning(f"with_for_update lock aviso (normal em SQLite): {lock_err}")
+                    projeto_obj = Projeto.query.filter_by(id=projeto_id).first()
+
+                # Busca atômica do maior numero_projeto já atribuído neste projeto
+                max_num = db.session.query(db.func.max(Relatorio.numero_projeto)).filter_by(projeto_id=projeto_id).scalar() or 0
+                num_inicial = getattr(projeto_obj, 'numeracao_inicial', 1) if projeto_obj else 1
+                if not num_inicial or num_inicial < 1:
+                    num_inicial = 1
+
+                proximo_numero_projeto = max(num_inicial - 1, max_num) + 1
+                official_numero = f"REL-{proximo_numero_projeto:04d}"
+
+                if not rel_uuid:
+                    rel_uuid = str(uuid.uuid4())
+
                 relatorio = Relatorio(
-                    numero=numero,
+                    uuid=rel_uuid,
+                    numero=official_numero,
+                    numero_projeto=proximo_numero_projeto,
                     projeto_id=projeto_id,
-                    autor_id=autor_id
+                    autor_id=autor_id,
+                    data_criacao_local=data_criacao_local_dt,
+                    data_sincronizacao=brazil_now()
                 )
                 db.session.add(relatorio)
+                current_app.logger.info(f"✨ Novo relatório criado com numeração atômica: {official_numero} (UUID: {rel_uuid})")
 
             relatorio.titulo = data.get('titulo') or 'Relatório de Visita Técnica'
             relatorio.visita_id = visita_id
@@ -12738,7 +12782,12 @@ def api_relatorios_collection():
                 'success': True,
                 'message': 'Relatório sincronizado com sucesso',
                 'id': relatorio.id,
-                'numero': relatorio.numero
+                'numero': relatorio.numero,
+                'numero_projeto': relatorio.numero_projeto,
+                'uuid': relatorio.uuid,
+                'data_criacao_local': relatorio.data_criacao_local.isoformat() if relatorio.data_criacao_local else None,
+                'data_sincronizacao': relatorio.data_sincronizacao.isoformat() if relatorio.data_sincronizacao else None,
+                'status': relatorio.status
             }), 201
         except Exception as post_err:
             db.session.rollback()
@@ -12779,7 +12828,9 @@ def api_relatorios_collection():
 
             result.append({
                 'id': r.id,
+                'uuid': r.uuid,
                 'numero': r.numero,
+                'numero_projeto': r.numero_projeto,
                 'titulo': r.titulo,
                 'projeto_id': r.projeto_id,
                 'projeto_nome': p_nome,
@@ -12787,6 +12838,8 @@ def api_relatorios_collection():
                 'autor_id': r.autor_id,
                 'autor_nome': a_nome,
                 'data_relatorio': r.data_relatorio.isoformat() if r.data_relatorio else None,
+                'data_criacao_local': r.data_criacao_local.isoformat() if r.data_criacao_local else None,
+                'data_sincronizacao': r.data_sincronizacao.isoformat() if r.data_sincronizacao else None,
                 'status': r.status,
                 'descricao': r.descricao or '',
                 'checklist_data': r.checklist_data or '[]',
@@ -12800,6 +12853,7 @@ def api_relatorios_collection():
     except Exception as e:
         current_app.logger.error(f'Erro ao listar relatorios na API: {e}')
         return jsonify([]), 200
+
 
 @app.route('/api/fotos/<int:foto_id>', methods=['GET'])
 @csrf.exempt

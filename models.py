@@ -401,8 +401,11 @@ class Relatorio(db.Model):
     status = db.Column(db.String(50), default='em_andamento')  # em_andamento (legado), preenchimento, Aguardando Aprovação, Aprovado, Rejeitado
     comentario_aprovacao = db.Column(db.Text)
     acompanhantes = db.Column(JSONB, nullable=True)  # JSONB array of visit attendees
-    criado_por = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Usuário que criou
-    atualizado_por = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)  # Último usuário que atualizou
+    # Campos de Auditoria e Numeração Atômica Sequencial
+    uuid = db.Column(db.String(64), unique=True, index=True, nullable=True)  # UUID único e imutável gerado offline
+    data_criacao_local = db.Column(db.DateTime, nullable=True)  # Data/hora original de criação no dispositivo
+    data_sincronizacao = db.Column(db.DateTime, nullable=True)  # Data/hora de confirmação pelo servidor central
+
     created_at = db.Column(db.DateTime, default=brazil_now)
     updated_at = db.Column(db.DateTime, default=brazil_now, onupdate=brazil_now)
     

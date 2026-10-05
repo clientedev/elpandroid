@@ -7,7 +7,7 @@ import {
   getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
-  saveLocalReembolso, getLocalFotos, saveLocalFoto, getDatabase
+  saveLocalReembolso, getLocalFotos, saveLocalFoto, updateLocalRelatorioNumero, getDatabase
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
 
@@ -26,7 +26,7 @@ class SyncService {
   /**
    * Initializes automatic synchronization:
    * 1. Detects internet connection recovery
-   * 2. Periodic sync check (heartbeat every 35s)
+   * 2. Periodic sync check (heartbeat every 20s)
    * 3. Syncs when app returns from background
    */
   private initAutoSync() {
@@ -36,7 +36,7 @@ class SyncService {
       if (online) {
         // Debounce connection burst
         const now = Date.now();
-        if (now - this.lastSyncTimestamp > 5000) {
+        if (now - this.lastSyncTimestamp > 3000) {
           this.syncAll(false);
         }
       } else {
@@ -44,7 +44,7 @@ class SyncService {
       }
     });
 
-    // 2. Heartbeat check every 35 seconds
+    // 2. Heartbeat check every 20 seconds (sincronização automática contínua e transparente)
     if (this.autoSyncInterval) {
       clearInterval(this.autoSyncInterval);
     }
@@ -56,7 +56,7 @@ class SyncService {
           await this.syncAll(false);
         }
       }
-    }, 35000);
+    }, 20000);
 
     // 3. Foreground resume listener
     AppState.addEventListener('change', async (state: AppStateStatus) => {
@@ -64,13 +64,14 @@ class SyncService {
         const online = await this.isOnline();
         if (online) {
           const now = Date.now();
-          if (now - this.lastSyncTimestamp > 10000) {
+          if (now - this.lastSyncTimestamp > 5000) {
             this.syncAll(false);
           }
         }
       }
     });
   }
+
 
   subscribe(listener: (state: SyncState, pendingCount: number) => void) {
     this.listeners.push(listener);
@@ -187,7 +188,13 @@ class SyncService {
           } else if (item.entity_type === 'visita') {
             await db.runAsync('UPDATE visitas SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'relatorio') {
-            await db.runAsync('UPDATE relatorios SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+            const officialNumero = response?.data?.numero;
+            const syncedAt = response?.data?.data_sincronizacao;
+            if (officialNumero) {
+              await updateLocalRelatorioNumero(item.entity_id, officialNumero, syncedAt);
+            } else {
+              await db.runAsync('UPDATE relatorios SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+            }
           } else if (item.entity_type === 'relatorio_express') {
             await db.runAsync('UPDATE relatorios_express SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'lembrete') {

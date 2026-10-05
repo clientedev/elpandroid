@@ -107,6 +107,9 @@ CREATE TABLE IF NOT EXISTS relatorios (
   acompanhantes TEXT,
   created_at TEXT,
   updated_at TEXT,
+  uuid TEXT,
+  data_criacao_local TEXT,
+  data_sincronizacao TEXT,
   sync_status TEXT DEFAULT 'synced'
 );
 

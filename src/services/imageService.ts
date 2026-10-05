@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
@@ -8,6 +9,15 @@ export interface CapturedPhoto {
 
 const docDir = (FileSystem as any).documentDirectory || '';
 const ROOT_DIR_NAME = 'ELP RELATORIOS';
+
+/**
+ * Caminhos públicos no Android onde o usuário consegue ver pelo "Meus Arquivos" ou "Galeria"
+ */
+const PUBLIC_ANDROID_DIRS = [
+  'file:///storage/emulated/0/Pictures/',
+  'file:///storage/emulated/0/Documents/',
+  'file:///sdcard/Pictures/',
+];
 
 /**
  * Garante a criação da pasta principal 'ELP RELATORIOS' e a subpasta com o nome da respectiva Obra
@@ -43,6 +53,38 @@ export async function ensureObraDirectory(projectName?: string): Promise<string>
   }
 
   return obraDir;
+}
+
+/**
+ * Espelha a foto na pasta pública do celular (Pictures/ELP RELATORIOS/<Obra>/) para visualização imediata nos Arquivos
+ */
+export async function mirrorToPublicFolder(sourceUri: string, projectName?: string, filename?: string): Promise<void> {
+  if (Platform.OS !== 'android' || !sourceUri) return;
+
+  const safeProject = (projectName || 'Obra Geral')
+    .replace(/[\/\\?%*:|"<>]/g, '_')
+    .trim() || 'Obra Geral';
+
+  const fname = filename || `foto_${Date.now()}.jpg`;
+
+  for (const basePath of PUBLIC_ANDROID_DIRS) {
+    try {
+      const publicObraDir = `${basePath}${ROOT_DIR_NAME}/${safeProject}/`;
+      const dirInfo = await (FileSystem as any).getInfoAsync(publicObraDir);
+      if (!dirInfo.exists) {
+        await (FileSystem as any).makeDirectoryAsync(publicObraDir, { intermediates: true });
+      }
+      const publicDestUri = `${publicObraDir}${fname}`;
+      await (FileSystem as any).copyAsync({
+        from: sourceUri,
+        to: publicDestUri,
+      });
+      // Se copiou com sucesso em um dos diretórios públicos, conclui
+      break;
+    } catch (e) {
+      // Ignora silenciosamente e tenta o próximo caminho
+    }
+  }
 }
 
 /**
@@ -97,6 +139,8 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
             from: asset.uri,
             to: permanentUri,
           });
+          // Espelha para a pasta pública acessível pelo app Meus Arquivos / Galeria do celular
+          mirrorToPublicFolder(permanentUri, projectName, filename).catch(() => {});
           return {
             uri: permanentUri,
             base64: asset.base64 || undefined,
@@ -148,6 +192,8 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
             from: asset.uri,
             to: permanentUri,
           });
+          // Espelha para a pasta pública acessível pelo app Meus Arquivos / Galeria do celular
+          mirrorToPublicFolder(permanentUri, projectName, filename).catch(() => {});
           return {
             uri: permanentUri,
             base64: asset.base64 || undefined,

@@ -144,10 +144,19 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
           >
             <View style={styles.cardHeader}>
               <View style={styles.badgeRow}>
-                <View style={styles.numBadge}>
-                  <Text style={styles.numText}>{item.numero}</Text>
-                </View>
+                {item.numero && item.numero.startsWith('REL-') ? (
+                  <View style={styles.numBadge}>
+                    <Text style={styles.numText}>{item.numero}</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.numBadge, { backgroundColor: '#FEF3C7' }]}>
+                    <Text style={[styles.numText, { color: '#B45309' }]}>
+                      {item.uuid ? `PENDENTE • ${item.uuid.substring(0, 6)}` : 'OFFLINE'}
+                    </Text>
+                  </View>
+                )}
                 <SyncStatusBadge status={item.sync_status} />
+
               </View>
               <Text style={styles.dateText}>
                 {item.data_relatorio ? new Date(item.data_relatorio).toLocaleDateString('pt-BR') : ''}

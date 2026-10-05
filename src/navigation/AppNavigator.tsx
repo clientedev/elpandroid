@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../contexts/AuthContext';
@@ -31,6 +32,9 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function TabNavigator() {
+  const insets = useSafeAreaInsets();
+  const safeBottom = Math.max(insets.bottom, Platform.OS === 'android' ? 18 : 10);
+
   return (
     <Tab.Navigator
       initialRouteName="DashboardTab"
@@ -41,13 +45,20 @@ function TabNavigator() {
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopColor: Colors.border,
-          height: 62,
-          paddingBottom: 8,
-          paddingTop: 6,
+          borderTopWidth: 1,
+          height: 60 + safeBottom,
+          paddingBottom: safeBottom,
+          paddingTop: 8,
+          elevation: 12,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 4,
         },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
+          marginTop: -2,
         },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'cube-outline';

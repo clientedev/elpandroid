@@ -101,6 +101,10 @@ export interface Relatorio {
   acompanhantes?: string;
   created_at?: string;
   updated_at?: string;
+  uuid?: string;
+  uuid_local?: string;
+  data_criacao_local?: string;
+  data_sincronizacao?: string;
   sync_status?: 'synced' | 'pending' | 'error';
   fotos_count?: number;
 }

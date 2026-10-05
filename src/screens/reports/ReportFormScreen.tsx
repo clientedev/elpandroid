@@ -48,7 +48,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(preSelectedProjectId || null);
-  const [reportNumber, setReportNumber] = useState(`REL-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`);
+  const [reportUuid, setReportUuid] = useState(() => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+  const [reportNumber, setReportNumber] = useState('Pendente Sincronização');
   const [titulo, setTitulo] = useState('Relatório de Vistoria Técnica');
   const [categoria, setCategoria] = useState('Geral');
   const [local, setLocal] = useState('Fachada Principal');
@@ -89,7 +90,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       getLocalRelatorioById(initialReportId).then(async (r) => {
         if (r) {
           setCurrentReportId(r.id);
-          setReportNumber(r.numero);
+          if (r.uuid) setReportUuid(r.uuid);
+          setReportNumber(r.numero || 'Pendente Sincronização');
           setTitulo(r.titulo);
           setSelectedProjectId(r.projeto_id);
           setDescricao(r.descricao || '');
@@ -126,6 +128,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         const selectedProj = projetos.find(p => p.id === selectedProjectId);
         const draft: Relatorio = {
           id: currentReportId,
+          uuid: reportUuid,
+          uuid_local: reportUuid,
+          data_criacao_local: new Date().toISOString(),
           numero: reportNumber,
           titulo: titulo.trim() || 'Rascunho de Relatório',
           projeto_id: selectedProjectId,
@@ -282,6 +287,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
       const relData: Relatorio = {
         id: reportId,
+        uuid: reportUuid,
+        uuid_local: reportUuid,
+        data_criacao_local: new Date().toISOString(),
         numero: reportNumber,
         titulo: titulo.trim(),
         projeto_id: selectedProjectId,
@@ -377,13 +385,45 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           <Text style={styles.sectionTitle}>1. Identificação da Obra</Text>
 
           {/* Number Locked */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Número do Relatório (Sequencial Travado)</Text>
-            <View style={styles.lockedNumberBox}>
-              <Ionicons name="lock-closed" size={16} color={Colors.textMuted} />
-              <Text style={styles.lockedNumberText}>{reportNumber}</Text>
-            </View>
-          </View>
+          {(() => {
+            const isOfficial = Boolean(reportNumber && reportNumber.startsWith('REL-'));
+            return (
+              <View style={styles.inputGroup}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text style={styles.label}>Número Oficial do Relatório</Text>
+                  <View style={{ 
+                    backgroundColor: isOfficial ? '#DCFCE7' : '#FEF3C7', 
+                    paddingHorizontal: 8, 
+                    paddingVertical: 2, 
+                    borderRadius: 6 
+                  }}>
+                    <Text style={{ 
+                      fontSize: 10, 
+                      color: isOfficial ? '#15803D' : '#B45309', 
+                      fontWeight: '700' 
+                    }}>
+                      {isOfficial ? 'OFICIAL • SERVIDOR' : 'OFFLINE • PENDENTE SYNC'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.lockedNumberBox, isOfficial && { borderColor: '#16A34A', backgroundColor: '#F0FDF4' }]}>
+                  <Ionicons 
+                    name={isOfficial ? "checkmark-circle" : "cloud-offline-outline"} 
+                    size={18} 
+                    color={isOfficial ? "#16A34A" : Colors.warning} 
+                  />
+                  <Text style={[styles.lockedNumberText, isOfficial && { color: '#15803D', fontWeight: '700' }]}>
+                    {isOfficial ? reportNumber : `Pendente Sincronização • UUID: ${reportUuid.substring(0, 8)}`}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
+                  {isOfficial 
+                    ? 'Número sequencial atômico validado e atribuído pelo servidor central.' 
+                    : 'A numeração oficial (REL-0001, REL-0042, etc.) é gerada exclusivamente pelo servidor central na ordem de sincronização.'}
+                </Text>
+              </View>
+            );
+          })()}
 
           <Text style={styles.label}>Obra Correspondente *</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>

@@ -500,8 +500,38 @@ def init_database():
 
             # Create default legendas if they don't exist
             create_default_legendas()
+
+            # Ensure uuid and audit columns exist in relatorios table
+            ensure_relatorios_uuid_columns()
     except Exception as e:
         logging.error(f"Database initialization error: {e}")
+
+def ensure_relatorios_uuid_columns():
+    """Garante a existência das colunas uuid, data_criacao_local e data_sincronizacao na tabela relatorios"""
+    try:
+        with db.engine.connect() as conn:
+            dialect = db.engine.dialect.name
+            if dialect == 'postgresql':
+                conn.execute(text("ALTER TABLE relatorios ADD COLUMN IF NOT EXISTS uuid VARCHAR(64);"))
+                conn.execute(text("ALTER TABLE relatorios ADD COLUMN IF NOT EXISTS data_criacao_local TIMESTAMP;"))
+                conn.execute(text("ALTER TABLE relatorios ADD COLUMN IF NOT EXISTS data_sincronizacao TIMESTAMP;"))
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_relatorios_uuid ON relatorios (uuid) WHERE uuid IS NOT NULL;"))
+                conn.commit()
+                logging.info("✅ Colunas uuid e auditoria verificadas/adicionadas no PostgreSQL")
+            elif dialect == 'sqlite':
+                res = conn.execute(text("PRAGMA table_info(relatorios)")).fetchall()
+                col_names = [r[1] for r in res]
+                if 'uuid' not in col_names:
+                    conn.execute(text("ALTER TABLE relatorios ADD COLUMN uuid VARCHAR(64);"))
+                if 'data_criacao_local' not in col_names:
+                    conn.execute(text("ALTER TABLE relatorios ADD COLUMN data_criacao_local TIMESTAMP;"))
+                if 'data_sincronizacao' not in col_names:
+                    conn.execute(text("ALTER TABLE relatorios ADD COLUMN data_sincronizacao TIMESTAMP;"))
+                conn.commit()
+                logging.info("✅ Colunas uuid e auditoria verificadas/adicionadas no SQLite")
+    except Exception as e:
+        logging.warning(f"⚠️ Erro ao verificar/adicionar colunas de uuid em relatorios: {e}")
+
 
 # Initialize database for Railway deployment - ROBUST VERSION
 if os.environ.get("RAILWAY_ENVIRONMENT") or (os.environ.get("DATABASE_URL") and "railway" in os.environ.get("DATABASE_URL", "")):
@@ -540,6 +570,7 @@ if os.environ.get("RAILWAY_ENVIRONMENT") or (os.environ.get("DATABASE_URL") and 
             create_admin_user_safe()
             create_default_checklists()
             create_default_legendas()
+            ensure_relatorios_uuid_columns()
 
             # Test reports route functionality
             logging.info("🧪 Testing reports functionality...")
