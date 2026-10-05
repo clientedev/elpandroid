@@ -303,17 +303,35 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
 
                   <View style={styles.photoImageContainer}>
                     {(() => {
-                      const resolvedUri = (item.uri_local && (item.uri_local.startsWith('file://') || item.uri_local.startsWith('content://') || item.uri_local.startsWith('http')))
-                        ? item.uri_local
-                        : (item.url?.startsWith('http')
-                            ? item.url
-                            : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : ''));
-                      return (
+                      let resolvedUri: string | null = null;
+                      if (item.uri_local) {
+                        if (item.uri_local.startsWith('file://') || item.uri_local.startsWith('content://') || item.uri_local.startsWith('http')) {
+                          resolvedUri = item.uri_local;
+                        } else if (item.uri_local.startsWith('/')) {
+                          resolvedUri = `file://${item.uri_local}`;
+                        } else {
+                          resolvedUri = item.uri_local;
+                        }
+                      } else if (item.url) {
+                        if (item.url.startsWith('http://') || item.url.startsWith('https://')) {
+                          resolvedUri = item.url;
+                        } else {
+                          const cleanUrl = item.url.startsWith('/') ? item.url : `/${item.url}`;
+                          resolvedUri = `https://elpandroid-production.up.railway.app${cleanUrl}`;
+                        }
+                      }
+
+                      return resolvedUri ? (
                         <Image 
                           source={{ uri: resolvedUri }} 
                           style={styles.photoFullImg} 
                           resizeMode="cover"
                         />
+                      ) : (
+                        <View style={styles.photoFallback}>
+                          <Ionicons name="image-outline" size={42} color="#94A3B8" />
+                          <Text style={styles.photoFallbackText}>Foto não disponível localmente</Text>
+                        </View>
                       );
                     })()}
                     <PhotoAnnotationOverlay annotationsJson={item.anotacoes_dados} />
@@ -543,8 +561,22 @@ const styles = StyleSheet.create({
   photoImageContainer: {
     width: '100%',
     height: 220,
-    backgroundColor: '#000000',
+    backgroundColor: '#F1F5F9',
     position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    gap: 8,
+  },
+  photoFallbackText: {
+    fontSize: 12,
+    color: '#94A3B8',
   },
   photoFullImg: {
     width: '100%',

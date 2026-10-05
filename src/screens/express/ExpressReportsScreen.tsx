@@ -431,7 +431,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                     style={styles.photoActionBtn} 
                     onPress={async () => {
                       const u = await takePhoto();
-                      if (u) setPhotoUri(u);
+                      if (u) setPhotoUri(u.uri);
                     }}
                   >
                     <Ionicons name="camera" size={18} color="#FFFFFF" />
@@ -442,7 +442,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                     style={[styles.photoActionBtn, { backgroundColor: '#0F172A' }]}
                     onPress={async () => {
                       const u = await pickImage();
-                      if (u) setPhotoUri(u);
+                      if (u) setPhotoUri(u.uri);
                     }}
                   >
                     <Ionicons name="images" size={18} color="#FFFFFF" />

@@ -81,7 +81,7 @@ class UpdateService {
     return (
       Constants.expoConfig?.version ||
       Constants.manifest2?.extra?.expoClient?.version ||
-      '1.0.3'
+      '1.0.4'
     );
   }
 

@@ -115,7 +115,7 @@ def health_check():
             'legendas_count': legendas_count,
             'database': 'connected',
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.3'
+            'version': '1.0.4'
         }), 200
 
     except Exception as e:
@@ -125,7 +125,7 @@ def health_check():
             'status': 'STARTING',
             'warning': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.3'
+            'version': '1.0.4'
         }), 200
 
 @app.route('/debug/images-data')
@@ -206,7 +206,7 @@ def debug_reports_data():
             'status': 'ERROR',
             'error': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.3'
+            'version': '1.0.4'
         }), 500
 
 @app.route('/debug/reports-status')
@@ -12355,11 +12355,11 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.3',
+        'version': '1.0.4',
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.3: Navegação simplificada com foco em Obras, auto-save em tempo real e sincronização total de fotos entre múltiplos aparelhos.',
+        'notes': 'Atualização 1.0.4: Dashboard idêntico ao site com KPIs coloridos, novo editor de marcação fotográfica com setas dimensionáveis e rotação em 8 sentidos, exibição com persistência e correção de imagens escuras.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 

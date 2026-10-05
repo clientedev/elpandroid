@@ -165,12 +165,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [selectedProjectId, titulo, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos]);
 
   async function handleAddPhotoCamera() {
-    const uri = await takePhoto();
-    if (uri) {
+    const photo = await takePhoto();
+    if (photo) {
       const newFoto: FotoRelatorio = {
         id: Date.now(),
-        relatorio_id: 0,
-        uri_local: uri,
+        relatorio_id: currentReportId,
+        uri_local: photo.uri,
+        base64: photo.base64,
         ordem: fotos.length,
         legenda: '',
         local: local,
@@ -182,12 +183,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }
 
   async function handleAddPhotoGallery() {
-    const uri = await pickImage();
-    if (uri) {
+    const photo = await pickImage();
+    if (photo) {
       const newFoto: FotoRelatorio = {
         id: Date.now(),
-        relatorio_id: 0,
-        uri_local: uri,
+        relatorio_id: currentReportId,
+        uri_local: photo.uri,
+        base64: photo.base64,
         ordem: fotos.length,
         legenda: '',
         local: local,
@@ -522,7 +524,16 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           {fotos.map((item, index) => (
             <View key={item.id} style={styles.photoCard}>
               <View style={styles.thumbWrapper}>
-                <Image source={{ uri: item.uri_local }} style={styles.thumb} />
+                {(() => {
+                  const resolvedUri = item.uri_local || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null));
+                  return resolvedUri ? (
+                    <Image source={{ uri: resolvedUri }} style={styles.thumb} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.thumbFallback}>
+                      <Ionicons name="camera-outline" size={24} color="#94A3B8" />
+                    </View>
+                  );
+                })()}
                 <PhotoAnnotationOverlay annotationsJson={item.anotacoes_dados} />
               </View>
 
@@ -635,7 +646,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       {/* Photo Editor Modal */}
       <PhotoEditorModal
         visible={showEditorModal}
-        photoUri={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? (fotos[editingPhotoIndex].uri_local || null) : null}
+        photoUri={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? (fotos[editingPhotoIndex].uri_local || fotos[editingPhotoIndex].url || null) : null}
         initialAnnotations={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? fotos[editingPhotoIndex].anotacoes_dados : undefined}
         onClose={() => {
           setShowEditorModal(false);
@@ -893,7 +904,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#000000',
+    backgroundColor: '#E2E8F0',
+  },
+  thumbFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
   },
   thumb: { width: '100%', height: '100%', borderRadius: 8 },
   photoInfo: { flex: 1, marginLeft: 12 },

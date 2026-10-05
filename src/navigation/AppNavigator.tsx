@@ -33,7 +33,7 @@ const Tab = createBottomTabNavigator();
 function TabNavigator() {
   return (
     <Tab.Navigator
-      initialRouteName="ObrasTab"
+      initialRouteName="DashboardTab"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: Colors.primary,
@@ -52,12 +52,12 @@ function TabNavigator() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'cube-outline';
 
-          if (route.name === 'ObrasTab') {
+          if (route.name === 'DashboardTab') {
+            iconName = focused ? 'speedometer' : 'speedometer-outline';
+          } else if (route.name === 'ObrasTab') {
             iconName = focused ? 'business' : 'business-outline';
           } else if (route.name === 'PendentesTab') {
             iconName = focused ? 'document-text' : 'document-text-outline';
-          } else if (route.name === 'ExpressTab') {
-            iconName = focused ? 'flash' : 'flash-outline';
           } else if (route.name === 'VisitasTab') {
             iconName = focused ? 'calendar' : 'calendar-outline';
           } else if (route.name === 'ConfiguracoesTab') {
@@ -69,6 +69,11 @@ function TabNavigator() {
       })}
     >
       <Tab.Screen 
+        name="DashboardTab" 
+        component={DashboardScreen} 
+        options={{ tabBarLabel: 'Início' }} 
+      />
+      <Tab.Screen 
         name="ObrasTab" 
         component={ProjectsListScreen} 
         options={{ tabBarLabel: 'Obras' }} 
@@ -76,12 +81,7 @@ function TabNavigator() {
       <Tab.Screen 
         name="PendentesTab" 
         component={ReportsListScreen} 
-        options={{ tabBarLabel: 'Pendentes' }} 
-      />
-      <Tab.Screen 
-        name="ExpressTab" 
-        component={ExpressReportsScreen} 
-        options={{ tabBarLabel: 'Express' }} 
+        options={{ tabBarLabel: 'Relatórios' }} 
       />
       <Tab.Screen 
         name="VisitasTab" 

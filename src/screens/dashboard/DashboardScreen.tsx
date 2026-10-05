@@ -1,38 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  RefreshControl, FlatList, Alert 
+  RefreshControl, Alert 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
-import { StatCard } from '../../components/StatCard';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalProjetos, getLocalVisitas, getLocalRelatorios, 
-  getLocalLembretes, saveLocalProjeto, saveLocalVisita, saveLocalRelatorio 
+  saveLocalProjeto, saveLocalVisita, saveLocalRelatorio 
 } from '../../database/db';
 import { Projeto, Visita, Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
-  const { isOnline, triggerSync, pendingCount, syncState } = useNetwork();
+  const { isOnline, triggerSync, syncState } = useNetwork();
 
   const [refreshing, setRefreshing] = useState(false);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
-  const [lembretesCount, setLembretesCount] = useState(0);
 
   const loadData = useCallback(async () => {
     try {
       const p = await getLocalProjetos();
       const v = await getLocalVisitas();
       const r = await getLocalRelatorios();
-      const l = await getLocalLembretes();
 
       // If database is completely empty on fresh install, seed initial sample data
       if (p.length === 0) {
@@ -92,7 +89,6 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         setProjetos(p);
         setVisitas(v);
         setRelatorios(r);
-        setLembretesCount(l.length);
       }
     } catch (err) {
       console.warn('Erro ao carregar dados do SQLite:', err);
@@ -113,19 +109,24 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   };
 
   const obrasAtivas = projetos.filter(p => p.status === 'Ativo').length;
-  const relatoriosPendentes = relatorios.filter(r => r.status === 'Aguardando Aprovação' || r.status === 'em_andamento').length;
+  const relatoriosPendentes = relatorios.filter(r => r.status === 'Aguardando Aprovação').length;
+  const visitasAgendadas = visitas.filter(v => v.status === 'Agendada' || v.status === 'Confirmada').length || visitas.length;
+  const relatoriosRascunho = relatorios.filter(r => r.status === 'em_andamento' || r.status === 'Rascunho' || !r.status).length;
+
+  const isApprover = Boolean(user?.is_master || (user as any)?.is_aprovador || user?.is_aprovador_express);
 
   return (
     <View style={styles.container}>
+      {/* Top Header matching Web System */}
       <Header 
-        title="ELP" 
-        subtitle={`Olá, ${user?.username || 'Engenheiro'}`}
+        title="Dashboard ELP" 
+        subtitle="Sistema de Visitas e Relatórios de Obras"
         rightAction={
           <TouchableOpacity 
             style={styles.headerSyncBtn} 
             onPress={async () => {
               const res = await triggerSync();
-              Alert.alert(res.success ? 'Sincronização' : 'Aviso', res.message);
+              Alert.alert(res.success ? 'Sincronização Concluída' : 'Aviso', res.message);
               await loadData();
             }}
             disabled={syncState === 'syncing'}
@@ -144,70 +145,112 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
-        {/* KPI Grid */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Visão Geral</Text>
-          <Text style={styles.sectionBadge}>
-            {isOnline ? 'Sincronizado' : 'Offline'}
-          </Text>
+        {/* User and Company Badges Bar (Identical to Web header) */}
+        <View style={styles.userBadgeBar}>
+          <View style={styles.badgePrimary}>
+            <Ionicons name="person" size={14} color="#FFFFFF" />
+            <Text style={styles.badgeTextWhite} numberOfLines={1}>
+              {(user as any)?.nome_completo || user?.username || 'Engenheiro Responsável'}
+            </Text>
+          </View>
+          <View style={styles.badgeCyan}>
+            <Ionicons name="business" size={14} color="#FFFFFF" />
+            <Text style={styles.badgeTextWhite} numberOfLines={1}>
+              {(user as any)?.empresa || 'ELP Consultoria'}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.statsRow}>
-          <StatCard
-            title="Obras Ativas"
-            value={obrasAtivas}
-            icon="business-outline"
-            color={Colors.primary}
-            bgColor={Colors.primaryBackground}
+        {/* Section Title */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="trending-up" size={20} color="#4E73DF" />
+            <Text style={styles.sectionTitle}>Dashboard</Text>
+          </View>
+          <View style={styles.onlinePill}>
+            <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+            <Text style={styles.onlinePillText}>{isOnline ? 'Online (Railway)' : 'Offline (Local)'}</Text>
+          </View>
+        </View>
+
+        {/* 4 Cards strictly matching Web dashboard_simple.html */}
+        <View style={styles.cardsGrid}>
+          {/* Card 1: Obras Ativas (#4e73df) */}
+          <TouchableOpacity 
+            style={[styles.webCard, styles.borderPrimary]} 
             onPress={() => navigation.navigate('ObrasTab')}
-          />
-          <StatCard
-            title="Visitas Agendadas"
-            value={visitas.length}
-            icon="calendar-outline"
-            color="#8B5CF6"
-            bgColor="#F3E8FF"
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardLabel, { color: '#4E73DF' }]}>🏗️ OBRAS ATIVAS</Text>
+              <Text style={styles.cardValue}>{obrasAtivas}</Text>
+            </View>
+            <Ionicons name="business" size={38} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          {/* Card 2: Relatórios Pendentes (#36b9cc) */}
+          <TouchableOpacity 
+            style={[styles.webCard, styles.borderInfo]} 
+            onPress={() => navigation.navigate('PendentesTab')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardLabel, { color: '#0891B2' }]}>📋 RELATÓRIOS PENDENTES</Text>
+              <Text style={styles.cardValue}>{relatoriosPendentes}</Text>
+            </View>
+            <Ionicons name="clipboard" size={38} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          {/* Card 3: Visitas Agendadas (#1cc88a) */}
+          <TouchableOpacity 
+            style={[styles.webCard, styles.borderSuccess]} 
             onPress={() => navigation.navigate('VisitasTab')}
-          />
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardLabel, { color: '#059669' }]}>🗓️ VISITAS AGENDADAS</Text>
+              <Text style={styles.cardValue}>{visitasAgendadas}</Text>
+            </View>
+            <Ionicons name="calendar" size={38} color="#CBD5E1" />
+          </TouchableOpacity>
+
+          {/* Card 4: Relatórios em Rascunho (#f6c23e) */}
+          <TouchableOpacity 
+            style={[styles.webCard, styles.borderWarning]} 
+            onPress={() => navigation.navigate('PendentesTab')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
+              <Text style={[styles.cardLabel, { color: '#D97706' }]}>📝 EM RASCUNHO</Text>
+              <Text style={styles.cardValue}>{relatoriosRascunho}</Text>
+            </View>
+            <Ionicons name="document-text" size={38} color="#CBD5E1" />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.statsRow}>
-          <StatCard
-            title="Relatórios Pendentes"
-            value={relatoriosPendentes}
-            icon="document-text-outline"
-            color="#F59E0B"
-            bgColor="#FEF3C7"
-            onPress={() => navigation.navigate('RelatoriosTab')}
-          />
-          <StatCard
-            title="Lembretes Ativos"
-            value={lembretesCount}
-            icon="notifications-outline"
-            color="#EC4899"
-            bgColor="#FCE7F3"
-            onPress={() => navigation.navigate('LembretesScreen')}
-          />
-        </View>
-
-        {/* Quick Action Buttons */}
+        {/* Quick Actions Grid */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Ações Rápidas no Canteiro</Text>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="flash-outline" size={18} color="#2563EB" />
+            <Text style={styles.sectionTitle}>Ações Rápidas no Canteiro</Text>
+          </View>
         </View>
 
         <View style={styles.actionsGrid}>
           <TouchableOpacity 
             style={[styles.actionBtn, { backgroundColor: '#2563EB' }]}
             onPress={() => navigation.navigate('ReportFormScreen')}
+            activeOpacity={0.8}
           >
             <Ionicons name="document-attach" size={24} color="#FFFFFF" />
             <Text style={styles.actionBtnText}>Novo Relatório</Text>
-            <Text style={styles.actionBtnSub}>Vistoria de Obra</Text>
+            <Text style={styles.actionBtnSub}>Vistoria Técnica</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.actionBtn, { backgroundColor: '#059669' }]}
             onPress={() => navigation.navigate('ExpressReportsScreen')}
+            activeOpacity={0.8}
           >
             <Ionicons name="flash" size={24} color="#FFFFFF" />
             <Text style={styles.actionBtnText}>Relatório Express</Text>
@@ -217,15 +260,17 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           <TouchableOpacity 
             style={[styles.actionBtn, { backgroundColor: '#7C3AED' }]}
             onPress={() => navigation.navigate('VisitFormScreen')}
+            activeOpacity={0.8}
           >
             <Ionicons name="calendar" size={24} color="#FFFFFF" />
             <Text style={styles.actionBtnText}>Agendar Visita</Text>
-            <Text style={styles.actionBtnSub}>Calendário Técnico</Text>
+            <Text style={styles.actionBtnSub}>Programação</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.actionBtn, { backgroundColor: '#D97706' }]}
             onPress={() => navigation.navigate('ProjectFormScreen')}
+            activeOpacity={0.8}
           >
             <Ionicons name="add-circle" size={24} color="#FFFFFF" />
             <Text style={styles.actionBtnText}>Cadastrar Obra</Text>
@@ -233,10 +278,13 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </TouchableOpacity>
         </View>
 
-        {/* Recent Relatórios */}
+        {/* Recent Relatórios Section matching Web */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Últimos Relatórios Técnicos</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('RelatoriosTab')}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="document-text-outline" size={18} color={Colors.text} />
+            <Text style={styles.sectionTitle}>Relatórios Recentes</Text>
+          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('PendentesTab')}>
             <Text style={styles.seeAllText}>Ver todos</Text>
           </TouchableOpacity>
         </View>
@@ -244,49 +292,77 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         {relatorios.length === 0 ? (
           <View style={styles.emptyCard}>
             <Ionicons name="document-text-outline" size={36} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>Nenhum relatório registrado ainda.</Text>
+            <Text style={styles.emptyText}>Nenhum relatório recente</Text>
           </View>
         ) : (
-          relatorios.slice(0, 3).map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={styles.listItemCard}
-              onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id })}
-            >
-              <View style={styles.itemHeader}>
-                <View style={styles.itemTitleRow}>
-                  <Text style={styles.itemNumber}>{item.numero}</Text>
-                  <SyncStatusBadge status={item.sync_status} />
+          relatorios.slice(0, 4).map((rel) => {
+            const isWaiting = rel.status === 'Aguardando Aprovação';
+            const isApproved = rel.status === 'Aprovado';
+            const isRejected = rel.status === 'Rejeitado';
+
+            return (
+              <View key={rel.id} style={styles.webListItemCard}>
+                <View style={styles.webItemLeft}>
+                  <View style={styles.webItemHeaderRow}>
+                    <Text style={styles.webItemNumero}>{rel.numero}</Text>
+                    <SyncStatusBadge status={rel.sync_status} />
+                  </View>
+                  <Text style={styles.webItemProject} numberOfLines={1}>
+                    {rel.projeto_nome || 'Obra não informada'}
+                  </Text>
+                  <View style={styles.statusPillContainer}>
+                    <View style={[
+                      styles.webStatusBadge,
+                      isApproved ? styles.badgeApproved :
+                      isRejected ? styles.badgeRejected :
+                      isWaiting ? styles.badgeWaiting : styles.badgeDraft
+                    ]}>
+                      <Text style={[
+                        styles.webStatusText,
+                        isApproved ? styles.textApproved :
+                        isRejected ? styles.textRejected :
+                        isWaiting ? styles.textWaiting : styles.textDraft
+                      ]}>
+                        {rel.status === 'em_andamento' ? 'Rascunho' : (rel.status || 'Rascunho')}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <Text style={styles.itemDate}>
-                  {item.data_relatorio ? new Date(item.data_relatorio).toLocaleDateString('pt-BR') : ''}
-                </Text>
+
+                <View style={styles.webItemRight}>
+                  <Text style={styles.webItemDate}>
+                    {rel.data_relatorio ? new Date(rel.data_relatorio).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Sem data'}
+                  </Text>
+
+                  {isWaiting && isApprover ? (
+                    <TouchableOpacity 
+                      style={styles.reviewBtn}
+                      onPress={() => navigation.navigate('ReportDetailScreen', { reportId: rel.id })}
+                    >
+                      <Ionicons name="checkmark-done" size={14} color="#D97706" />
+                      <Text style={styles.reviewBtnText}>Revisar</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity 
+                      style={styles.viewBtn}
+                      onPress={() => navigation.navigate('ReportDetailScreen', { reportId: rel.id })}
+                    >
+                      <Ionicons name="eye-outline" size={14} color={Colors.primary} />
+                      <Text style={styles.viewBtnText}>Ver</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-
-              <Text style={styles.itemTitle}>{item.titulo}</Text>
-              <Text style={styles.itemSubtitle}>{item.projeto_nome || 'Obra não informada'}</Text>
-
-              <View style={styles.itemFooter}>
-                <View style={[
-                  styles.statusPill, 
-                  item.status === 'Aprovado' ? styles.statusApproved : 
-                  item.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusProgress
-                ]}>
-                  <Text style={styles.statusPillText}>{item.status}</Text>
-                </View>
-
-                <View style={styles.photosIndicator}>
-                  <Ionicons name="images-outline" size={14} color={Colors.textSecondary} />
-                  <Text style={styles.photosCount}>{item.fotos_count || 0} fotos</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))
+            );
+          })
         )}
 
-        {/* Recent Visitas */}
+        {/* Recent Visitas Section */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Próximas Visitas</Text>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="calendar-outline" size={18} color={Colors.text} />
+            <Text style={styles.sectionTitle}>Próximas Visitas</Text>
+          </View>
           <TouchableOpacity onPress={() => navigation.navigate('VisitasTab')}>
             <Text style={styles.seeAllText}>Ver todas</Text>
           </TouchableOpacity>
@@ -301,17 +377,27 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           visitas.slice(0, 3).map((item) => (
             <TouchableOpacity 
               key={item.id} 
-              style={styles.listItemCard}
+              style={styles.webListItemCard}
               onPress={() => navigation.navigate('VisitDetailScreen', { visitId: item.id })}
             >
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemNumber}>{item.numero}</Text>
-                <SyncStatusBadge status={item.sync_status} />
+              <View style={styles.webItemLeft}>
+                <View style={styles.webItemHeaderRow}>
+                  <Text style={styles.webItemNumero}>{item.numero}</Text>
+                  <SyncStatusBadge status={item.sync_status} />
+                </View>
+                <Text style={styles.webItemProject} numberOfLines={1}>
+                  {item.projeto_nome || item.projeto_outros || 'Visita Técnica'}
+                </Text>
+                <Text style={styles.visitaTimeText}>
+                  {new Date(item.data_inicio).toLocaleDateString('pt-BR')} às {new Date(item.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </Text>
               </View>
-              <Text style={styles.itemTitle}>{item.projeto_nome || item.projeto_outros || 'Visita'}</Text>
-              <Text style={styles.itemSubtitle}>
-                Data: {new Date(item.data_inicio).toLocaleDateString('pt-BR')} • {new Date(item.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-              </Text>
+
+              <View style={styles.webItemRight}>
+                <View style={[styles.webStatusBadge, styles.badgeSuccess]}>
+                  <Text style={[styles.webStatusText, styles.textSuccess]}>{item.status}</Text>
+                </View>
+              </View>
             </TouchableOpacity>
           ))
         )}
@@ -325,15 +411,46 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
   scroll: {
     padding: 16,
   },
   headerSyncBtn: {
-    padding: 6,
+    padding: 8,
     borderRadius: 8,
-    backgroundColor: Colors.primaryBackground,
+    backgroundColor: '#EFF6FF',
+  },
+  userBadgeBar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  badgePrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    ...Shadows.sm,
+  },
+  badgeCyan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#0891B2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    ...Shadows.sm,
+  },
+  badgeTextWhite: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -342,29 +459,90 @@ const styles = StyleSheet.create({
     marginTop: 18,
     marginBottom: 12,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#1E293B',
   },
-  sectionBadge: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textSecondary,
+  onlinePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: 6,
+    gap: 5,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  onlineDot: {
+    backgroundColor: '#10B981',
+  },
+  offlineDot: {
+    backgroundColor: '#F59E0B',
+  },
+  onlinePillText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
   },
   seeAllText: {
     fontSize: 13,
-    color: Colors.primary,
+    color: '#2563EB',
     fontWeight: '600',
   },
-  statsRow: {
-    flexDirection: 'row',
+  cardsGrid: {
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  webCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
+  },
+  borderPrimary: {
+    borderLeftWidth: 5,
+    borderLeftColor: '#4E73DF',
+  },
+  borderInfo: {
+    borderLeftWidth: 5,
+    borderLeftColor: '#36B9CC',
+  },
+  borderSuccess: {
+    borderLeftWidth: 5,
+    borderLeftColor: '#1CC88A',
+  },
+  borderWarning: {
+    borderLeftWidth: 5,
+    borderLeftColor: '#F6C23E',
+  },
+  cardContent: {
+    flex: 1,
+  },
+  cardLabel: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  cardValue: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#1E293B',
   },
   actionsGrid: {
     flexDirection: 'row',
@@ -373,109 +551,150 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     width: '48%',
-    borderRadius: 14,
-    padding: 16,
-    ...Shadows.md,
+    borderRadius: 12,
+    padding: 14,
+    ...Shadows.sm,
   },
   actionBtnText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
-    marginTop: 8,
+    marginTop: 6,
   },
   actionBtnSub: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: 'rgba(255, 255, 255, 0.85)',
     fontSize: 11,
     marginTop: 2,
   },
-  listItemCard: {
+  webListItemCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 14,
     marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
     ...Shadows.sm,
   },
-  itemHeader: {
+  webItemLeft: {
+    flex: 1,
+    marginRight: 10,
+  },
+  webItemHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
+    marginBottom: 2,
+  },
+  webItemNumero: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  webItemProject: {
+    fontSize: 12,
+    color: '#64748B',
     marginBottom: 6,
   },
-  itemTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  itemNumber: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.primary,
-  },
-  itemDate: {
+  visitaTimeText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: '#64748B',
   },
-  itemTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: Colors.text,
-  },
-  itemSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  itemFooter: {
+  statusPillContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
   },
-  statusPill: {
+  webStatusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  statusApproved: {
-    backgroundColor: '#D1FAE5',
+  badgeApproved: {
+    backgroundColor: '#DCFCE7',
   },
-  statusWaiting: {
+  badgeRejected: {
+    backgroundColor: '#FEE2E2',
+  },
+  badgeWaiting: {
     backgroundColor: '#FEF3C7',
   },
-  statusProgress: {
-    backgroundColor: '#EFF6FF',
+  badgeDraft: {
+    backgroundColor: '#F1F5F9',
   },
-  statusPillText: {
+  badgeSuccess: {
+    backgroundColor: '#DCFCE7',
+  },
+  webStatusText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#1E293B',
+    fontWeight: 'bold',
   },
-  photosIndicator: {
+  textApproved: {
+    color: '#166534',
+  },
+  textRejected: {
+    color: '#991B1B',
+  },
+  textWaiting: {
+    color: '#B45309',
+  },
+  textDraft: {
+    color: '#475569',
+  },
+  textSuccess: {
+    color: '#166534',
+  },
+  webItemRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  webItemDate: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  viewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    borderWidth: 1,
+    borderColor: '#2563EB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
-  photosCount: {
-    fontSize: 12,
-    color: Colors.textSecondary,
+  viewBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#2563EB',
+  },
+  reviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#D97706',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#FFFBEB',
+  },
+  reviewBtnText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#D97706',
   },
   emptyCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
     marginBottom: 10,
   },
   emptyText: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: '#94A3B8',
     marginTop: 8,
   },
 });
