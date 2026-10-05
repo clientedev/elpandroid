@@ -10055,34 +10055,7 @@ def api_legendas_options():
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     return response
 
-# API para salvar dados de relatórios (mobile/desktop)
-@app.route('/api/relatorios', methods=['POST'])
-def api_salvar_relatorio():
-    """API para salvar relatórios - compatível mobile/desktop"""
-    try:
-        data = request.get_json()
-
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'Dados não recebidos'
-            }), 400
-
-        # Aqui você pode implementar a lógica de salvamento
-        # Por enquanto, só retorna sucesso para confirmar que a API funciona
-
-        return jsonify({
-            'success': True,
-            'message': 'Dados recebidos com sucesso',
-            'data_received': len(str(data))
-        })
-
-    except Exception as e:
-        print(f"ERRO API SALVAR: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+# /api/relatorios is handled canonically by api_relatorios_collection below (with CSRF exempt & DB save)
 
 @app.route('/api/test')
 def api_test():
