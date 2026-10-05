@@ -115,7 +115,7 @@ def health_check():
             'legendas_count': legendas_count,
             'database': 'connected',
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.1'
+            'version': '1.0.2'
         }), 200
 
     except Exception as e:
@@ -125,7 +125,7 @@ def health_check():
             'status': 'STARTING',
             'warning': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.1'
+            'version': '1.0.2'
         }), 200
 
 @app.route('/debug/images-data')
@@ -206,7 +206,7 @@ def debug_reports_data():
             'status': 'ERROR',
             'error': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.1'
+            'version': '1.0.2'
         }), 500
 
 @app.route('/debug/reports-status')
@@ -12363,11 +12363,11 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.1',
+        'version': '1.0.2',
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Versao de producao sincronizada com Railway.',
+        'notes': 'Atualização 1.0.2: Sincronização de fotos no banco, editor de fotos com setas e formas, e ajustes de legendas.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 

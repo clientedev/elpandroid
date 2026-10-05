@@ -81,7 +81,7 @@ class UpdateService {
     return (
       Constants.expoConfig?.version ||
       Constants.manifest2?.extra?.expoClient?.version ||
-      '1.0.1'
+      '1.0.2'
     );
   }
 
@@ -121,7 +121,7 @@ class UpdateService {
       try {
         const res = await apiClient.axios.get('/api/app-version', { timeout: 6000 });
         if (res.data) {
-          const serverVersion = String(res.data.version || '1.0.1');
+          const serverVersion = String(res.data.version || '1.0.2');
           const currentVersion = this.getCurrentVersion();
           const serverDeployId = String(res.data.deployId || res.data.buildTime || serverVersion);
           
@@ -143,7 +143,8 @@ class UpdateService {
           );
           const hasHigherVersion = isVersionGreater(serverVersion, currentVersion);
 
-          const shouldPrompt = (isNewDeploy || hasHigherVersion || manual) && (manual || dismissedDeployId !== serverDeployId);
+          // Prompt if manual check, newer version available, or new un-dismissed deploy
+          const shouldPrompt = manual || hasHigherVersion || isNewDeploy;
 
           if (shouldPrompt) {
             const info: UpdateInfo = {
