@@ -31,6 +31,9 @@ BIND_ARGS="--bind=0.0.0.0:${PORT}"
 if [ "$PORT" != "8081" ]; then
     BIND_ARGS="$BIND_ARGS --bind=0.0.0.0:8081"
 fi
+if [ "$PORT" != "5000" ]; then
+    BIND_ARGS="$BIND_ARGS --bind=0.0.0.0:5000"
+fi
 
 echo "🌐 Starting Gunicorn with: $BIND_ARGS..."
 

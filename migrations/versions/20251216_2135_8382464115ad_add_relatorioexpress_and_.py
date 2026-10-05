@@ -17,9 +17,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create the fotos_relatorio_express table (new name with underscore)
-    op.create_table('fotos_relatorio_express',
-        sa.Column('id', sa.Integer(), nullable=False),
+    conn = op.get_bind()
+    from sqlalchemy import inspect
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
+    
+    # Create the fotos_relatorio_express table if it does not exist
+    if 'fotos_relatorio_express' not in tables:
+        op.create_table('fotos_relatorio_express',
+            sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('relatorio_express_id', sa.Integer(), nullable=False),
         sa.Column('url', sa.Text(), nullable=True),
         sa.Column('filename', sa.String(length=255), nullable=True),
