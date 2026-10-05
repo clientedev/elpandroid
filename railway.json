@@ -6,11 +6,9 @@
   },
   "deploy": {
     "numReplicas": 1,
-    "restartPolicyType": "always",
+    "restartPolicyType": "ALWAYS",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,
-    "healthcheckMaxRetries": 15,
-    "healthcheckInterval": 30,
     "startCommand": "bash start.sh"
   }
 }

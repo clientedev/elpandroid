@@ -31,7 +31,9 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "postinstall": "python3 -m pip install -r requirements.txt 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true",
+    "start": "node -e \"if(process.env.RAILWAY_ENVIRONMENT||process.env.PORT||process.platform==='linux'){require('child_process').spawn('bash',['start.sh'],{stdio:'inherit'})}else{require('child_process').spawn('npx',['expo','start'],{stdio:'inherit',shell:true})}\"",
+    "expo": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
