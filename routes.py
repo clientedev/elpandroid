@@ -8957,14 +8957,20 @@ def api_visits_list():
             responsavel_id = user.id if user else 1
 
             # Parse dates
-            from dateutil.parser import parse as parse_date
             def parse_dt(v, default=None):
                 if not v:
                     return default or brazil_now()
+                if isinstance(v, datetime):
+                    return v
                 try:
-                    return parse_date(str(v)).replace(tzinfo=None)
+                    clean = str(v).strip().replace('Z', '+00:00')
+                    return datetime.fromisoformat(clean).replace(tzinfo=None)
                 except Exception:
-                    return default or brazil_now()
+                    try:
+                        from dateutil.parser import parse as parse_date
+                        return parse_date(str(v)).replace(tzinfo=None)
+                    except Exception:
+                        return default or brazil_now()
 
             data_inicio = parse_dt(data.get('data_inicio') or data.get('data_agendada'))
             data_fim = parse_dt(data.get('data_fim'), default=data_inicio)
@@ -12365,12 +12371,22 @@ def _resolve_mobile_user(data):
 def _parse_iso_date(val, as_date=False, default=None):
     if not val:
         return default
+    if isinstance(val, datetime):
+        return val.date() if as_date else val
+    from datetime import date as dt_date
+    if isinstance(val, dt_date):
+        return val if as_date else datetime.combine(val, datetime.min.time())
     try:
-        from dateutil.parser import parse
-        dt = parse(str(val)).replace(tzinfo=None)
+        clean = str(val).strip().replace('Z', '+00:00')
+        dt = datetime.fromisoformat(clean).replace(tzinfo=None)
         return dt.date() if as_date else dt
     except Exception:
-        return default
+        try:
+            from dateutil.parser import parse
+            dt = parse(str(val)).replace(tzinfo=None)
+            return dt.date() if as_date else dt
+        except Exception:
+            return default
 
 # --- PROJETOS ---
 @app.route('/api/projetos', methods=['GET', 'POST'])
