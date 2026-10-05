@@ -39,7 +39,7 @@ def clean_orphaned_alembic_versions():
     except Exception as e:
         logging.warning(f"⚠️ Erro ao verificar versão Alembic: {e}")
 
-if os.environ.get("DATABASE_URL"):
+if os.environ.get("DATABASE_URL") and not os.environ.get("SKIP_APP_MIGRATIONS"):
     logging.info("🔄 PostgreSQL detectado - preparando migrações...")
     
     # Limpar versões órfãs antes de executar migrações

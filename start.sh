@@ -28,15 +28,17 @@ else
     echo "⚠️ Warning: DATABASE_URL not set yet. Starting app in standalone mode."
 fi
 
-# Multi-port binding to support any Railway port configuration
+# Migrations already ran above - don't repeat them inside each Gunicorn worker
+export SKIP_APP_MIGRATIONS=1
+
+# Multi-port binding to support any Railway target port configuration
 PORT="${PORT:-5000}"
 BIND_ARGS="--bind=0.0.0.0:${PORT}"
-if [ "$PORT" != "8081" ]; then
-    BIND_ARGS="$BIND_ARGS --bind=0.0.0.0:8081"
-fi
-if [ "$PORT" != "5000" ]; then
-    BIND_ARGS="$BIND_ARGS --bind=0.0.0.0:5000"
-fi
+for P in 5000 8080 8000 8081 3000; do
+    if [ "$PORT" != "$P" ]; then
+        BIND_ARGS="$BIND_ARGS --bind=0.0.0.0:$P"
+    fi
+done
 
 echo "🌐 Starting Gunicorn with: $BIND_ARGS..."
 
