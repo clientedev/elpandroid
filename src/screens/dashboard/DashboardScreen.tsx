@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  RefreshControl, Alert 
+  RefreshControl, Alert, Image, Modal, Switch 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Header } from '../../components/Header';
@@ -16,6 +17,32 @@ import {
 import { Projeto, Visita, Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
+const WIDGETS_CONFIG_KEY = '@elp_dashboard_widgets_v2';
+
+export interface DashboardWidgetsConfig {
+  showHero: boolean;
+  showBadges: boolean;
+  showObrasAtivas: boolean;
+  showRelatoriosPendentes: boolean;
+  showVisitasAgendadas: boolean;
+  showRelatoriosRascunho: boolean;
+  showAcoesRapidas: boolean;
+  showRelatoriosRecentes: boolean;
+  showProximasVisitas: boolean;
+}
+
+const DEFAULT_CONFIG: DashboardWidgetsConfig = {
+  showHero: true,
+  showBadges: true,
+  showObrasAtivas: true,
+  showRelatoriosPendentes: true,
+  showVisitasAgendadas: true,
+  showRelatoriosRascunho: true,
+  showAcoesRapidas: true,
+  showRelatoriosRecentes: true,
+  showProximasVisitas: true,
+};
+
 export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
   const { isOnline, triggerSync, syncState } = useNetwork();
@@ -24,6 +51,39 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
+  const [widgetsConfig, setWidgetsConfig] = useState<DashboardWidgetsConfig>(DEFAULT_CONFIG);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+
+  // Load custom user widgets configuration
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(WIDGETS_CONFIG_KEY);
+        if (saved) {
+          setWidgetsConfig({ ...DEFAULT_CONFIG, ...JSON.parse(saved) });
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar configuracoes do dashboard:', err);
+      }
+    })();
+  }, []);
+
+  async function updateWidgetConfig<K extends keyof DashboardWidgetsConfig>(key: K, value: boolean) {
+    const updated = { ...widgetsConfig, [key]: value };
+    setWidgetsConfig(updated);
+    try {
+      await AsyncStorage.setItem(WIDGETS_CONFIG_KEY, JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Erro ao salvar configuracao do widget:', err);
+    }
+  }
+
+  async function resetWidgetConfig() {
+    setWidgetsConfig(DEFAULT_CONFIG);
+    try {
+      await AsyncStorage.removeItem(WIDGETS_CONFIG_KEY);
+    } catch {}
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -31,7 +91,6 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       const v = await getLocalVisitas();
       const r = await getLocalRelatorios();
 
-      // If database is completely empty on fresh install, seed initial sample data
       if (p.length === 0) {
         const sampleProj: Projeto = {
           id: 1,
@@ -120,23 +179,33 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       {/* Top Header matching Web System */}
       <Header 
         title="Dashboard ELP" 
-        subtitle="Sistema de Visitas e Relatórios de Obras"
+        subtitle="Acompanhamento de Obras & Vistorias"
         rightAction={
-          <TouchableOpacity 
-            style={styles.headerSyncBtn} 
-            onPress={async () => {
-              const res = await triggerSync();
-              Alert.alert(res.success ? 'Sincronização Concluída' : 'Aviso', res.message);
-              await loadData();
-            }}
-            disabled={syncState === 'syncing'}
-          >
-            <Ionicons 
-              name={syncState === 'syncing' ? "sync" : "cloud-done-outline"} 
-              size={22} 
-              color={Colors.primary} 
-            />
-          </TouchableOpacity>
+          <View style={styles.headerActionsRow}>
+            <TouchableOpacity 
+              style={styles.headerBtn} 
+              onPress={() => setShowConfigModal(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="options-outline" size={20} color="#334155" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.headerBtn, styles.headerSyncBtn]} 
+              onPress={async () => {
+                const res = await triggerSync();
+                Alert.alert(res.success ? 'Sincronização Concluída' : 'Aviso', res.message);
+                await loadData();
+              }}
+              disabled={syncState === 'syncing'}
+            >
+              <Ionicons 
+                name={syncState === 'syncing' ? "sync" : "cloud-done-outline"} 
+                size={20} 
+                color={Colors.primary} 
+              />
+            </TouchableOpacity>
+          </View>
         }
       />
       <OfflineBanner />
@@ -145,21 +214,68 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
       >
-        {/* User and Company Badges Bar (Identical to Web header) */}
-        <View style={styles.userBadgeBar}>
-          <View style={styles.badgePrimary}>
-            <Ionicons name="person" size={14} color="#FFFFFF" />
-            <Text style={styles.badgeTextWhite} numberOfLines={1}>
-              {(user as any)?.nome_completo || user?.username || 'Engenheiro Responsável'}
-            </Text>
+        {/* 1. HERO SECTION WITH LOGO */}
+        {widgetsConfig.showHero && (
+          <View style={styles.heroCard}>
+            <View style={styles.heroLeft}>
+              <Image 
+                source={require('../../../assets/logo.png')} 
+                style={styles.heroLogo} 
+                resizeMode="contain" 
+              />
+              <View style={styles.heroTextContainer}>
+                <Text style={styles.heroCompany}>ELP CONSULTORIA</Text>
+                <Text style={styles.heroSubtitle}>Engenharia & Inspeção Predial</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.customizeShortcutBtn} 
+              onPress={() => setShowConfigModal(true)}
+            >
+              <Ionicons name="sparkles" size={14} color="#2563EB" />
+              <Text style={styles.customizeShortcutText}>Editar</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.badgeCyan}>
-            <Ionicons name="business" size={14} color="#FFFFFF" />
-            <Text style={styles.badgeTextWhite} numberOfLines={1}>
-              {(user as any)?.empresa || 'ELP Consultoria'}
-            </Text>
+        )}
+
+        {/* 2. USER AND COMPANY BADGES BAR */}
+        {widgetsConfig.showBadges && (
+          <View style={styles.userBadgeBar}>
+            <View style={styles.badgePrimary}>
+              <Ionicons name="person" size={14} color="#FFFFFF" />
+              <Text style={styles.badgeTextWhite} numberOfLines={1}>
+                {(user as any)?.nome_completo || user?.username || 'Engenheiro Responsável'}
+              </Text>
+            </View>
+            <View style={styles.badgeCyan}>
+              <Ionicons name="business" size={14} color="#FFFFFF" />
+              <Text style={styles.badgeTextWhite} numberOfLines={1}>
+                {(user as any)?.empresa || 'ELP Consultoria'}
+              </Text>
+            </View>
           </View>
-        </View>
+        )}
+
+        {/* Approver Alert Box (Strict RBAC integration) */}
+        {isApprover && relatoriosPendentes > 0 && (
+          <TouchableOpacity 
+            style={styles.approverAlertBanner}
+            onPress={() => navigation.navigate('PendentesTab')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.approverAlertLeft}>
+              <Ionicons name="alert-circle" size={24} color="#D97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.approverAlertTitle}>Relatórios Pendentes de Aprovação</Text>
+                <Text style={styles.approverAlertSub}>
+                  Existem {relatoriosPendentes} relatório(s) aguardando sua revisão e carimbo técnico.
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#D97706" />
+          </TouchableOpacity>
+        )}
 
         {/* Section Title */}
         <View style={styles.sectionHeader}>
@@ -176,234 +292,403 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         {/* 4 Cards strictly matching Web dashboard_simple.html */}
         <View style={styles.cardsGrid}>
           {/* Card 1: Obras Ativas (#4e73df) */}
-          <TouchableOpacity 
-            style={[styles.webCard, styles.borderPrimary]} 
-            onPress={() => navigation.navigate('ObrasTab')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <Text style={[styles.cardLabel, { color: '#4E73DF' }]}>🏗️ OBRAS ATIVAS</Text>
-              <Text style={styles.cardValue}>{obrasAtivas}</Text>
-            </View>
-            <Ionicons name="business" size={38} color="#CBD5E1" />
-          </TouchableOpacity>
+          {widgetsConfig.showObrasAtivas && (
+            <TouchableOpacity 
+              style={[styles.webCard, styles.borderPrimary]} 
+              onPress={() => navigation.navigate('ObrasTab')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardLabel, { color: '#4E73DF' }]}>🏗️ OBRAS ATIVAS</Text>
+                <Text style={styles.cardValue}>{obrasAtivas}</Text>
+              </View>
+              <Ionicons name="business" size={38} color="#CBD5E1" />
+            </TouchableOpacity>
+          )}
 
           {/* Card 2: Relatórios Pendentes (#36b9cc) */}
-          <TouchableOpacity 
-            style={[styles.webCard, styles.borderInfo]} 
-            onPress={() => navigation.navigate('PendentesTab')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <Text style={[styles.cardLabel, { color: '#0891B2' }]}>📋 RELATÓRIOS PENDENTES</Text>
-              <Text style={styles.cardValue}>{relatoriosPendentes}</Text>
-            </View>
-            <Ionicons name="clipboard" size={38} color="#CBD5E1" />
-          </TouchableOpacity>
+          {widgetsConfig.showRelatoriosPendentes && (
+            <TouchableOpacity 
+              style={[styles.webCard, styles.borderInfo]} 
+              onPress={() => navigation.navigate('PendentesTab')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardLabel, { color: '#0891B2' }]}>📋 RELATÓRIOS PENDENTES</Text>
+                <Text style={styles.cardValue}>{relatoriosPendentes}</Text>
+              </View>
+              <Ionicons name="clipboard" size={38} color="#CBD5E1" />
+            </TouchableOpacity>
+          )}
 
           {/* Card 3: Visitas Agendadas (#1cc88a) */}
-          <TouchableOpacity 
-            style={[styles.webCard, styles.borderSuccess]} 
-            onPress={() => navigation.navigate('VisitasTab')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <Text style={[styles.cardLabel, { color: '#059669' }]}>🗓️ VISITAS AGENDADAS</Text>
-              <Text style={styles.cardValue}>{visitasAgendadas}</Text>
-            </View>
-            <Ionicons name="calendar" size={38} color="#CBD5E1" />
-          </TouchableOpacity>
+          {widgetsConfig.showVisitasAgendadas && (
+            <TouchableOpacity 
+              style={[styles.webCard, styles.borderSuccess]} 
+              onPress={() => navigation.navigate('VisitasTab')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardLabel, { color: '#059669' }]}>🗓️ VISITAS AGENDADAS</Text>
+                <Text style={styles.cardValue}>{visitasAgendadas}</Text>
+              </View>
+              <Ionicons name="calendar" size={38} color="#CBD5E1" />
+            </TouchableOpacity>
+          )}
 
           {/* Card 4: Relatórios em Rascunho (#f6c23e) */}
-          <TouchableOpacity 
-            style={[styles.webCard, styles.borderWarning]} 
-            onPress={() => navigation.navigate('PendentesTab')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <Text style={[styles.cardLabel, { color: '#D97706' }]}>📝 EM RASCUNHO</Text>
-              <Text style={styles.cardValue}>{relatoriosRascunho}</Text>
-            </View>
-            <Ionicons name="document-text" size={38} color="#CBD5E1" />
-          </TouchableOpacity>
+          {widgetsConfig.showRelatoriosRascunho && (
+            <TouchableOpacity 
+              style={[styles.webCard, styles.borderWarning]} 
+              onPress={() => navigation.navigate('PendentesTab')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardLabel, { color: '#D97706' }]}>📝 EM RASCUNHO</Text>
+                <Text style={styles.cardValue}>{relatoriosRascunho}</Text>
+              </View>
+              <Ionicons name="document-text" size={38} color="#CBD5E1" />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Quick Actions Grid */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="flash-outline" size={18} color="#2563EB" />
-            <Text style={styles.sectionTitle}>Ações Rápidas no Canteiro</Text>
-          </View>
-        </View>
+        {widgetsConfig.showAcoesRapidas && (
+          <>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="flash-outline" size={18} color="#2563EB" />
+                <Text style={styles.sectionTitle}>Ações Rápidas no Canteiro</Text>
+              </View>
+            </View>
 
-        <View style={styles.actionsGrid}>
-          <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: '#2563EB' }]}
-            onPress={() => navigation.navigate('ReportFormScreen')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="document-attach" size={24} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Novo Relatório</Text>
-            <Text style={styles.actionBtnSub}>Vistoria Técnica</Text>
-          </TouchableOpacity>
+            <View style={styles.actionsGrid}>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: '#2563EB' }]}
+                onPress={() => navigation.navigate('ReportFormScreen')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="document-attach" size={24} color="#FFFFFF" />
+                <Text style={styles.actionBtnText}>Novo Relatório</Text>
+                <Text style={styles.actionBtnSub}>Vistoria Técnica</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: '#059669' }]}
-            onPress={() => navigation.navigate('ExpressReportsScreen')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="flash" size={24} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Relatório Express</Text>
-            <Text style={styles.actionBtnSub}>Criação Instantânea</Text>
-          </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: '#059669' }]}
+                onPress={() => navigation.navigate('ExpressReportsScreen')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flash" size={24} color="#FFFFFF" />
+                <Text style={styles.actionBtnText}>Relatório Express</Text>
+                <Text style={styles.actionBtnSub}>Criação Instantânea</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: '#7C3AED' }]}
-            onPress={() => navigation.navigate('VisitFormScreen')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="calendar" size={24} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Agendar Visita</Text>
-            <Text style={styles.actionBtnSub}>Programação</Text>
-          </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: '#7C3AED' }]}
+                onPress={() => navigation.navigate('VisitFormScreen')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="calendar" size={24} color="#FFFFFF" />
+                <Text style={styles.actionBtnText}>Agendar Visita</Text>
+                <Text style={styles.actionBtnSub}>Programação</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: '#D97706' }]}
-            onPress={() => navigation.navigate('ProjectFormScreen')}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add-circle" size={24} color="#FFFFFF" />
-            <Text style={styles.actionBtnText}>Cadastrar Obra</Text>
-            <Text style={styles.actionBtnSub}>Novo Projeto</Text>
-          </TouchableOpacity>
-        </View>
+              <TouchableOpacity 
+                style={[styles.actionBtn, { backgroundColor: '#D97706' }]}
+                onPress={() => navigation.navigate('ProjectFormScreen')}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add-circle" size={24} color="#FFFFFF" />
+                <Text style={styles.actionBtnText}>Cadastrar Obra</Text>
+                <Text style={styles.actionBtnSub}>Novo Projeto</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
 
-        {/* Recent Relatórios Section matching Web */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="document-text-outline" size={18} color={Colors.text} />
-            <Text style={styles.sectionTitle}>Relatórios Recentes</Text>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('PendentesTab')}>
-            <Text style={styles.seeAllText}>Ver todos</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Recent Relatórios Section */}
+        {widgetsConfig.showRelatoriosRecentes && (
+          <>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="document-text-outline" size={18} color={Colors.text} />
+                <Text style={styles.sectionTitle}>Relatórios Recentes</Text>
+              </View>
+              <TouchableOpacity onPress={() => navigation.navigate('PendentesTab')}>
+                <Text style={styles.seeAllText}>Ver todos</Text>
+              </TouchableOpacity>
+            </View>
 
-        {relatorios.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="document-text-outline" size={36} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>Nenhum relatório recente</Text>
-          </View>
-        ) : (
-          relatorios.slice(0, 4).map((rel) => {
-            const isWaiting = rel.status === 'Aguardando Aprovação';
-            const isApproved = rel.status === 'Aprovado';
-            const isRejected = rel.status === 'Rejeitado';
+            {relatorios.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="document-text-outline" size={36} color={Colors.textMuted} />
+                <Text style={styles.emptyText}>Nenhum relatório recente</Text>
+              </View>
+            ) : (
+              relatorios.slice(0, 4).map((rel) => {
+                const isWaiting = rel.status === 'Aguardando Aprovação';
+                const isApproved = rel.status === 'Aprovado';
+                const isRejected = rel.status === 'Rejeitado';
 
-            return (
-              <View key={rel.id} style={styles.webListItemCard}>
-                <View style={styles.webItemLeft}>
-                  <View style={styles.webItemHeaderRow}>
-                    <Text style={styles.webItemNumero}>{rel.numero}</Text>
-                    <SyncStatusBadge status={rel.sync_status} />
-                  </View>
-                  <Text style={styles.webItemProject} numberOfLines={1}>
-                    {rel.projeto_nome || 'Obra não informada'}
-                  </Text>
-                  <View style={styles.statusPillContainer}>
-                    <View style={[
-                      styles.webStatusBadge,
-                      isApproved ? styles.badgeApproved :
-                      isRejected ? styles.badgeRejected :
-                      isWaiting ? styles.badgeWaiting : styles.badgeDraft
-                    ]}>
-                      <Text style={[
-                        styles.webStatusText,
-                        isApproved ? styles.textApproved :
-                        isRejected ? styles.textRejected :
-                        isWaiting ? styles.textWaiting : styles.textDraft
-                      ]}>
-                        {rel.status === 'em_andamento' ? 'Rascunho' : (rel.status || 'Rascunho')}
+                return (
+                  <View key={rel.id} style={styles.webListItemCard}>
+                    <View style={styles.webItemLeft}>
+                      <View style={styles.webItemHeaderRow}>
+                        <Text style={styles.webItemNumero}>{rel.numero}</Text>
+                        <SyncStatusBadge status={rel.sync_status} />
+                      </View>
+                      <Text style={styles.webItemProject} numberOfLines={1}>
+                        {rel.projeto_nome || 'Obra não informada'}
                       </Text>
+                      <View style={styles.statusPillContainer}>
+                        <View style={[
+                          styles.webStatusBadge,
+                          isApproved ? styles.badgeApproved :
+                          isRejected ? styles.badgeRejected :
+                          isWaiting ? styles.badgeWaiting : styles.badgeDraft
+                        ]}>
+                          <Text style={[
+                            styles.webStatusText,
+                            isApproved ? styles.textApproved :
+                            isRejected ? styles.textRejected :
+                            isWaiting ? styles.textWaiting : styles.textDraft
+                          ]}>
+                            {rel.status === 'em_andamento' ? 'Rascunho' : (rel.status || 'Rascunho')}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={styles.webItemRight}>
+                      <Text style={styles.webItemDate}>
+                        {rel.data_relatorio ? new Date(rel.data_relatorio).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Sem data'}
+                      </Text>
+
+                      {isWaiting && isApprover ? (
+                        <TouchableOpacity 
+                          style={styles.reviewBtn}
+                          onPress={() => navigation.navigate('ReportDetailScreen', { reportId: rel.id })}
+                        >
+                          <Ionicons name="checkmark-done" size={14} color="#D97706" />
+                          <Text style={styles.reviewBtnText}>Revisar</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity 
+                          style={styles.viewBtn}
+                          onPress={() => navigation.navigate('ReportDetailScreen', { reportId: rel.id })}
+                        >
+                          <Ionicons name="eye-outline" size={14} color={Colors.primary} />
+                          <Text style={styles.viewBtnText}>Ver</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
-                </View>
-
-                <View style={styles.webItemRight}>
-                  <Text style={styles.webItemDate}>
-                    {rel.data_relatorio ? new Date(rel.data_relatorio).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'Sem data'}
-                  </Text>
-
-                  {isWaiting && isApprover ? (
-                    <TouchableOpacity 
-                      style={styles.reviewBtn}
-                      onPress={() => navigation.navigate('ReportDetailScreen', { reportId: rel.id })}
-                    >
-                      <Ionicons name="checkmark-done" size={14} color="#D97706" />
-                      <Text style={styles.reviewBtnText}>Revisar</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity 
-                      style={styles.viewBtn}
-                      onPress={() => navigation.navigate('ReportDetailScreen', { reportId: rel.id })}
-                    >
-                      <Ionicons name="eye-outline" size={14} color={Colors.primary} />
-                      <Text style={styles.viewBtnText}>Ver</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            );
-          })
+                );
+              })
+            )}
+          </>
         )}
 
         {/* Recent Visitas Section */}
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleRow}>
-            <Ionicons name="calendar-outline" size={18} color={Colors.text} />
-            <Text style={styles.sectionTitle}>Próximas Visitas</Text>
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('VisitasTab')}>
-            <Text style={styles.seeAllText}>Ver todas</Text>
-          </TouchableOpacity>
-        </View>
-
-        {visitas.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="calendar-outline" size={36} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>Nenhuma visita agendada.</Text>
-          </View>
-        ) : (
-          visitas.slice(0, 3).map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={styles.webListItemCard}
-              onPress={() => navigation.navigate('VisitDetailScreen', { visitId: item.id })}
-            >
-              <View style={styles.webItemLeft}>
-                <View style={styles.webItemHeaderRow}>
-                  <Text style={styles.webItemNumero}>{item.numero}</Text>
-                  <SyncStatusBadge status={item.sync_status} />
-                </View>
-                <Text style={styles.webItemProject} numberOfLines={1}>
-                  {item.projeto_nome || item.projeto_outros || 'Visita Técnica'}
-                </Text>
-                <Text style={styles.visitaTimeText}>
-                  {new Date(item.data_inicio).toLocaleDateString('pt-BR')} às {new Date(item.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </Text>
+        {widgetsConfig.showProximasVisitas && (
+          <>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleRow}>
+                <Ionicons name="calendar-outline" size={18} color={Colors.text} />
+                <Text style={styles.sectionTitle}>Próximas Visitas</Text>
               </View>
+              <TouchableOpacity onPress={() => navigation.navigate('VisitasTab')}>
+                <Text style={styles.seeAllText}>Ver todas</Text>
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.webItemRight}>
-                <View style={[styles.webStatusBadge, styles.badgeSuccess]}>
-                  <Text style={[styles.webStatusText, styles.textSuccess]}>{item.status}</Text>
-                </View>
+            {visitas.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="calendar-outline" size={36} color={Colors.textMuted} />
+                <Text style={styles.emptyText}>Nenhuma visita agendada.</Text>
               </View>
-            </TouchableOpacity>
-          ))
+            ) : (
+              visitas.slice(0, 3).map((item) => (
+                <TouchableOpacity 
+                  key={item.id} 
+                  style={styles.webListItemCard}
+                  onPress={() => navigation.navigate('VisitDetailScreen', { visitId: item.id })}
+                >
+                  <View style={styles.webItemLeft}>
+                    <View style={styles.webItemHeaderRow}>
+                      <Text style={styles.webItemNumero}>{item.numero}</Text>
+                      <SyncStatusBadge status={item.sync_status} />
+                    </View>
+                    <Text style={styles.webItemProject} numberOfLines={1}>
+                      {item.projeto_nome || item.projeto_outros || 'Visita Técnica'}
+                    </Text>
+                    <Text style={styles.visitaTimeText}>
+                      {new Date(item.data_inicio).toLocaleDateString('pt-BR')} às {new Date(item.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+
+                  <View style={styles.webItemRight}>
+                    <View style={[styles.webStatusBadge, styles.badgeSuccess]}>
+                      <Text style={[styles.webStatusText, styles.textSuccess]}>{item.status}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </>
         )}
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* MODAL: PERSONALIZAR TELA INICIAL (DASHBOARD) */}
+      <Modal visible={showConfigModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="options" size={20} color={Colors.primary} />
+                <Text style={styles.modalTitle}>Personalizar Tela Inicial</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowConfigModal(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Selecione quais seções e indicadores deseja exibir ou ocultar no início do aplicativo.
+            </Text>
+
+            <ScrollView style={styles.modalScroll}>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>Logo & Identidade Visual (Hero)</Text>
+                  <Text style={styles.toggleDesc}>Banner superior com logo da ELP e slogan</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showHero}
+                  onValueChange={v => updateWidgetConfig('showHero', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showHero ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>Badges de Usuário / Empresa</Text>
+                  <Text style={styles.toggleDesc}>Identificação do engenheiro e consultoria</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showBadges}
+                  onValueChange={v => updateWidgetConfig('showBadges', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showBadges ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>🏗️ Card: Obras Ativas</Text>
+                  <Text style={styles.toggleDesc}>Contador de empreendimentos ativos</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showObrasAtivas}
+                  onValueChange={v => updateWidgetConfig('showObrasAtivas', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showObrasAtivas ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>📋 Card: Relatórios Pendentes</Text>
+                  <Text style={styles.toggleDesc}>Vistorias aguardando aprovação técnica</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showRelatoriosPendentes}
+                  onValueChange={v => updateWidgetConfig('showRelatoriosPendentes', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showRelatoriosPendentes ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>🗓️ Card: Visitas Agendadas</Text>
+                  <Text style={styles.toggleDesc}>Agendamentos futuros na agenda</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showVisitasAgendadas}
+                  onValueChange={v => updateWidgetConfig('showVisitasAgendadas', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showVisitasAgendadas ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>📝 Card: Em Rascunho</Text>
+                  <Text style={styles.toggleDesc}>Relatórios em preenchimento local</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showRelatoriosRascunho}
+                  onValueChange={v => updateWidgetConfig('showRelatoriosRascunho', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showRelatoriosRascunho ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>⚡ Ações Rápidas no Canteiro</Text>
+                  <Text style={styles.toggleDesc}>Botões de Novo Relatório, Express, Visita, Obra</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showAcoesRapidas}
+                  onValueChange={v => updateWidgetConfig('showAcoesRapidas', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showAcoesRapidas ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>📄 Relatórios Recentes</Text>
+                  <Text style={styles.toggleDesc}>Lista resumida dos últimos relatórios</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showRelatoriosRecentes}
+                  onValueChange={v => updateWidgetConfig('showRelatoriosRecentes', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showRelatoriosRecentes ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabelBox}>
+                  <Text style={styles.toggleTitle}>📅 Próximas Visitas</Text>
+                  <Text style={styles.toggleDesc}>Lista com as próximas vistorias agendadas</Text>
+                </View>
+                <Switch
+                  value={widgetsConfig.showProximasVisitas}
+                  onValueChange={v => updateWidgetConfig('showProximasVisitas', v)}
+                  trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+                  thumbColor={widgetsConfig.showProximasVisitas ? '#2563EB' : '#F1F5F9'}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.resetBtn} onPress={resetWidgetConfig}>
+                <Text style={styles.resetBtnText}>Restaurar Padrão</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.doneBtn} onPress={() => setShowConfigModal(false)}>
+                <Text style={styles.doneBtnText}>Salvar Preferências</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -416,16 +701,77 @@ const styles = StyleSheet.create({
   scroll: {
     padding: 16,
   },
-  headerSyncBtn: {
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerBtn: {
     padding: 8,
     borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  headerSyncBtn: {
     backgroundColor: '#EFF6FF',
+  },
+  heroCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
+  },
+  heroLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  heroLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+  },
+  heroTextContainer: {
+    flex: 1,
+  },
+  heroCompany: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+  },
+  heroSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  customizeShortcutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  customizeShortcutText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#2563EB',
   },
   userBadgeBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   badgePrimary: {
     flexDirection: 'row',
@@ -452,12 +798,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
+  approverAlertBanner: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    ...Shadows.sm,
+  },
+  approverAlertLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  approverAlertTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#92400E',
+  },
+  approverAlertSub: {
+    fontSize: 11,
+    color: '#B45309',
+    marginTop: 2,
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 18,
-    marginBottom: 12,
+    marginTop: 14,
+    marginBottom: 10,
   },
   sectionTitleRow: {
     flexDirection: 'row',
@@ -465,7 +839,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#1E293B',
   },
@@ -501,7 +875,7 @@ const styles = StyleSheet.create({
   },
   cardsGrid: {
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   webCard: {
     backgroundColor: '#FFFFFF',
@@ -696,5 +1070,91 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#94A3B8',
     marginTop: 8,
+  },
+  // Customization Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '85%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  modalScroll: {
+    maxHeight: 380,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  toggleLabelBox: {
+    flex: 1,
+    marginRight: 12,
+  },
+  toggleTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  toggleDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+  },
+  resetBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resetBtnText: {
+    fontSize: 13,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  doneBtn: {
+    flex: 1.5,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneBtnText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
 });

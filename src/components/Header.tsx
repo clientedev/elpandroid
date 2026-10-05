@@ -1,9 +1,11 @@
-﻿import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNetwork } from '../contexts/NetworkContext';
 import { Colors, Shadows } from '../theme/colors';
+
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 44;
 
 interface HeaderProps {
   title: string;
@@ -25,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent />
       <View style={styles.left}>
         {showBack && (
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -65,7 +68,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: STATUSBAR_HEIGHT + 10,
     paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',

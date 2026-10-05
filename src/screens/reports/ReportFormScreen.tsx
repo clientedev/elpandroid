@@ -165,7 +165,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [selectedProjectId, titulo, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos]);
 
   async function handleAddPhotoCamera() {
-    const photo = await takePhoto();
+    const selectedProj = projetos.find(p => p.id === selectedProjectId);
+    const photo = await takePhoto(selectedProj?.nome);
     if (photo) {
       const newFoto: FotoRelatorio = {
         id: Date.now(),
@@ -183,7 +184,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }
 
   async function handleAddPhotoGallery() {
-    const photo = await pickImage();
+    const selectedProj = projetos.find(p => p.id === selectedProjectId);
+    const photo = await pickImage(selectedProj?.nome);
     if (photo) {
       const newFoto: FotoRelatorio = {
         id: Date.now(),

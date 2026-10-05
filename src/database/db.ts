@@ -20,6 +20,13 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
 async function initDatabase(db: SQLite.SQLiteDatabase) {
   await db.execAsync(CREATE_TABLES_SQL);
+
+  // Migration: ensure base64 column exists in fotos_relatorio
+  try {
+    await db.execAsync('ALTER TABLE fotos_relatorio ADD COLUMN base64 TEXT;');
+  } catch {
+    // Column already exists
+  }
   
   // Seed initial legendas if empty
   const countRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM legendas_predefinidas');
@@ -224,12 +231,12 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (
       id, relatorio_id, url, filename, uri_local, titulo, legenda, descricao,
-      tipo_servico, local, ordem, anotacoes_dados, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      tipo_servico, local, ordem, anotacoes_dados, base64, sync_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       f.id, f.relatorio_id, f.url || '', f.filename || '', f.uri_local || '',
       f.titulo || '', f.legenda || '', f.descricao || '', f.tipo_servico || '',
-      f.local || '', f.ordem || 0, f.anotacoes_dados || '', syncStatus
+      f.local || '', f.ordem || 0, f.anotacoes_dados || '', f.base64 || '', syncStatus
     ]
   );
 }

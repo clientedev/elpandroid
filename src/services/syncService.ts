@@ -2,6 +2,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import * as FileSystem from 'expo-file-system';
 import { apiClient } from './api';
+import { readPhotoBase64 } from './imageService';
 import { 
   getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
@@ -145,20 +146,15 @@ class SyncService {
                   fotos.map(async (f) => {
                     let base64Data = f.base64;
                     if (!base64Data && f.uri_local) {
-                      try {
-                        const fileInfo = await FileSystem.getInfoAsync(f.uri_local);
-                        if (fileInfo.exists) {
-                          base64Data = await FileSystem.readAsStringAsync(f.uri_local, {
-                            encoding: FileSystem.EncodingType.Base64,
-                          });
-                        }
-                      } catch (readErr) {
-                        console.warn('[SyncService] Could not convert photo to base64:', readErr);
+                      base64Data = await readPhotoBase64(f.uri_local);
+                      if (base64Data) {
+                        await saveLocalFoto({ ...f, base64: base64Data }, 'pending').catch(() => null);
                       }
                     }
                     return {
                       ...f,
                       base64: base64Data,
+                      imagem_base64: base64Data,
                     };
                   })
                 );

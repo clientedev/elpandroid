@@ -1,4 +1,4 @@
-﻿export const CREATE_TABLES_SQL = `
+export const CREATE_TABLES_SQL = `
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY,
   username TEXT NOT NULL,
@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS fotos_relatorio (
   local TEXT,
   ordem INTEGER DEFAULT 0,
   anotacoes_dados TEXT,
+  base64 TEXT,
   sync_status TEXT DEFAULT 'synced'
 );
 

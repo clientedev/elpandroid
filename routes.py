@@ -115,7 +115,7 @@ def health_check():
             'legendas_count': legendas_count,
             'database': 'connected',
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.4'
+            'version': '1.0.5'
         }), 200
 
     except Exception as e:
@@ -125,7 +125,7 @@ def health_check():
             'status': 'STARTING',
             'warning': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.4'
+            'version': '1.0.5'
         }), 200
 
 @app.route('/debug/images-data')
@@ -206,7 +206,7 @@ def debug_reports_data():
             'status': 'ERROR',
             'error': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.4'
+            'version': '1.0.5'
         }), 500
 
 @app.route('/debug/reports-status')
@@ -12355,11 +12355,11 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.4',
+        'version': '1.0.5',
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.4: Dashboard idêntico ao site com KPIs coloridos, novo editor de marcação fotográfica com setas dimensionáveis e rotação em 8 sentidos, exibição com persistência e correção de imagens escuras.',
+        'notes': 'Atualização 1.0.5: Sincronização persistente de fotos no banco Railway, organização de pastas locais no celular em ELP RELATORIOS por obra, logo no hero do app, cabeçalho rebaixado sem sobrepor status bar do Android e tela inicial com widgets personalizáveis.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12582,6 +12582,97 @@ def api_projeto_detail_sync(projeto_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+def _save_fotos_for_relatorio(relatorio_id, fotos_list):
+    """Processa e salva fotos de relatório no PostgreSQL e filesystem com suporte completo a Base64"""
+    if not isinstance(fotos_list, list) or len(fotos_list) == 0:
+        return 0
+
+    import base64
+    import hashlib
+    import uuid
+    import json
+
+    upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Limpar fotos anteriores do relatório para atualização limpa
+    try:
+        FotoRelatorio.query.filter_by(relatorio_id=relatorio_id).delete()
+        db.session.flush()
+    except Exception as del_err:
+        current_app.logger.warning(f"Erro ao limpar fotos anteriores: {del_err}")
+
+    saved_count = 0
+    for idx, f_data in enumerate(fotos_list):
+        if not isinstance(f_data, dict):
+            continue
+
+        anotacoes_raw = f_data.get('anotacoes_dados')
+        anotacoes_obj = None
+        if anotacoes_raw:
+            if isinstance(anotacoes_raw, str):
+                try:
+                    anotacoes_obj = json.loads(anotacoes_raw)
+                except Exception:
+                    anotacoes_obj = anotacoes_raw
+            else:
+                anotacoes_obj = anotacoes_raw
+
+        foto = FotoRelatorio(
+            relatorio_id=relatorio_id,
+            titulo=f_data.get('titulo') or f"Foto {idx+1}",
+            legenda=f_data.get('legenda') or '',
+            descricao=f_data.get('descricao') or '',
+            tipo_servico=f_data.get('tipo_servico'),
+            local=f_data.get('local') or '',
+            ordem=f_data.get('ordem', idx),
+            anotacoes_dados=anotacoes_obj
+        )
+
+        b64_str = (
+            f_data.get('base64') or 
+            f_data.get('imagem_base64') or 
+            f_data.get('imagem') or 
+            f_data.get('dataUrl') or 
+            ''
+        )
+
+        if b64_str and isinstance(b64_str, str):
+            if ',' in b64_str:
+                b64_str = b64_str.split(',', 1)[1]
+            b64_str = b64_str.strip()
+            pad = len(b64_str) % 4
+            if pad:
+                b64_str += '=' * (4 - pad)
+
+            try:
+                img_bytes = base64.b64decode(b64_str)
+                foto.imagem = img_bytes
+                foto.imagem_hash = hashlib.sha256(img_bytes).hexdigest()
+                foto.imagem_size = len(img_bytes)
+                foto.content_type = 'image/jpeg'
+
+                fname = f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+                fpath = os.path.join(upload_dir, fname)
+                try:
+                    with open(fpath, 'wb') as f_out:
+                        f_out.write(img_bytes)
+                    foto.filename = fname
+                    foto.url = f"/uploads/{fname}"
+                except Exception as file_save_err:
+                    current_app.logger.warning(f"Erro ao salvar arquivo em disco: {file_save_err}")
+            except Exception as b64_err:
+                current_app.logger.warning(f"Erro ao decodificar base64 foto {idx}: {b64_err}")
+                foto.url = f_data.get('url') or f_data.get('uri') or ''
+        else:
+            foto.url = f_data.get('url') or f_data.get('uri') or ''
+
+        db.session.add(foto)
+        saved_count += 1
+
+    db.session.flush()
+    return saved_count
+
 # --- RELATORIOS ---
 @app.route('/api/relatorios', methods=['GET', 'POST'])
 @csrf.exempt
@@ -12640,68 +12731,7 @@ def api_relatorios_collection():
             # Processar fotos em lote se enviadas no payload
             fotos_list = data.get('fotos') or []
             if isinstance(fotos_list, list) and len(fotos_list) > 0:
-                import base64
-                import hashlib
-                import uuid
-                import json
-
-                # Limpar fotos anteriores do relatório se já existiam para evitar duplicatas em re-sync
-                if existing:
-                    FotoRelatorio.query.filter_by(relatorio_id=relatorio.id).delete()
-
-                upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
-                os.makedirs(upload_dir, exist_ok=True)
-
-                for idx, f_data in enumerate(fotos_list):
-                    anotacoes_raw = f_data.get('anotacoes_dados')
-                    anotacoes_obj = None
-                    if anotacoes_raw:
-                        if isinstance(anotacoes_raw, str):
-                            try:
-                                anotacoes_obj = json.loads(anotacoes_raw)
-                            except Exception:
-                                anotacoes_obj = anotacoes_raw
-                        else:
-                            anotacoes_obj = anotacoes_raw
-
-                    foto = FotoRelatorio(
-                        relatorio_id=relatorio.id,
-                        titulo=f_data.get('titulo') or f"Foto {idx+1}",
-                        legenda=f_data.get('legenda') or '',
-                        descricao=f_data.get('descricao') or '',
-                        tipo_servico=f_data.get('tipo_servico'),
-                        local=f_data.get('local') or '',
-                        ordem=f_data.get('ordem', idx),
-                        anotacoes_dados=anotacoes_obj
-                    )
-
-                    # Processar dados base64 da foto se fornecidos
-                    b64_str = f_data.get('base64') or ''
-                    if b64_str:
-                        if ',' in b64_str:
-                            b64_str = b64_str.split(',', 1)[1]
-                        try:
-                            img_bytes = base64.b64decode(b64_str)
-                            foto.imagem = img_bytes
-                            foto.imagem_hash = hashlib.sha256(img_bytes).hexdigest()
-                            foto.imagem_size = len(img_bytes)
-                            foto.content_type = 'image/jpeg'
-
-                            # Salvar arquivo na pasta uploads para disponibilizar rota estática
-                            fname = f"rel_{relatorio.id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
-                            fpath = os.path.join(upload_dir, fname)
-                            with open(fpath, 'wb') as f_out:
-                                f_out.write(img_bytes)
-
-                            foto.filename = fname
-                            foto.url = f"/uploads/{fname}"
-                        except Exception as b64_err:
-                            current_app.logger.warning(f"Erro ao processar imagem base64 foto {idx}: {b64_err}")
-                            foto.url = f_data.get('url') or f_data.get('uri') or ''
-                    else:
-                        foto.url = f_data.get('url') or f_data.get('uri') or ''
-
-                    db.session.add(foto)
+                _save_fotos_for_relatorio(relatorio.id, fotos_list)
 
             db.session.commit()
             return jsonify({
@@ -12810,6 +12840,9 @@ def api_relatorio_detail_sync(relatorio_id):
                 if field in data and data[field] is not None:
                     setattr(relatorio, field, data[field])
             
+            if 'fotos' in data and isinstance(data['fotos'], list):
+                _save_fotos_for_relatorio(relatorio.id, data['fotos'])
+
             db.session.commit()
             return jsonify({'success': True, 'id': relatorio.id, 'status': relatorio.status}), 200
 
@@ -12854,6 +12887,41 @@ def api_relatorio_detail_sync(relatorio_id):
             'observacoes_finais': relatorio.observacoes_finais,
             'fotos': fotos_list,
         }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/relatorios/<int:relatorio_id>/fotos', methods=['GET', 'POST'])
+@csrf.exempt
+def api_relatorio_fotos(relatorio_id):
+    """Endpoint dedicado para sincronizacao e consulta direta de fotos de relatorios"""
+    try:
+        relatorio = Relatorio.query.get(relatorio_id)
+        if not relatorio:
+            return jsonify({'success': False, 'error': 'Relatório não encontrado'}), 404
+
+        if request.method == 'POST':
+            data = request.get_json(silent=True) or request.form or {}
+            fotos_list = data.get('fotos') if 'fotos' in data else [data]
+            saved = _save_fotos_for_relatorio(relatorio.id, fotos_list)
+            db.session.commit()
+            return jsonify({'success': True, 'saved_photos': saved}), 200
+
+        fotos = FotoRelatorio.query.filter_by(relatorio_id=relatorio.id).order_by(FotoRelatorio.ordem).all()
+        base_app_url = 'https://elpandroid-production.up.railway.app'
+        return jsonify([{
+            'id': f.id,
+            'relatorio_id': f.relatorio_id,
+            'url': f"{base_app_url}/api/fotos/{f.id}" if not f.filename else f"{base_app_url}/uploads/{f.filename}",
+            'filename': f.filename,
+            'titulo': f.titulo or '',
+            'legenda': f.legenda or '',
+            'local': f.local or '',
+            'ordem': f.ordem,
+            'anotacoes_dados': f.anotacoes_dados,
+            'has_binary': f.imagem is not None,
+            'size': f.imagem_size or 0
+        } for f in fotos]), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
