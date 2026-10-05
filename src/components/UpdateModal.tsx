@@ -46,8 +46,11 @@ export const UpdateModal: React.FC = () => {
     }
   }
 
-  function handleDismiss() {
+  async function handleDismiss() {
     if (isDownloading) return;
+    if (updateInfo) {
+      await updateService.dismissUpdate(updateInfo);
+    }
     setVisible(false);
   }
 

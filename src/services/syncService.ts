@@ -1,10 +1,11 @@
-﻿import NetInfo from '@react-native-community/netinfo';
+import { AppState, AppStateStatus } from 'react-native';
+import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { apiClient } from './api';
 import { 
   getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
-  saveLocalReembolso, getDatabase
+  saveLocalReembolso, getLocalFotos, getDatabase
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
 
@@ -13,6 +14,61 @@ export type SyncState = 'idle' | 'syncing' | 'offline' | 'error';
 class SyncService {
   private isSyncing: boolean = false;
   private listeners: ((state: SyncState, pendingCount: number) => void)[] = [];
+  private autoSyncInterval: any = null;
+  private lastSyncTimestamp: number = 0;
+
+  constructor() {
+    this.initAutoSync();
+  }
+
+  /**
+   * Initializes automatic synchronization:
+   * 1. Detects internet connection recovery
+   * 2. Periodic sync check (heartbeat every 35s)
+   * 3. Syncs when app returns from background
+   */
+  private initAutoSync() {
+    // 1. Connection change listener
+    NetInfo.addEventListener((state: NetInfoState) => {
+      const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+      if (online) {
+        // Debounce connection burst
+        const now = Date.now();
+        if (now - this.lastSyncTimestamp > 5000) {
+          this.syncAll(false);
+        }
+      } else {
+        this.getPendingCount().then(c => this.notify('offline', c));
+      }
+    });
+
+    // 2. Heartbeat check every 35 seconds
+    if (this.autoSyncInterval) {
+      clearInterval(this.autoSyncInterval);
+    }
+    this.autoSyncInterval = setInterval(async () => {
+      const online = await this.isOnline();
+      if (online) {
+        const pending = await this.getPendingCount();
+        if (pending > 0 && !this.isSyncing) {
+          await this.syncAll(false);
+        }
+      }
+    }, 35000);
+
+    // 3. Foreground resume listener
+    AppState.addEventListener('change', async (state: AppStateStatus) => {
+      if (state === 'active') {
+        const online = await this.isOnline();
+        if (online) {
+          const now = Date.now();
+          if (now - this.lastSyncTimestamp > 10000) {
+            this.syncAll(false);
+          }
+        }
+      }
+    });
+  }
 
   subscribe(listener: (state: SyncState, pendingCount: number) => void) {
     this.listeners.push(listener);
@@ -26,8 +82,12 @@ class SyncService {
   }
 
   async isOnline(): Promise<boolean> {
-    const net = await NetInfo.fetch();
-    return Boolean(net.isConnected && net.isInternetReachable !== false);
+    try {
+      const net = await NetInfo.fetch();
+      return Boolean(net.isConnected && net.isInternetReachable !== false);
+    } catch {
+      return false;
+    }
   }
 
   async getPendingCount(): Promise<number> {
@@ -39,41 +99,70 @@ class SyncService {
     }
   }
 
-  async syncAll(): Promise<{ success: boolean; message: string }> {
+  /**
+   * Main synchronization routine:
+   * Works 100% offline first, pushes pending local SQLite items to Railway,
+   * and pulls remote records down to SQLite.
+   */
+  async syncAll(manual: boolean = false): Promise<{ success: boolean; message: string }> {
     if (this.isSyncing) {
-      return { success: false, message: 'Sincronização já em andamento' };
+      return { success: false, message: 'Sincronização já em andamento...' };
     }
 
     const online = await this.isOnline();
     if (!online) {
       const pending = await this.getPendingCount();
       this.notify('offline', pending);
-      return { success: false, message: 'Dispositivo offline. Os dados estão salvos localmente.' };
+      return { 
+        success: false, 
+        message: 'Dispositivo sem internet. Dados salvos 100% no celular e serão sincronizados automaticamente assim que conectar à rede.' 
+      };
     }
 
     this.isSyncing = true;
+    this.lastSyncTimestamp = Date.now();
     let pendingCount = await this.getPendingCount();
     this.notify('syncing', pendingCount);
 
+    let processedCount = 0;
+    let failedCount = 0;
+
     try {
-      // 1. Process Outbound Sync Queue (Device -> Server)
+      // 1. Process Outbound Sync Queue (Local SQLite -> Railway Server)
       const queue = await getPendingSyncQueue();
       for (const item of queue) {
         try {
           await updateSyncQueueItem(item.id, 'processing');
-          const payload = JSON.parse(item.payload);
+          let payload = JSON.parse(item.payload || '{}');
 
-          if (item.method === 'POST') {
-            await apiClient.axios.post(item.endpoint, payload);
-          } else if (item.method === 'PUT') {
-            await apiClient.axios.put(item.endpoint, payload);
-          } else if (item.method === 'DELETE') {
-            await apiClient.axios.delete(item.endpoint);
+          // Enrich report payload with local photos if available
+          if (item.entity_type === 'relatorio') {
+            try {
+              const fotos = await getLocalFotos(item.entity_id);
+              if (fotos && fotos.length > 0) {
+                payload.fotos = fotos;
+              }
+            } catch (fotoErr) {
+              console.warn('[SyncService] Could not attach photos:', fotoErr);
+            }
           }
 
-          await updateSyncQueueItem(item.id, 'completed');
+          let response;
+          if (item.method === 'POST') {
+            response = await apiClient.axios.post(item.endpoint, payload);
+          } else if (item.method === 'PUT') {
+            response = await apiClient.axios.put(item.endpoint, payload);
+          } else if (item.method === 'DELETE') {
+            response = await apiClient.axios.delete(item.endpoint);
+          } else {
+            response = await apiClient.axios.get(item.endpoint);
+          }
 
-          // Update local entity sync_status
+          // Mark completed
+          await updateSyncQueueItem(item.id, 'completed');
+          processedCount++;
+
+          // Update local entity sync_status to 'synced'
           const db = await getDatabase();
           if (item.entity_type === 'projeto') {
             await db.runAsync('UPDATE projetos SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
@@ -87,23 +176,33 @@ class SyncService {
             await db.runAsync('UPDATE lembretes SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'reembolso') {
             await db.runAsync('UPDATE reembolsos SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+          } else if (item.entity_type === 'contato') {
+            await db.runAsync('UPDATE contatos SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           }
         } catch (itemErr: any) {
-          console.warn(`Sync queue item ${item.id} failed:`, itemErr.message);
-          await updateSyncQueueItem(item.id, 'failed', itemErr.message);
+          failedCount++;
+          console.warn(`[SyncService] Queue item ${item.id} (${item.endpoint}) error:`, itemErr?.message);
+          // If offline / network dropped mid-sync, mark pending for next retry
+          const isNetErr = !itemErr.response;
+          await updateSyncQueueItem(item.id, isNetErr ? 'pending' : 'failed', itemErr?.message);
         }
       }
 
       await clearCompletedSyncQueue();
 
-      // 2. Process Inbound Sync (Server -> SQLite Local)
+      // 2. Process Inbound Sync (Railway Server -> SQLite Local)
       await this.pullFromServer();
 
       pendingCount = await this.getPendingCount();
       this.notify('idle', pendingCount);
-      return { success: true, message: 'Sincronização concluída com sucesso' };
+
+      const msg = processedCount > 0 
+        ? `Sincronização concluída! ${processedCount} alteração(ões) enviada(s) com sucesso para o Railway.`
+        : 'Sincronização concluída! Todos os dados estão atualizados no servidor.';
+
+      return { success: true, message: msg };
     } catch (err: any) {
-      console.error('Error during full sync:', err);
+      console.error('[SyncService] Global sync error:', err);
       pendingCount = await this.getPendingCount();
       this.notify('error', pendingCount);
       return { success: false, message: `Erro na sincronização: ${err.message}` };
@@ -112,35 +211,44 @@ class SyncService {
     }
   }
 
+  /**
+   * Pulls remote changes from Railway down to the local SQLite database
+   */
   private async pullFromServer(): Promise<void> {
     try {
-      // Pull Projetos
-      const projRes = await apiClient.axios.get('/api/dashboard-stats').catch(() => null);
-      // Try to fetch projects list
-      const projectsRes = await apiClient.axios.get('/api/projetos').catch(() => null);
+      // 1. Pull Projetos
+      const projectsRes = await apiClient.axios.get('/api/projetos', { timeout: 8000 }).catch(() => null);
       if (projectsRes && Array.isArray(projectsRes.data)) {
         for (const p of projectsRes.data) {
           await saveLocalProjeto(p, 'synced');
         }
       }
 
-      // Pull Visitas
-      const visitsRes = await apiClient.axios.get('/api/visits').catch(() => null);
+      // 2. Pull Visitas
+      const visitsRes = await apiClient.axios.get('/api/visits', { timeout: 8000 }).catch(() => null);
       if (visitsRes && Array.isArray(visitsRes.data)) {
         for (const v of visitsRes.data) {
           await saveLocalVisita(v, 'synced');
         }
       }
 
-      // Pull Relatorios
-      const reportsRes = await apiClient.axios.get('/api/relatorios').catch(() => null);
+      // 3. Pull Relatorios
+      const reportsRes = await apiClient.axios.get('/api/relatorios', { timeout: 8000 }).catch(() => null);
       if (reportsRes && Array.isArray(reportsRes.data)) {
         for (const r of reportsRes.data) {
           await saveLocalRelatorio(r, 'synced');
         }
       }
+
+      // 4. Pull Lembretes
+      const remindersRes = await apiClient.axios.get('/api/lembretes', { timeout: 8000 }).catch(() => null);
+      if (remindersRes && Array.isArray(remindersRes.data)) {
+        for (const l of remindersRes.data) {
+          await saveLocalLembrete(l, 'synced');
+        }
+      }
     } catch (pullErr) {
-      console.warn('Inbound pull partially completed or backend offline:', pullErr);
+      console.warn('[SyncService] Inbound pull notice:', pullErr);
     }
   }
 }

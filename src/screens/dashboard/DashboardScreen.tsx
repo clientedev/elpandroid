@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
-  RefreshControl, FlatList 
+  RefreshControl, FlatList, Alert 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
@@ -123,7 +123,11 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         rightAction={
           <TouchableOpacity 
             style={styles.headerSyncBtn} 
-            onPress={() => triggerSync()}
+            onPress={async () => {
+              const res = await triggerSync();
+              Alert.alert(res.success ? 'Sincronização' : 'Aviso', res.message);
+              await loadData();
+            }}
             disabled={syncState === 'syncing'}
           >
             <Ionicons 

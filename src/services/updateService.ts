@@ -15,6 +15,23 @@ export interface UpdateInfo {
 }
 
 const LAST_DEPLOY_KEY = 'elp_last_seen_deploy_id';
+const DISMISSED_DEPLOY_KEY = 'elp_dismissed_deploy_id';
+
+function isVersionGreater(v1: string, v2: string): boolean {
+  try {
+    const p1 = (v1 || '').replace(/[^0-9.]/g, '').split('.').map(n => parseInt(n, 10) || 0);
+    const p2 = (v2 || '').replace(/[^0-9.]/g, '').split('.').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+      const a = p1[i] || 0;
+      const b = p2[i] || 0;
+      if (a > b) return true;
+      if (a < b) return false;
+    }
+  } catch {
+    // fallback
+  }
+  return false;
+}
 
 class UpdateService {
   private isChecking = false;
@@ -47,9 +64,9 @@ class UpdateService {
         currentAppState.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // Debounce foreground checks (at least 30 seconds between checks)
+        // Debounce foreground checks (at least 60 seconds between checks)
         const now = Date.now();
-        if (now - this.lastCheckTime > 30000) {
+        if (now - this.lastCheckTime > 60000) {
           this.checkForUpdate(false);
         }
       }
@@ -64,7 +81,7 @@ class UpdateService {
     return (
       Constants.expoConfig?.version ||
       Constants.manifest2?.extra?.expoClient?.version ||
-      '1.0.0'
+      '1.0.1'
     );
   }
 
@@ -104,20 +121,31 @@ class UpdateService {
       try {
         const res = await apiClient.axios.get('/api/app-version', { timeout: 6000 });
         if (res.data) {
-          const serverVersion = res.data.version || '1.0.1';
+          const serverVersion = String(res.data.version || '1.0.1');
           const currentVersion = this.getCurrentVersion();
           const serverDeployId = String(res.data.deployId || res.data.buildTime || serverVersion);
           
           const lastSeenDeployId = await AsyncStorage.getItem(LAST_DEPLOY_KEY);
+          const dismissedDeployId = await AsyncStorage.getItem(DISMISSED_DEPLOY_KEY);
           
-          // Triggers prompt whenever:
-          // 1. A new deploy occurred on Railway (deployId changed)
-          // 2. The server version is different from the app version
-          // 3. User manually asked to check
-          const isNewDeploy = Boolean(lastSeenDeployId && lastSeenDeployId !== serverDeployId);
-          const isNewVersion = serverVersion !== currentVersion;
+          // First install on device: initialize last seen deploy ID so we don't nag immediately
+          if (!lastSeenDeployId) {
+            await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
+          }
 
-          if (isNewDeploy || isNewVersion || manual) {
+          // A genuinely new deploy is detected if:
+          // 1. The server deploy ID changed from what we previously saw, and has not been dismissed
+          // 2. OR server has a strictly higher semver version than the installed app
+          const isNewDeploy = Boolean(
+            lastSeenDeployId && 
+            lastSeenDeployId !== serverDeployId && 
+            dismissedDeployId !== serverDeployId
+          );
+          const hasHigherVersion = isVersionGreater(serverVersion, currentVersion);
+
+          const shouldPrompt = (isNewDeploy || hasHigherVersion || manual) && (manual || dismissedDeployId !== serverDeployId);
+
+          if (shouldPrompt) {
             const info: UpdateInfo = {
               available: true,
               isOta: false,
@@ -128,9 +156,6 @@ class UpdateService {
             };
             this.notifyUpdateAvailable(info);
             return info;
-          } else if (!lastSeenDeployId) {
-            // First run: save current deploy id
-            await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
           }
         }
       } catch (backendErr) {
@@ -168,7 +193,11 @@ class UpdateService {
         'Atualização Disponível',
         'Tem uma atualização recente. Deseja atualizar?',
         [
-          { text: 'Mais tarde', style: 'cancel' },
+          { 
+            text: 'Mais tarde', 
+            style: 'cancel',
+            onPress: () => this.dismissUpdate(info),
+          },
           {
             text: 'Atualizar',
             style: 'default',
@@ -180,6 +209,21 @@ class UpdateService {
   }
 
   /**
+   * Record dismissal of an update so the prompt does not keep repeating
+   */
+  public async dismissUpdate(info?: UpdateInfo | null): Promise<void> {
+    try {
+      const deployId = info?.deployId;
+      if (deployId) {
+        await AsyncStorage.setItem(LAST_DEPLOY_KEY, deployId);
+        await AsyncStorage.setItem(DISMISSED_DEPLOY_KEY, deployId);
+      }
+    } catch (e) {
+      console.warn('Error saving dismissed update state:', e);
+    }
+  }
+
+  /**
    * Apply the update and restart/reload or open APK download and sync data
    */
   public async applyUpdate(info: UpdateInfo): Promise<boolean> {
@@ -187,14 +231,15 @@ class UpdateService {
     this.isUpdating = true;
 
     try {
-      // Record this deploy so we don't spam repeatedly for the same deploy ID
+      // Record this deploy so we don't prompt repeatedly for this deploy ID
       if (info.deployId) {
         await AsyncStorage.setItem(LAST_DEPLOY_KEY, info.deployId);
+        await AsyncStorage.setItem(DISMISSED_DEPLOY_KEY, info.deployId);
       }
 
       // Sync local database tables with Railway immediately
       try {
-        await syncService.syncAll();
+        await syncService.syncAll(false);
       } catch (syncErr) {
         console.warn('[UpdateService] Pre-update sync notice:', syncErr);
       }

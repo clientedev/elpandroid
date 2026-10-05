@@ -1,4 +1,4 @@
-﻿import * as SQLite from 'expo-sqlite';
+import * as SQLite from 'expo-sqlite';
 import { CREATE_TABLES_SQL, SEED_LEGENDAS } from './schema';
 import { 
   Projeto, Visita, Relatorio, FotoRelatorio, 
@@ -415,7 +415,7 @@ export async function getPendingSyncQueue(): Promise<SyncQueueItem[]> {
   );
 }
 
-export async function updateSyncQueueItem(id: number, status: 'completed' | 'failed' | 'processing', errorMessage?: string): Promise<void> {
+export async function updateSyncQueueItem(id: number, status: 'pending' | 'processing' | 'failed' | 'completed', errorMessage?: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
     'UPDATE sync_queue SET status = ?, retries = retries + 1, error_message = ? WHERE id = ?',

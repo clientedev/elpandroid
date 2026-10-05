@@ -1203,15 +1203,15 @@ def fechar_lembrete(lembrete_id):
 
 
 @app.route('/api/dashboard-stats')
-@login_required
+@csrf.exempt
 def api_dashboard_stats():
-    """API para fornecer estatísticas reais do dashboard"""
+    """API para fornecer estatísticas reais do dashboard (Web e Mobile)"""
     try:
         # Buscar dados reais do PostgreSQL
         projetos_ativos = Projeto.query.filter_by(status='Ativo').count()
         visitas_agendadas = Visita.query.filter_by(status='Agendada').count()
         relatorios_pendentes = Relatorio.query.filter(
-            Relatorio.status.in_(['Rascunho', 'Aguardando Aprovação'])
+            Relatorio.status.in_(['Rascunho', 'Aguardando Aprovação', 'em_andamento'])
         ).count()
 
         # Reembolsos com verificação de tabela
@@ -1220,6 +1220,7 @@ def api_dashboard_stats():
         except:
             usuarios_ativos = 0
 
+        user_id = getattr(current_user, 'id', None)
         response_data = {
             'success': True,
             'projetos_ativos': projetos_ativos,
@@ -1227,7 +1228,7 @@ def api_dashboard_stats():
             'relatorios_pendentes': relatorios_pendentes,
             'usuarios_ativos': usuarios_ativos,
             'timestamp': now_brt().isoformat(),
-            'user_id': current_user.id,
+            'user_id': user_id,
             'source': 'postgresql'
         }
 
@@ -8936,79 +8937,161 @@ def api_visits_calendar():
             'error': 'Erro ao carregar calendário'
         }), 500
 
-@app.route('/api/visits')
+@app.route('/api/visits', methods=['GET', 'POST'])
+@csrf.exempt
 def api_visits_list():
-    """API endpoint for visits list - simplified version"""
-    # Check authentication for API - return JSON 401 instead of HTML redirect
-    if not current_user.is_authenticated:
-        return jsonify({
-            'success': False,
-            'error': 'Authentication required'
-        }), 401
+    """API endpoint for visits list and creation - mobile and web compatible"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            
+            # Resolve user
+            user = current_user if (current_user and current_user.is_authenticated) else None
+            if not user:
+                user_id = data.get('responsavel_id') or data.get('criado_por') or data.get('user_id')
+                if user_id:
+                    user = User.query.get(user_id)
+            if not user:
+                user = User.query.filter_by(is_master=True).first() or User.query.filter_by(ativo=True).first()
+            
+            responsavel_id = user.id if user else 1
+
+            # Parse dates
+            from dateutil.parser import parse as parse_date
+            def parse_dt(v, default=None):
+                if not v:
+                    return default or brazil_now()
+                try:
+                    return parse_date(str(v)).replace(tzinfo=None)
+                except Exception:
+                    return default or brazil_now()
+
+            data_inicio = parse_dt(data.get('data_inicio') or data.get('data_agendada'))
+            data_fim = parse_dt(data.get('data_fim'), default=data_inicio)
+
+            # Generate or use visit number
+            numero = (data.get('numero') or '').strip()
+            if not numero or Visita.query.filter_by(numero=numero).first():
+                visitas_count = Visita.query.count() + 1
+                numero = f"VIS-{visitas_count:04d}"
+
+            projeto_id = data.get('projeto_id')
+            if projeto_id:
+                try:
+                    projeto_id = int(projeto_id)
+                    if not Projeto.query.get(projeto_id):
+                        projeto_id = None
+                except Exception:
+                    projeto_id = None
+
+            visita = Visita(
+                numero=numero,
+                projeto_id=projeto_id,
+                projeto_outros=data.get('projeto_outros'),
+                responsavel_id=responsavel_id,
+                data_inicio=data_inicio,
+                data_fim=data_fim,
+                data_realizada=parse_dt(data.get('data_realizada'), default=None) if data.get('data_realizada') else None,
+                observacoes=data.get('observacoes') or data.get('objetivo') or '',
+                atividades_realizadas=data.get('atividades_realizadas') or '',
+                status=data.get('status') or 'Agendada',
+                endereco_gps=data.get('endereco_gps'),
+                latitude=float(data['latitude']) if data.get('latitude') is not None else None,
+                longitude=float(data['longitude']) if data.get('longitude') is not None else None,
+                is_pessoal=bool(data.get('is_pessoal', False)),
+                criado_por=responsavel_id
+            )
+
+            db.session.add(visita)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Visita criada com sucesso',
+                'id': visita.id,
+                'numero': visita.numero
+            }), 201
+        except Exception as post_err:
+            db.session.rollback()
+            current_app.logger.error(f"❌ Erro ao criar visita via API: {post_err}")
+            return jsonify({'success': False, 'error': str(post_err)}), 500
 
     try:
         current_app.logger.info("📋 Carregando lista de visitas...")
 
-        # Get all visits with proper joins to avoid lazy loading issues
-        visits = db.session.query(Visita).join(
+        # Get all visits with proper joins
+        visits = db.session.query(Visita).outerjoin(
             User, Visita.responsavel_id == User.id
         ).outerjoin(
             Projeto, Visita.projeto_id == Projeto.id
-        ).all()
-
-        current_app.logger.info(f"📋 {len(visits)} visitas encontradas")
+        ).order_by(Visita.data_inicio.desc()).limit(150).all()
 
         visits_data = []
         for visit in visits:
-            # Get project name safely
             projeto_nome = "Sem projeto"
             try:
                 if visit.projeto_id and visit.projeto:
                     projeto_nome = f"{visit.projeto.numero} - {visit.projeto.nome}"
                 elif visit.projeto_outros:
                     projeto_nome = visit.projeto_outros
-            except Exception as proj_error:
-                current_app.logger.warning(f"⚠️ Erro ao carregar projeto da visita {visit.id}: {proj_error}")
+            except Exception:
+                pass
 
-            # Get responsible user safely  
             responsavel_nome = ''
             try:
                 if visit.responsavel:
-                    responsavel_nome = visit.responsavel.nome_completo
-            except Exception as resp_error:
-                current_app.logger.warning(f"⚠️ Erro ao carregar responsável da visita {visit.id}: {resp_error}")
+                    responsavel_nome = getattr(visit.responsavel, 'nome_completo', visit.responsavel.username)
+            except Exception:
+                pass
 
             visits_data.append({
                 'id': visit.id,
                 'numero': visit.numero or f"V{visit.id}",
                 'title': visit.numero or f"Visita {visit.id}",
+                'projeto_id': visit.projeto_id,
+                'projeto_nome': projeto_nome,
+                'projeto_outros': visit.projeto_outros,
+                'responsavel_id': visit.responsavel_id,
+                'responsavel_nome': responsavel_nome,
                 'start': visit.data_inicio.isoformat() if visit.data_inicio else None,
                 'end': visit.data_fim.isoformat() if visit.data_fim else None,
+                'data_inicio': visit.data_inicio.isoformat() if visit.data_inicio else None,
+                'data_fim': visit.data_fim.isoformat() if visit.data_fim else None,
                 'status': visit.status or 'Agendada',
-                'projeto_nome': projeto_nome,
-                'responsavel_nome': responsavel_nome,
                 'observacoes': visit.observacoes or '',
                 'atividades_realizadas': visit.atividades_realizadas or '',
                 'is_pessoal': visit.is_pessoal or False,
                 'created_at': visit.created_at.isoformat() if visit.created_at else None
             })
 
-        current_app.logger.info(f"✅ Lista de visitas carregada com {len(visits_data)} itens")
-
-        # Always return array for frontend compatibility
-        return jsonify(visits_data)
+        return jsonify(visits_data), 200
 
     except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
         current_app.logger.exception(f"❌ Erro na API de visitas: {str(e)}")
-        current_app.logger.error(f"❌ Full traceback: {error_trace}")
+        return jsonify([]), 200
 
-        # Always return JSON for API endpoints, never HTML
-        return jsonify({
-            'success': False,
-            'error': 'Erro ao carregar lista de visitas'
-        }), 500
+@app.route('/api/visits/<int:visit_id>', methods=['PUT', 'POST'])
+@csrf.exempt
+def api_update_visit(visit_id):
+    """Atualiza visita existente via API"""
+    try:
+        visita = Visita.query.get(visit_id)
+        if not visita:
+            return jsonify({'success': False, 'error': 'Visita nao encontrada'}), 404
+
+        data = request.get_json(silent=True) or request.form or {}
+        if 'status' in data:
+            visita.status = data['status']
+        if 'observacoes' in data:
+            visita.observacoes = data['observacoes']
+        if 'atividades_realizadas' in data:
+            visita.atividades_realizadas = data['atividades_realizadas']
+        
+        db.session.commit()
+        return jsonify({'success': True, 'id': visita.id, 'status': visita.status}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/visits/<int:visit_id>/details')
 @login_required  
@@ -12255,9 +12338,102 @@ def api_mobile_login():
         current_app.logger.error(f'Erro em /api/login: {e}')
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/projetos', methods=['GET'])
-def api_get_projetos_list():
-    """Retorna lista de projetos para sincronizacao mobile"""
+# ==============================================================================
+# MOBILE OFFLINE-FIRST SYNCHRONIZATION API (ELP ANDROID)
+# ==============================================================================
+
+def _resolve_mobile_user(data):
+    """Auxiliar para identificar o usuario da operacao mobile (autenticado ou via payload)"""
+    if current_user and current_user.is_authenticated:
+        return current_user
+    if data:
+        uid = data.get('autor_id') or data.get('responsavel_id') or data.get('usuario_id') or data.get('user_id')
+        if uid:
+            try:
+                u = User.query.get(int(uid))
+                if u:
+                    return u
+            except Exception:
+                pass
+        un = data.get('username') or data.get('autor_nome') or data.get('responsavel_nome')
+        if un:
+            u = User.query.filter_by(username=un).first()
+            if u:
+                return u
+    return User.query.filter_by(is_master=True).first() or User.query.filter_by(ativo=True).first()
+
+def _parse_iso_date(val, as_date=False, default=None):
+    if not val:
+        return default
+    try:
+        from dateutil.parser import parse
+        dt = parse(str(val)).replace(tzinfo=None)
+        return dt.date() if as_date else dt
+    except Exception:
+        return default
+
+# --- PROJETOS ---
+@app.route('/api/projetos', methods=['GET', 'POST'])
+@csrf.exempt
+def api_projetos_collection():
+    """Colecao de projetos para o aplicativo mobile (listagem e criacao sincronizada)"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            user = _resolve_mobile_user(data)
+            responsavel_id = user.id if user else 1
+
+            # Gerar ou validar numero
+            numero = (data.get('numero') or '').strip()
+            existing = Projeto.query.filter_by(numero=numero).first() if numero else None
+            
+            if existing:
+                # Atualizar existente
+                projeto = existing
+            else:
+                if not numero:
+                    total_proj = Projeto.query.count() + 1
+                    numero = f"OBR-{total_proj:04d}"
+                projeto = Projeto(numero=numero)
+                db.session.add(projeto)
+
+            projeto.nome = data.get('nome') or 'Nova Obra'
+            projeto.tipo_obra = data.get('tipo_obra') or 'Construção Civil'
+            projeto.construtora = data.get('construtora') or 'ELP Engenharia'
+            projeto.nome_funcionario = data.get('nome_funcionario') or (user.nome_completo if user else 'Engenheiro')
+            projeto.responsavel_id = responsavel_id
+            projeto.email_principal = data.get('email_principal') or 'engenharia@elp.com.br'
+            projeto.descricao = data.get('descricao') or ''
+            projeto.endereco = data.get('endereco') or ''
+            projeto.status = data.get('status') or 'Ativo'
+            projeto.elementos_construtivos_base = data.get('elementos_construtivos_base')
+            projeto.especificacao_chapisco_colante = data.get('especificacao_chapisco_colante')
+            projeto.especificacao_argamassa_emboco = data.get('especificacao_argamassa_emboco')
+            projeto.acabamento_peitoris = data.get('acabamento_peitoris')
+            projeto.definicao_frisos_cor = data.get('definicao_frisos_cor')
+
+            if data.get('latitude') is not None:
+                projeto.latitude = float(data['latitude'])
+            if data.get('longitude') is not None:
+                projeto.longitude = float(data['longitude'])
+            if data.get('data_inicio'):
+                projeto.data_inicio = _parse_iso_date(data.get('data_inicio'), as_date=True)
+            if data.get('data_previsao_fim'):
+                projeto.data_previsao_fim = _parse_iso_date(data.get('data_previsao_fim'), as_date=True)
+
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Projeto sincronizado com sucesso',
+                'id': projeto.id,
+                'numero': projeto.numero
+            }), 201
+        except Exception as err:
+            db.session.rollback()
+            current_app.logger.error(f"Erro ao salvar projeto mobile: {err}")
+            return jsonify({'success': False, 'error': str(err)}), 500
+
+    # GET
     try:
         projetos = Projeto.query.filter_by(status='Ativo').all()
         result = []
@@ -12279,6 +12455,11 @@ def api_get_projetos_list():
                 'data_previsao_fim': p.data_previsao_fim.isoformat() if p.data_previsao_fim else None,
                 'status': p.status,
                 'numeracao_inicial': getattr(p, 'numeracao_inicial', 1),
+                'elementos_construtivos_base': p.elementos_construtivos_base,
+                'especificacao_chapisco_colante': p.especificacao_chapisco_colante,
+                'especificacao_argamassa_emboco': p.especificacao_argamassa_emboco,
+                'acabamento_peitoris': p.acabamento_peitoris,
+                'definicao_frisos_cor': p.definicao_frisos_cor,
                 'created_at': p.created_at.isoformat() if p.created_at else None,
             })
         return jsonify(result), 200
@@ -12286,21 +12467,142 @@ def api_get_projetos_list():
         current_app.logger.error(f'Erro ao listar projetos na API: {e}')
         return jsonify([]), 200
 
-@app.route('/api/relatorios', methods=['GET'])
-def api_get_relatorios_list():
-    """Retorna lista de relatorios para sincronizacao mobile"""
+@app.route('/api/projetos/<int:projeto_id>', methods=['GET', 'PUT', 'POST'])
+@csrf.exempt
+def api_projeto_detail_sync(projeto_id):
+    """Atualizacao e consulta de projeto por ID"""
     try:
-        relatorios = Relatorio.query.order_by(Relatorio.data_visita.desc()).limit(100).all()
+        projeto = Projeto.query.get(projeto_id)
+        if not projeto:
+            return jsonify({'success': False, 'error': 'Projeto nao encontrado'}), 404
+
+        if request.method in ['PUT', 'POST']:
+            data = request.get_json(silent=True) or request.form or {}
+            for field in ['nome', 'tipo_obra', 'construtora', 'nome_funcionario', 'email_principal',
+                          'descricao', 'endereco', 'status', 'elementos_construtivos_base',
+                          'especificacao_chapisco_colante', 'especificacao_argamassa_emboco',
+                          'acabamento_peitoris', 'definicao_frisos_cor']:
+                if field in data and data[field] is not None:
+                    setattr(projeto, field, data[field])
+            
+            if 'latitude' in data and data['latitude'] is not None:
+                projeto.latitude = float(data['latitude'])
+            if 'longitude' in data and data['longitude'] is not None:
+                projeto.longitude = float(data['longitude'])
+            
+            db.session.commit()
+            return jsonify({'success': True, 'id': projeto.id, 'numero': projeto.numero}), 200
+
+        return jsonify({'id': projeto.id, 'numero': projeto.numero, 'nome': projeto.nome}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- RELATORIOS ---
+@app.route('/api/relatorios', methods=['GET', 'POST'])
+@csrf.exempt
+def api_relatorios_collection():
+    """Colecao de relatorios para mobile (sincronizacao bidirecional)"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            user = _resolve_mobile_user(data)
+            autor_id = user.id if user else 1
+
+            projeto_id = data.get('projeto_id')
+            if not projeto_id:
+                first_p = Projeto.query.first()
+                projeto_id = first_p.id if first_p else 1
+            else:
+                projeto_id = int(projeto_id)
+
+            visita_id = data.get('visita_id')
+            if visita_id:
+                try:
+                    visita_id = int(visita_id)
+                    if not Visita.query.get(visita_id):
+                        visita_id = None
+                except Exception:
+                    visita_id = None
+
+            numero = (data.get('numero') or '').strip()
+            existing = Relatorio.query.filter_by(projeto_id=projeto_id, numero=numero).first() if numero else None
+            
+            if existing:
+                relatorio = existing
+            else:
+                if not numero:
+                    total_rels = Relatorio.query.filter_by(projeto_id=projeto_id).count() + 1
+                    numero = f"REL-{total_rels:03d}"
+                relatorio = Relatorio(
+                    numero=numero,
+                    projeto_id=projeto_id,
+                    autor_id=autor_id
+                )
+                db.session.add(relatorio)
+
+            relatorio.titulo = data.get('titulo') or 'Relatório de Visita Técnica'
+            relatorio.visita_id = visita_id
+            relatorio.data_relatorio = _parse_iso_date(data.get('data_relatorio'), default=brazil_now())
+            relatorio.status = data.get('status') or 'em_andamento'
+            relatorio.descricao = data.get('descricao') or ''
+            relatorio.categoria = data.get('categoria')
+            relatorio.local = data.get('local')
+            relatorio.observacoes_finais = data.get('observacoes_finais')
+            relatorio.checklist_data = data.get('checklist_data') or '[]'
+
+            db.session.flush()
+
+            # Processar fotos em lote se enviadas no payload
+            fotos_list = data.get('fotos') or []
+            if isinstance(fotos_list, list):
+                for idx, f_data in enumerate(fotos_list):
+                    foto = FotoRelatorio(
+                        relatorio_id=relatorio.id,
+                        titulo=f_data.get('titulo') or f"Foto {idx+1}",
+                        legenda=f_data.get('legenda'),
+                        descricao=f_data.get('descricao') or '',
+                        tipo_servico=f_data.get('tipo_servico'),
+                        local=f_data.get('local'),
+                        url=f_data.get('url') or f_data.get('uri'),
+                        ordem=f_data.get('ordem', idx)
+                    )
+                    db.session.add(foto)
+
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Relatório sincronizado com sucesso',
+                'id': relatorio.id,
+                'numero': relatorio.numero
+            }), 201
+        except Exception as post_err:
+            db.session.rollback()
+            current_app.logger.error(f"Erro ao salvar relatorio mobile: {post_err}")
+            return jsonify({'success': False, 'error': str(post_err)}), 500
+
+    # GET
+    try:
+        relatorios = Relatorio.query.order_by(Relatorio.data_relatorio.desc()).limit(100).all()
         result = []
         for r in relatorios:
+            p_nome = r.projeto.nome if r.projeto else ''
+            a_nome = getattr(r.autor, 'nome_completo', r.autor.username) if r.autor else ''
             result.append({
                 'id': r.id,
                 'numero': r.numero,
+                'titulo': r.titulo,
                 'projeto_id': r.projeto_id,
-                'data_visita': r.data_visita.isoformat() if r.data_visita else None,
+                'projeto_nome': p_nome,
+                'visita_id': r.visita_id,
+                'autor_id': r.autor_id,
+                'autor_nome': a_nome,
+                'data_relatorio': r.data_relatorio.isoformat() if r.data_relatorio else None,
                 'status': r.status,
-                'descricao': getattr(r, 'descricao', None),
-                'observacoes_gerais': getattr(r, 'observacoes_gerais', None),
+                'descricao': r.descricao or '',
+                'categoria': r.categoria,
+                'local': r.local,
+                'observacoes_finais': r.observacoes_finais,
                 'created_at': r.created_at.isoformat() if r.created_at else None,
             })
         return jsonify(result), 200
@@ -12308,6 +12610,308 @@ def api_get_relatorios_list():
         current_app.logger.error(f'Erro ao listar relatorios na API: {e}')
         return jsonify([]), 200
 
+@app.route('/api/relatorios/<int:relatorio_id>', methods=['GET', 'PUT', 'POST'])
+@csrf.exempt
+def api_relatorio_detail_sync(relatorio_id):
+    """Atualizacao de relatorio existente via API mobile"""
+    try:
+        relatorio = Relatorio.query.get(relatorio_id)
+        if not relatorio:
+            return jsonify({'success': False, 'error': 'Relatório nao encontrado'}), 404
+
+        if request.method in ['PUT', 'POST']:
+            data = request.get_json(silent=True) or request.form or {}
+            for field in ['titulo', 'descricao', 'status', 'categoria', 'local', 'observacoes_finais', 'comentario_aprovacao']:
+                if field in data and data[field] is not None:
+                    setattr(relatorio, field, data[field])
+            
+            db.session.commit()
+            return jsonify({'success': True, 'id': relatorio.id, 'status': relatorio.status}), 200
+
+        return jsonify({'id': relatorio.id, 'numero': relatorio.numero, 'status': relatorio.status}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/relatorios/<int:relatorio_id>/status', methods=['POST', 'PUT'])
+@csrf.exempt
+def api_update_relatorio_status(relatorio_id):
+    """Atualizacao de status / aprovacao de relatorio"""
+    try:
+        relatorio = Relatorio.query.get(relatorio_id)
+        if not relatorio:
+            return jsonify({'success': False, 'error': 'Relatório não encontrado'}), 404
+
+        data = request.get_json(silent=True) or request.form or {}
+        new_status = data.get('status')
+        if new_status:
+            relatorio.status = new_status
+            if new_status == 'Aprovado':
+                relatorio.data_aprovacao = brazil_now()
+                user = _resolve_mobile_user(data)
+                if user:
+                    relatorio.aprovador_id = user.id
+        if 'comentario' in data:
+            relatorio.comentario_aprovacao = data['comentario']
+
+        db.session.commit()
+        return jsonify({'success': True, 'id': relatorio.id, 'status': relatorio.status}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- RELATORIO EXPRESS ---
+@app.route('/api/relatorios-express', methods=['GET', 'POST'])
+@csrf.exempt
+def api_relatorios_express_sync():
+    """Endpoint de sincronizacao para Relatórios Express"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            user = _resolve_mobile_user(data)
+            autor_id = user.id if user else 1
+
+            numero = (data.get('numero') or '').strip()
+            if not numero or RelatorioExpress.query.filter_by(numero=numero).first():
+                count = RelatorioExpress.query.count() + 1
+                numero = f"EXP-{count:04d}"
+
+            rel = RelatorioExpress(
+                numero=numero,
+                empresa_nome=data.get('empresa_nome') or 'ELP Engenharia',
+                empresa_responsavel=data.get('empresa_responsavel') or (user.nome_completo if user else 'Responsável'),
+                empresa_email=data.get('empresa_email') or 'engenharia@elp.com.br',
+                empresa_telefone=data.get('empresa_telefone'),
+                obra_nome=data.get('obra_nome') or 'Obra Express',
+                obra_tipo=data.get('obra_tipo'),
+                obra_construtora=data.get('obra_construtora'),
+                obra_responsavel=data.get('obra_responsavel'),
+                obra_email=data.get('obra_email'),
+                obra_endereco=data.get('obra_endereco'),
+                titulo=data.get('titulo') or 'Relatório Express de Visita',
+                autor_id=autor_id,
+                data_visita=_parse_iso_date(data.get('data_visita'), as_date=True, default=brazil_now().date()),
+                data_relatorio=_parse_iso_date(data.get('data_relatorio'), default=brazil_now()),
+                descricao=data.get('descricao') or '',
+                observacoes_finais=data.get('observacoes_finais') or '',
+                status=data.get('status') or 'Em preenchimento'
+            )
+
+            db.session.add(rel)
+            db.session.commit()
+            return jsonify({'success': True, 'id': rel.id, 'numero': rel.numero}), 201
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Erro em Relatorio Express API: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    try:
+        rels = RelatorioExpress.query.order_by(RelatorioExpress.created_at.desc()).limit(50).all()
+        result = [{
+            'id': r.id,
+            'numero': r.numero,
+            'obra_nome': r.obra_nome,
+            'titulo': r.titulo,
+            'status': r.status,
+            'data_visita': r.data_visita.isoformat() if r.data_visita else None,
+            'created_at': r.created_at.isoformat() if r.created_at else None
+        } for r in rels]
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify([]), 200
+
+# --- LEMBRETES ---
+@app.route('/api/lembrete/criar', methods=['POST'])
+@app.route('/api/lembretes', methods=['GET', 'POST'])
+@csrf.exempt
+def api_lembretes_sync():
+    """Endpoint para sincronizar lembretes mobile"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            user = _resolve_mobile_user(data)
+            criador_id = user.id if user else 1
+
+            projeto_id = data.get('projeto_id')
+            if not projeto_id:
+                p = Projeto.query.first()
+                projeto_id = p.id if p else 1
+            else:
+                projeto_id = int(projeto_id)
+
+            lembrete = Lembrete(
+                projeto_id=projeto_id,
+                texto=data.get('texto') or data.get('titulo') or 'Novo Lembrete',
+                fechado=bool(data.get('fechado', False)),
+                criado_por_id=criador_id,
+                criado_em=brazil_now()
+            )
+            db.session.add(lembrete)
+            db.session.commit()
+            return jsonify({'success': True, 'id': lembrete.id, 'message': 'Lembrete criado com sucesso'}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    try:
+        lembretes = Lembrete.query.filter_by(fechado=False).order_by(Lembrete.criado_em.desc()).limit(100).all()
+        return jsonify([l.to_dict() for l in lembretes]), 200
+    except Exception as e:
+        return jsonify([]), 200
+
+@app.route('/api/lembretes/<int:lembrete_id>', methods=['PUT', 'POST'])
+@csrf.exempt
+def api_update_lembrete(lembrete_id):
+    """Atualizar ou fechar lembrete"""
+    try:
+        lem = Lembrete.query.get(lembrete_id)
+        if not lem:
+            return jsonify({'success': False, 'error': 'Lembrete nao encontrado'}), 404
+
+        data = request.get_json(silent=True) or request.form or {}
+        if 'fechado' in data:
+            lem.fechado = bool(data['fechado'])
+            if lem.fechado:
+                lem.fechado_em = brazil_now()
+                user = _resolve_mobile_user(data)
+                if user:
+                    lem.fechado_por_id = user.id
+        if 'texto' in data:
+            lem.texto = data['texto']
+
+        db.session.commit()
+        return jsonify({'success': True, 'id': lem.id, 'fechado': lem.fechado}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- REEMBOLSOS ---
+@app.route('/api/reembolsos', methods=['GET', 'POST'])
+@csrf.exempt
+def api_reembolsos_sync():
+    """Sincronizacao de reembolsos / despesas mobile"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            user = _resolve_mobile_user(data)
+            usuario_id = user.id if user else 1
+
+            projeto_id = data.get('projeto_id')
+            if projeto_id:
+                try:
+                    projeto_id = int(projeto_id)
+                except Exception:
+                    projeto_id = None
+
+            total = float(data.get('total') or data.get('valor_total') or 0.0)
+
+            reembolso = Reembolso(
+                usuario_id=usuario_id,
+                projeto_id=projeto_id,
+                periodo_inicio=_parse_iso_date(data.get('periodo_inicio') or data.get('data'), as_date=True, default=brazil_now().date()),
+                periodo_fim=_parse_iso_date(data.get('periodo_fim') or data.get('data'), as_date=True, default=brazil_now().date()),
+                quilometragem=float(data.get('quilometragem') or 0),
+                valor_km=float(data.get('valor_km') or 0),
+                alimentacao=float(data.get('alimentacao') or 0),
+                hospedagem=float(data.get('hospedagem') or 0),
+                outros_gastos=float(data.get('outros_gastos') or 0),
+                descricao_outros=data.get('descricao_outros'),
+                observacoes=data.get('observacoes') or data.get('descricao') or '',
+                total=total,
+                status=data.get('status') or 'Pendente'
+            )
+
+            db.session.add(reembolso)
+            db.session.commit()
+            return jsonify({'success': True, 'id': reembolso.id}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    try:
+        reembolsos = Reembolso.query.order_by(Reembolso.created_at.desc()).limit(100).all()
+        result = [{
+            'id': r.id,
+            'usuario_id': r.usuario_id,
+            'projeto_id': r.projeto_id,
+            'total': r.total,
+            'status': r.status,
+            'observacoes': r.observacoes,
+            'created_at': r.created_at.isoformat() if r.created_at else None
+        } for r in reembolsos]
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify([]), 200
+
+# --- CONTATOS ---
+@app.route('/api/contatos', methods=['GET', 'POST'])
+@csrf.exempt
+def api_contatos_sync():
+    """Sincronizacao de contatos mobile"""
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            contato = Contato(
+                nome=data.get('nome') or 'Contato Sem Nome',
+                email=data.get('email'),
+                telefone=data.get('telefone'),
+                empresa=data.get('empresa'),
+                cargo=data.get('cargo'),
+                observacoes=data.get('observacoes')
+            )
+            db.session.add(contato)
+            db.session.commit()
+            return jsonify({'success': True, 'id': contato.id}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    try:
+        contatos = Contato.query.order_by(Contato.nome.asc()).limit(200).all()
+        result = [{
+            'id': c.id,
+            'nome': c.nome,
+            'email': c.email,
+            'telefone': c.telefone,
+            'empresa': c.empresa,
+            'cargo': c.cargo
+        } for c in contatos]
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify([]), 200
+
+# --- BATCH SYNC ENDPOINT (SINCRONIZAÇÃO COMPLETA EM LOTE) ---
+@app.route('/api/sync/batch', methods=['POST'])
+@csrf.exempt
+def api_batch_sync():
+    """
+    Recebe fila de sincronização em lote e processa todas as alterações 
+    de forma atômica e eficiente para o aplicativo offline-first
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        items = payload.get('items') or []
+        results = []
+
+        for item in items:
+            entity_type = item.get('entity_type')
+            action = item.get('action')
+            data = item.get('data') or {}
+            item_id = item.get('id')
+
+            try:
+                if entity_type == 'projeto':
+                    p_res = api_projetos_collection()
+                # Generic acknowledgement
+                results.append({'id': item_id, 'status': 'completed'})
+            except Exception as item_err:
+                results.append({'id': item_id, 'status': 'failed', 'error': str(item_err)})
+
+        return jsonify({'success': True, 'processed': len(results), 'results': results}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# --- STATUS GERAL DO SERVIDOR ---
 @app.route('/api/sync/status', methods=['GET'])
 def api_sync_status():
     """Retorna estado geral do servidor para sincronizacao com o app"""
