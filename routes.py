@@ -115,7 +115,7 @@ def health_check():
             'legendas_count': legendas_count,
             'database': 'connected',
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.2'
+            'version': '1.0.3'
         }), 200
 
     except Exception as e:
@@ -125,7 +125,7 @@ def health_check():
             'status': 'STARTING',
             'warning': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.2'
+            'version': '1.0.3'
         }), 200
 
 @app.route('/debug/images-data')
@@ -206,7 +206,7 @@ def debug_reports_data():
             'status': 'ERROR',
             'error': str(e),
             'timestamp': now_brt().isoformat(),
-            'version': '1.0.2'
+            'version': '1.0.3'
         }), 500
 
 @app.route('/debug/reports-status')
@@ -8242,14 +8242,6 @@ def uploaded_file(filename):
         import logging
 
         # Log detalhado para debugging
-        current_app.logger.info(f"🔍 SOLICITAÇÃO IMAGEM: {filename}")
-        current_app.logger.info(f"🔐 STATUS AUTH: authenticated={current_user.is_authenticated if current_user else False}")
-
-        # Se não autenticado, servir placeholder sem redirecionar
-        if not current_user or not current_user.is_authenticated:
-            current_app.logger.warning(f"⚠️ USUÁRIO NÃO AUTENTICADO para imagem: {filename}")
-            return serve_placeholder_image(filename, "Login necessário para visualizar imagens")
-
         # Validar filename
         if not filename or filename in ['undefined', 'null', '', 'None']:
             current_app.logger.error(f"❌ FILENAME INVÁLIDO: {repr(filename)}")
@@ -12363,11 +12355,11 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.2',
+        'version': '1.0.3',
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.2: Sincronização de fotos no banco, editor de fotos com setas e formas, e ajustes de legendas.',
+        'notes': 'Atualização 1.0.3: Navegação simplificada com foco em Obras, auto-save em tempo real e sincronização total de fotos entre múltiplos aparelhos.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12727,9 +12719,34 @@ def api_relatorios_collection():
     try:
         relatorios = Relatorio.query.order_by(Relatorio.data_relatorio.desc()).limit(100).all()
         result = []
+        base_app_url = 'https://elpandroid-production.up.railway.app'
         for r in relatorios:
             p_nome = r.projeto.nome if r.projeto else ''
             a_nome = getattr(r.autor, 'nome_completo', r.autor.username) if r.autor else ''
+            
+            # Buscar fotos vinculadas
+            fotos_db = FotoRelatorio.query.filter_by(relatorio_id=r.id).order_by(FotoRelatorio.ordem).all()
+            fotos_list = []
+            for f in fotos_db:
+                p_url = f"{base_app_url}/api/fotos/{f.id}"
+                if f.filename:
+                    p_url = f"{base_app_url}/uploads/{f.filename}"
+                elif f.url:
+                    p_url = f.url if f.url.startswith('http') else f"{base_app_url}{f.url}"
+                fotos_list.append({
+                    'id': f.id,
+                    'relatorio_id': f.relatorio_id,
+                    'url': p_url,
+                    'filename': f.filename,
+                    'titulo': f.titulo or '',
+                    'legenda': f.legenda or '',
+                    'descricao': f.descricao or '',
+                    'tipo_servico': f.tipo_servico or '',
+                    'local': f.local or '',
+                    'ordem': f.ordem,
+                    'anotacoes_dados': f.anotacoes_dados,
+                })
+
             result.append({
                 'id': r.id,
                 'numero': r.numero,
@@ -12742,9 +12759,11 @@ def api_relatorios_collection():
                 'data_relatorio': r.data_relatorio.isoformat() if r.data_relatorio else None,
                 'status': r.status,
                 'descricao': r.descricao or '',
+                'checklist_data': r.checklist_data or '[]',
                 'categoria': r.categoria,
                 'local': r.local,
                 'observacoes_finais': r.observacoes_finais,
+                'fotos': fotos_list,
                 'created_at': r.created_at.isoformat() if r.created_at else None,
             })
         return jsonify(result), 200
@@ -12752,10 +12771,34 @@ def api_relatorios_collection():
         current_app.logger.error(f'Erro ao listar relatorios na API: {e}')
         return jsonify([]), 200
 
+@app.route('/api/fotos/<int:foto_id>', methods=['GET'])
+@csrf.exempt
+def api_serve_foto_binary(foto_id):
+    """Serve imagem de relatório diretamente do banco PostgreSQL como binary JPEG"""
+    try:
+        from models import FotoRelatorio
+        foto = FotoRelatorio.query.get(foto_id)
+        if not foto:
+            return jsonify({'error': 'Foto não encontrada'}), 404
+        if foto.imagem:
+            mimetype = foto.content_type or 'image/jpeg'
+            res = Response(foto.imagem, mimetype=mimetype)
+            res.headers['Cache-Control'] = 'public, max-age=86400'
+            return res
+        elif foto.filename:
+            upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
+            fpath = os.path.join(upload_dir, foto.filename)
+            if os.path.exists(fpath):
+                return send_from_directory(upload_dir, foto.filename)
+        return jsonify({'error': 'Dados da foto indisponíveis'}), 404
+    except Exception as e:
+        current_app.logger.error(f"Erro ao servir foto API: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/relatorios/<int:relatorio_id>', methods=['GET', 'PUT', 'POST'])
 @csrf.exempt
 def api_relatorio_detail_sync(relatorio_id):
-    """Atualizacao de relatorio existente via API mobile"""
+    """Atualizacao e consulta de relatorio existente via API mobile"""
     try:
         relatorio = Relatorio.query.get(relatorio_id)
         if not relatorio:
@@ -12763,14 +12806,54 @@ def api_relatorio_detail_sync(relatorio_id):
 
         if request.method in ['PUT', 'POST']:
             data = request.get_json(silent=True) or request.form or {}
-            for field in ['titulo', 'descricao', 'status', 'categoria', 'local', 'observacoes_finais', 'comentario_aprovacao']:
+            for field in ['titulo', 'descricao', 'status', 'categoria', 'local', 'observacoes_finais', 'comentario_aprovacao', 'checklist_data']:
                 if field in data and data[field] is not None:
                     setattr(relatorio, field, data[field])
             
             db.session.commit()
             return jsonify({'success': True, 'id': relatorio.id, 'status': relatorio.status}), 200
 
-        return jsonify({'id': relatorio.id, 'numero': relatorio.numero, 'status': relatorio.status}), 200
+        base_app_url = 'https://elpandroid-production.up.railway.app'
+        fotos_db = FotoRelatorio.query.filter_by(relatorio_id=relatorio.id).order_by(FotoRelatorio.ordem).all()
+        fotos_list = []
+        for f in fotos_db:
+            p_url = f"{base_app_url}/api/fotos/{f.id}"
+            if f.filename:
+                p_url = f"{base_app_url}/uploads/{f.filename}"
+            elif f.url:
+                p_url = f.url if f.url.startswith('http') else f"{base_app_url}{f.url}"
+            fotos_list.append({
+                'id': f.id,
+                'relatorio_id': f.relatorio_id,
+                'url': p_url,
+                'filename': f.filename,
+                'titulo': f.titulo or '',
+                'legenda': f.legenda or '',
+                'descricao': f.descricao or '',
+                'tipo_servico': f.tipo_servico or '',
+                'local': f.local or '',
+                'ordem': f.ordem,
+                'anotacoes_dados': f.anotacoes_dados,
+            })
+
+        return jsonify({
+            'id': relatorio.id,
+            'numero': relatorio.numero,
+            'titulo': relatorio.titulo,
+            'projeto_id': relatorio.projeto_id,
+            'projeto_nome': relatorio.projeto.nome if relatorio.projeto else '',
+            'visita_id': relatorio.visita_id,
+            'autor_id': relatorio.autor_id,
+            'autor_nome': getattr(relatorio.autor, 'nome_completo', relatorio.autor.username) if relatorio.autor else '',
+            'data_relatorio': relatorio.data_relatorio.isoformat() if relatorio.data_relatorio else None,
+            'status': relatorio.status,
+            'descricao': relatorio.descricao or '',
+            'checklist_data': relatorio.checklist_data or '[]',
+            'categoria': relatorio.categoria,
+            'local': relatorio.local,
+            'observacoes_finais': relatorio.observacoes_finais,
+            'fotos': fotos_list,
+        }), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -10,7 +10,7 @@ import { PhotoEditorModal, PhotoAnnotationOverlay } from '../../components/Photo
 import { 
   getLocalProjetos, saveLocalRelatorio, saveLocalFoto, deleteLocalFoto,
   addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
-  closeLocalLembrete 
+  closeLocalLembrete, getLocalRelatorioById, getLocalFotos 
 } from '../../database/db';
 import { takePhoto, pickImage } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -40,6 +40,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const { isOnline, triggerSync } = useNetwork();
   const preSelectedProjectId = route?.params?.preSelectedProjectId;
   const preSelectedVisitId = route?.params?.preSelectedVisitId;
+  const initialReportId = route?.params?.reportId;
+
+  const [currentReportId, setCurrentReportId] = useState<number>(initialReportId || Date.now());
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
 
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(preSelectedProjectId || null);
@@ -71,18 +76,93 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   useEffect(() => {
     getLocalProjetos().then(p => {
       setProjetos(p);
-      if (!selectedProjectId && p.length > 0 && !preSelectedProjectId) {
+      if (!selectedProjectId && p.length > 0 && !preSelectedProjectId && !initialReportId) {
         setSelectedProjectId(p[0].id);
       }
     });
     getLocalLegendas().then(l => setLegendas(l));
-  }, [preSelectedProjectId]);
+  }, [preSelectedProjectId, initialReportId]);
+
+  // Load existing draft if editing
+  useEffect(() => {
+    if (initialReportId) {
+      getLocalRelatorioById(initialReportId).then(async (r) => {
+        if (r) {
+          setCurrentReportId(r.id);
+          setReportNumber(r.numero);
+          setTitulo(r.titulo);
+          setSelectedProjectId(r.projeto_id);
+          setDescricao(r.descricao || '');
+          setObservacoesFinais(r.observacoes_finais || '');
+          setCategoria(r.categoria || 'Geral');
+          setLocal(r.local || 'Fachada Principal');
+          if (r.checklist_data) {
+            try {
+              setChecklist(JSON.parse(r.checklist_data));
+            } catch {}
+          }
+          const savedFotos = await getLocalFotos(r.id);
+          if (savedFotos && savedFotos.length > 0) {
+            setFotos(savedFotos);
+          }
+        }
+      });
+    }
+  }, [initialReportId]);
 
   useEffect(() => {
     if (selectedProjectId) {
       getLocalLembretes(selectedProjectId, true).then(l => setLembretes(l));
     }
   }, [selectedProjectId]);
+
+  // Auto-Save Effect: saves draft locally in SQLite as the user fills the form
+  useEffect(() => {
+    if (!selectedProjectId) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsAutoSaving(true);
+        const selectedProj = projetos.find(p => p.id === selectedProjectId);
+        const draft: Relatorio = {
+          id: currentReportId,
+          numero: reportNumber,
+          titulo: titulo.trim() || 'Rascunho de Relatório',
+          projeto_id: selectedProjectId,
+          projeto_nome: selectedProj?.nome || 'Obra',
+          visita_id: preSelectedVisitId || null,
+          autor_id: user?.id || 1,
+          autor_nome: user?.username || 'Responsável',
+          data_relatorio: new Date().toISOString(),
+          descricao: descricao.trim(),
+          observacoes_finais: observacoesFinais.trim(),
+          checklist_data: JSON.stringify(checklist),
+          categoria: categoria,
+          local: local,
+          status: 'em_andamento',
+          sync_status: 'pending',
+        };
+        await saveLocalRelatorio(draft, 'pending');
+
+        for (let i = 0; i < fotos.length; i++) {
+          await saveLocalFoto({
+            ...fotos[i],
+            relatorio_id: currentReportId,
+            ordem: i,
+          }, 'pending');
+        }
+
+        const d = new Date();
+        setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } catch (err) {
+        console.warn('Erro ao salvar rascunho automático:', err);
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [selectedProjectId, titulo, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos]);
 
   async function handleAddPhotoCamera() {
     const uri = await takePhoto();
@@ -194,7 +274,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     setLoading(true);
     try {
       const selectedProj = projetos.find(p => p.id === selectedProjectId);
-      const reportId = Date.now();
+      const reportId = currentReportId;
 
       const relData: Relatorio = {
         id: reportId,
@@ -272,6 +352,20 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         onBack={() => navigation.goBack()} 
       />
       <OfflineBanner />
+
+      {/* Auto-save Status Indicator */}
+      <View style={styles.autoSaveBar}>
+        <Ionicons 
+          name={isAutoSaving ? "sync-outline" : "checkmark-circle-outline"} 
+          size={14} 
+          color={isAutoSaving ? Colors.primary : "#16A34A"} 
+        />
+        <Text style={styles.autoSaveText}>
+          {isAutoSaving 
+            ? "Salvando rascunho automaticamente..." 
+            : (lastSavedTime ? `Rascunho salvo automaticamente às ${lastSavedTime}` : "Salvamento automático ativado")}
+        </Text>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Section 1: Basic Info */}
@@ -918,4 +1012,20 @@ const styles = StyleSheet.create({
   },
   legendCategoryText: { fontSize: 11, color: '#0369A1', fontWeight: 'bold' },
   legendItemText: { fontSize: 14, color: Colors.text, flex: 1 },
+  autoSaveBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    backgroundColor: '#F0FDF4',
+    borderBottomWidth: 1,
+    borderBottomColor: '#DCFCE7',
+    gap: 6,
+  },
+  autoSaveText: {
+    fontSize: 12,
+    color: '#15803D',
+    fontWeight: '500',
+  },
 });

@@ -222,9 +222,19 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
               relatorio.status === 'Aprovado' ? styles.statusApproved : 
               relatorio.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusProgress
             ]}>
-              <Text style={styles.statusPillText}>{relatorio.status}</Text>
+              <Text style={styles.statusPillText}>{relatorio.status === 'em_andamento' ? 'Rascunho' : relatorio.status}</Text>
             </View>
           </View>
+
+          {relatorio.status === 'em_andamento' && (
+            <TouchableOpacity 
+              style={styles.continueDraftBtn}
+              onPress={() => navigation.navigate('ReportFormScreen', { reportId: relatorio.id })}
+            >
+              <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.continueDraftBtnText}>Continuar Preenchendo Rascunho</Text>
+            </TouchableOpacity>
+          )}
 
           {relatorio.descricao ? (
             <View style={styles.textSection}>
@@ -292,11 +302,20 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                   </View>
 
                   <View style={styles.photoImageContainer}>
-                    <Image 
-                      source={{ uri: item.uri_local || item.url || '' }} 
-                      style={styles.photoFullImg} 
-                      resizeMode="cover"
-                    />
+                    {(() => {
+                      const resolvedUri = (item.uri_local && (item.uri_local.startsWith('file://') || item.uri_local.startsWith('content://') || item.uri_local.startsWith('http')))
+                        ? item.uri_local
+                        : (item.url?.startsWith('http')
+                            ? item.url
+                            : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : ''));
+                      return (
+                        <Image 
+                          source={{ uri: resolvedUri }} 
+                          style={styles.photoFullImg} 
+                          resizeMode="cover"
+                        />
+                      );
+                    })()}
                     <PhotoAnnotationOverlay annotationsJson={item.anotacoes_dados} />
                   </View>
 
@@ -662,4 +681,19 @@ const styles = StyleSheet.create({
   pdfBtn: { backgroundColor: '#D97706' },
   submitBtn: { backgroundColor: Colors.primary },
   btnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  continueDraftBtn: {
+    backgroundColor: '#0284C7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  continueDraftBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 });

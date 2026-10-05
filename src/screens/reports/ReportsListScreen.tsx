@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl 
 } from 'react-native';
@@ -70,7 +70,7 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
   return (
     <View style={styles.container}>
       <Header 
-        title="Relatórios Técnicos" 
+        title="Relatórios Pendentes" 
         subtitle={`${filteredRelatorios.length} relatórios registrados`}
         rightAction={
           <TouchableOpacity 
@@ -111,7 +111,7 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
             onPress={() => handleStatusFilter(st)}
           >
             <Text style={[styles.filterText, selectedStatus === st && styles.filterTextActive]}>
-              {st === 'em_andamento' ? 'Em Preenchimento' : st}
+              {st === 'em_andamento' ? 'Rascunhos' : st === 'Aguardando Aprovação' ? 'Aguardando' : st}
             </Text>
           </TouchableOpacity>
         ))}
@@ -134,7 +134,13 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
           <TouchableOpacity 
             style={styles.card}
             activeOpacity={0.7}
-            onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id })}
+            onPress={() => {
+              if (item.status === 'em_andamento') {
+                navigation.navigate('ReportFormScreen', { reportId: item.id });
+              } else {
+                navigation.navigate('ReportDetailScreen', { reportId: item.id });
+              }
+            }}
           >
             <View style={styles.cardHeader}>
               <View style={styles.badgeRow}>
@@ -158,13 +164,12 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
                 item.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusProgress
               ]}>
                 <Text style={styles.statusTagText}>
-                  {item.status === 'em_andamento' ? 'Em Preenchimento' : item.status}
+                  {item.status === 'em_andamento' ? '📝 Rascunho (Editar)' : item.status}
                 </Text>
               </View>
 
               <View style={styles.photosIndicator}>
-                <Ionicons name="images-outline" size={14} color={Colors.textSecondary} />
-                <Text style={styles.photosCount}>{item.fotos_count || 0} fotos</Text>
+                <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
               </View>
             </View>
           </TouchableOpacity>

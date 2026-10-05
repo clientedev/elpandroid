@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -33,6 +33,7 @@ const Tab = createBottomTabNavigator();
 function TabNavigator() {
   return (
     <Tab.Navigator
+      initialRouteName="ObrasTab"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: Colors.primary,
@@ -40,26 +41,26 @@ function TabNavigator() {
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopColor: Colors.border,
-          height: 60,
+          height: 62,
           paddingBottom: 8,
-          paddingTop: 8,
+          paddingTop: 6,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '600',
         },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap = 'cube-outline';
 
-          if (route.name === 'DashboardTab') {
-            iconName = focused ? 'speedometer' : 'speedometer-outline';
-          } else if (route.name === 'ObrasTab') {
+          if (route.name === 'ObrasTab') {
             iconName = focused ? 'business' : 'business-outline';
+          } else if (route.name === 'PendentesTab') {
+            iconName = focused ? 'document-text' : 'document-text-outline';
+          } else if (route.name === 'ExpressTab') {
+            iconName = focused ? 'flash' : 'flash-outline';
           } else if (route.name === 'VisitasTab') {
             iconName = focused ? 'calendar' : 'calendar-outline';
-          } else if (route.name === 'RelatoriosTab') {
-            iconName = focused ? 'document-text' : 'document-text-outline';
-          } else if (route.name === 'MaisTab') {
+          } else if (route.name === 'ConfiguracoesTab') {
             iconName = focused ? 'settings' : 'settings-outline';
           }
 
@@ -67,11 +68,31 @@ function TabNavigator() {
         },
       })}
     >
-      <Tab.Screen name="DashboardTab" component={DashboardScreen} options={{ tabBarLabel: 'Início' }} />
-      <Tab.Screen name="ObrasTab" component={ProjectsListScreen} options={{ tabBarLabel: 'Obras' }} />
-      <Tab.Screen name="VisitasTab" component={VisitsListScreen} options={{ tabBarLabel: 'Visitas' }} />
-      <Tab.Screen name="RelatoriosTab" component={ReportsListScreen} options={{ tabBarLabel: 'Relatórios' }} />
-      <Tab.Screen name="MaisTab" component={SettingsScreen} options={{ tabBarLabel: 'Ajustes' }} />
+      <Tab.Screen 
+        name="ObrasTab" 
+        component={ProjectsListScreen} 
+        options={{ tabBarLabel: 'Obras' }} 
+      />
+      <Tab.Screen 
+        name="PendentesTab" 
+        component={ReportsListScreen} 
+        options={{ tabBarLabel: 'Pendentes' }} 
+      />
+      <Tab.Screen 
+        name="ExpressTab" 
+        component={ExpressReportsScreen} 
+        options={{ tabBarLabel: 'Express' }} 
+      />
+      <Tab.Screen 
+        name="VisitasTab" 
+        component={VisitsListScreen} 
+        options={{ tabBarLabel: 'Agenda' }} 
+      />
+      <Tab.Screen 
+        name="ConfiguracoesTab" 
+        component={SettingsScreen} 
+        options={{ tabBarLabel: 'Ajustes' }} 
+      />
     </Tab.Navigator>
   );
 }

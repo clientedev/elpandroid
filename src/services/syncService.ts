@@ -6,7 +6,7 @@ import {
   getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
-  saveLocalReembolso, getLocalFotos, getDatabase
+  saveLocalReembolso, getLocalFotos, saveLocalFoto, getDatabase
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
 
@@ -254,11 +254,33 @@ class SyncService {
         }
       }
 
-      // 3. Pull Relatorios
-      const reportsRes = await apiClient.axios.get('/api/relatorios', { timeout: 8000 }).catch(() => null);
+      // 3. Pull Relatorios & Fotos
+      const reportsRes = await apiClient.axios.get('/api/relatorios', { timeout: 12000 }).catch(() => null);
       if (reportsRes && Array.isArray(reportsRes.data)) {
         for (const r of reportsRes.data) {
           await saveLocalRelatorio(r, 'synced');
+          if (Array.isArray(r.fotos)) {
+            for (const f of r.fotos) {
+              const fullUrl = f.url?.startsWith('http') 
+                ? f.url 
+                : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
+              await saveLocalFoto({
+                id: f.id,
+                relatorio_id: r.id,
+                url: fullUrl,
+                filename: f.filename,
+                uri_local: fullUrl,
+                titulo: f.titulo || '',
+                legenda: f.legenda || '',
+                descricao: f.descricao || '',
+                tipo_servico: f.tipo_servico || '',
+                local: f.local || '',
+                ordem: f.ordem || 0,
+                anotacoes_dados: typeof f.anotacoes_dados === 'object' ? JSON.stringify(f.anotacoes_dados) : (f.anotacoes_dados || ''),
+                sync_status: 'synced',
+              }, 'synced');
+            }
+          }
         }
       }
 
