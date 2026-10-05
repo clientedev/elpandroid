@@ -7,7 +7,9 @@ import {
   getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
-  saveLocalReembolso, getLocalFotos, saveLocalFoto, updateLocalRelatorioNumero, getDatabase
+  saveLocalReembolso, getLocalFotos, saveLocalFoto, 
+  getLocalFotosExpress, saveLocalFotoExpress,
+  updateLocalRelatorioNumero, getDatabase
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
 
@@ -26,7 +28,7 @@ class SyncService {
   /**
    * Initializes automatic synchronization:
    * 1. Detects internet connection recovery
-   * 2. Periodic sync check (heartbeat every 20s)
+   * 2. Periodic sync check (heartbeat a cada 10s para tempo real)
    * 3. Syncs when app returns from background
    */
   private initAutoSync() {
@@ -44,19 +46,16 @@ class SyncService {
       }
     });
 
-    // 2. Heartbeat check every 20 seconds (sincronização automática contínua e transparente)
+    // 2. Heartbeat check every 10 seconds (sincronização contínua e em tempo real entre todos os dispositivos)
     if (this.autoSyncInterval) {
       clearInterval(this.autoSyncInterval);
     }
     this.autoSyncInterval = setInterval(async () => {
       const online = await this.isOnline();
-      if (online) {
-        const pending = await this.getPendingCount();
-        if (pending > 0 && !this.isSyncing) {
-          await this.syncAll(false);
-        }
+      if (online && !this.isSyncing) {
+        await this.syncAll(false);
       }
-    }, 20000);
+    }, 10000);
 
     // 3. Foreground resume listener
     AppState.addEventListener('change', async (state: AppStateStatus) => {
@@ -163,6 +162,33 @@ class SyncService {
               }
             } catch (fotoErr) {
               console.warn('[SyncService] Could not attach photos:', fotoErr);
+            }
+          }
+
+          if (item.entity_type === 'relatorio_express') {
+            try {
+              const fotosExp = await getLocalFotosExpress(item.entity_id);
+              if (fotosExp && fotosExp.length > 0) {
+                const enrichedFotos = await Promise.all(
+                  fotosExp.map(async (f) => {
+                    let base64Data = f.base64;
+                    if (!base64Data && f.uri_local) {
+                      base64Data = await readPhotoBase64(f.uri_local);
+                      if (base64Data) {
+                        await saveLocalFotoExpress({ ...f, base64: base64Data }, 'pending').catch(() => null);
+                      }
+                    }
+                    return {
+                      ...f,
+                      base64: base64Data,
+                      imagem_base64: base64Data,
+                    };
+                  })
+                );
+                payload.fotos = enrichedFotos;
+              }
+            } catch (expFotoErr) {
+              console.warn('[SyncService] Could not attach express photos:', expFotoErr);
             }
           }
 
@@ -292,6 +318,34 @@ class SyncService {
       if (remindersRes && Array.isArray(remindersRes.data)) {
         for (const l of remindersRes.data) {
           await saveLocalLembrete(l, 'synced');
+        }
+      }
+
+      // 5. Pull Relatórios Express & Fotos
+      const expressRes = await apiClient.axios.get('/api/relatorios-express', { timeout: 10000 }).catch(() => null);
+      if (expressRes && Array.isArray(expressRes.data)) {
+        for (const exp of expressRes.data) {
+          await saveLocalRelatorioExpress(exp, 'synced');
+          if (Array.isArray(exp.fotos)) {
+            for (const f of exp.fotos) {
+              const fullUrl = f.url?.startsWith('http')
+                ? f.url
+                : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
+              await saveLocalFotoExpress({
+                id: f.id,
+                relatorio_express_id: exp.id,
+                url: fullUrl,
+                filename: f.filename,
+                uri_local: fullUrl,
+                titulo: f.titulo || '',
+                legenda: f.legenda || '',
+                descricao: f.descricao || '',
+                local: f.local || '',
+                ordem: f.ordem || 0,
+                sync_status: 'synced',
+              }, 'synced');
+            }
+          }
         }
       }
     } catch (pullErr) {

@@ -99,7 +99,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   async function initImmediateDraft(projId: number) {
     try {
       const selectedProj = projetos.find(p => p.id === projId);
-      const draftId = currentReportId;
+      let draftId = currentReportId;
       const initialUuid = reportUuid;
       const creationDate = new Date().toISOString();
 
@@ -122,6 +122,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             assignedNumero = res.data.numero;
             syncStatus = 'synced';
             setReportNumber(assignedNumero);
+            if (res.data.id) {
+              draftId = res.data.id;
+              setCurrentReportId(draftId);
+            }
           }
         } catch (netErr) {
           console.warn('[ReportForm] Criação online indisponível, iniciando rascunho offline:', netErr);

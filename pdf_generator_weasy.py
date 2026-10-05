@@ -82,12 +82,22 @@ class WeasyPrintReportGenerator:
         
         # Carregar logo em base64
         logo_base64 = ""
+        logo_mime = "image/png"
         try:
-            logo_path = os.path.join('static', 'logo_elp_new.jpg')
-            if os.path.exists(logo_path):
-                import base64
-                with open(logo_path, 'rb') as f:
-                    logo_base64 = base64.b64encode(f.read()).decode('utf-8')
+            candidates = [
+                os.path.join('assets', 'logo-transparent.png'),
+                os.path.join('assets', 'logo.png'),
+                os.path.join('static', 'logo_elp_transparent.png'),
+                os.path.join('static', 'logo_elp_new.jpg'),
+                os.path.join('static', 'logo_elp_final.jpg')
+            ]
+            import base64
+            for logo_path in candidates:
+                if os.path.exists(logo_path):
+                    with open(logo_path, 'rb') as f:
+                        logo_base64 = base64.b64encode(f.read()).decode('utf-8')
+                        logo_mime = 'image/png' if logo_path.lower().endswith('.png') else 'image/jpeg'
+                        break
         except Exception as e:
             print(f"Erro ao carregar logo: {e}")
         
@@ -171,6 +181,7 @@ class WeasyPrintReportGenerator:
             'responsavel': responsavel_acompanhamento,
             'data_relatorio': date_str, # Usar a mesma data (Criação)
             'logo_base64': logo_base64,
+            'logo_mime': logo_mime,
             'fotos': []
         }
         
@@ -280,7 +291,7 @@ class WeasyPrintReportGenerator:
     <!-- Cabeçalho com logo ELP e título -->
     <div class="header-section">
         <div class="logo-container">
-            <img src="data:image/jpeg;base64,{{ data.logo_base64 }}" alt="ELP Consultoria" class="elp-logo">
+            <img src="data:{{ data.get('logo_mime', 'image/png') }};base64,{{ data.logo_base64 }}" alt="ELP Consultoria" class="elp-logo">
         </div>
         
         <h1 class="main-title">{{ data.titulo }}</h1>
@@ -433,7 +444,7 @@ class WeasyPrintReportGenerator:
     <!-- Rodapé ELP -->
     <div class="footer-section">
         <div class="footer-left">
-            <img src="data:image/jpeg;base64,{{ data.logo_base64 }}" alt="ELP Consultoria" class="footer-logo">
+            <img src="data:{{ data.get('logo_mime', 'image/png') }};base64,{{ data.logo_base64 }}" alt="ELP Consultoria" class="footer-logo">
             <div class="company-info">
                 <div class="company-name">ELP Consultoria</div>
                 <div>Rua Jaboticabal, 530 apto. 31 - São Paulo - SP - CEP: 03188-000</div>

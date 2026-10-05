@@ -228,6 +228,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const relatoriosRascunho = relatorios.filter(r => r.status === 'em_andamento' || r.status === 'Rascunho' || !r.status).length;
 
   const isApprover = Boolean(user?.is_master || (user as any)?.is_aprovador || user?.is_aprovador_express);
+  const isMasterOrAdmin = Boolean(user?.is_master || user?.username === 'admin');
 
   const [modalTab, setModalTab] = useState<'order' | 'visibility'>('order');
 
@@ -427,6 +428,18 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <Text style={styles.actionBtnText}>Cadastrar Obra</Text>
                 <Text style={styles.actionBtnSub}>Novo Projeto</Text>
               </TouchableOpacity>
+
+              {isMasterOrAdmin && (
+                <TouchableOpacity 
+                  style={[styles.actionBtn, { backgroundColor: '#4F46E5' }]}
+                  onPress={() => navigation.navigate('UserManagementScreen')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="people" size={24} color="#FFFFFF" />
+                  <Text style={styles.actionBtnText}>Gestão Usuários</Text>
+                  <Text style={styles.actionBtnSub}>Admin & Acessos</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         );

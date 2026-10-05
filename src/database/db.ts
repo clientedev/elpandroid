@@ -26,6 +26,14 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
     await db.execAsync('ALTER TABLE fotos_relatorio ADD COLUMN base64 TEXT;');
   } catch {}
 
+  // Migration: ensure base64 and local exist in fotos_relatorio_express
+  try {
+    await db.execAsync('ALTER TABLE fotos_relatorio_express ADD COLUMN base64 TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE fotos_relatorio_express ADD COLUMN local TEXT;');
+  } catch {}
+
   // Migration: ensure uuid and audit columns exist in relatorios
   try {
     await db.execAsync('ALTER TABLE relatorios ADD COLUMN uuid TEXT;');
@@ -177,7 +185,7 @@ export async function getLocalRelatorios(projetoId?: number): Promise<Relatorio[
     query += ' WHERE r.projeto_id = ?';
     params.push(projetoId);
   }
-  query += ' GROUP BY r.id ORDER BY r.data_relatorio DESC';
+  query += ' GROUP BY COALESCE(NULLIF(r.uuid, ""), NULLIF(r.numero, ""), r.id) ORDER BY r.data_relatorio DESC';
   return await db.getAllAsync<Relatorio>(query, params);
 }
 
@@ -188,6 +196,26 @@ export async function getLocalRelatorioById(id: number): Promise<Relatorio | nul
 
 export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
+
+  // Deduplicação Atômica: Se já existir rascunho com o mesmo UUID ou Número oficial
+  try {
+    let existing: { id: number } | null = null;
+    if (r.uuid) {
+      existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios WHERE uuid = ?', [r.uuid]);
+    }
+    if (!existing && r.numero && !r.numero.includes('Pendente')) {
+      existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios WHERE numero = ?', [r.numero]);
+    }
+    if (existing && existing.id !== r.id) {
+      // Reconcilia fotos vinculadas do ID temporário para o novo ID
+      await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [r.id, existing.id]);
+      // Remove o registro duplicado antigo
+      await db.runAsync('DELETE FROM relatorios WHERE id = ?', [existing.id]);
+    }
+  } catch (dedupErr) {
+    console.warn('[db] Aviso na deduplicação de relatório:', dedupErr);
+  }
+
   await db.runAsync(
     `INSERT OR REPLACE INTO relatorios (
       id, numero, numero_projeto, titulo, projeto_id, projeto_nome, visita_id,
@@ -279,7 +307,13 @@ export async function deleteLocalFoto(id: number): Promise<void> {
 // ================= RELATORIOS EXPRESS =================
 export async function getLocalRelatoriosExpress(): Promise<RelatorioExpress[]> {
   const db = await getDatabase();
-  return await db.getAllAsync<RelatorioExpress>('SELECT * FROM relatorios_express ORDER BY data_relatorio DESC');
+  return await db.getAllAsync<RelatorioExpress>(`
+    SELECT r.*, COUNT(f.id) as fotos_count 
+    FROM relatorios_express r 
+    LEFT JOIN fotos_relatorio_express f ON r.id = f.relatorio_express_id 
+    GROUP BY COALESCE(NULLIF(r.numero, ""), r.id) 
+    ORDER BY r.data_relatorio DESC
+  `);
 }
 
 export async function getLocalRelatorioExpressById(id: number): Promise<RelatorioExpress | null> {
@@ -289,6 +323,18 @@ export async function getLocalRelatorioExpressById(id: number): Promise<Relatori
 
 export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
+
+  // Deduplicação por número
+  try {
+    if (r.numero && !r.numero.includes('Pendente')) {
+      const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios_express WHERE numero = ?', [r.numero]);
+      if (existing && existing.id !== r.id) {
+        await db.runAsync('UPDATE fotos_relatorio_express SET relatorio_express_id = ? WHERE relatorio_express_id = ?', [r.id, existing.id]);
+        await db.runAsync('DELETE FROM relatorios_express WHERE id = ?', [existing.id]);
+      }
+    }
+  } catch (e) {}
+
   await db.runAsync(
     `INSERT OR REPLACE INTO relatorios_express (
       id, numero, titulo, autor_id, autor_nome, aprovador_id, aprovador_nome,
@@ -306,6 +352,39 @@ export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus:
       r.acompanhantes || '[]', r.created_at || new Date().toISOString(), syncStatus
     ]
   );
+}
+
+export async function getLocalFotosExpress(relatorioExpressId: number): Promise<FotoRelatorioExpress[]> {
+  const db = await getDatabase();
+  return await db.getAllAsync<FotoRelatorioExpress>(
+    'SELECT * FROM fotos_relatorio_express WHERE relatorio_express_id = ? ORDER BY ordem ASC, id ASC',
+    [relatorioExpressId]
+  );
+}
+
+export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO fotos_relatorio_express (
+      id, relatorio_express_id, url, filename, uri_local, titulo, legenda, descricao, local, base64, ordem, sync_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      f.id, f.relatorio_express_id, f.url || '', f.filename || '', f.uri_local || '',
+      f.titulo || '', f.legenda || '', f.descricao || '', f.local || '', f.base64 || '',
+      f.ordem || 0, syncStatus
+    ]
+  );
+}
+
+export async function deleteLocalFotoExpress(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [id]);
+}
+
+export async function deleteLocalRelatorioExpress(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ?', [id]);
+  await db.runAsync('DELETE FROM relatorios_express WHERE id = ?', [id]);
 }
 
 // ================= REEMBOLSOS =================

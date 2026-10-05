@@ -244,38 +244,35 @@ class ArtesanoPDFGenerator:
             raise Exception(f"Erro ao gerar PDF: {str(e)}")
     
     def _create_header(self, relatorio):
-        """Criar cabeçalho exatamente como no modelo"""
+        """Criar cabeçalho com logo ELP e dados de data"""
         elements = []
         
-        # Espaço inicial
-        elements.append(Spacer(1, 10*mm))
+        # Logo ELP
+        possible_logos = ['assets/logo.png', 'assets/logo-transparent.png', 'static/logo_elp_transparent.png', 'static/logo_elp_new.jpg']
+        logo_path = next((p for p in possible_logos if os.path.exists(p)), None)
         
-        # Título centralizado
-        title = Paragraph("Relatório de Visita", self.styles['MainTitle'])
-        elements.append(title)
-        
-        # Espaço grande após título
-        elements.append(Spacer(1, 50*mm))
-        
-        # Data no canto direito
+        logo_cell = Paragraph("", self.styles['Normal'])
+        if logo_path:
+            try:
+                logo_cell = Image(logo_path, width=42*mm, height=18*mm)
+            except Exception:
+                pass
+            
+        title_p = Paragraph("<b>ELP ENGENHARIA & CONSULTORIA</b><br/><font size=9 color='#64748B'>Relatório de Visita Técnica</font>", self.styles['MainTitle'])
         data_atual = datetime.now().strftime('%d/%m/%Y %H:%M')
-        date_p = Paragraph(f"Em: {data_atual}", self.styles['HeaderDate'])
+        date_p = Paragraph(f"<b>Data:</b> {data_atual}", self.styles['HeaderDate'])
         
-        # Tabela para posicionar a data no canto direito
-        date_table = Table([[date_p]], colWidths=[A4[0]-40*mm])
-        date_table.setStyle(TableStyle([
-            ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-            ('TOPPADDING', (0, 0), (-1, -1), 0),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        header_table = Table([[logo_cell, title_p, date_p]], colWidths=[45*mm, 85*mm, 40*mm])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+            ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+            ('LINEBELOW', (0, 0), (-1, -1), 1.5, HexColor('#1E3A8A')),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ]))
-        
-        elements.append(date_table)
-        
-        # Espaço após data
-        elements.append(Spacer(1, 20*mm))
-        
+        elements.append(header_table)
+        elements.append(Spacer(1, 10*mm))
         return elements
     
     def _create_dados_gerais(self, relatorio):

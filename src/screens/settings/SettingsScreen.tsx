@@ -212,6 +212,33 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
         </View>
 
+        {/* Gestão de Usuários (Exclusivo Admin / Master) */}
+        {(user?.is_master || user?.username === 'admin') && (
+          <TouchableOpacity 
+            style={[styles.card, styles.adminCard]}
+            onPress={() => navigation.navigate('UserManagementScreen')}
+            activeOpacity={0.8}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={styles.adminIconBox}>
+                  <Ionicons name="people" size={24} color="#7C3AED" />
+                </View>
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.adminCardTitle}>Gestão de Usuários</Text>
+                    <View style={styles.adminBadge}>
+                      <Text style={styles.adminBadgeText}>Admin/Master</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.adminCardSub}>Cadastre usuários e configure permissões no app</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#7C3AED" />
+            </View>
+          </TouchableOpacity>
+        )}
+
         {/* ================= GESTÃO DE LEGENDAS ================= */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
@@ -787,5 +814,38 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  adminCard: {
+    borderColor: '#C4B5FD',
+    backgroundColor: '#FAF5FF',
+  },
+  adminIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminCardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#5B21B6',
+  },
+  adminBadge: {
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  adminBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  adminCardSub: {
+    fontSize: 12,
+    color: '#6D28D9',
+    marginTop: 2,
   },
 });

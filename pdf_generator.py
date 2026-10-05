@@ -325,8 +325,9 @@ class ReportPDFGenerator:
         """Professional ELP header with logo and company info"""
         try:
             # Company header with logo
-            logo_path = 'static/logo_elp_new.jpg'
-            if os.path.exists(logo_path):
+            possible_logos = ['assets/logo.png', 'assets/logo-transparent.png', 'static/logo_elp_transparent.png', 'static/logo_elp_new.jpg']
+            logo_path = next((p for p in possible_logos if os.path.exists(p)), None)
+            if logo_path:
                 logo_img = Image(logo_path, width=3.5*cm, height=1.8*cm)
                 
                 # Create header table with logo and company info
@@ -630,8 +631,9 @@ class ReportPDFGenerator:
         """Add professional ELP header with logo and company info"""
         try:
             # Try to load ELP logo
-            logo_path = 'static/logo_elp_new.jpg'
-            if os.path.exists(logo_path):
+            possible_logos = ['assets/logo.png', 'assets/logo-transparent.png', 'static/logo_elp_transparent.png', 'static/logo_elp_new.jpg']
+            logo_path = next((p for p in possible_logos if os.path.exists(p)), None)
+            if logo_path:
                 logo_img = Image(logo_path, width=4*cm, height=2*cm)
                 
                 company_info = [
@@ -953,9 +955,12 @@ class ReportPDFGenerator:
             from flask import current_app
             # Try multiple logo paths to ensure we find the correct one
             possible_logos = [
-                'static/logo_elp_final.jpg',  # New ELP logo from user
+                'assets/logo.png',
+                'assets/logo-transparent.png',
+                'static/logo_elp_transparent.png',
+                'static/logo_elp_final.jpg',
                 'static/logo_elp_current.jpg',
-                'attached_assets/elp_1755611724757.jpg',  # User's new logo
+                'attached_assets/elp_1755611724757.jpg',
                 'static/logo_elp_new.jpg'
             ]
             logo_path = None

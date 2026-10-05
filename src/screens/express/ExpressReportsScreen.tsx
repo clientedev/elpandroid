@@ -8,13 +8,14 @@ import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
-  getLocalRelatoriosExpress, saveLocalRelatorioExpress, addToSyncQueue 
+  getLocalRelatoriosExpress, saveLocalRelatorioExpress, 
+  getLocalFotosExpress, saveLocalFotoExpress, addToSyncQueue 
 } from '../../database/db';
-import { takePhoto, pickImage } from '../../services/imageService';
+import { takePhoto, pickImage, savePhotoToDeviceGallery, readPhotoBase64 } from '../../services/imageService';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { RelatorioExpress } from '../../types';
+import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
 export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
@@ -49,7 +50,17 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const loadReports = useCallback(async () => {
     try {
       const data = await getLocalRelatoriosExpress();
-      setExpressList(data);
+      const enriched = await Promise.all(
+        data.map(async (r) => {
+          const fotos = await getLocalFotosExpress(r.id);
+          return {
+            ...r,
+            fotos,
+            fotos_count: (fotos && fotos.length) || r.fotos_count || 0
+          };
+        })
+      );
+      setExpressList(enriched);
     } catch (e) {
       console.warn('Erro ao carregar express:', e);
     }
@@ -95,7 +106,6 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   function handleCaptureGpsAddress() {
     setLoadingGps(true);
-    // Simular/capturar geolocalização do dispositivo
     setTimeout(() => {
       setObraEndereco('Av. das Nações Unidas, 14401 - Chácara Santo Antônio, São Paulo - SP');
       setLoadingGps(false);
@@ -112,6 +122,35 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setLoading(true);
     try {
       const expId = Date.now();
+      const attachedFotos: any[] = [];
+
+      if (photoUri) {
+        let b64 = await readPhotoBase64(photoUri);
+        const fotoObj: FotoRelatorioExpress = {
+          id: Date.now() + 1,
+          relatorio_express_id: expId,
+          uri_local: photoUri,
+          base64: b64,
+          local: obraNome.trim(),
+          titulo: `Foto Express - ${obraNome.trim()}`,
+          legenda: observacoes || 'Registro Fotográfico Express',
+          ordem: 0,
+          sync_status: 'pending'
+        };
+        await saveLocalFotoExpress(fotoObj, 'pending');
+
+        // Salva na galeria do dispositivo no álbum específico da Obra
+        savePhotoToDeviceGallery(photoUri, obraNome.trim()).catch(() => {});
+
+        attachedFotos.push({
+          uri_local: photoUri,
+          base64: b64,
+          imagem_base64: b64,
+          titulo: `Foto Express - ${obraNome.trim()}`,
+          legenda: observacoes || 'Registro Fotográfico Express',
+          ordem: 0
+        });
+      }
 
       const newExp: RelatorioExpress = {
         id: expId,
@@ -129,6 +168,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         observacoes_finais: observacoes.trim(),
         status: 'Aguardando Aprovação',
         sync_status: 'pending',
+        fotos_count: attachedFotos.length,
       };
 
       await saveLocalRelatorioExpress(newExp, 'pending');
@@ -139,7 +179,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         'create',
         '/api/relatorios-express',
         'POST',
-        newExp
+        {
+          ...newExp,
+          fotos: attachedFotos
+        }
       );
 
       if (isOnline) triggerSync();
@@ -156,7 +199,23 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   async function handleExportPDF(item: RelatorioExpress) {
     try {
-      const pdfUri = await generateReportPDF(item, []);
+      const fotosExp = item.fotos && item.fotos.length > 0 
+        ? item.fotos 
+        : await getLocalFotosExpress(item.id);
+      const convertedFotos: FotoRelatorio[] = (fotosExp || []).map(f => ({
+        id: f.id,
+        relatorio_id: f.relatorio_express_id,
+        url: f.url,
+        filename: f.filename,
+        uri_local: f.uri_local,
+        titulo: f.titulo,
+        legenda: f.legenda,
+        descricao: f.descricao,
+        local: f.local || item.obra_nome,
+        ordem: f.ordem,
+        sync_status: 'synced'
+      }));
+      const pdfUri = await generateReportPDF(item, convertedFotos);
       await shareReportPDF(pdfUri);
     } catch (e: any) {
       Alert.alert('Erro no PDF', e.message);
@@ -227,6 +286,19 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 {item.observacoes_finais}
               </Text>
             ) : null}
+
+            {item.fotos && item.fotos.length > 0 && (
+              <View style={styles.cardPhotoRow}>
+                <Image 
+                  source={{ uri: item.fotos[0].uri_local || item.fotos[0].url }} 
+                  style={styles.cardPhotoThumb} 
+                />
+                <View style={{ flex: 1, justifyContent: 'center', marginLeft: 10 }}>
+                  <Text style={styles.photoCountLabel}>📷 {item.fotos.length} foto(s) anexada(s)</Text>
+                  <Text style={styles.photoDescLabel} numberOfLines={1}>{item.fotos[0].legenda || 'Registro fotográfico express'}</Text>
+                </View>
+              </View>
+            )}
 
             <View style={styles.cardFooter}>
               <View style={[
@@ -671,4 +743,29 @@ const styles = StyleSheet.create({
     ...Shadows.md,
   },
   submitExpressText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  cardPhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  cardPhotoThumb: {
+    width: 50,
+    height: 50,
+    borderRadius: 6,
+    backgroundColor: '#E2E8F0',
+  },
+  photoCountLabel: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  photoDescLabel: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
 });

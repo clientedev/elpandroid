@@ -27,6 +27,7 @@ import { ExpensesScreen } from '../screens/expenses/ExpensesScreen';
 import { RemindersScreen } from '../screens/reminders/RemindersScreen';
 import { ContactsScreen } from '../screens/contacts/ContactsScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
+import { UserManagementScreen } from '../screens/admin/UserManagementScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -139,6 +140,7 @@ export const AppNavigator: React.FC = () => {
             <Stack.Screen name="LembretesScreen" component={RemindersScreen} />
             <Stack.Screen name="ContactsScreen" component={ContactsScreen} />
             <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
+            <Stack.Screen name="UserManagementScreen" component={UserManagementScreen} />
           </>
         )}
       </Stack.Navigator>

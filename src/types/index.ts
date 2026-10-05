@@ -2,12 +2,15 @@ export interface User {
   id: number;
   username: string;
   email: string;
+  nome_completo?: string;
   is_master?: boolean;
   is_aprovador_express?: boolean;
   cargo?: string;
   telefone?: string;
   cor_agenda?: string;
   ativo?: boolean;
+  tipo_acesso?: 'admin' | 'master' | 'aprovador' | 'funcionario' | 'visualizador';
+  created_at?: string;
   token?: string;
 }
 
@@ -150,6 +153,8 @@ export interface RelatorioExpress {
   acompanhantes?: string;
   created_at?: string;
   sync_status?: 'synced' | 'pending' | 'error';
+  fotos_count?: number;
+  fotos?: FotoRelatorioExpress[];
 }
 
 export interface FotoRelatorioExpress {
@@ -161,6 +166,8 @@ export interface FotoRelatorioExpress {
   titulo?: string;
   legenda?: string;
   descricao?: string;
+  local?: string;
+  base64?: string;
   ordem: number;
   sync_status?: 'synced' | 'pending' | 'error';
 }

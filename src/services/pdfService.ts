@@ -1,6 +1,7 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Relatorio, FotoRelatorio, RelatorioExpress } from '../types';
+import { ELP_LOGO_BASE64 } from './logoBase64';
 
 export async function generateReportPDF(
   relatorio: Relatorio | RelatorioExpress,
@@ -44,22 +45,46 @@ export async function generateReportPDF(
           margin: 20px;
           line-height: 1.5;
         }
-        .header {
-          display: flex;
-          justify-content: space-between;
-          border-bottom: 3px solid #2563EB;
+        .header-table {
+          width: 100%;
+          border-bottom: 3px solid #1E3A8A;
           padding-bottom: 12px;
-          margin-bottom: 20px;
+          margin-bottom: 18px;
+        }
+        .header-logo-cell {
+          width: 120px;
+          vertical-align: middle;
+        }
+        .header-logo {
+          height: 48px;
+          max-width: 120px;
+          object-fit: contain;
+          display: block;
+        }
+        .header-text-cell {
+          vertical-align: middle;
+          padding-left: 12px;
         }
         .header-title {
-          font-size: 22px;
-          font-weight: bold;
+          font-size: 20px;
+          font-weight: 800;
           color: #1E3A8A;
+          letter-spacing: 0.5px;
+        }
+        .header-subtitle {
+          font-size: 13px;
+          font-weight: 600;
+          color: #334155;
+          margin-top: 2px;
+        }
+        .header-meta-cell {
+          text-align: right;
+          vertical-align: middle;
+          width: 130px;
         }
         .header-meta {
-          font-size: 13px;
+          font-size: 12px;
           color: #64748B;
-          text-align: right;
         }
         .section-title {
           font-size: 14px;
@@ -130,7 +155,6 @@ export async function generateReportPDF(
           padding-top: 10px;
           font-size: 11px;
           color: #94A3B8;
-          text-align: center;
         }
         .status-badge {
           display: inline-block;
@@ -144,18 +168,23 @@ export async function generateReportPDF(
       </style>
     </head>
     <body>
-      <div class="header">
-        <div>
-          <div class="header-title">ELP - RELATÓRIO TÉCNICO</div>
-          <div style="font-size: 14px; font-weight: 600; color: #334155; margin-top: 4px;">
-            ${relatorio.titulo} (${numero})
-          </div>
-        </div>
-        <div class="header-meta">
-          <div><strong>Data:</strong> ${data}</div>
-          <div style="margin-top: 4px;"><span class="status-badge">${relatorio.status}</span></div>
-        </div>
-      </div>
+      <table class="header-table" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="header-logo-cell">
+            <img src="${ELP_LOGO_BASE64}" class="header-logo" alt="ELP Engenharia" />
+          </td>
+          <td class="header-text-cell">
+            <div class="header-title">ELP ENGENHARIA</div>
+            <div class="header-subtitle">
+              ${relatorio.titulo} (${numero})
+            </div>
+          </td>
+          <td class="header-meta-cell">
+            <div class="header-meta"><strong>Data:</strong> ${data}</div>
+            <div style="margin-top: 4px;"><span class="status-badge">${relatorio.status}</span></div>
+          </td>
+        </tr>
+      </table>
 
       <div class="section-title">DADOS DA OBRA & VISITA</div>
       <div class="info-grid">
@@ -178,7 +207,16 @@ export async function generateReportPDF(
       ${photosHtml}
 
       <div class="footer">
-        Documento gerado pelo ELP Android - Sistema de Gestão Técnica de Obras
+        <table style="width: 100%; border: none;">
+          <tr>
+            <td style="text-align: left; font-size: 10px; color: #94A3B8;">
+              ELP Engenharia &amp; Consultoria &bull; Sistema Integrado de Obras
+            </td>
+            <td style="text-align: right; font-size: 10px; color: #94A3B8;">
+              Gerado em ${new Date().toLocaleDateString('pt-BR')}
+            </td>
+          </tr>
+        </table>
       </div>
     </body>
     </html>

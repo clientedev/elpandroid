@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.7',
-        'versionCode': 8,
+        'version': '1.0.8',
+        'versionCode': 9,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.7: Salvamento automático de fotos na Galeria nativa do dispositivo com criação de álbuns dedicados por Obra ("ELP - Nome da Obra") e álbum geral ("ELP RELATORIOS"); criação instantânea de rascunho ao iniciar relatório (sem botão manual); atribuição imediata do número oficial (REL-XXXX) quando online; exibição de "Pendente Sincronização" exclusivamente quando offline; exclusão restrita a usuários Master e Administradores; editor de fotos com setas, formas e textos arrastáveis e dimensionáveis com o dedo; dashboard personalizável com modo de edição para reordenar blocos livremente.',
+        'notes': 'Atualização 1.0.8: Gestão completa de usuários integrada no APK (exclusiva para Administradores e Masters) com todos os perfis de acesso; Sincronização em tempo real sem duplicação de relatórios; Relatórios Express 100% integrados com captura e salvamento de fotos na galeria e álbuns; Logotipo oficial da ELP fixo no cabeçalho superior do aplicativo e renderizado em alta definição nos relatórios em PDF.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -13029,11 +13029,64 @@ def api_update_relatorio_status(relatorio_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
+    """Salva fotos vinculadas a um Relatório Express com decodificação base64 e persistência em disco"""
+    if not fotos_data or not isinstance(fotos_data, list):
+        return 0
+    upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+    os.makedirs(upload_dir, exist_ok=True)
+    saved = 0
+    for idx, f_data in enumerate(fotos_data):
+        if not f_data or not isinstance(f_data, dict):
+            continue
+        foto = FotoRelatorioExpress(
+            relatorio_express_id=rel_exp_id,
+            titulo=f_data.get('titulo') or f"Foto Express {idx+1}",
+            legenda=f_data.get('legenda') or '',
+            descricao=f_data.get('descricao') or '',
+            local=f_data.get('local') or '',
+            ordem=f_data.get('ordem', idx)
+        )
+        b64_str = (
+            f_data.get('base64') or 
+            f_data.get('imagem_base64') or 
+            f_data.get('imagem') or 
+            ''
+        )
+        if b64_str and isinstance(b64_str, str):
+            if ',' in b64_str:
+                b64_str = b64_str.split(',', 1)[1]
+            b64_str = b64_str.strip()
+            pad = len(b64_str) % 4
+            if pad:
+                b64_str += '=' * (4 - pad)
+            try:
+                img_bytes = base64.b64decode(b64_str)
+                foto.imagem = img_bytes
+                foto.imagem_hash = hashlib.sha256(img_bytes).hexdigest()
+                foto.imagem_size = len(img_bytes)
+                foto.content_type = 'image/jpeg'
+                fname = f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+                fpath = os.path.join(upload_dir, fname)
+                with open(fpath, 'wb') as f_out:
+                    f_out.write(img_bytes)
+                foto.filename = fname
+                foto.url = f"/uploads/{fname}"
+            except Exception as e:
+                current_app.logger.warning(f"Erro ao salvar foto express: {e}")
+                foto.url = f_data.get('url') or f_data.get('uri_local') or f_data.get('uri') or ''
+        else:
+            foto.url = f_data.get('url') or f_data.get('uri_local') or f_data.get('uri') or ''
+        db.session.add(foto)
+        saved += 1
+    db.session.flush()
+    return saved
+
 # --- RELATORIO EXPRESS ---
 @app.route('/api/relatorios-express', methods=['GET', 'POST'])
 @csrf.exempt
 def api_relatorios_express_sync():
-    """Endpoint de sincronizacao para Relatórios Express"""
+    """Endpoint de sincronizacao para Relatórios Express com suporte completo a fotos"""
     if request.method == 'POST':
         try:
             data = request.get_json(silent=True) or request.form or {}
@@ -13041,32 +13094,47 @@ def api_relatorios_express_sync():
             autor_id = user.id if user else 1
 
             numero = (data.get('numero') or '').strip()
-            if not numero or RelatorioExpress.query.filter_by(numero=numero).first():
-                count = RelatorioExpress.query.count() + 1
-                numero = f"EXP-{count:04d}"
+            existing = RelatorioExpress.query.filter_by(numero=numero).first() if numero else None
 
-            rel = RelatorioExpress(
-                numero=numero,
-                empresa_nome=data.get('empresa_nome') or 'ELP Engenharia',
-                empresa_responsavel=data.get('empresa_responsavel') or (user.nome_completo if user else 'Responsável'),
-                empresa_email=data.get('empresa_email') or 'engenharia@elp.com.br',
-                empresa_telefone=data.get('empresa_telefone'),
-                obra_nome=data.get('obra_nome') or 'Obra Express',
-                obra_tipo=data.get('obra_tipo'),
-                obra_construtora=data.get('obra_construtora'),
-                obra_responsavel=data.get('obra_responsavel'),
-                obra_email=data.get('obra_email'),
-                obra_endereco=data.get('obra_endereco'),
-                titulo=data.get('titulo') or 'Relatório Express de Visita',
-                autor_id=autor_id,
-                data_visita=_parse_iso_date(data.get('data_visita'), as_date=True, default=brazil_now().date()),
-                data_relatorio=_parse_iso_date(data.get('data_relatorio'), default=brazil_now()),
-                descricao=data.get('descricao') or '',
-                observacoes_finais=data.get('observacoes_finais') or '',
-                status=data.get('status') or 'Em preenchimento'
-            )
+            if existing:
+                rel = existing
+            else:
+                if not numero:
+                    count = RelatorioExpress.query.count() + 1
+                    numero = f"EXP-{count:04d}"
 
-            db.session.add(rel)
+                rel = RelatorioExpress(
+                    numero=numero,
+                    empresa_nome=data.get('empresa_nome') or 'ELP Engenharia',
+                    empresa_responsavel=data.get('empresa_responsavel') or (user.nome_completo if user else 'Responsável'),
+                    empresa_email=data.get('empresa_email') or 'engenharia@elp.com.br',
+                    empresa_telefone=data.get('empresa_telefone'),
+                    autor_id=autor_id
+                )
+                db.session.add(rel)
+
+            rel.obra_nome = data.get('obra_nome') or 'Obra Express'
+            rel.obra_tipo = data.get('obra_tipo')
+            rel.obra_construtora = data.get('obra_construtora')
+            rel.obra_responsavel = data.get('obra_responsavel')
+            rel.obra_email = data.get('obra_email')
+            rel.obra_endereco = data.get('obra_endereco')
+            rel.titulo = data.get('titulo') or 'Relatório Express de Visita'
+            rel.data_visita = _parse_iso_date(data.get('data_visita'), as_date=True, default=brazil_now().date())
+            rel.data_relatorio = _parse_iso_date(data.get('data_relatorio'), default=brazil_now())
+            rel.descricao = data.get('descricao') or ''
+            rel.observacoes_finais = data.get('observacoes_finais') or ''
+            rel.informacoes_tecnicas = data.get('informacoes_tecnicas') or ''
+            rel.checklist_data = data.get('checklist_data') or ''
+            rel.status = data.get('status') or 'Aguardando Aprovação'
+
+            db.session.flush()
+
+            # Processar fotos anexadas ao Relatório Express
+            fotos_payload = data.get('fotos') or []
+            if isinstance(fotos_payload, list) and len(fotos_payload) > 0:
+                _save_fotos_for_relatorio_express(rel.id, fotos_payload)
+
             db.session.commit()
             return jsonify({'success': True, 'id': rel.id, 'numero': rel.numero}), 201
         except Exception as e:
@@ -13075,19 +13143,293 @@ def api_relatorios_express_sync():
             return jsonify({'success': False, 'error': str(e)}), 500
 
     try:
-        rels = RelatorioExpress.query.order_by(RelatorioExpress.created_at.desc()).limit(50).all()
-        result = [{
-            'id': r.id,
-            'numero': r.numero,
-            'obra_nome': r.obra_nome,
-            'titulo': r.titulo,
-            'status': r.status,
-            'data_visita': r.data_visita.isoformat() if r.data_visita else None,
-            'created_at': r.created_at.isoformat() if r.created_at else None
-        } for r in rels]
+        rels = RelatorioExpress.query.order_by(RelatorioExpress.created_at.desc()).limit(100).all()
+        base_app_url = 'https://elpandroid-production.up.railway.app'
+        result = []
+        for r in rels:
+            fotos_db = FotoRelatorioExpress.query.filter_by(relatorio_express_id=r.id).order_by(FotoRelatorioExpress.ordem).all()
+            fotos_list = []
+            for f in fotos_db:
+                p_url = f.url or ''
+                if f.filename:
+                    p_url = f"{base_app_url}/uploads/{f.filename}"
+                elif p_url and not p_url.startswith('http'):
+                    p_url = f"{base_app_url}{p_url if p_url.startswith('/') else '/' + p_url}"
+                fotos_list.append({
+                    'id': f.id,
+                    'relatorio_express_id': f.relatorio_express_id,
+                    'url': p_url,
+                    'filename': f.filename,
+                    'titulo': f.titulo or '',
+                    'legenda': f.legenda or '',
+                    'descricao': f.descricao or '',
+                    'local': f.local or '',
+                    'ordem': f.ordem or 0
+                })
+
+            result.append({
+                'id': r.id,
+                'numero': r.numero,
+                'obra_nome': r.obra_nome,
+                'obra_endereco': r.obra_endereco or '',
+                'obra_construtora': r.obra_construtora or '',
+                'titulo': r.titulo,
+                'autor_id': r.autor_id,
+                'autor_nome': getattr(r.autor, 'nome_completo', r.autor.username) if r.autor else '',
+                'status': r.status,
+                'data_visita': r.data_visita.isoformat() if r.data_visita else None,
+                'data_relatorio': r.data_relatorio.isoformat() if r.data_relatorio else None,
+                'informacoes_tecnicas': r.informacoes_tecnicas or '',
+                'checklist_data': r.checklist_data or '',
+                'observacoes_finais': r.observacoes_finais or '',
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'fotos': fotos_list
+            })
         return jsonify(result), 200
     except Exception as e:
+        current_app.logger.error(f"Erro ao listar relatorios express: {e}")
         return jsonify([]), 200
+
+# ==============================================================================
+# USER MANAGEMENT API (EXCLUSIVO PARA ADMIN / MASTER)
+# ==============================================================================
+@app.route('/api/users', methods=['GET', 'POST'])
+@csrf.exempt
+def api_users_collection():
+    """Gerenciamento de usuários pelo APK - Restrito a Administradores/Master"""
+    user = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    is_master_or_admin = (
+        (user and user.is_master) or 
+        (user and user.username == 'admin') or
+        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
+    )
+    if not is_master_or_admin:
+        return jsonify({'success': False, 'error': 'Acesso restrito a Administradores do sistema.'}), 403
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            username = (data.get('username') or '').strip().lower()
+            email = (data.get('email') or '').strip().lower()
+            password = data.get('password') or ''
+            nome_completo = (data.get('nome_completo') or username).strip()
+            cargo = data.get('cargo') or ''
+            telefone = data.get('telefone') or ''
+            tipo_acesso = data.get('tipo_acesso') or 'funcionario'
+
+            if not username or not email or not password:
+                return jsonify({'success': False, 'error': 'Preencha usuário, e-mail e senha.'}), 400
+
+            if User.query.filter_by(username=username).first():
+                return jsonify({'success': False, 'error': f'Nome de usuário "{username}" já está em uso.'}), 400
+
+            if User.query.filter_by(email=email).first():
+                return jsonify({'success': False, 'error': f'E-mail "{email}" já cadastrado.'}), 400
+
+            is_master = False
+            is_aprovador_express = False
+            if tipo_acesso in ['admin', 'master']:
+                is_master = True
+                is_aprovador_express = True
+                if not cargo:
+                    cargo = 'Administrador' if tipo_acesso == 'admin' else 'Master'
+            elif tipo_acesso == 'aprovador':
+                is_aprovador_express = True
+                if not cargo:
+                    cargo = 'Engenheiro Aprovador'
+            elif tipo_acesso == 'funcionario':
+                if not cargo:
+                    cargo = 'Técnico de Campo'
+            elif tipo_acesso == 'visualizador':
+                if not cargo:
+                    cargo = 'Visualizador'
+
+            if 'is_master' in data:
+                is_master = bool(data['is_master'])
+            if 'is_aprovador_express' in data:
+                is_aprovador_express = bool(data['is_aprovador_express'])
+
+            new_user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                nome_completo=nome_completo,
+                cargo=cargo,
+                telefone=telefone,
+                is_master=is_master,
+                is_aprovador_express=is_aprovador_express,
+                ativo=bool(data.get('ativo', True))
+            )
+            db.session.add(new_user)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Usuário {username} criado com sucesso!',
+                'user': {
+                    'id': new_user.id,
+                    'username': new_user.username,
+                    'email': new_user.email,
+                    'nome_completo': new_user.nome_completo,
+                    'cargo': new_user.cargo,
+                    'telefone': new_user.telefone,
+                    'is_master': new_user.is_master,
+                    'is_aprovador_express': new_user.is_aprovador_express,
+                    'ativo': new_user.ativo,
+                    'tipo_acesso': tipo_acesso
+                }
+            }), 201
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Erro ao criar usuario: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # GET
+    try:
+        users = User.query.order_by(User.nome_completo.asc(), User.username.asc()).all()
+        result = []
+        for u in users:
+            if u.username == 'admin' or (u.is_master and 'admin' in (u.cargo or '').lower()):
+                tipo = 'admin'
+            elif u.is_master:
+                tipo = 'master'
+            elif u.is_aprovador_express or 'aprovad' in (u.cargo or '').lower():
+                tipo = 'aprovador'
+            elif 'visualiza' in (u.cargo or '').lower() or 'client' in (u.cargo or '').lower():
+                tipo = 'visualizador'
+            else:
+                tipo = 'funcionario'
+
+            result.append({
+                'id': u.id,
+                'username': u.username,
+                'email': u.email,
+                'nome_completo': u.nome_completo or u.username,
+                'cargo': u.cargo or '',
+                'telefone': u.telefone or '',
+                'is_master': bool(u.is_master),
+                'is_aprovador_express': bool(u.is_aprovador_express),
+                'ativo': bool(u.ativo),
+                'tipo_acesso': tipo,
+                'created_at': u.created_at.isoformat() if u.created_at else None
+            })
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/users/<int:user_id>', methods=['GET', 'PUT', 'DELETE'])
+@csrf.exempt
+def api_users_detail(user_id):
+    """Edição e exclusão de usuário pelo APK - Restrito a Admin/Master"""
+    user_req = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    is_master_or_admin = (
+        (user_req and user_req.is_master) or 
+        (user_req and user_req.username == 'admin') or
+        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
+    )
+    if not is_master_or_admin:
+        return jsonify({'success': False, 'error': 'Acesso restrito a Administradores do sistema.'}), 403
+
+    target_user = User.query.get(user_id)
+    if not target_user:
+        return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
+
+    if request.method == 'DELETE':
+        if target_user.username == 'admin':
+            return jsonify({'success': False, 'error': 'O usuário administrador principal não pode ser excluído.'}), 400
+        try:
+            target_user.ativo = False
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'Usuário {target_user.username} desativado com sucesso.'}), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    if request.method == 'PUT':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            
+            if 'username' in data and data['username']:
+                new_un = data['username'].strip().lower()
+                existing = User.query.filter_by(username=new_un).first()
+                if existing and existing.id != target_user.id:
+                    return jsonify({'success': False, 'error': 'Nome de usuário já em uso.'}), 400
+                target_user.username = new_un
+
+            if 'email' in data and data['email']:
+                new_em = data['email'].strip().lower()
+                existing = User.query.filter_by(email=new_em).first()
+                if existing and existing.id != target_user.id:
+                    return jsonify({'success': False, 'error': 'E-mail já em uso.'}), 400
+                target_user.email = new_em
+
+            if 'nome_completo' in data:
+                target_user.nome_completo = (data['nome_completo'] or '').strip()
+
+            if 'cargo' in data:
+                target_user.cargo = (data['cargo'] or '').strip()
+
+            if 'telefone' in data:
+                target_user.telefone = (data['telefone'] or '').strip()
+
+            if 'ativo' in data:
+                if target_user.username == 'admin' and not data['ativo']:
+                    pass
+                else:
+                    target_user.ativo = bool(data['ativo'])
+
+            tipo_acesso = data.get('tipo_acesso')
+            if tipo_acesso:
+                if tipo_acesso in ['admin', 'master']:
+                    target_user.is_master = True
+                    target_user.is_aprovador_express = True
+                elif tipo_acesso == 'aprovador':
+                    target_user.is_master = False
+                    target_user.is_aprovador_express = True
+                elif tipo_acesso in ['funcionario', 'visualizador']:
+                    target_user.is_master = False
+                    target_user.is_aprovador_express = False
+
+            if 'is_master' in data:
+                target_user.is_master = bool(data['is_master'])
+
+            if 'is_aprovador_express' in data:
+                target_user.is_aprovador_express = bool(data['is_aprovador_express'])
+
+            if data.get('password'):
+                target_user.password_hash = generate_password_hash(data['password'])
+
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Usuário {target_user.username} atualizado com sucesso!',
+                'user': {
+                    'id': target_user.id,
+                    'username': target_user.username,
+                    'email': target_user.email,
+                    'nome_completo': target_user.nome_completo,
+                    'cargo': target_user.cargo,
+                    'is_master': target_user.is_master,
+                    'is_aprovador_express': target_user.is_aprovador_express,
+                    'ativo': target_user.ativo
+                }
+            }), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # GET detail
+    return jsonify({
+        'id': target_user.id,
+        'username': target_user.username,
+        'email': target_user.email,
+        'nome_completo': target_user.nome_completo,
+        'cargo': target_user.cargo,
+        'telefone': target_user.telefone,
+        'is_master': target_user.is_master,
+        'is_aprovador_express': target_user.is_aprovador_express,
+        'ativo': target_user.ativo
+    }), 200
 
 # --- LEMBRETES ---
 @app.route('/api/lembrete/criar', methods=['POST'])

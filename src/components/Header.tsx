@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNetwork } from '../contexts/NetworkContext';
@@ -29,15 +29,21 @@ export const Header: React.FC<HeaderProps> = ({
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent />
       <View style={styles.left}>
-        {showBack && (
+        {showBack ? (
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
+        ) : (
+          <Image 
+            source={require('../../assets/logo.png')} 
+            style={styles.headerLogo} 
+            resizeMode="contain" 
+          />
         )}
-        <View>
-          <Text style={styles.title}>{title}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
           {subtitle ? (
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
           ) : (
             <View style={styles.statusIndicator}>
               <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
@@ -82,6 +88,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+  },
+  headerLogo: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
   },
   backButton: {
     padding: 4,
