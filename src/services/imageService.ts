@@ -63,7 +63,7 @@ export async function savePhotoToDeviceGallery(
   photoUri: string,
   projectName?: string,
   filename?: string
-): Promise<MediaLibrary.Asset | null> {
+): Promise<any> {
   if (Platform.OS === 'web' || !photoUri) return null;
 
   // Evita re-salvar a mesma foto múltiplas vezes

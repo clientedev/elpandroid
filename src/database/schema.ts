@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS relatorios (
 CREATE TABLE IF NOT EXISTS fotos_relatorio (
   id INTEGER PRIMARY KEY,
   relatorio_id INTEGER NOT NULL,
+  relatorio_uuid TEXT,
   url TEXT,
   filename TEXT,
   uri_local TEXT,

@@ -116,6 +116,7 @@ export interface Relatorio {
 export interface FotoRelatorio {
   id: number;
   relatorio_id: number;
+  relatorio_uuid?: string;
   url?: string;
   filename?: string;
   uri_local?: string;

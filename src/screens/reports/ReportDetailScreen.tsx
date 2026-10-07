@@ -39,7 +39,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     try {
       const r = await getLocalRelatorioById(reportId);
       setRelatorio(r);
-      const f = await getLocalFotos(reportId);
+      const f = await getLocalFotos(reportId, r?.uuid);
       setFotos(f);
     } catch (e) {
       console.warn('Erro ao carregar relatório:', e);

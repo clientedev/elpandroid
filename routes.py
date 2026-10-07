@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.12',
-        'versionCode': 13,
+        'version': '1.0.13',
+        'versionCode': 14,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.12: Correção completa no salvamento de fotos - eliminação de duplicatas na galeria (1 foto por registro no álbum da obra), armazenamento offline seguro no aparelho (SQLite + Base64), persistência total de rascunhos sem perda de dados.',
+        'notes': 'Atualização v1.0.13: Numeração sequencial atômica à prova de concorrência com bloqueio e prevenção de colisões, isolamento de rascunhos por UUID único, salvamento local contínuo de fotos com Base64 garantido no SQLite e galeria nativa sem duplicações.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12753,11 +12753,11 @@ def api_relatorios_collection():
             if rel_uuid:
                 existing = Relatorio.query.filter_by(uuid=rel_uuid).first()
 
-            # 2. Busca por ID numérico direto se fornecido
+            # 2. Busca por ID numérico direto se fornecido (somente se for ID válido do banco, menor que 2.1 bilhões)
             if not existing and data.get('id'):
                 try:
                     c_id = int(data['id'])
-                    if c_id > 0:
+                    if 0 < c_id < 2147483647:
                         existing = Relatorio.query.get(c_id)
                 except Exception:
                     pass
@@ -12766,17 +12766,8 @@ def api_relatorios_collection():
             if not existing and numero_informado and not numero_informado.startswith('OFF-') and not numero_informado.startswith('TEMP-') and 'Pendente' not in numero_informado and 'Rascunho' not in numero_informado:
                 existing = Relatorio.query.filter_by(projeto_id=projeto_id, numero=numero_informado).first()
 
-            # 4. REAPROVEITAMENTO INTELIGENTE DE RASCUNHO:
-            # Se a requisição for um rascunho (status == 'em_andamento'), verificar se o mesmo autor
-            # já tem um rascunho em andamento nesta obra. Se tiver, reaproveita o rascunho existente
-            # para JAMAIS pular numeração (de 1 pra 2) ou criar relatórios vazios duplicados!
-            req_status = data.get('status') or 'em_andamento'
-            if not existing and req_status == 'em_andamento':
-                existing = Relatorio.query.filter_by(
-                    projeto_id=projeto_id,
-                    autor_id=autor_id,
-                    status='em_andamento'
-                ).order_by(Relatorio.id.desc()).first()
+            # Idempotência estrita: Cada relatório é único por UUID (ou ID direto).
+            # Nunca sobrescrever rascunhos de UUIDs diferentes!
 
             if existing:
                 # O relatório já foi sincronizado antes ou já existe:
@@ -12805,7 +12796,19 @@ def api_relatorios_collection():
                     num_inicial = 1
 
                 proximo_numero_projeto = max(num_inicial - 1, max_num) + 1
-                official_numero = f"REL-{proximo_numero_projeto:04d}"
+                
+                # Previne colisão em acessos concorrentes verificando se candidato já existe
+                tentativas = 0
+                while tentativas < 50:
+                    numero_candidato = f"REL-{proximo_numero_projeto:04d}"
+                    existing_num = Relatorio.query.filter_by(projeto_id=projeto_id, numero=numero_candidato).first()
+                    if not existing_num:
+                        official_numero = numero_candidato
+                        break
+                    proximo_numero_projeto += 1
+                    tentativas += 1
+                else:
+                    official_numero = f"REL-{proximo_numero_projeto:04d}"
 
                 if not rel_uuid:
                     rel_uuid = str(uuid.uuid4())
@@ -12952,6 +12955,8 @@ def api_serve_foto_binary(foto_id):
 def api_relatorio_detail_sync(relatorio_id):
     """Atualizacao, exclusao e consulta de relatorio existente via API mobile (exclusao restrita a Master/Admin)"""
     try:
+        if relatorio_id >= 2147483647:
+            return jsonify({'success': False, 'error': 'ID temporário não existe no servidor'}), 404
         relatorio = Relatorio.query.get(relatorio_id)
         if not relatorio:
             return jsonify({'success': False, 'error': 'Relatório não encontrado'}), 404

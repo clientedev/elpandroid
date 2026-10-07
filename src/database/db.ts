@@ -25,6 +25,9 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
   try {
     await db.execAsync('ALTER TABLE fotos_relatorio ADD COLUMN base64 TEXT;');
   } catch {}
+  try {
+    await db.execAsync('ALTER TABLE fotos_relatorio ADD COLUMN relatorio_uuid TEXT;');
+  } catch {}
 
   // Migration: ensure base64 and local exist in fotos_relatorio_express
   try {
@@ -303,8 +306,14 @@ export async function deleteLocalRelatorio(id: number): Promise<void> {
 
 // ================= FOTOS =================
 
-export async function getLocalFotos(relatorioId: number): Promise<FotoRelatorio[]> {
+export async function getLocalFotos(relatorioId: number, relatorioUuid?: string): Promise<FotoRelatorio[]> {
   const db = await getDatabase();
+  if (relatorioUuid) {
+    return await db.getAllAsync<FotoRelatorio>(
+      'SELECT * FROM fotos_relatorio WHERE relatorio_id = ? OR (relatorio_uuid IS NOT NULL AND relatorio_uuid = ?) ORDER BY ordem ASC',
+      [relatorioId, relatorioUuid]
+    );
+  }
   return await db.getAllAsync<FotoRelatorio>(
     'SELECT * FROM fotos_relatorio WHERE relatorio_id = ? ORDER BY ordem ASC',
     [relatorioId]
@@ -335,11 +344,11 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (
-      id, relatorio_id, url, filename, uri_local, titulo, legenda, descricao,
+      id, relatorio_id, relatorio_uuid, url, filename, uri_local, titulo, legenda, descricao,
       tipo_servico, local, ordem, anotacoes_dados, base64, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      f.id, f.relatorio_id, f.url || '', f.filename || '', f.uri_local || '',
+      f.id, f.relatorio_id, f.relatorio_uuid || null, f.url || '', f.filename || '', f.uri_local || '',
       f.titulo || '', f.legenda || '', f.descricao || '', f.tipo_servico || '',
       f.local || '', f.ordem || 0, f.anotacoes_dados || '', finalBase64, syncStatus
     ]
@@ -347,12 +356,19 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
 }
 
 /** Migra fotos no SQLite quando o ID provisório do relatório muda para o ID definitivo do servidor */
-export async function migrateLocalFotosRelatorioId(oldRelatorioId: number, newRelatorioId: number): Promise<void> {
-  if (!oldRelatorioId || !newRelatorioId || oldRelatorioId === newRelatorioId) return;
+export async function migrateLocalFotosRelatorioId(oldRelatorioId: number, newRelatorioId: number, uuid?: string): Promise<void> {
+  if (!oldRelatorioId || !newRelatorioId) return;
   const db = await getDatabase();
   try {
-    await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [newRelatorioId, oldRelatorioId]);
-    console.log(`[db] Fotos migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId}`);
+    if (uuid) {
+      await db.runAsync(
+        'UPDATE fotos_relatorio SET relatorio_id = ?, relatorio_uuid = ? WHERE relatorio_id = ? OR relatorio_uuid = ?',
+        [newRelatorioId, uuid, oldRelatorioId, uuid]
+      );
+    } else {
+      await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [newRelatorioId, oldRelatorioId]);
+    }
+    console.log(`[db] Fotos migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId} (uuid: ${uuid || 'none'})`);
   } catch (err) {
     console.warn('[db] Erro ao migrar fotos entre relatórios:', err);
   }

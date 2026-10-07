@@ -9,7 +9,7 @@ import {
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
   saveLocalReembolso, getLocalFotos, saveLocalFoto, 
   getLocalFotosExpress, saveLocalFotoExpress,
-  updateLocalRelatorioNumero, getDatabase
+  updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
 
@@ -215,9 +215,20 @@ class SyncService {
             await db.runAsync('UPDATE visitas SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'relatorio') {
             const officialNumero = response?.data?.numero;
-            const syncedAt = response?.data?.data_sincronizacao;
+            const syncedAt = response?.data?.data_sincronizacao || new Date().toISOString();
+            const serverId = response?.data?.id;
+            const serverUuid = response?.data?.uuid || payload.uuid;
             if (officialNumero) {
               await updateLocalRelatorioNumero(item.entity_id, officialNumero, syncedAt);
+            }
+            if (serverId && serverId !== item.entity_id) {
+              await migrateLocalFotosRelatorioId(item.entity_id, serverId, serverUuid);
+              const db = await getDatabase();
+              await db.runAsync(
+                'UPDATE relatorios SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", data_sincronizacao = ? WHERE id = ?',
+                [serverId, officialNumero || null, syncedAt, item.entity_id]
+              );
+              console.log(`[SyncService] Relatório local ${item.entity_id} migrado para ID servidor ${serverId}`);
             } else {
               await db.runAsync('UPDATE relatorios SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
             }
@@ -296,6 +307,7 @@ class SyncService {
               await saveLocalFoto({
                 id: f.id,
                 relatorio_id: r.id,
+                relatorio_uuid: r.uuid,
                 url: fullUrl,
                 filename: f.filename,
                 uri_local: fullUrl,

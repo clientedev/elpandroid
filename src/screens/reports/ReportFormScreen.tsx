@@ -11,7 +11,7 @@ import {
   getLocalProjetos, saveLocalRelatorio, saveLocalFoto, deleteLocalFoto,
   addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
   closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
-  migrateLocalFotosRelatorioId
+  migrateLocalFotosRelatorioId, getDatabase
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -183,75 +183,14 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   async function initImmediateDraft(projId: number) {
     try {
       const proj = projetos.find(p => p.id === projId);
-
-      // 1. Checar se já existe um rascunho em andamento deste autor nesta obra
-      const existingDraft = await getActiveDraft(projId, user?.id || 1);
-      if (existingDraft) {
-        setCurrentReportId(existingDraft.id);
-        if (existingDraft.uuid) setReportUuid(existingDraft.uuid);
-        setReportNumber(existingDraft.numero || 'Rascunho em Andamento');
-        setTitulo(existingDraft.titulo || 'Relatório de Vistoria Técnica');
-        if (existingDraft.data_relatorio) setDataVisita(existingDraft.data_relatorio.substring(0, 10));
-        setDescricao(existingDraft.descricao || '');
-        setObservacoesFinais(existingDraft.observacoes_finais || '');
-        setCategoria(existingDraft.categoria || 'Geral');
-        setLocal(existingDraft.local || 'Fachada Principal');
-        if (existingDraft.checklist_data) {
-          try {
-            setChecklist(JSON.parse(existingDraft.checklist_data));
-          } catch {}
-        }
-        const savedFotos = await getLocalFotos(existingDraft.id);
-        if (savedFotos && savedFotos.length > 0) {
-          setFotos(savedFotos);
-        }
-        const d = new Date();
-        setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        return;
-      }
-
-      // 2. Se não existir rascunho anterior, inicia um novo de forma idempotente
-      let draftId = currentReportId;
       const initialUuid = reportUuid;
       const creationDate = new Date().toISOString();
 
-      let assignedNumero = 'Rascunho Pendente';
-      let syncStatus: 'synced' | 'pending' = 'pending';
-
-      if (isOnline) {
-        try {
-          const res = await apiClient.axios.post('/api/relatorios', {
-            uuid: initialUuid,
-            uuid_local: initialUuid,
-            projeto_id: projId,
-            titulo: titulo || 'Relatório de Vistoria Técnica',
-            status: 'em_andamento',
-            data_criacao_local: creationDate,
-            autor_id: user?.id,
-          }, { timeout: 7000 });
-
-          if (res?.data?.numero) {
-            assignedNumero = res.data.numero;
-            syncStatus = 'synced';
-            setReportNumber(assignedNumero);
-            if (res.data.id && res.data.id !== currentReportId) {
-              const oldId = currentReportId;
-              draftId = res.data.id;
-              setCurrentReportId(draftId);
-              await migrateLocalFotosRelatorioId(oldId, draftId);
-              setFotos(prev => prev.map(f => ({ ...f, relatorio_id: draftId })));
-            }
-          }
-        } catch (netErr) {
-          console.warn('[ReportForm] Criação online indisponível, iniciando rascunho offline:', netErr);
-        }
-      }
-
       const draftObj: Relatorio = {
-        id: draftId,
+        id: currentReportId,
         uuid: initialUuid,
         uuid_local: initialUuid,
-        numero: assignedNumero,
+        numero: 'Rascunho',
         titulo: titulo || 'Relatório de Vistoria Técnica',
         projeto_id: projId,
         projeto_nome: proj?.nome || 'Obra',
@@ -266,15 +205,15 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         categoria: categoria,
         local: local,
         status: 'em_andamento',
-        sync_status: syncStatus,
+        sync_status: 'pending',
       };
 
-      await saveLocalRelatorio(draftObj, syncStatus);
+      await saveLocalRelatorio(draftObj, 'pending');
 
       const d = new Date();
       setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     } catch (e) {
-      console.warn('Erro ao inicializar rascunho imediato:', e);
+      console.warn('Erro ao inicializar rascunho local:', e);
     }
   }
 
@@ -298,7 +237,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               setChecklist(JSON.parse(r.checklist_data));
             } catch {}
           }
-          const savedFotos = await getLocalFotos(r.id);
+          const savedFotos = await getLocalFotos(r.id, r.uuid);
           if (savedFotos && savedFotos.length > 0) {
             setFotos(savedFotos);
           }
@@ -363,6 +302,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           const fObj: FotoRelatorio = {
             ...fotos[i],
             relatorio_id: currentReportId,
+            relatorio_uuid: reportUuid,
             ordem: i,
             base64: b64,
           };
@@ -376,9 +316,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         // 3. Sincronização em tempo real com o servidor Railway se conectado
         if (isOnline) {
           try {
-            if (currentReportId > 0) {
-              // PUT: atualizar rascunho existente no servidor
-              // Envia autor_id para que o backend resolva o usuário corretamente
+            const isServerId = currentReportId > 0 && currentReportId < 2000000000;
+            if (isServerId) {
+              // PUT: atualizar relatório existente no servidor
               await apiClient.axios.put(`/api/relatorios/${currentReportId}`, {
                 ...draft,
                 autor_id: user?.id,
@@ -387,9 +327,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               // Marca como synced no local
               await saveLocalRelatorio({ ...draft, sync_status: 'synced' }, 'synced');
             } else {
-              // POST: criar novo rascunho no servidor
+              // POST: criar novo relatório no servidor com o UUID
               const res = await apiClient.axios.post('/api/relatorios', {
                 ...draft,
+                uuid: reportUuid,
+                uuid_local: reportUuid,
                 autor_id: user?.id,
                 fotos: preparedFotos,
               }, { timeout: 12000 });
@@ -401,7 +343,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                 setCurrentReportId(serverId);
                 setReportNumber(serverNumero);
                 if (oldId !== serverId) {
-                  await migrateLocalFotosRelatorioId(oldId, serverId);
+                  await migrateLocalFotosRelatorioId(oldId, serverId, reportUuid);
+                  const db = await getDatabase();
+                  await db.runAsync('DELETE FROM relatorios WHERE id = ?', [oldId]);
                   setFotos(prev => prev.map(f => ({ ...f, relatorio_id: serverId })));
                 }
                 await saveLocalRelatorio({ ...draft, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
@@ -439,6 +383,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       const newFoto: FotoRelatorio = {
         id: Date.now(),
         relatorio_id: currentReportId,
+        relatorio_uuid: reportUuid,
         uri_local: photo.uri,
         base64: b64,
         ordem: fotos.length,
@@ -462,6 +407,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       const newFoto: FotoRelatorio = {
         id: Date.now(),
         relatorio_id: currentReportId,
+        relatorio_uuid: reportUuid,
         uri_local: photo.uri,
         base64: b64,
         ordem: fotos.length,
@@ -608,21 +554,61 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         await saveLocalFoto({
           ...f,
           relatorio_id: reportId,
+          relatorio_uuid: reportUuid,
           ordem: i,
         }, 'pending');
       }
 
-      // 3. Queue sync operation for Railway backend
-      await addToSyncQueue(
-        'relatorio',
-        reportId,
-        'create',
-        '/api/relatorios',
-        'POST',
-        relData
-      );
+      // 3. Sincronização ou enfileiramento inteligente
+      const isServerId = reportId > 0 && reportId < 2000000000;
+      if (isOnline) {
+        try {
+          if (isServerId) {
+            await apiClient.axios.put(`/api/relatorios/${reportId}`, {
+              ...relData,
+              autor_id: user?.id,
+            }, { timeout: 12000 });
+            await saveLocalRelatorio({ ...relData, sync_status: 'synced' }, 'synced');
+          } else {
+            const preparedFotos = fotos.map((f, i) => ({ ...f, relatorio_id: reportId, relatorio_uuid: reportUuid, ordem: i, imagem_base64: f.base64 }));
+            const res = await apiClient.axios.post('/api/relatorios', {
+              ...relData,
+              uuid: reportUuid,
+              uuid_local: reportUuid,
+              autor_id: user?.id,
+              fotos: preparedFotos,
+            }, { timeout: 12000 });
 
-      if (isOnline) triggerSync();
+            if (res?.data?.id) {
+              const serverId = res.data.id;
+              const serverNumero = res.data.numero;
+              await migrateLocalFotosRelatorioId(reportId, serverId, reportUuid);
+              const db = await getDatabase();
+              await db.runAsync('DELETE FROM relatorios WHERE id = ?', [reportId]);
+              await saveLocalRelatorio({ ...relData, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
+            }
+          }
+        } catch (netErr) {
+          console.warn('[ReportForm] Envio online falhou, adicionando à fila offline:', netErr);
+          await addToSyncQueue(
+            'relatorio',
+            reportId,
+            isServerId ? 'update' : 'create',
+            isServerId ? `/api/relatorios/${reportId}` : '/api/relatorios',
+            isServerId ? 'PUT' : 'POST',
+            relData
+          );
+        }
+      } else {
+        await addToSyncQueue(
+          'relatorio',
+          reportId,
+          isServerId ? 'update' : 'create',
+          isServerId ? `/api/relatorios/${reportId}` : '/api/relatorios',
+          isServerId ? 'PUT' : 'POST',
+          relData
+        );
+      }
 
       Alert.alert(
         'Sucesso!', 
