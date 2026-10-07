@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.10',
-        'versionCode': 11,
+        'version': '1.0.11',
+        'versionCode': 12,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.10: Salvamento automático de fotos em tempo real no SQLite e servidor com Base64; Indicador em tempo real do usuário interagindo no relatório; Correção na criação e preservação de rascunhos para evitar salto de numeração; Ordenação de todos os relatórios estritamente do mais recente para o mais antigo.',
+        'notes': 'Atualização 1.0.11: Fotos salvas automaticamente na Galeria Nativa (Álbuns ELP e pastas por Obra), sincronização e rascunhos corrigidos sem perda de dados.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 

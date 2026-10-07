@@ -133,15 +133,18 @@ class UpdateService {
             await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
           }
 
+          const serverVersionCode = Number(res.data.versionCode || 0);
+          const currentVersionCode = Number(Constants.expoConfig?.android?.versionCode ?? 11);
+
           // A genuinely new deploy is detected if:
           // 1. The server deploy ID changed from what we previously saw, and has not been dismissed
-          // 2. OR server has a strictly higher semver version than the installed app
+          // 2. OR server has a strictly higher semver version or versionCode than the installed app
           const isNewDeploy = Boolean(
             lastSeenDeployId && 
             lastSeenDeployId !== serverDeployId && 
             dismissedDeployId !== serverDeployId
           );
-          const hasHigherVersion = isVersionGreater(serverVersion, currentVersion);
+          const hasHigherVersion = isVersionGreater(serverVersion, currentVersion) || (serverVersionCode > currentVersionCode);
 
           // Prompt if manual check, newer version available, or new un-dismissed deploy
           const shouldPrompt = manual || hasHigherVersion || isNewDeploy;
