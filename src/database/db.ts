@@ -193,13 +193,14 @@ export async function saveLocalVisita(v: Visita, syncStatus: 'synced' | 'pending
 // ================= RELATORIOS =================
 export async function getLocalRelatorios(projetoId?: number): Promise<Relatorio[]> {
   const db = await getDatabase();
+  // IMPORTANTE: GROUP BY r.id (chave primária) para não perder rascunhos com mesmo uuid/numero
   let query = 'SELECT r.*, COUNT(f.id) as fotos_count FROM relatorios r LEFT JOIN fotos_relatorio f ON r.id = f.relatorio_id';
   const params: any[] = [];
   if (projetoId) {
     query += ' WHERE r.projeto_id = ?';
     params.push(projetoId);
   }
-  query += ' GROUP BY COALESCE(NULLIF(r.uuid, ""), NULLIF(r.numero, ""), r.id) ORDER BY COALESCE(r.updated_at, r.data_criacao_local, r.data_relatorio) DESC, r.id DESC';
+  query += ' GROUP BY r.id ORDER BY COALESCE(r.updated_at, r.data_criacao_local, r.data_relatorio) DESC, r.id DESC';
   return await db.getAllAsync<Relatorio>(query, params);
 }
 
@@ -210,8 +211,12 @@ export async function getLocalRelatorioById(id: number): Promise<Relatorio | nul
 
 export async function getActiveDraft(projetoId: number, autorId: number): Promise<Relatorio | null> {
   const db = await getDatabase();
+  // Busca o rascunho mais recente em andamento deste autor nesta obra
   return await db.getFirstAsync<Relatorio>(
-    `SELECT * FROM relatorios WHERE projeto_id = ? AND autor_id = ? AND status = 'em_andamento' ORDER BY COALESCE(updated_at, data_criacao_local, data_relatorio) DESC, id DESC LIMIT 1`,
+    `SELECT * FROM relatorios 
+     WHERE projeto_id = ? AND autor_id = ? AND status = 'em_andamento' 
+     ORDER BY COALESCE(updated_at, data_criacao_local, data_relatorio) DESC, id DESC 
+     LIMIT 1`,
     [projetoId, autorId]
   );
 }
@@ -219,20 +224,20 @@ export async function getActiveDraft(projetoId: number, autorId: number): Promis
 export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
 
-  // Deduplicação Atômica: Se já existir rascunho com o mesmo UUID ou Número oficial
+  // Deduplicação segura: apenas reconcilia se UUID do registro DIFERENTE do ID atual
+  // Evita apagar registros legítimos quando IDs locais temporários coincidem
   try {
-    let existing: { id: number } | null = null;
-    if (r.uuid) {
-      existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios WHERE uuid = ?', [r.uuid]);
-    }
-    if (!existing && r.numero && !r.numero.includes('Pendente')) {
-      existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios WHERE numero = ?', [r.numero]);
-    }
-    if (existing && existing.id !== r.id) {
-      // Reconcilia fotos vinculadas do ID temporário para o novo ID
-      await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [r.id, existing.id]);
-      // Remove o registro duplicado antigo
-      await db.runAsync('DELETE FROM relatorios WHERE id = ?', [existing.id]);
+    if (r.uuid && r.uuid.length > 0) {
+      const byUuid = await db.getFirstAsync<{ id: number }>(
+        'SELECT id FROM relatorios WHERE uuid = ? AND id != ?', 
+        [r.uuid, r.id]
+      );
+      if (byUuid) {
+        // Migra fotos do registro duplicado para o atual
+        await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [r.id, byUuid.id]);
+        await db.runAsync('DELETE FROM relatorios WHERE id = ?', [byUuid.id]);
+        console.log(`[db] Dedup: registro ${byUuid.id} mesclado no ${r.id}`);
+      }
     }
   } catch (dedupErr) {
     console.warn('[db] Aviso na deduplicação de relatório:', dedupErr);

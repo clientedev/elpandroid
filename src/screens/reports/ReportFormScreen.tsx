@@ -62,6 +62,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [currentReportId, setCurrentReportId] = useState<number>(initialReportId || Date.now());
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  // Ref para acessar projetos no autosave sem gerar re-renders/re-trigger do efeito
+  const projetosRef = React.useRef<Projeto[]>([]);
 
   // 1º Campo Superior: Data da Visita (editável no topo)
   const [dataVisita, setDataVisita] = useState(new Date().toISOString().substring(0, 10));
@@ -151,6 +153,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           return distA - distB;
         });
       }
+      // Atualiza o ref primeiro (para uso no autosave sem trigger de re-render)
+      projetosRef.current = sortedProjs;
       setProjetos(sortedProjs);
       if (!selectedProjectId && sortedProjs.length > 0 && !preSelectedProjectId && !initialReportId) {
         setSelectedProjectId(sortedProjs[0].id);
@@ -159,15 +163,21 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     getLocalLegendas().then(l => setLegendas(l));
   }, [preSelectedProjectId, initialReportId, userLocation]);
 
+  // Manter ref em sincronia quando projetos mudar
+  useEffect(() => {
+    projetosRef.current = projetos;
+  }, [projetos]);
+
   const selectedProj = projetos.find(p => p.id === selectedProjectId);
 
   // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
+  // Depende de projetos ESTAR CARREGADO para funcionar corretamente
   useEffect(() => {
-    if (!initialReportId && selectedProjectId && !initializedDraftRef.current) {
+    if (!initialReportId && selectedProjectId && !initializedDraftRef.current && projetos.length > 0) {
       initializedDraftRef.current = true;
       initImmediateDraft(selectedProjectId);
     }
-  }, [selectedProjectId, initialReportId]);
+  }, [selectedProjectId, initialReportId, projetos]);
 
   async function initImmediateDraft(projId: number) {
     try {
@@ -300,13 +310,16 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [selectedProjectId]);
 
   // Mecanismo de AutoSave a cada 2 segundos após parar de digitar (debounce de 2000ms conforme Regra do Manual)
+  // IMPORTANTE: NÃO incluir `projetos` nas dependências para evitar re-trigger ao carregar a lista!
+  // Use `projetosRef.current` para acessar a lista de projetos sem causar re-render.
   useEffect(() => {
     if (!selectedProjectId) return;
 
     const timer = setTimeout(async () => {
       try {
         setIsAutoSaving(true);
-        const proj = projetos.find(p => p.id === selectedProjectId);
+        // Usa ref para não disparar o efeito ao carregar projetos
+        const proj = projetosRef.current.find(p => p.id === selectedProjectId);
         const draft: Relatorio = {
           id: currentReportId,
           uuid: reportUuid,
@@ -326,18 +339,22 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           categoria: categoria,
           local: local,
           status: 'em_andamento',
-          sync_status: isOnline ? 'synced' : 'pending',
+          sync_status: 'pending',
         };
 
-        // 1. Salva no SQLite local
-        await saveLocalRelatorio(draft, isOnline ? 'synced' : 'pending');
+        // 1. Salva SEMPRE no SQLite local primeiro (garantia de persistência offline)
+        await saveLocalRelatorio(draft, 'pending');
 
         // 2. Persistir todas as fotos no SQLite com Base64 garantido
         const preparedFotos: any[] = [];
         for (let i = 0; i < fotos.length; i++) {
           let b64 = fotos[i].base64;
           if (!b64 && fotos[i].uri_local && !fotos[i].uri_local?.startsWith('http')) {
-            b64 = await readPhotoBase64(fotos[i].uri_local!);
+            try {
+              b64 = await readPhotoBase64(fotos[i].uri_local!);
+            } catch (b64Err) {
+              console.warn('[AutoSave] Erro ao ler base64 da foto:', b64Err);
+            }
           }
           const fObj: FotoRelatorio = {
             ...fotos[i],
@@ -345,7 +362,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             ordem: i,
             base64: b64,
           };
-          await saveLocalFoto(fObj, isOnline ? 'synced' : 'pending');
+          await saveLocalFoto(fObj, 'pending');
           preparedFotos.push({
             ...fObj,
             imagem_base64: b64,
@@ -356,32 +373,36 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         if (isOnline) {
           try {
             if (currentReportId > 0) {
+              // PUT: atualizar rascunho existente no servidor
+              // Envia autor_id para que o backend resolva o usuário corretamente
               await apiClient.axios.put(`/api/relatorios/${currentReportId}`, {
                 ...draft,
-                user_id: user?.id,
+                autor_id: user?.id,
                 fotos: preparedFotos,
               }, { timeout: 12000 });
+              // Marca como synced no local
+              await saveLocalRelatorio({ ...draft, sync_status: 'synced' }, 'synced');
             } else {
+              // POST: criar novo rascunho no servidor
               const res = await apiClient.axios.post('/api/relatorios', {
                 ...draft,
-                user_id: user?.id,
+                autor_id: user?.id,
                 fotos: preparedFotos,
               }, { timeout: 12000 });
 
-              if (res?.data?.id && res.data.id !== currentReportId) {
+              if (res?.data?.id) {
                 const serverId = res.data.id;
+                const serverNumero = res.data.numero || draft.numero;
                 setCurrentReportId(serverId);
-                if (res.data.numero) {
-                  setReportNumber(res.data.numero);
-                }
-                await saveLocalRelatorio({ ...draft, id: serverId, numero: res.data.numero || draft.numero }, 'synced');
+                setReportNumber(serverNumero);
+                await saveLocalRelatorio({ ...draft, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
                 for (const f of preparedFotos) {
-                  await saveLocalFoto({ ...f, relatorio_id: serverId }, 'synced');
+                  await saveLocalFoto({ ...f, relatorio_id: serverId, sync_status: 'synced' }, 'synced');
                 }
               }
             }
           } catch (netSaveErr) {
-            console.warn('[ReportForm] AutoSave online aviso:', netSaveErr);
+            console.warn('[ReportForm] AutoSave online aviso (continuando offline):', netSaveErr);
           }
         }
 
@@ -395,7 +416,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos, isOnline]);
+  // ATENÇÃO: `projetos` PROPOSITALMENTE removido das dependências - usar projetosRef.current!
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, isOnline]);
 
   async function handleAddPhotoCamera() {
     const photo = await takePhoto(selectedProj?.nome);
