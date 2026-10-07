@@ -43,28 +43,21 @@ async function ensureDir(path: string): Promise<boolean> {
  */
 export async function ensureObraDirectory(projectName?: string): Promise<string> {
   if (!docDir) return '';
-  const base   = docDir.endsWith('/') ? docDir : `${docDir}/`;
-  const rootDir = `${base}ELP RELATORIOS/`;
-  const obraDir = `${rootDir}${safeName(projectName)}/`;
-  await ensureDir(rootDir);
+  const base = docDir.endsWith('/') ? docDir : `${docDir}/`;
+  const cleanObra = (projectName || 'Obra_Geral').replace(/[^a-zA-Z0-9_-]/g, '_');
+  const obraDir = `${base}ELP_RELATORIOS_${cleanObra}/`;
   await ensureDir(obraDir);
   return obraDir;
 }
 
+// ─── Cache de URIs para evitar duplicação ──────────────────────────────────
+const savedGalleryUris = new Set<string>();
+
 /**
- * Salva a foto na galeria nativa do Android/iOS com organização em pastas:
- *   Android: DCIM/ELP/<NomeObra>/  →  aparece na galeria nativa
- *   iOS: Álbum "ELP - <NomeObra>"
- *
- * Fluxo Android:
- *  1. Pede permissão MediaLibrary
- *  2. Copia o arquivo para DCIM/ELP/<NomeObra>/<filename>.jpg
- *  3. Escaneia via createAssetAsync → aparece na galeria nativa organizado
- *  4. Adiciona ao álbum "ELP - <NomeObra>" na galeria (aba Álbuns)
- *
- * Fluxo iOS:
- *  1. Cria asset diretamente do photoUri
- *  2. Adiciona ao álbum "ELP - <NomeObra>"
+ * Salva a foto na galeria nativa do dispositivo sem duplicações:
+ * - Cria 1 único asset na galeria nativa
+ * - Move/Organiza no álbum correspondente ("ELP - Nome da Obra" ou "ELP")
+ * - Deduplica por URI para nunca salvar a mesma foto mais de uma vez
  */
 export async function savePhotoToDeviceGallery(
   photoUri: string,
@@ -72,6 +65,12 @@ export async function savePhotoToDeviceGallery(
   filename?: string
 ): Promise<MediaLibrary.Asset | null> {
   if (Platform.OS === 'web' || !photoUri) return null;
+
+  // Evita re-salvar a mesma foto múltiplas vezes
+  if (savedGalleryUris.has(photoUri)) {
+    return null;
+  }
+  savedGalleryUris.add(photoUri);
 
   try {
     const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -81,82 +80,30 @@ export async function savePhotoToDeviceGallery(
     }
 
     const obraName  = safeName(projectName);
-    const albumName = `ELP - ${obraName}`;
-    const fname     = filename || `elp_foto_${Date.now()}.jpg`;
+    const albumName = projectName && projectName.trim() ? `ELP - ${obraName}` : ROOT_ALBUM;
 
-    let assetUri = photoUri;
-
-    // ── Android: copia para DCIM/ELP/<Obra>/ antes de criar asset ─────────
-    if (Platform.OS === 'android') {
-      const publicUri = await _copyToPublicAndroid(photoUri, obraName, fname);
-      if (publicUri) {
-        assetUri = publicUri;
-      }
-    }
-
-    // Cria asset na galeria nativa
-    const asset = await MediaLibrary.createAssetAsync(assetUri);
+    // 1. Cria 1 único asset diretamente no MediaStore do dispositivo
+    const asset = await MediaLibrary.createAssetAsync(photoUri);
     if (!asset) return null;
 
-    // Adiciona ao álbum da obra
+    // 2. Organiza o asset no álbum da obra na galeria (sem gerar duplicata física)
     try {
       let album = await MediaLibrary.getAlbumAsync(albumName);
       if (!album) {
-        album = await MediaLibrary.createAlbumAsync(albumName, asset, false);
+        await MediaLibrary.createAlbumAsync(albumName, asset, false);
       } else {
         await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
       }
     } catch (albumErr) {
-      console.warn(`[Gallery] Erro ao criar álbum "${albumName}":`, albumErr);
+      console.warn(`[Gallery] Erro ao vincular foto ao álbum "${albumName}":`, albumErr);
     }
 
-    // Adiciona também ao álbum raiz "ELP"
-    try {
-      let rootAlbum = await MediaLibrary.getAlbumAsync(ROOT_ALBUM);
-      if (!rootAlbum) {
-        await MediaLibrary.createAlbumAsync(ROOT_ALBUM, asset, false);
-      } else {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], rootAlbum, false);
-      }
-    } catch {}
-
-    console.log(`[Gallery] ✅ Foto salva na galeria: álbum "${albumName}" — ${fname}`);
+    console.log(`[Gallery] ✅ Foto única salva no álbum "${albumName}" com sucesso.`);
     return asset;
   } catch (err) {
     console.error('[Gallery] Erro ao salvar foto na galeria:', err);
     return null;
   }
-}
-
-/**
- * Copia foto para DCIM/ELP/<NomeObra>/ no Android (pasta pública visível na galeria).
- * Tenta DCIM primeiro, depois Pictures como fallback.
- * Retorna a URI pública se bem-sucedido, null caso contrário.
- */
-async function _copyToPublicAndroid(
-  sourceUri: string,
-  obraName: string,
-  filename: string
-): Promise<string | null> {
-  const candidates = [
-    `${DCIM_ROOT}${obraName}/`,
-    `${PICS_ROOT}${obraName}/`,
-  ];
-
-  for (const dirPath of candidates) {
-    try {
-      const ok = await ensureDir(dirPath);
-      if (!ok) continue;
-
-      const destUri = `${dirPath}${filename}`;
-      await (FileSystem as any).copyAsync({ from: sourceUri, to: destUri });
-      console.log(`[Gallery] Arquivo copiado para pasta pública: ${destUri}`);
-      return destUri;
-    } catch (e) {
-      console.warn(`[Gallery] Falha ao copiar para ${dirPath}:`, e);
-    }
-  }
-  return null;
 }
 
 /**
@@ -177,8 +124,7 @@ export async function readPhotoBase64(uri: string): Promise<string | undefined> 
 
 /**
  * Tira foto com a câmera.
- * Salva permanentemente no app (documentDirectory/ELP RELATORIOS/<Obra>/)
- * e também na galeria nativa (DCIM/ELP/<Obra>/).
+ * Salva permanentemente no app (documentDirectory) e na galeria nativa do dispositivo.
  */
 export async function takePhoto(projectName?: string): Promise<CapturedPhoto | null> {
   try {
@@ -187,6 +133,11 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
       alert('Permissão para câmera é necessária para registrar fotos de obras.');
       return null;
     }
+
+    // Solicita permissão da galeria antecipadamente para evitar bloqueio no background
+    try {
+      await MediaLibrary.requestPermissionsAsync();
+    } catch {}
 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -204,7 +155,7 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
     const filename = `elp_foto_${timestamp}_${rand}.jpg`;
     const obraName = safeName(projectName);
 
-    // 1. Salva no diretório permanente do app
+    // 1. Salva permanentemente no armazenamento interno seguro do app
     let permanentUri = asset.uri;
     try {
       const appDir = await ensureObraDirectory(projectName);
@@ -217,12 +168,20 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
       console.warn('[Camera] Fallback para uri original:', copyErr);
     }
 
-    // 2. Salva na galeria nativa do dispositivo (assíncrono, não bloqueia)
+    // 2. Garante Base64 em memória para persistência no SQLite
+    let b64 = asset.base64 || undefined;
+    if (!b64) {
+      try {
+        b64 = await readPhotoBase64(permanentUri);
+      } catch {}
+    }
+
+    // 3. Salva na galeria nativa do dispositivo (1 cópia única, assíncrono)
     savePhotoToDeviceGallery(permanentUri, obraName, filename).catch(err =>
       console.warn('[Camera] Erro ao salvar na galeria (background):', err)
     );
 
-    return { uri: permanentUri, base64: asset.base64 || undefined };
+    return { uri: permanentUri, base64: b64 };
   } catch (error) {
     console.error('[Camera] Erro ao tirar foto:', error);
     return null;

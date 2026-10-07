@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.11',
-        'versionCode': 12,
+        'version': '1.0.12',
+        'versionCode': 13,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.11: Fotos salvas automaticamente na Galeria Nativa (Álbuns ELP e pastas por Obra), sincronização e rascunhos corrigidos sem perda de dados.',
+        'notes': 'Atualização v1.0.12: Correção completa no salvamento de fotos - eliminação de duplicatas na galeria (1 foto por registro no álbum da obra), armazenamento offline seguro no aparelho (SQLite + Base64), persistência total de rascunhos sem perda de dados.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12584,8 +12584,8 @@ def api_projeto_detail_sync(projeto_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-def _save_fotos_for_relatorio(relatorio_id, fotos_list):
-    """Processa e salva fotos de relatório no PostgreSQL e filesystem com suporte completo a Base64 e preservação de binários já gravados"""
+def _save_fotos_for_relatorio(relatorio_id, fotos_list, allow_delete=True):
+    """Processa e salva fotos de relatório no PostgreSQL e filesystem com suporte completo a Base64 e prevenção de duplicidades"""
     if not isinstance(fotos_list, list) or len(fotos_list) == 0:
         return 0
 
@@ -12597,10 +12597,12 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
     upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
     os.makedirs(upload_dir, exist_ok=True)
 
-    # Obter fotos existentes para este relatório indexadas por id e por filename
+    # Obter fotos existentes para este relatório indexadas por id, filename e hash
     existing_fotos = FotoRelatorio.query.filter_by(relatorio_id=relatorio_id).all()
     existing_by_id = {f.id: f for f in existing_fotos}
     existing_by_filename = {f.filename: f for f in existing_fotos if f.filename}
+    existing_by_hash = {f.imagem_hash: f for f in existing_fotos if f.imagem_hash}
+    existing_by_ordem = {f.ordem: f for f in existing_fotos}
 
     incoming_db_ids = set()
     saved_count = 0
@@ -12615,11 +12617,41 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
         except (ValueError, TypeError):
             f_id = None
 
+        b64_str = (
+            f_data.get('base64') or 
+            f_data.get('imagem_base64') or 
+            f_data.get('imagem') or 
+            f_data.get('dataUrl') or 
+            ''
+        )
+
+        img_bytes = None
+        img_hash = None
+        if b64_str and isinstance(b64_str, str) and len(b64_str) > 100:
+            if ',' in b64_str:
+                b64_str = b64_str.split(',', 1)[1]
+            b64_str = b64_str.strip()
+            pad = len(b64_str) % 4
+            if pad:
+                b64_str += '=' * (4 - pad)
+
+            try:
+                img_bytes = base64.b64decode(b64_str)
+                img_hash = hashlib.sha256(img_bytes).hexdigest()
+            except Exception as b64_err:
+                current_app.logger.warning(f"Erro ao decodificar base64 foto {idx}: {b64_err}")
+
+        # Busca foto existente para evitar duplicar
         foto = None
         if f_id and f_id in existing_by_id:
             foto = existing_by_id[f_id]
         elif f_data.get('filename') and f_data['filename'] in existing_by_filename:
             foto = existing_by_filename[f_data['filename']]
+        elif img_hash and img_hash in existing_by_hash:
+            # Foto exatamente idêntica já existe no banco: reutiliza para NÃO duplicar
+            foto = existing_by_hash[img_hash]
+        elif idx in existing_by_ordem and (existing_by_ordem[idx].titulo == f_data.get('titulo') or existing_by_ordem[idx].local == f_data.get('local')):
+            foto = existing_by_ordem[idx]
 
         anotacoes_raw = f_data.get('anotacoes_dados')
         anotacoes_obj = None
@@ -12645,42 +12677,21 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
         foto.ordem = f_data.get('ordem', idx)
         foto.anotacoes_dados = anotacoes_obj
 
-        b64_str = (
-            f_data.get('base64') or 
-            f_data.get('imagem_base64') or 
-            f_data.get('imagem') or 
-            f_data.get('dataUrl') or 
-            ''
-        )
+        if img_bytes:
+            foto.imagem = img_bytes
+            foto.imagem_hash = img_hash
+            foto.imagem_size = len(img_bytes)
+            foto.content_type = 'image/jpeg'
 
-        if b64_str and isinstance(b64_str, str) and len(b64_str) > 100:
-            if ',' in b64_str:
-                b64_str = b64_str.split(',', 1)[1]
-            b64_str = b64_str.strip()
-            pad = len(b64_str) % 4
-            if pad:
-                b64_str += '=' * (4 - pad)
-
+            fname = foto.filename or f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+            fpath = os.path.join(upload_dir, fname)
             try:
-                img_bytes = base64.b64decode(b64_str)
-                foto.imagem = img_bytes
-                foto.imagem_hash = hashlib.sha256(img_bytes).hexdigest()
-                foto.imagem_size = len(img_bytes)
-                foto.content_type = 'image/jpeg'
-
-                fname = foto.filename or f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
-                fpath = os.path.join(upload_dir, fname)
-                try:
-                    with open(fpath, 'wb') as f_out:
-                        f_out.write(img_bytes)
-                    foto.filename = fname
-                    foto.url = f"/uploads/{fname}"
-                except Exception as file_save_err:
-                    current_app.logger.warning(f"Erro ao salvar arquivo em disco: {file_save_err}")
-            except Exception as b64_err:
-                current_app.logger.warning(f"Erro ao decodificar base64 foto {idx}: {b64_err}")
-                if not foto.url:
-                    foto.url = f_data.get('url') or f_data.get('uri') or ''
+                with open(fpath, 'wb') as f_out:
+                    f_out.write(img_bytes)
+                foto.filename = fname
+                foto.url = f"/uploads/{fname}"
+            except Exception as file_save_err:
+                current_app.logger.warning(f"Erro ao salvar arquivo em disco: {file_save_err}")
         else:
             if f_data.get('url') and not foto.url:
                 foto.url = f_data.get('url')
@@ -12692,13 +12703,14 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
         incoming_db_ids.add(foto.id)
         saved_count += 1
 
-    # Remover fotos que foram explicitamente deletadas no aplicativo
-    for old_id, old_foto in existing_by_id.items():
-        if old_id not in incoming_db_ids:
-            try:
-                db.session.delete(old_foto)
-            except Exception:
-                pass
+    # Remover fotos apenas quando explicitamente permitido (ex: PUT completo do relatório)
+    if allow_delete and len(fotos_list) > 0:
+        for old_id, old_foto in existing_by_id.items():
+            if old_id not in incoming_db_ids:
+                try:
+                    db.session.delete(old_foto)
+                except Exception:
+                    pass
 
     db.session.flush()
     return saved_count
@@ -13036,7 +13048,7 @@ def api_relatorio_fotos(relatorio_id):
         if request.method == 'POST':
             data = request.get_json(silent=True) or request.form or {}
             fotos_list = data.get('fotos') if 'fotos' in data else [data]
-            saved = _save_fotos_for_relatorio(relatorio.id, fotos_list)
+            saved = _save_fotos_for_relatorio(relatorio.id, fotos_list, allow_delete=False)
             db.session.commit()
             return jsonify({'success': True, 'saved_photos': saved}), 200
 

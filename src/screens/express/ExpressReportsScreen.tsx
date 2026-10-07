@@ -139,9 +139,6 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         };
         await saveLocalFotoExpress(fotoObj, 'pending');
 
-        // Salva na galeria do dispositivo no álbum específico da Obra
-        savePhotoToDeviceGallery(photoUri, obraNome.trim()).catch(() => {});
-
         attachedFotos.push({
           uri_local: photoUri,
           base64: b64,

@@ -10,7 +10,8 @@ import { PhotoEditorModal, PhotoAnnotationOverlay } from '../../components/Photo
 import { 
   getLocalProjetos, saveLocalRelatorio, saveLocalFoto, deleteLocalFoto,
   addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
-  closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft 
+  closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
+  migrateLocalFotosRelatorioId
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -233,9 +234,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             assignedNumero = res.data.numero;
             syncStatus = 'synced';
             setReportNumber(assignedNumero);
-            if (res.data.id) {
+            if (res.data.id && res.data.id !== currentReportId) {
+              const oldId = currentReportId;
               draftId = res.data.id;
               setCurrentReportId(draftId);
+              await migrateLocalFotosRelatorioId(oldId, draftId);
+              setFotos(prev => prev.map(f => ({ ...f, relatorio_id: draftId })));
             }
           }
         } catch (netErr) {
@@ -393,8 +397,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               if (res?.data?.id) {
                 const serverId = res.data.id;
                 const serverNumero = res.data.numero || draft.numero;
+                const oldId = currentReportId;
                 setCurrentReportId(serverId);
                 setReportNumber(serverNumero);
+                if (oldId !== serverId) {
+                  await migrateLocalFotosRelatorioId(oldId, serverId);
+                  setFotos(prev => prev.map(f => ({ ...f, relatorio_id: serverId })));
+                }
                 await saveLocalRelatorio({ ...draft, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
                 for (const f of preparedFotos) {
                   await saveLocalFoto({ ...f, relatorio_id: serverId, sync_status: 'synced' }, 'synced');
@@ -440,12 +449,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       };
       await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
       setFotos(prev => [...prev, newFoto]);
-
-      if (isOnline && currentReportId > 0) {
-        apiClient.axios.post(`/api/relatorios/${currentReportId}/fotos`, {
-          fotos: [{ ...newFoto, base64: b64, imagem_base64: b64 }]
-        }).catch(err => console.warn('[ReportForm] AutoUpload foto camera:', err?.message));
-      }
     }
   }
 
@@ -469,12 +472,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       };
       await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
       setFotos(prev => [...prev, newFoto]);
-
-      if (isOnline && currentReportId > 0) {
-        apiClient.axios.post(`/api/relatorios/${currentReportId}/fotos`, {
-          fotos: [{ ...newFoto, base64: b64, imagem_base64: b64 }]
-        }).catch(err => console.warn('[ReportForm] AutoUpload foto galeria:', err?.message));
-      }
     }
   }
 
@@ -945,7 +942,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             <View key={item.id} style={styles.photoCard}>
               <View style={styles.thumbWrapper}>
                 {(() => {
-                  const resolvedUri = item.uri_local || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null));
+                  const resolvedUri = item.uri_local 
+                    || (item.base64 ? (item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`) : null)
+                    || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null));
                   return resolvedUri ? (
                     <Image source={{ uri: resolvedUri }} style={styles.thumb} resizeMode="cover" />
                   ) : (

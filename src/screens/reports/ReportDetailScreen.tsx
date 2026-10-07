@@ -428,6 +428,8 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                         } else {
                           resolvedUri = item.uri_local;
                         }
+                      } else if (item.base64) {
+                        resolvedUri = item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`;
                       } else if (item.url) {
                         if (item.url.startsWith('http://') || item.url.startsWith('https://')) {
                           resolvedUri = item.url;

@@ -322,6 +322,16 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
       }
     } catch {}
   }
+  // Se ainda não tiver base64 e tiver arquivo local, lê diretamente do arquivo para salvar no SQLite
+  if (!finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
+    try {
+      const { readPhotoBase64 } = require('../services/imageService');
+      const b64Read = await readPhotoBase64(f.uri_local);
+      if (b64Read) {
+        finalBase64 = b64Read;
+      }
+    } catch {}
+  }
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (
@@ -334,6 +344,18 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
       f.local || '', f.ordem || 0, f.anotacoes_dados || '', finalBase64, syncStatus
     ]
   );
+}
+
+/** Migra fotos no SQLite quando o ID provisório do relatório muda para o ID definitivo do servidor */
+export async function migrateLocalFotosRelatorioId(oldRelatorioId: number, newRelatorioId: number): Promise<void> {
+  if (!oldRelatorioId || !newRelatorioId || oldRelatorioId === newRelatorioId) return;
+  const db = await getDatabase();
+  try {
+    await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [newRelatorioId, oldRelatorioId]);
+    console.log(`[db] Fotos migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId}`);
+  } catch (err) {
+    console.warn('[db] Erro ao migrar fotos entre relatórios:', err);
+  }
 }
 
 export async function deleteLocalFoto(id: number): Promise<void> {
