@@ -203,7 +203,7 @@ export async function getLocalRelatorios(projetoId?: number): Promise<Relatorio[
     query += ' WHERE r.projeto_id = ?';
     params.push(projetoId);
   }
-  query += ' GROUP BY r.id ORDER BY COALESCE(r.updated_at, r.data_criacao_local, r.data_relatorio) DESC, r.id DESC';
+  query += ' GROUP BY r.id ORDER BY COALESCE(NULLIF(r.updated_at, ""), NULLIF(r.data_criacao_local, ""), NULLIF(r.created_at, ""), NULLIF(r.data_sincronizacao, ""), r.data_relatorio) DESC, r.id DESC';
   return await db.getAllAsync<Relatorio>(query, params);
 }
 
@@ -308,16 +308,36 @@ export async function deleteLocalRelatorio(id: number): Promise<void> {
 
 export async function getLocalFotos(relatorioId: number, relatorioUuid?: string): Promise<FotoRelatorio[]> {
   const db = await getDatabase();
+  let rows: FotoRelatorio[] = [];
   if (relatorioUuid) {
-    return await db.getAllAsync<FotoRelatorio>(
-      'SELECT * FROM fotos_relatorio WHERE relatorio_id = ? OR (relatorio_uuid IS NOT NULL AND relatorio_uuid = ?) ORDER BY ordem ASC',
+    rows = await db.getAllAsync<FotoRelatorio>(
+      'SELECT * FROM fotos_relatorio WHERE relatorio_id = ? OR (relatorio_uuid IS NOT NULL AND relatorio_uuid = ?) ORDER BY ordem ASC, id ASC',
       [relatorioId, relatorioUuid]
     );
+  } else {
+    rows = await db.getAllAsync<FotoRelatorio>(
+      'SELECT * FROM fotos_relatorio WHERE relatorio_id = ? ORDER BY ordem ASC, id ASC',
+      [relatorioId]
+    );
   }
-  return await db.getAllAsync<FotoRelatorio>(
-    'SELECT * FROM fotos_relatorio WHERE relatorio_id = ? ORDER BY ordem ASC',
-    [relatorioId]
-  );
+
+  // DEDUPLICAÇÃO RIGOROSA: se houver duas fotos com mesma imagem, mantém apenas uma
+  const seen = new Set<string>();
+  const unique: FotoRelatorio[] = [];
+  for (const f of rows) {
+    const fp = (f.filename && f.filename.length > 3) ? f.filename 
+      : (f.uri_local && !f.uri_local.startsWith('http') ? f.uri_local.split('/').pop() : null)
+      || (f.base64 && f.base64.length > 50 ? f.base64.substring(0, 80) : null)
+      || (f.url ? f.url.split('/').pop() : null)
+      || `ordem_${f.ordem}`;
+    
+    if (fp && seen.has(fp)) {
+      continue;
+    }
+    if (fp) seen.add(fp);
+    unique.push(f);
+  }
+  return unique;
 }
 
 export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
@@ -341,6 +361,18 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
       }
     } catch {}
   }
+
+  // Se esta foto está vindo com ID do servidor (f.id < 2000000000), limpa fotos temporárias locais equivalentes
+  try {
+    if (f.relatorio_id && f.id && f.id < 2000000000) {
+      await db.runAsync(
+        `DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id >= 2000000000 AND (
+          ordem = ? OR (filename IS NOT NULL AND filename = ?) OR (uri_local IS NOT NULL AND uri_local = ?)
+        )`,
+        [f.relatorio_id, f.ordem || 0, f.filename || '', f.uri_local || '']
+      );
+    }
+  } catch {}
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (

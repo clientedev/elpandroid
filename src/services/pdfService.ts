@@ -12,22 +12,41 @@ export async function generateReportPDF(
   const numero = relatorio.numero;
   const data = relatorio.data_relatorio ? new Date(relatorio.data_relatorio).toLocaleDateString('pt-BR') : '';
 
+  // Deduplica fotos para garantir que nenhuma foto seja renderizada 2x no PDF
+  const uniqueFotos: FotoRelatorio[] = [];
+  const seenFp = new Set<string>();
+  for (const f of fotos) {
+    const fp = (f.filename && f.filename.length > 3) ? f.filename
+      : (f.uri_local && !f.uri_local.startsWith('http') ? f.uri_local.split('/').pop() : null)
+      || (f.base64 && f.base64.length > 50 ? f.base64.substring(0, 80) : null)
+      || (f.url ? f.url.split('/').pop() : null)
+      || `ordem_${f.ordem}_${f.id}`;
+    if (fp && seenFp.has(fp)) continue;
+    if (fp) seenFp.add(fp);
+    uniqueFotos.push(f);
+  }
+
   let photosHtml = '';
-  if (fotos && fotos.length > 0) {
+  if (uniqueFotos.length > 0) {
     photosHtml = `
-      <div class="section-title">REGISTRO FOTOGRÁFICO (${fotos.length} fotos)</div>
+      <div class="section-title">REGISTRO FOTOGRÁFICO (${uniqueFotos.length} fotos)</div>
       <div class="photos-grid">
-        ${fotos.map((f, i) => `
+        ${uniqueFotos.map((f, i) => {
+          const imgSrc = (f.base64 && f.base64.length > 50)
+            ? (f.base64.startsWith('data:') ? f.base64 : `data:image/jpeg;base64,${f.base64}`)
+            : (f.uri_local || f.url || '');
+          return `
           <div class="photo-card">
             <div class="photo-container">
-              <img src="${f.uri_local || f.url || ''}" class="photo-img" />
+              <img src="${imgSrc}" class="photo-img" />
             </div>
             <div class="photo-caption">
               <strong>Foto ${i + 1}:</strong> ${f.legenda || f.titulo || 'Sem legenda'}
               ${f.local ? `<br/><span style="color:#64748B;">Local: ${f.local}</span>` : ''}
             </div>
           </div>
-        `).join('')}
+        `;
+        }).join('')}
       </div>
     `;
   }
@@ -52,12 +71,14 @@ export async function generateReportPDF(
           margin-bottom: 18px;
         }
         .header-logo-cell {
-          width: 120px;
+          width: 140px;
           vertical-align: middle;
         }
         .header-logo {
-          height: 48px;
-          max-width: 120px;
+          width: 140px;
+          height: 60px;
+          max-width: 140px;
+          max-height: 60px;
           object-fit: contain;
           display: block;
         }
@@ -171,7 +192,7 @@ export async function generateReportPDF(
       <table class="header-table" cellpadding="0" cellspacing="0">
         <tr>
           <td class="header-logo-cell">
-            <img src="${ELP_LOGO_BASE64}" class="header-logo" alt="ELP Engenharia" />
+            <img src="${ELP_LOGO_BASE64}" width="140" height="60" style="width:140px; height:60px; max-width:140px; max-height:60px; object-fit:contain; display:block;" alt="ELP Engenharia" />
           </td>
           <td class="header-text-cell">
             <div class="header-title">ELP ENGENHARIA</div>

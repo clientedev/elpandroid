@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.13',
-        'versionCode': 14,
+        'version': '1.0.14',
+        'versionCode': 15,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.13: Numeração sequencial atômica à prova de concorrência com bloqueio e prevenção de colisões, isolamento de rascunhos por UUID único, salvamento local contínuo de fotos com Base64 garantido no SQLite e galeria nativa sem duplicações.',
+        'notes': 'Atualização v1.0.14: Ordenação estrita por data mais recente na aba Relatórios, deduplicação completa de fotos no SQLite e PDF, garantia de renderização da Logo oficial da ELP no PDF exportado.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 

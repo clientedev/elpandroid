@@ -10,30 +10,34 @@ import { getLocalRelatorios } from '../../database/db';
 import { Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
+import { useNetwork } from '../../contexts/NetworkContext';
+import { syncService } from '../../services/syncService';
+
 export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { isOnline } = useNetwork();
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [filteredRelatorios, setFilteredRelatorios] = useState<Relatorio[]>([]);
   const [search, setSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadRelatorios = useCallback(async () => {
-    try {
-      const data = await getLocalRelatorios();
-      setRelatorios(data);
-      filterReports(data, search, selectedStatus);
-    } catch (e) {
-      console.warn('Erro ao carregar relatórios:', e);
+  function getReportTimestamp(r: Relatorio): number {
+    const dates = [
+      r.updated_at,
+      r.data_criacao_local,
+      r.created_at,
+      r.data_sincronizacao,
+      r.data_relatorio,
+    ];
+    for (const d of dates) {
+      if (d && typeof d === 'string' && d.trim().length > 0) {
+        const t = new Date(d).getTime();
+        if (!isNaN(t) && t > 0) return t;
+      }
     }
-  }, [search, selectedStatus]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadRelatorios();
-    });
-    loadRelatorios();
-    return unsubscribe;
-  }, [navigation, loadRelatorios]);
+    if (r.id && r.id > 1700000000000) return r.id;
+    return 0;
+  }
 
   function filterReports(data: Relatorio[], text: string, status: string) {
     let result = [...data];
@@ -51,14 +55,45 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
 
     // Regra do Sistema: A ordem dos relatórios geral deve ser SEMPRE o mais recente primeiro
     result.sort((a, b) => {
-      const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
-      const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
+      const timeA = getReportTimestamp(a);
+      const timeB = getReportTimestamp(b);
       if (timeB !== timeA) return timeB - timeA;
+
+      const numA = a.numero_projeto || parseInt((a.numero || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const numB = b.numero_projeto || parseInt((b.numero || '').replace(/[^0-9]/g, ''), 10) || 0;
+      if (numB !== numA) return numB - numA;
+
       return (b.id || 0) - (a.id || 0);
     });
 
     setFilteredRelatorios(result);
   }
+
+  const loadRelatorios = useCallback(async () => {
+    try {
+      const data = await getLocalRelatorios();
+      setRelatorios(data);
+      filterReports(data, search, selectedStatus);
+
+      if (isOnline) {
+        syncService.syncAll().then(async () => {
+          const fresh = await getLocalRelatorios();
+          setRelatorios(fresh);
+          filterReports(fresh, search, selectedStatus);
+        }).catch(() => null);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar relatórios:', e);
+    }
+  }, [search, selectedStatus, isOnline]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadRelatorios();
+    });
+    loadRelatorios();
+    return unsubscribe;
+  }, [navigation, loadRelatorios]);
 
   const handleSearch = (text: string) => {
     setSearch(text);
@@ -72,6 +107,9 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
 
   const onRefresh = async () => {
     setRefreshing(true);
+    if (isOnline) {
+      await syncService.syncAll().catch(() => null);
+    }
     await loadRelatorios();
     setRefreshing(false);
   };
