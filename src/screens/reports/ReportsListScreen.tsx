@@ -36,7 +36,7 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
   }, [navigation, loadRelatorios]);
 
   function filterReports(data: Relatorio[], text: string, status: string) {
-    let result = data;
+    let result = [...data];
     if (status !== 'Todos') {
       result = result.filter(r => r.status === status);
     }
@@ -48,6 +48,15 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
         (r.projeto_nome && r.projeto_nome.toLowerCase().includes(q))
       );
     }
+
+    // Regra do Sistema: A ordem dos relatórios geral deve ser SEMPRE o mais recente primeiro
+    result.sort((a, b) => {
+      const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
+      const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.id || 0) - (a.id || 0);
+    });
+
     setFilteredRelatorios(result);
   }
 
@@ -165,6 +174,14 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
 
             <Text style={styles.cardTitle}>{item.titulo}</Text>
             <Text style={styles.cardSub}>{item.projeto_nome || 'Obra não especificada'}</Text>
+
+            {/* Usuário Responsável / Interagindo */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, marginBottom: 2 }}>
+              <Ionicons name="person-circle-outline" size={15} color="#64748B" />
+              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
+                {item.autor_nome || 'Responsável Técnico'}
+              </Text>
+            </View>
 
             <View style={styles.cardFooter}>
               <View style={[

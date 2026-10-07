@@ -240,6 +240,36 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
       <OfflineBanner />
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Banner do Usuário Interagindo / Visualizando */}
+        <View style={styles.userPresenceCard}>
+          <View style={styles.userPresenceAvatar}>
+            <Text style={styles.userPresenceInitials}>
+              {(user?.nome_completo || user?.username || 'U').substring(0, 2).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={styles.presenceDot} />
+              <Text style={styles.presenceStatus}>Interagindo neste relatório agora</Text>
+            </View>
+            <Text style={styles.presenceName}>
+              {user?.nome_completo || user?.username || 'Usuário Atual'}
+            </Text>
+            <Text style={styles.presenceRole}>
+              {user?.cargo || (user?.is_master ? 'Administrador Master' : 'Responsável Técnico')}
+            </Text>
+          </View>
+          {(relatorio.status === 'em_andamento' || relatorio.status === 'Rejeitado') && (
+            <TouchableOpacity 
+              style={styles.presenceEditBtn}
+              onPress={() => navigation.navigate('ReportFormScreen', { reportId: relatorio.id })}
+            >
+              <Ionicons name="create-outline" size={15} color="#FFFFFF" />
+              <Text style={styles.presenceEditBtnText}>Editar</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Main Card */}
         <View style={styles.card}>
           <View style={styles.headerRow}>
@@ -843,5 +873,69 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  userPresenceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
+  },
+  userPresenceAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#0F2027',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  userPresenceInitials: {
+    color: '#D4AF37',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  presenceDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#16A34A',
+  },
+  presenceStatus: {
+    fontSize: 10,
+    color: '#16A34A',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  presenceName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 1,
+  },
+  presenceRole: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  presenceEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0284C7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  presenceEditBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

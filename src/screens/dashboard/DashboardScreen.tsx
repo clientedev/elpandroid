@@ -202,6 +202,12 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       } else {
         setProjetos(p);
         setVisitas(v);
+        r.sort((a, b) => {
+          const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
+          const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
+          if (timeB !== timeA) return timeB - timeA;
+          return (b.id || 0) - (a.id || 0);
+        });
         setRelatorios(r);
       }
     } catch (err) {

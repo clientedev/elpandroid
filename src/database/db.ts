@@ -199,13 +199,21 @@ export async function getLocalRelatorios(projetoId?: number): Promise<Relatorio[
     query += ' WHERE r.projeto_id = ?';
     params.push(projetoId);
   }
-  query += ' GROUP BY COALESCE(NULLIF(r.uuid, ""), NULLIF(r.numero, ""), r.id) ORDER BY r.data_relatorio DESC';
+  query += ' GROUP BY COALESCE(NULLIF(r.uuid, ""), NULLIF(r.numero, ""), r.id) ORDER BY COALESCE(r.updated_at, r.data_criacao_local, r.data_relatorio) DESC, r.id DESC';
   return await db.getAllAsync<Relatorio>(query, params);
 }
 
 export async function getLocalRelatorioById(id: number): Promise<Relatorio | null> {
   const db = await getDatabase();
   return await db.getFirstAsync<Relatorio>('SELECT * FROM relatorios WHERE id = ?', [id]);
+}
+
+export async function getActiveDraft(projetoId: number, autorId: number): Promise<Relatorio | null> {
+  const db = await getDatabase();
+  return await db.getFirstAsync<Relatorio>(
+    `SELECT * FROM relatorios WHERE projeto_id = ? AND autor_id = ? AND status = 'em_andamento' ORDER BY COALESCE(updated_at, data_criacao_local, data_relatorio) DESC, id DESC LIMIT 1`,
+    [projetoId, autorId]
+  );
 }
 
 export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
@@ -300,6 +308,16 @@ export async function getLocalFotos(relatorioId: number): Promise<FotoRelatorio[
 
 export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
+  let finalBase64 = f.base64 || '';
+  if (!finalBase64 && f.id) {
+    try {
+      const existing = await db.getFirstAsync<{ base64?: string }>('SELECT base64 FROM fotos_relatorio WHERE id = ?', [f.id]);
+      if (existing?.base64) {
+        finalBase64 = existing.base64;
+      }
+    } catch {}
+  }
+
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (
       id, relatorio_id, url, filename, uri_local, titulo, legenda, descricao,
@@ -308,7 +326,7 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
     [
       f.id, f.relatorio_id, f.url || '', f.filename || '', f.uri_local || '',
       f.titulo || '', f.legenda || '', f.descricao || '', f.tipo_servico || '',
-      f.local || '', f.ordem || 0, f.anotacoes_dados || '', f.base64 || '', syncStatus
+      f.local || '', f.ordem || 0, f.anotacoes_dados || '', finalBase64, syncStatus
     ]
   );
 }
@@ -326,7 +344,7 @@ export async function getLocalRelatoriosExpress(): Promise<RelatorioExpress[]> {
     FROM relatorios_express r 
     LEFT JOIN fotos_relatorio_express f ON r.id = f.relatorio_express_id 
     GROUP BY COALESCE(NULLIF(r.numero, ""), r.id) 
-    ORDER BY r.data_relatorio DESC
+    ORDER BY COALESCE(r.updated_at, r.data_criacao_local, r.data_relatorio) DESC, r.id DESC
   `);
 }
 

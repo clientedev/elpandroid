@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.9',
-        'versionCode': 10,
+        'version': '1.0.10',
+        'versionCode': 11,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.9: Nova Splash Screen com logotipo oficial limpo e centralizado da ELP Consultoria (removida imagem estranha anterior); Módulo de Obras com ordenação GPS e especificações de fachada; Fluxo de aprovação com legendas obrigatórias; Reembolsos com upload de comprovantes fiscais e homologação Master; UI/UX 100% atualizada.',
+        'notes': 'Atualização 1.0.10: Salvamento automático de fotos em tempo real no SQLite e servidor com Base64; Indicador em tempo real do usuário interagindo no relatório; Correção na criação e preservação de rascunhos para evitar salto de numeração; Ordenação de todos os relatórios estritamente do mais recente para o mais antigo.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12585,7 +12585,7 @@ def api_projeto_detail_sync(projeto_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def _save_fotos_for_relatorio(relatorio_id, fotos_list):
-    """Processa e salva fotos de relatório no PostgreSQL e filesystem com suporte completo a Base64"""
+    """Processa e salva fotos de relatório no PostgreSQL e filesystem com suporte completo a Base64 e preservação de binários já gravados"""
     if not isinstance(fotos_list, list) or len(fotos_list) == 0:
         return 0
 
@@ -12597,17 +12597,29 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
     upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
     os.makedirs(upload_dir, exist_ok=True)
 
-    # Limpar fotos anteriores do relatório para atualização limpa
-    try:
-        FotoRelatorio.query.filter_by(relatorio_id=relatorio_id).delete()
-        db.session.flush()
-    except Exception as del_err:
-        current_app.logger.warning(f"Erro ao limpar fotos anteriores: {del_err}")
+    # Obter fotos existentes para este relatório indexadas por id e por filename
+    existing_fotos = FotoRelatorio.query.filter_by(relatorio_id=relatorio_id).all()
+    existing_by_id = {f.id: f for f in existing_fotos}
+    existing_by_filename = {f.filename: f for f in existing_fotos if f.filename}
 
+    incoming_db_ids = set()
     saved_count = 0
+
     for idx, f_data in enumerate(fotos_list):
         if not isinstance(f_data, dict):
             continue
+
+        f_id = f_data.get('id')
+        try:
+            f_id = int(f_id) if f_id else None
+        except (ValueError, TypeError):
+            f_id = None
+
+        foto = None
+        if f_id and f_id in existing_by_id:
+            foto = existing_by_id[f_id]
+        elif f_data.get('filename') and f_data['filename'] in existing_by_filename:
+            foto = existing_by_filename[f_data['filename']]
 
         anotacoes_raw = f_data.get('anotacoes_dados')
         anotacoes_obj = None
@@ -12620,16 +12632,18 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
             else:
                 anotacoes_obj = anotacoes_raw
 
-        foto = FotoRelatorio(
-            relatorio_id=relatorio_id,
-            titulo=f_data.get('titulo') or f"Foto {idx+1}",
-            legenda=f_data.get('legenda') or '',
-            descricao=f_data.get('descricao') or '',
-            tipo_servico=f_data.get('tipo_servico'),
-            local=f_data.get('local') or '',
-            ordem=f_data.get('ordem', idx),
-            anotacoes_dados=anotacoes_obj
-        )
+        is_new = False
+        if not foto:
+            foto = FotoRelatorio(relatorio_id=relatorio_id)
+            is_new = True
+
+        foto.titulo = f_data.get('titulo') or f"Foto {idx+1}"
+        foto.legenda = f_data.get('legenda') or ''
+        foto.descricao = f_data.get('descricao') or ''
+        foto.tipo_servico = f_data.get('tipo_servico')
+        foto.local = f_data.get('local') or ''
+        foto.ordem = f_data.get('ordem', idx)
+        foto.anotacoes_dados = anotacoes_obj
 
         b64_str = (
             f_data.get('base64') or 
@@ -12639,7 +12653,7 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
             ''
         )
 
-        if b64_str and isinstance(b64_str, str):
+        if b64_str and isinstance(b64_str, str) and len(b64_str) > 100:
             if ',' in b64_str:
                 b64_str = b64_str.split(',', 1)[1]
             b64_str = b64_str.strip()
@@ -12654,7 +12668,7 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
                 foto.imagem_size = len(img_bytes)
                 foto.content_type = 'image/jpeg'
 
-                fname = f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+                fname = foto.filename or f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
                 fpath = os.path.join(upload_dir, fname)
                 try:
                     with open(fpath, 'wb') as f_out:
@@ -12665,12 +12679,26 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list):
                     current_app.logger.warning(f"Erro ao salvar arquivo em disco: {file_save_err}")
             except Exception as b64_err:
                 current_app.logger.warning(f"Erro ao decodificar base64 foto {idx}: {b64_err}")
-                foto.url = f_data.get('url') or f_data.get('uri') or ''
+                if not foto.url:
+                    foto.url = f_data.get('url') or f_data.get('uri') or ''
         else:
-            foto.url = f_data.get('url') or f_data.get('uri') or ''
+            if f_data.get('url') and not foto.url:
+                foto.url = f_data.get('url')
 
-        db.session.add(foto)
+        if is_new:
+            db.session.add(foto)
+            db.session.flush()
+
+        incoming_db_ids.add(foto.id)
         saved_count += 1
+
+    # Remover fotos que foram explicitamente deletadas no aplicativo
+    for old_id, old_foto in existing_by_id.items():
+        if old_id not in incoming_db_ids:
+            try:
+                db.session.delete(old_foto)
+            except Exception:
+                pass
 
     db.session.flush()
     return saved_count
@@ -12712,10 +12740,31 @@ def api_relatorios_collection():
             # 1. Regra de idempotência estrita por UUID
             if rel_uuid:
                 existing = Relatorio.query.filter_by(uuid=rel_uuid).first()
-            
-            # Fallback de busca por numero se já foi informado e existente no projeto
-            if not existing and numero_informado and not numero_informado.startswith('OFF-') and not numero_informado.startswith('TEMP-'):
+
+            # 2. Busca por ID numérico direto se fornecido
+            if not existing and data.get('id'):
+                try:
+                    c_id = int(data['id'])
+                    if c_id > 0:
+                        existing = Relatorio.query.get(c_id)
+                except Exception:
+                    pass
+
+            # 3. Fallback de busca por numero se já foi informado e existente no projeto
+            if not existing and numero_informado and not numero_informado.startswith('OFF-') and not numero_informado.startswith('TEMP-') and 'Pendente' not in numero_informado and 'Rascunho' not in numero_informado:
                 existing = Relatorio.query.filter_by(projeto_id=projeto_id, numero=numero_informado).first()
+
+            # 4. REAPROVEITAMENTO INTELIGENTE DE RASCUNHO:
+            # Se a requisição for um rascunho (status == 'em_andamento'), verificar se o mesmo autor
+            # já tem um rascunho em andamento nesta obra. Se tiver, reaproveita o rascunho existente
+            # para JAMAIS pular numeração (de 1 pra 2) ou criar relatórios vazios duplicados!
+            req_status = data.get('status') or 'em_andamento'
+            if not existing and req_status == 'em_andamento':
+                existing = Relatorio.query.filter_by(
+                    projeto_id=projeto_id,
+                    autor_id=autor_id,
+                    status='em_andamento'
+                ).order_by(Relatorio.id.desc()).first()
 
             if existing:
                 # O relatório já foi sincronizado antes ou já existe:
@@ -12726,6 +12775,7 @@ def api_relatorios_collection():
                 if not relatorio.data_criacao_local and data_criacao_local_dt:
                     relatorio.data_criacao_local = data_criacao_local_dt
                 relatorio.data_sincronizacao = brazil_now()
+                relatorio.updated_at = brazil_now()
                 current_app.logger.info(f"🔄 Relatório idempotente reutilizado: {relatorio.numero} (UUID: {relatorio.uuid})")
             else:
                 # NOVO RELATÓRIO: Numeração atribuída exclusivamente pelo servidor
@@ -12755,7 +12805,9 @@ def api_relatorios_collection():
                     projeto_id=projeto_id,
                     autor_id=autor_id,
                     data_criacao_local=data_criacao_local_dt,
-                    data_sincronizacao=brazil_now()
+                    data_sincronizacao=brazil_now(),
+                    created_at=brazil_now(),
+                    updated_at=brazil_now()
                 )
                 db.session.add(relatorio)
                 current_app.logger.info(f"✨ Novo relatório criado com numeração atômica: {official_numero} (UUID: {rel_uuid})")
@@ -12769,6 +12821,7 @@ def api_relatorios_collection():
             relatorio.local = data.get('local')
             relatorio.observacoes_finais = data.get('observacoes_finais')
             relatorio.checklist_data = data.get('checklist_data') or '[]'
+            relatorio.updated_at = brazil_now()
 
             db.session.flush()
 
@@ -12794,9 +12847,12 @@ def api_relatorios_collection():
             current_app.logger.error(f"Erro ao salvar relatorio mobile: {post_err}")
             return jsonify({'success': False, 'error': str(post_err)}), 500
 
-    # GET
+    # GET: Sempre ordenar do mais recente para o mais antigo
     try:
-        relatorios = Relatorio.query.order_by(Relatorio.data_relatorio.desc()).limit(100).all()
+        relatorios = Relatorio.query.order_by(
+            db.func.coalesce(Relatorio.updated_at, Relatorio.data_criacao_local, Relatorio.created_at, Relatorio.data_relatorio).desc(),
+            Relatorio.id.desc()
+        ).limit(200).all()
         result = []
         base_app_url = 'https://elpandroid-production.up.railway.app'
         for r in relatorios:
@@ -12918,6 +12974,7 @@ def api_relatorio_detail_sync(relatorio_id):
             if 'fotos' in data and isinstance(data['fotos'], list):
                 _save_fotos_for_relatorio(relatorio.id, data['fotos'])
 
+            relatorio.updated_at = brazil_now()
             db.session.commit()
             return jsonify({'success': True, 'id': relatorio.id, 'status': relatorio.status}), 200
 
@@ -13143,7 +13200,10 @@ def api_relatorios_express_sync():
             return jsonify({'success': False, 'error': str(e)}), 500
 
     try:
-        rels = RelatorioExpress.query.order_by(RelatorioExpress.created_at.desc()).limit(100).all()
+        rels = RelatorioExpress.query.order_by(
+            db.func.coalesce(RelatorioExpress.updated_at, RelatorioExpress.created_at).desc(),
+            RelatorioExpress.id.desc()
+        ).limit(100).all()
         base_app_url = 'https://elpandroid-production.up.railway.app'
         result = []
         for r in rels:

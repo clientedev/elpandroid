@@ -10,9 +10,9 @@ import { PhotoEditorModal, PhotoAnnotationOverlay } from '../../components/Photo
 import { 
   getLocalProjetos, saveLocalRelatorio, saveLocalFoto, deleteLocalFoto,
   addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
-  closeLocalLembrete, getLocalRelatorioById, getLocalFotos 
+  closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft 
 } from '../../database/db';
-import { takePhoto, pickImage } from '../../services/imageService';
+import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { apiClient } from '../../services/api';
@@ -172,11 +172,39 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   async function initImmediateDraft(projId: number) {
     try {
       const proj = projetos.find(p => p.id === projId);
+
+      // 1. Checar se já existe um rascunho em andamento deste autor nesta obra
+      const existingDraft = await getActiveDraft(projId, user?.id || 1);
+      if (existingDraft) {
+        setCurrentReportId(existingDraft.id);
+        if (existingDraft.uuid) setReportUuid(existingDraft.uuid);
+        setReportNumber(existingDraft.numero || 'Rascunho em Andamento');
+        setTitulo(existingDraft.titulo || 'Relatório de Vistoria Técnica');
+        if (existingDraft.data_relatorio) setDataVisita(existingDraft.data_relatorio.substring(0, 10));
+        setDescricao(existingDraft.descricao || '');
+        setObservacoesFinais(existingDraft.observacoes_finais || '');
+        setCategoria(existingDraft.categoria || 'Geral');
+        setLocal(existingDraft.local || 'Fachada Principal');
+        if (existingDraft.checklist_data) {
+          try {
+            setChecklist(JSON.parse(existingDraft.checklist_data));
+          } catch {}
+        }
+        const savedFotos = await getLocalFotos(existingDraft.id);
+        if (savedFotos && savedFotos.length > 0) {
+          setFotos(savedFotos);
+        }
+        const d = new Date();
+        setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        return;
+      }
+
+      // 2. Se não existir rascunho anterior, inicia um novo de forma idempotente
       let draftId = currentReportId;
       const initialUuid = reportUuid;
       const creationDate = new Date().toISOString();
 
-      let assignedNumero = 'Pendente Sincronização';
+      let assignedNumero = 'Rascunho Pendente';
       let syncStatus: 'synced' | 'pending' = 'pending';
 
       if (isOnline) {
@@ -188,6 +216,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             titulo: titulo || 'Relatório de Vistoria Técnica',
             status: 'em_andamento',
             data_criacao_local: creationDate,
+            autor_id: user?.id,
           }, { timeout: 7000 });
 
           if (res?.data?.numero) {
@@ -214,7 +243,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         projeto_nome: proj?.nome || 'Obra',
         visita_id: preSelectedVisitId || null,
         autor_id: user?.id || 1,
-        autor_nome: user?.username || 'Responsável',
+        autor_nome: user?.nome_completo || user?.username || 'Responsável',
         data_relatorio: dataVisita,
         data_criacao_local: creationDate,
         descricao: '',
@@ -227,10 +256,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       };
 
       await saveLocalRelatorio(draftObj, syncStatus);
-
-      if (syncStatus === 'pending') {
-        await addToSyncQueue('relatorio', draftId, 'create', '/api/relatorios', 'POST', draftObj);
-      }
 
       const d = new Date();
       setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
@@ -293,7 +318,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           projeto_nome: proj?.nome || 'Obra',
           visita_id: preSelectedVisitId || null,
           autor_id: user?.id || 1,
-          autor_nome: user?.username || 'Responsável',
+          autor_nome: user?.nome_completo || user?.username || 'Responsável',
           data_relatorio: dataVisita,
           descricao: descricao.trim(),
           observacoes_finais: observacoesFinais.trim(),
@@ -301,63 +326,132 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           categoria: categoria,
           local: local,
           status: 'em_andamento',
-          sync_status: 'pending',
+          sync_status: isOnline ? 'synced' : 'pending',
         };
-        await saveLocalRelatorio(draft, 'pending');
 
+        // 1. Salva no SQLite local
+        await saveLocalRelatorio(draft, isOnline ? 'synced' : 'pending');
+
+        // 2. Persistir todas as fotos no SQLite com Base64 garantido
+        const preparedFotos: any[] = [];
         for (let i = 0; i < fotos.length; i++) {
-          await saveLocalFoto({
+          let b64 = fotos[i].base64;
+          if (!b64 && fotos[i].uri_local && !fotos[i].uri_local?.startsWith('http')) {
+            b64 = await readPhotoBase64(fotos[i].uri_local!);
+          }
+          const fObj: FotoRelatorio = {
             ...fotos[i],
             relatorio_id: currentReportId,
             ordem: i,
-          }, 'pending');
+            base64: b64,
+          };
+          await saveLocalFoto(fObj, isOnline ? 'synced' : 'pending');
+          preparedFotos.push({
+            ...fObj,
+            imagem_base64: b64,
+          });
+        }
+
+        // 3. Sincronização em tempo real com o servidor Railway se conectado
+        if (isOnline) {
+          try {
+            if (currentReportId > 0) {
+              await apiClient.axios.put(`/api/relatorios/${currentReportId}`, {
+                ...draft,
+                user_id: user?.id,
+                fotos: preparedFotos,
+              }, { timeout: 12000 });
+            } else {
+              const res = await apiClient.axios.post('/api/relatorios', {
+                ...draft,
+                user_id: user?.id,
+                fotos: preparedFotos,
+              }, { timeout: 12000 });
+
+              if (res?.data?.id && res.data.id !== currentReportId) {
+                const serverId = res.data.id;
+                setCurrentReportId(serverId);
+                if (res.data.numero) {
+                  setReportNumber(res.data.numero);
+                }
+                await saveLocalRelatorio({ ...draft, id: serverId, numero: res.data.numero || draft.numero }, 'synced');
+                for (const f of preparedFotos) {
+                  await saveLocalFoto({ ...f, relatorio_id: serverId }, 'synced');
+                }
+              }
+            }
+          } catch (netSaveErr) {
+            console.warn('[ReportForm] AutoSave online aviso:', netSaveErr);
+          }
         }
 
         const d = new Date();
         setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       } catch (err) {
-        console.warn('Erro ao salvar rascunho automático:', err);
+        console.warn('Erro ao salvar rascunho automático em tempo real:', err);
       } finally {
         setIsAutoSaving(false);
       }
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos]);
+  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos, isOnline]);
 
   async function handleAddPhotoCamera() {
     const photo = await takePhoto(selectedProj?.nome);
     if (photo) {
+      let b64 = photo.base64;
+      if (!b64 && photo.uri) {
+        b64 = await readPhotoBase64(photo.uri);
+      }
       const newFoto: FotoRelatorio = {
         id: Date.now(),
         relatorio_id: currentReportId,
         uri_local: photo.uri,
-        base64: photo.base64,
+        base64: b64,
         ordem: fotos.length,
         legenda: '',
         local: local,
         anotacoes_dados: '',
-        sync_status: 'pending',
+        sync_status: isOnline ? 'synced' : 'pending',
       };
+      await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
       setFotos(prev => [...prev, newFoto]);
+
+      if (isOnline && currentReportId > 0) {
+        apiClient.axios.post(`/api/relatorios/${currentReportId}/fotos`, {
+          fotos: [{ ...newFoto, base64: b64, imagem_base64: b64 }]
+        }).catch(err => console.warn('[ReportForm] AutoUpload foto camera:', err?.message));
+      }
     }
   }
 
   async function handleAddPhotoGallery() {
     const photo = await pickImage(selectedProj?.nome);
     if (photo) {
+      let b64 = photo.base64;
+      if (!b64 && photo.uri) {
+        b64 = await readPhotoBase64(photo.uri);
+      }
       const newFoto: FotoRelatorio = {
         id: Date.now(),
         relatorio_id: currentReportId,
         uri_local: photo.uri,
-        base64: photo.base64,
+        base64: b64,
         ordem: fotos.length,
         legenda: '',
         local: local,
         anotacoes_dados: '',
-        sync_status: 'pending',
+        sync_status: isOnline ? 'synced' : 'pending',
       };
+      await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
       setFotos(prev => [...prev, newFoto]);
+
+      if (isOnline && currentReportId > 0) {
+        apiClient.axios.post(`/api/relatorios/${currentReportId}/fotos`, {
+          fotos: [{ ...newFoto, base64: b64, imagem_base64: b64 }]
+        }).catch(err => console.warn('[ReportForm] AutoUpload foto galeria:', err?.message));
+      }
     }
   }
 
@@ -555,6 +649,31 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             ? "⏳ Salvando rascunho silenciosamente..." 
             : (lastSavedTime ? `🟢 Salvo automaticamente às ${lastSavedTime}` : "🟢 Salvamento automático em tempo real ativado")}
         </Text>
+      </View>
+
+      {/* Indicador do Usuário Interagindo no Relatório (Identificação do operador e status ativo) */}
+      <View style={styles.userInteractingCard}>
+        <View style={styles.userAvatarBox}>
+          <Text style={styles.userAvatarInitials}>
+            {(user?.nome_completo || user?.username || 'U').substring(0, 2).toUpperCase()}
+          </Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={styles.onlineDot} />
+            <Text style={styles.userInteractingStatus}>Interagindo agora neste relatório</Text>
+          </View>
+          <Text style={styles.userInteractingName}>
+            {user?.nome_completo || user?.username || 'Usuário Responsável'}
+          </Text>
+          <Text style={styles.userInteractingRole}>
+            {user?.cargo || (user?.is_master ? 'Administrador Master' : 'Responsável Técnico / Engenheiro')}
+          </Text>
+        </View>
+        <View style={styles.reportBadgeMini}>
+          <Ionicons name="document-text-outline" size={13} color="#0F2027" />
+          <Text style={styles.reportBadgeMiniText}>{reportNumber}</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -1549,5 +1668,71 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#15803D',
     fontWeight: '600',
+  },
+  userInteractingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
+  },
+  userAvatarBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#0F2027',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  userAvatarInitials: {
+    color: '#D4AF37',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#16A34A',
+  },
+  userInteractingStatus: {
+    fontSize: 10,
+    color: '#16A34A',
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  userInteractingName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 1,
+  },
+  userInteractingRole: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  reportBadgeMini: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    gap: 4,
+  },
+  reportBadgeMiniText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0F2027',
   },
 });
