@@ -12,6 +12,7 @@ import {
   updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
+import { notificationService } from './notificationService';
 
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'error';
 
@@ -261,6 +262,15 @@ class SyncService {
       const msg = processedCount > 0 
         ? `Sincronização concluída! ${processedCount} alteração(ões) enviada(s) com sucesso para o servidor.`
         : 'Sincronização concluída! Todos os dados estão atualizados no servidor.';
+
+      if (processedCount > 0) {
+        notificationService.notify({
+          titulo: 'Sincronização Concluída',
+          mensagem: msg,
+          tipo: 'sincronizacao',
+          silent: true,
+        }).catch(() => null);
+      }
 
       return { success: true, message: msg };
     } catch (err: any) {

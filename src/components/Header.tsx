@@ -12,6 +12,7 @@ import {
   clearLocalNotificacoes, saveLocalNotificacao 
 } from '../database/db';
 import { Notificacao } from '../types';
+import { notificationService } from '../services/notificationService';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 44;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -60,6 +61,10 @@ export const Header: React.FC<HeaderProps> = ({
 
   useEffect(() => {
     loadNotificacoes();
+    const unsub = notificationService.subscribe(() => {
+      loadNotificacoes();
+    });
+    return unsub;
   }, [loadNotificacoes]);
 
   const unreadCount = notificacoes.filter(n => !n.lida).length;
@@ -110,30 +115,28 @@ export const Header: React.FC<HeaderProps> = ({
       </View>
 
       <View style={styles.right}>
-        {/* Ícone Discreto de Sincronização na parte superior */}
-        <TouchableOpacity 
-          style={styles.syncIconButton} 
-          onPress={() => triggerSync()}
-          disabled={syncState === 'syncing'}
-          activeOpacity={0.7}
-        >
-          {syncState === 'syncing' ? (
-            <ActivityIndicator size="small" color={Colors.primary} />
-          ) : (
+        {/* Ícone Discreto no Header: Exibido SOMENTE se estiver offline ou com pendências a sincronizar */}
+        {(!isOnline || pendingCount > 0) && (
+          <TouchableOpacity 
+            style={styles.syncIconButton} 
+            onPress={() => triggerSync()}
+            disabled={!isOnline}
+            activeOpacity={0.7}
+          >
             <Ionicons 
-              name={!isOnline ? "cloud-offline-outline" : (pendingCount > 0 ? "cloud-upload-outline" : "cloud-done-outline")} 
+              name={!isOnline ? "cloud-offline-outline" : "cloud-upload-outline"} 
               size={20} 
-              color={!isOnline ? "#94A3B8" : (pendingCount > 0 ? "#D97706" : "#10B981")} 
+              color={!isOnline ? "#94A3B8" : "#D97706"} 
             />
-          )}
-          {pendingCount > 0 && syncState !== 'syncing' && (
-            <View style={styles.syncBadge}>
-              <Text style={styles.syncBadgeText}>
-                {pendingCount > 9 ? '9+' : pendingCount}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+            {pendingCount > 0 && isOnline && (
+              <View style={styles.syncBadge}>
+                <Text style={styles.syncBadgeText}>
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Sino de Notificações com Badge Vermelho Flutuante */}
         <TouchableOpacity 

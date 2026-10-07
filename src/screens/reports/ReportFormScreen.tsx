@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, 
-  Image, Alert, Modal, FlatList, ActivityIndicator 
+  Image, Alert, Modal, FlatList, ActivityIndicator, BackHandler 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -17,6 +17,7 @@ import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageServi
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { apiClient } from '../../services/api';
+import { notificationService } from '../../services/notificationService';
 
 import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
@@ -171,51 +172,106 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   const selectedProj = projetos.find(p => p.id === selectedProjectId);
 
-  // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
-  // Depende de projetos ESTAR CARREGADO para funcionar corretamente
-  useEffect(() => {
-    if (!initialReportId && selectedProjectId && !initializedDraftRef.current && projetos.length > 0) {
-      initializedDraftRef.current = true;
-      initImmediateDraft(selectedProjectId);
-    }
-  }, [selectedProjectId, initialReportId, projetos]);
-
-  async function initImmediateDraft(projId: number) {
+  // Função central para persistência imediata de rascunho
+  const saveDraftImmediately = useCallback(async () => {
     try {
-      const proj = projetos.find(p => p.id === projId);
-      const initialUuid = reportUuid;
-      const creationDate = new Date().toISOString();
+      setIsAutoSaving(true);
+      const proj = projetosRef.current.find(p => p.id === selectedProjectId) || projetosRef.current[0];
+      const projId = selectedProjectId || proj?.id || 1;
+      const projNome = proj?.nome || 'Obra';
 
       const draftObj: Relatorio = {
         id: currentReportId,
-        uuid: initialUuid,
-        uuid_local: initialUuid,
-        numero: 'Rascunho',
-        titulo: titulo || 'Relatório de Vistoria Técnica',
+        uuid: reportUuid,
+        uuid_local: reportUuid,
+        numero: reportNumber && reportNumber.startsWith('REL-') ? reportNumber : 'Rascunho',
+        titulo: (titulo && titulo.trim().length > 0) ? titulo.trim() : 'Relatório de Vistoria Técnica',
         projeto_id: projId,
-        projeto_nome: proj?.nome || 'Obra',
+        projeto_nome: projNome,
         visita_id: preSelectedVisitId || null,
         autor_id: user?.id || 1,
         autor_nome: user?.nome_completo || user?.username || 'Responsável',
-        data_relatorio: dataVisita,
-        data_criacao_local: creationDate,
-        descricao: '',
-        observacoes_finais: '',
+        data_relatorio: dataVisita || new Date().toISOString().substring(0, 10),
+        data_criacao_local: new Date().toISOString(),
+        descricao: descricao.trim(),
+        observacoes_finais: observacoesFinais.trim(),
         checklist_data: JSON.stringify(checklist),
         categoria: categoria,
         local: local,
-        status: 'em_andamento',
+        status: 'em_andamento', // RASCUNHO GARANTIDO
         sync_status: 'pending',
+        updated_at: new Date().toISOString(),
       };
 
+      // 1. Salva no SQLite local
       await saveLocalRelatorio(draftObj, 'pending');
+
+      // 2. Persistir fotos atuais no SQLite
+      for (let i = 0; i < fotos.length; i++) {
+        let b64 = fotos[i].base64;
+        if (!b64 && fotos[i].uri_local && !fotos[i].uri_local?.startsWith('http')) {
+          try {
+            b64 = await readPhotoBase64(fotos[i].uri_local!);
+          } catch {}
+        }
+        await saveLocalFoto({
+          ...fotos[i],
+          relatorio_id: currentReportId,
+          relatorio_uuid: reportUuid,
+          ordem: i,
+          base64: b64,
+        }, 'pending');
+      }
 
       const d = new Date();
       setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+      // Notifica o sistema de notificações para alimentar o sino no cabeçalho
+      notificationService.notify({
+        titulo: 'Rascunho Salvo',
+        mensagem: `Rascunho de "${draftObj.titulo}" salvo localmente.`,
+        tipo: 'relatorio',
+        userId: user?.id,
+        silent: true,
+      });
     } catch (e) {
-      console.warn('Erro ao inicializar rascunho local:', e);
+      console.warn('Erro ao salvar rascunho imediatamente:', e);
+    } finally {
+      setIsAutoSaving(false);
     }
-  }
+  }, [
+    currentReportId, reportUuid, reportNumber, titulo, selectedProjectId,
+    preSelectedVisitId, user, dataVisita, descricao, observacoesFinais,
+    checklist, categoria, local, fotos
+  ]);
+
+  // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
+  useEffect(() => {
+    if (!initialReportId && !initializedDraftRef.current && (selectedProjectId || projetos.length > 0)) {
+      initializedDraftRef.current = true;
+      saveDraftImmediately();
+    }
+  }, [selectedProjectId, initialReportId, projetos, saveDraftImmediately]);
+
+  // Intercepta botão voltar do hardware do Android
+  useEffect(() => {
+    const onHardwareBack = () => {
+      saveDraftImmediately().finally(() => {
+        navigation.goBack();
+      });
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+    return () => sub.remove();
+  }, [saveDraftImmediately, navigation]);
+
+  // Intercepta qualquer saída da navegação (incluindo gestos e pop)
+  useEffect(() => {
+    const unsub = navigation.addListener('beforeRemove', () => {
+      saveDraftImmediately().catch(() => null);
+    });
+    return unsub;
+  }, [navigation, saveDraftImmediately]);
 
   // Carregar rascunho existente
   useEffect(() => {
@@ -639,9 +695,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         title="Relatório de Obra" 
         subtitle={reportNumber} 
         showBack 
-        onBack={() => navigation.goBack()} 
+        onBack={async () => {
+          await saveDraftImmediately();
+          navigation.goBack();
+        }} 
       />
-      <OfflineBanner />
 
       {/* Indicador de AutoSave em Tempo Real no Topo (Seção 6 e 15.7) */}
       <View style={styles.autoSaveBar}>

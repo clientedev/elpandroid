@@ -10,6 +10,7 @@ import { Colors, Shadows } from '../../theme/colors';
 
 import { useNetwork } from '../../contexts/NetworkContext';
 import { syncService } from '../../services/syncService';
+import { useFocusEffect } from '@react-navigation/native';
 
 export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isOnline } = useNetwork();
@@ -98,13 +99,11 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
     }
   }, [search, selectedStatus, isOnline]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
+  useFocusEffect(
+    useCallback(() => {
       loadRelatorios();
-    });
-    loadRelatorios();
-    return unsubscribe;
-  }, [navigation, loadRelatorios]);
+    }, [loadRelatorios])
+  );
 
   const handleSearch = (text: string) => {
     setSearch(text);

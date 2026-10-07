@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.15',
-        'versionCode': 16,
+        'version': '1.0.16',
+        'versionCode': 17,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.15: Ordenação estrita por data mais recente na aba Relatórios, interface minimalista e limpa, remoção de faixas intrusivas com status discreto de sincronização no topo.',
+        'notes': 'Atualização v1.0.16: Salvamento imediato de rascunhos ao voltar de tela, ícone de cabeçalho exibido exclusivamente quando offline/pendente e permissão nativa de notificações no Android.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
