@@ -467,9 +467,10 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                 </View>
               </View>
             ) : (
-              <View style={styles.approvalButtonsRow}>
+              <View style={styles.approvalButtonsVertical}>
+                {/* 1. Botão "Aprovar Relatório" (Verde sólido) */}
                 <TouchableOpacity 
-                  style={[styles.btnAction, styles.approveBtn]} 
+                  style={[styles.btnActionFull, styles.approveBtn]} 
                   onPress={handleApprove}
                   disabled={approving}
                 >
@@ -477,8 +478,19 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                   <Text style={styles.btnActionText}>Aprovar Relatório</Text>
                 </TouchableOpacity>
 
+                {/* 2. Botão "Editar Relatório" (Azul sólido - Correção técnica pontual) */}
                 <TouchableOpacity 
-                  style={[styles.btnAction, styles.rejectBtn]} 
+                  style={[styles.btnActionFull, styles.editReportBtn]} 
+                  onPress={() => navigation.navigate('ReportFormScreen', { reportId: relatorio.id, preSelectedProjectId: relatorio.projeto_id })}
+                  disabled={approving}
+                >
+                  <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.btnActionText}>Editar Relatório</Text>
+                </TouchableOpacity>
+
+                {/* 3. Botão "Reprovar com Ajustes" (Vermelho sólido) */}
+                <TouchableOpacity 
+                  style={[styles.btnActionFull, styles.rejectBtn]} 
                   onPress={() => setShowRejectBox(true)}
                   disabled={approving}
                 >
@@ -711,21 +723,24 @@ const styles = StyleSheet.create({
     color: '#334155',
     marginBottom: 12,
   },
-  approvalButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
+  approvalButtonsVertical: {
+    gap: 8,
   },
-  btnAction: {
-    flex: 1,
-    height: 44,
+  btnActionFull: {
+    width: '100%',
+    height: 48,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
+    ...Shadows.sm,
   },
   approveBtn: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#16A34A',
+  },
+  editReportBtn: {
+    backgroundColor: '#0284C7',
   },
   rejectBtn: {
     backgroundColor: '#EF4444',

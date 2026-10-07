@@ -1,13 +1,17 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
-  Modal, TextInput, RefreshControl, Alert, ScrollView 
+  Modal, TextInput, RefreshControl, Alert, ScrollView, Image, ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
-import { getLocalReembolsos, saveLocalReembolso, addToSyncQueue, getLocalProjetos } from '../../database/db';
+import { 
+  getLocalReembolsos, saveLocalReembolso, addToSyncQueue, 
+  getLocalProjetos, updateLocalReembolsoStatus 
+} from '../../database/db';
+import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Reembolso, Projeto } from '../../types';
@@ -22,6 +26,15 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // Perfil Master / Diretoria
+  const isMaster = Boolean(
+    user?.is_master || 
+    (user as any)?.role === 'master' || 
+    (user as any)?.role === 'admin' || 
+    (user as any)?.is_admin ||
+    user?.username?.toLowerCase() === 'admin'
+  );
+
   // New Expense form
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [km, setKm] = useState('');
@@ -30,7 +43,9 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [hospedagem, setHospedagem] = useState('');
   const [outros, setOutros] = useState('');
   const [obs, setObs] = useState('');
+  const [comprovanteUri, setComprovanteUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [processingAction, setProcessingAction] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -47,6 +62,16 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     loadData();
   }, [loadData]);
 
+  async function handleAttachPhotoCamera() {
+    const p = await takePhoto('Comprovante Reembolso');
+    if (p) setComprovanteUri(p.uri);
+  }
+
+  async function handleAttachPhotoGallery() {
+    const p = await pickImage('Comprovante Reembolso');
+    if (p) setComprovanteUri(p.uri);
+  }
+
   async function handleCreateExpense() {
     setLoading(true);
     try {
@@ -59,6 +84,11 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       const nHosp = parseFloat(hospedagem) || 0;
       const nOutros = parseFloat(outros) || 0;
       const total = (nKm * nValorKm) + nAlim + nHosp + nOutros;
+
+      let b64: string | undefined = undefined;
+      if (comprovanteUri) {
+        b64 = await readPhotoBase64(comprovanteUri).catch(() => undefined);
+      }
 
       const newExp: Reembolso = {
         id: expId,
@@ -76,6 +106,8 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         total: total,
         status: 'Pendente',
         observacoes: obs.trim(),
+        comprovante_uri: comprovanteUri || undefined,
+        comprovante_base64: b64,
         sync_status: 'pending',
       };
 
@@ -98,6 +130,7 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       setHospedagem('');
       setOutros('');
       setObs('');
+      setComprovanteUri(null);
       setModalVisible(false);
 
       await loadData();
@@ -106,6 +139,44 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       Alert.alert('Erro ao Salvar', err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleApproveExpense(expId: number) {
+    if (!isMaster) return;
+    setProcessingAction(expId);
+    try {
+      await updateLocalReembolsoStatus(expId, 'Aprovado', user?.username || 'Gestor Master');
+      await addToSyncQueue('reembolso', expId, 'approve', `/api/reembolsos/${expId}/status`, 'POST', {
+        status: 'Aprovado',
+        aprovado_por_nome: user?.username || 'Gestor Master',
+      });
+      if (isOnline) triggerSync();
+      await loadData();
+      Alert.alert('Sucesso', 'Despesa homologada e aprovada com sucesso!');
+    } catch (err: any) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setProcessingAction(null);
+    }
+  }
+
+  async function handleRejectExpense(expId: number) {
+    if (!isMaster) return;
+    setProcessingAction(expId);
+    try {
+      await updateLocalReembolsoStatus(expId, 'Rejeitado', user?.username || 'Gestor Master');
+      await addToSyncQueue('reembolso', expId, 'reject', `/api/reembolsos/${expId}/status`, 'POST', {
+        status: 'Rejeitado',
+        aprovado_por_nome: user?.username || 'Gestor Master',
+      });
+      if (isOnline) triggerSync();
+      await loadData();
+      Alert.alert('Sucesso', 'Despesa rejeitada.');
+    } catch (err: any) {
+      Alert.alert('Erro', err.message);
+    } finally {
+      setProcessingAction(null);
     }
   }
 
@@ -153,6 +224,7 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             </View>
 
             <Text style={styles.projTitle}>{item.projeto_nome || 'Geral'}</Text>
+            <Text style={styles.userLabel}>Solicitante: {item.usuario_nome || 'Colaborador'}</Text>
 
             <View style={styles.breakdownBox}>
               {item.quilometragem > 0 && (
@@ -167,14 +239,23 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 <Text style={styles.breakdownText}>• Hospedagem: R$ {item.hospedagem.toFixed(2)}</Text>
               )}
               {item.outros_gastos > 0 && (
-                <Text style={styles.breakdownText}>• Outros: R$ {item.outros_gastos.toFixed(2)}</Text>
+                <Text style={styles.breakdownText}>• Outros / Pedágio: R$ {item.outros_gastos.toFixed(2)}</Text>
               )}
             </View>
+
+            {/* Comprovante Anexo (se houver) */}
+            {item.comprovante_uri && (
+              <View style={styles.comprovanteThumbWrapper}>
+                <Ionicons name="document-attach" size={16} color="#0284C7" />
+                <Text style={styles.comprovanteThumbText}>Comprovante Fiscal Anexado</Text>
+                <Image source={{ uri: item.comprovante_uri }} style={styles.receiptSmallImg} resizeMode="cover" />
+              </View>
+            )}
 
             <View style={styles.cardFooter}>
               <View style={[
                 styles.statusTag, 
-                item.status === 'Aprovado' ? styles.statusApproved : styles.statusPending
+                item.status === 'Aprovado' ? styles.statusApproved : item.status === 'Rejeitado' ? styles.statusRejected : styles.statusPending
               ]}>
                 <Text style={styles.statusTagText}>{item.status}</Text>
               </View>
@@ -183,16 +264,48 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 Total: R$ {(item.total || 0).toFixed(2)}
               </Text>
             </View>
+
+            {item.aprovado_por_nome && (
+              <Text style={styles.homologadoText}>
+                Homologado por: {item.aprovado_por_nome}
+              </Text>
+            )}
+
+            {/* Mesa de Homologação do Gestor Master (Seção 11.2 e 15.12) */}
+            {isMaster && item.status === 'Pendente' && (
+              <View style={styles.masterApprovalBox}>
+                <Text style={styles.masterApprovalTitle}>Decisão do Gestor Master:</Text>
+                <View style={styles.masterApprovalButtonsRow}>
+                  <TouchableOpacity 
+                    style={[styles.btnMasterApprove, processingAction === item.id && { opacity: 0.6 }]}
+                    onPress={() => handleApproveExpense(item.id)}
+                    disabled={processingAction === item.id}
+                  >
+                    <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                    <Text style={styles.btnMasterActionText}>Aprovar Despesa</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.btnMasterReject, processingAction === item.id && { opacity: 0.6 }]}
+                    onPress={() => handleRejectExpense(item.id)}
+                    disabled={processingAction === item.id}
+                  >
+                    <Ionicons name="close-circle" size={16} color="#FFFFFF" />
+                    <Text style={styles.btnMasterActionText}>Rejeitar Despesa</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         )}
       />
 
-      {/* New Modal */}
+      {/* Modal Novo Reembolso */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Novo Reembolso</Text>
+              <Text style={styles.modalTitle}>Solicitar Reembolso</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
@@ -200,7 +313,7 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Obra Vinculada:</Text>
+                <Text style={styles.label}>Obra Atendida:</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
                   {projetos.map(p => (
                     <TouchableOpacity
@@ -272,27 +385,61 @@ export const ExpensesScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 />
               </View>
 
+              {/* Upload de Comprovantes Fiscais (Câmera / Galeria - Seção 11.1 e 15.12) */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Comprovante Fiscal (Cupom / Nota):</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity style={styles.receiptAttachBtn} onPress={handleAttachPhotoCamera}>
+                    <Ionicons name="camera" size={18} color="#FFFFFF" />
+                    <Text style={styles.receiptAttachBtnText}>Foto Cupom</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.receiptAttachBtn, { backgroundColor: '#475569' }]} onPress={handleAttachPhotoGallery}>
+                    <Ionicons name="images" size={18} color="#FFFFFF" />
+                    <Text style={styles.receiptAttachBtnText}>Galeria</Text>
+                  </TouchableOpacity>
+                </View>
+                {comprovanteUri && (
+                  <View style={styles.previewBox}>
+                    <Image source={{ uri: comprovanteUri }} style={styles.previewImg} resizeMode="cover" />
+                    <TouchableOpacity style={styles.removeReceiptBtn} onPress={() => setComprovanteUri(null)}>
+                      <Ionicons name="trash" size={16} color="#EF4444" />
+                      <Text style={styles.removeReceiptText}>Remover</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Observações:</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   multiline
                   numberOfLines={2}
-                  placeholder="Descreva o motivo da despesa..."
+                  placeholder="Descreva o motivo da despesa ou detalhes do trajeto..."
                   value={obs}
                   onChangeText={setObs}
                 />
               </View>
 
-              <TouchableOpacity 
-                style={[styles.saveBtn, loading && { opacity: 0.7 }]}
-                onPress={handleCreateExpense}
-                disabled={loading}
-              >
-                <Text style={styles.saveBtnText}>
-                  {loading ? 'Salvando...' : 'Salvar Reembolso'}
-                </Text>
-              </TouchableOpacity>
+              {/* Disposição de Botões do Modal: Cancelar à esquerda e Enviar Solicitação à direita (Seção 15.12) */}
+              <View style={styles.modalButtonsRow}>
+                <TouchableOpacity 
+                  style={styles.modalCancelBtn}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={styles.modalCancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.modalSubmitBtn, loading && { opacity: 0.7 }]}
+                  onPress={handleCreateExpense}
+                  disabled={loading}
+                >
+                  <Text style={styles.modalSubmitBtnText}>
+                    {loading ? 'Enviando...' : 'Enviar Solicitação'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
@@ -328,7 +475,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   dateText: { fontSize: 12, color: Colors.textMuted },
-  projTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 8 },
+  projTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 2 },
+  userLabel: { fontSize: 12, color: '#64748B', marginBottom: 8 },
   breakdownBox: {
     backgroundColor: '#F8FAFC',
     borderRadius: 8,
@@ -347,8 +495,78 @@ const styles = StyleSheet.create({
   statusTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   statusApproved: { backgroundColor: '#D1FAE5' },
   statusPending: { backgroundColor: '#FEF3C7' },
+  statusRejected: { backgroundColor: '#FEE2E2' },
   statusTagText: { fontSize: 11, fontWeight: 'bold', color: '#1E293B' },
   totalText: { fontSize: 15, fontWeight: 'bold', color: Colors.primary },
+  homologadoText: { fontSize: 11, color: '#15803D', fontStyle: 'italic', marginTop: 4 },
+  
+  // Master Approval Section
+  masterApprovalBox: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  masterApprovalTitle: { fontSize: 12, fontWeight: 'bold', color: '#334155', marginBottom: 6 },
+  masterApprovalButtonsRow: { flexDirection: 'row', gap: 8 },
+  btnMasterApprove: {
+    flex: 1,
+    height: 38,
+    backgroundColor: '#16A34A',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  btnMasterReject: {
+    flex: 1,
+    height: 38,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  btnMasterActionText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
+
+  // Comprovante
+  comprovanteThumbWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0F9FF',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  comprovanteThumbText: { fontSize: 12, color: '#0369A1', flex: 1, fontWeight: '600' },
+  receiptSmallImg: { width: 36, height: 36, borderRadius: 4 },
+  receiptAttachBtn: {
+    flex: 1,
+    height: 42,
+    backgroundColor: '#0284C7',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  receiptAttachBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
+  previewBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  previewImg: { width: 60, height: 60, borderRadius: 6 },
+  removeReceiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6 },
+  removeReceiptText: { color: '#EF4444', fontSize: 12, fontWeight: 'bold' },
+
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginTop: 12 },
   emptySub: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 },
@@ -401,14 +619,42 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   chipText: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
   chipTextActive: { color: '#FFFFFF' },
-  saveBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  // Modal Buttons: Cancelar à esquerda e Enviar Solicitação à direita (Seção 15.12)
+  modalButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
     marginTop: 12,
     marginBottom: 20,
   },
-  saveBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
+  modalCancelBtn: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  modalCancelBtnText: {
+    color: '#475569',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  modalSubmitBtn: {
+    flex: 1.5,
+    height: 48,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.sm,
+  },
+  modalSubmitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
 });
+

@@ -113,7 +113,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     }, 700);
   }
 
-  async function handleCreateExpress() {
+  async function handleCreateExpress(status: 'em_andamento' | 'Aguardando Aprovação' = 'Aguardando Aprovação') {
     if (!obraNome.trim()) {
       Alert.alert('Atenção', 'Informe o nome da obra.');
       return;
@@ -166,7 +166,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         informacoes_tecnicas: informacoesTecnicas.trim(),
         checklist_data: checklistData.trim(),
         observacoes_finais: observacoes.trim(),
-        status: 'Aguardando Aprovação',
+        status: status,
         sync_status: 'pending',
         fotos_count: attachedFotos.length,
       };
@@ -189,7 +189,12 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
       setModalVisible(false);
       await loadReports();
-      Alert.alert('Sucesso', `Relatório Express ${numero} registrado com sucesso!`);
+      Alert.alert(
+        'Sucesso', 
+        status === 'Aguardando Aprovação' 
+          ? `Relatório Express ${numero} submetido para aprovação!` 
+          : `Rascunho do Relatório Express ${numero} salvo localmente!`
+      );
     } catch (err: any) {
       Alert.alert('Erro ao Salvar', err.message);
     } finally {
@@ -527,15 +532,28 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 )}
               </View>
 
-              <TouchableOpacity 
-                style={[styles.submitExpressBtn, loading && { opacity: 0.7 }]}
-                onPress={handleCreateExpress}
-                disabled={loading}
-              >
-                <Text style={styles.submitExpressText}>
-                  {loading ? 'Salvando...' : 'Salvar & Concluir Relatório Express'}
-                </Text>
-              </TouchableOpacity>
+              {/* Disposição dos Botões Inferiores (Um de Cada Lado - Seção 15.9 & 16) */}
+              <View style={styles.modalExpressFooterRow}>
+                {/* Lado Esquerdo (50% de largura): Botão "Salvar Rascunho" */}
+                <TouchableOpacity 
+                  style={[styles.btnExpressDraft, loading && { opacity: 0.6 }]}
+                  onPress={() => handleCreateExpress('em_andamento')}
+                  disabled={loading}
+                >
+                  <Ionicons name="document-text-outline" size={18} color="#0284C7" />
+                  <Text style={styles.btnExpressDraftText}>Salvar Rascunho</Text>
+                </TouchableOpacity>
+
+                {/* Lado Direito (50% de largura): Botão "Enviar Aprovação" */}
+                <TouchableOpacity 
+                  style={[styles.btnExpressSubmit, loading && { opacity: 0.6 }]}
+                  onPress={() => handleCreateExpress('Aguardando Aprovação')}
+                  disabled={loading}
+                >
+                  <Ionicons name="paper-plane" size={18} color="#FFFFFF" />
+                  <Text style={styles.btnExpressSubmitText}>Enviar Aprovação</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
@@ -732,17 +750,46 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
-  submitExpressBtn: {
-    backgroundColor: '#059669',
+  modalExpressFooterRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+    marginBottom: 20,
+  },
+  btnExpressDraft: {
+    flex: 1,
     height: 48,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0284C7',
     borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
-    marginBottom: 20,
+    gap: 6,
+    ...Shadows.sm,
+  },
+  btnExpressDraftText: {
+    color: '#0284C7',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  btnExpressSubmit: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     ...Shadows.md,
   },
-  submitExpressText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  btnExpressSubmitText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
   cardPhotoRow: {
     flexDirection: 'row',
     alignItems: 'center',

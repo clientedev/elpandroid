@@ -37,6 +37,21 @@ const DEFAULT_CHECKLIST: ChecklistItemState[] = [
   { id: 7, item: 'Limpeza e desincrustação final da fachada', checked: false, observacao: '' },
 ];
 
+const DEFAULT_USER_LAT = -23.55052;
+const DEFAULT_USER_LON = -46.633308;
+
+function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ route, navigation }) => {
   const { user } = useAuth();
   const { isOnline, triggerSync } = useNetwork();
@@ -48,19 +63,44 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
 
+  // 1º Campo Superior: Data da Visita (editável no topo)
+  const [dataVisita, setDataVisita] = useState(new Date().toISOString().substring(0, 10));
+
+  // 2º Campo: Obra Selecionada (ordenada por proximidade geográfica do GPS)
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(preSelectedProjectId || null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number }>({
+    latitude: DEFAULT_USER_LAT,
+    longitude: DEFAULT_USER_LON
+  });
+
+  // 3º Campo: Número Oficial (read-only)
   const [reportUuid, setReportUuid] = useState(() => `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   const [reportNumber, setReportNumber] = useState('Pendente Sincronização');
   const [titulo, setTitulo] = useState('Relatório de Vistoria Técnica');
   const [categoria, setCategoria] = useState('Geral');
   const [local, setLocal] = useState('Fachada Principal');
+
+  // Sanfonas colapsáveis
+  const [showTechInfo, setShowTechInfo] = useState(false);
+  const [showChecklist, setShowChecklist] = useState(false);
+
+  // Acompanhantes da Visita
+  const [acompanhantesList, setAcompanhantesList] = useState<string[]>([]);
+  const [showAcompanhanteModal, setShowAcompanhanteModal] = useState(false);
+  const [novoAcompNome, setNovoAcompNome] = useState('');
+  const [novoAcompCargo, setNovoAcompCargo] = useState('');
+  const [novoAcompEmpresa, setNovoAcompEmpresa] = useState('');
+
+  // Checklist e Observações
+  const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
   const [descricao, setDescricao] = useState('');
   const [observacoesFinais, setObservacoesFinais] = useState('');
-  const [fotos, setFotos] = useState<FotoRelatorio[]>([]);
-  const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
 
-  // Reminders
+  // Fotos
+  const [fotos, setFotos] = useState<FotoRelatorio[]>([]);
+
+  // Lembretes para a Próxima Visita
   const [lembretes, setLembretes] = useState<Lembrete[]>([]);
   const [novoLembreteTexto, setNovoLembreteTexto] = useState('');
   const [showNovoLembreteInput, setShowNovoLembreteInput] = useState(false);
@@ -77,18 +117,51 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [loading, setLoading] = useState(false);
   const initializedDraftRef = React.useRef(false);
 
+  // Localização do dispositivo para ordenação inteligente por proximidade
+  useEffect(() => {
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any)?.geolocation) {
+        (navigator as any).geolocation.getCurrentPosition(
+          (pos: any) => {
+            if (pos?.coords) {
+              setUserLocation({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude
+              });
+            }
+          },
+          () => null,
+          { timeout: 5000 }
+        );
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     getLocalProjetos().then(p => {
-      setProjetos(p);
-      if (!selectedProjectId && p.length > 0 && !preSelectedProjectId && !initialReportId) {
-        setSelectedProjectId(p[0].id);
+      let sortedProjs = [...p];
+      if (userLocation) {
+        sortedProjs.sort((a, b) => {
+          const distA = (a.latitude && a.longitude) 
+            ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, a.latitude, a.longitude) 
+            : 999999;
+          const distB = (b.latitude && b.longitude) 
+            ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, b.latitude, b.longitude) 
+            : 999999;
+          return distA - distB;
+        });
+      }
+      setProjetos(sortedProjs);
+      if (!selectedProjectId && sortedProjs.length > 0 && !preSelectedProjectId && !initialReportId) {
+        setSelectedProjectId(sortedProjs[0].id);
       }
     });
     getLocalLegendas().then(l => setLegendas(l));
-  }, [preSelectedProjectId, initialReportId]);
+  }, [preSelectedProjectId, initialReportId, userLocation]);
+
+  const selectedProj = projetos.find(p => p.id === selectedProjectId);
 
   // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
-  // Se estiver ONLINE, o número oficial é reservado e atribuído pelo servidor na hora!
   useEffect(() => {
     if (!initialReportId && selectedProjectId && !initializedDraftRef.current) {
       initializedDraftRef.current = true;
@@ -98,7 +171,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   async function initImmediateDraft(projId: number) {
     try {
-      const selectedProj = projetos.find(p => p.id === projId);
+      const proj = projetos.find(p => p.id === projId);
       let draftId = currentReportId;
       const initialUuid = reportUuid;
       const creationDate = new Date().toISOString();
@@ -106,7 +179,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       let assignedNumero = 'Pendente Sincronização';
       let syncStatus: 'synced' | 'pending' = 'pending';
 
-      // 1. Se estiver ONLINE ao começar, já busca o número oficial no servidor
       if (isOnline) {
         try {
           const res = await apiClient.axios.post('/api/relatorios', {
@@ -132,7 +204,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         }
       }
 
-      // 2. Salva o rascunho imediatamente no SQLite local
       const draftObj: Relatorio = {
         id: draftId,
         uuid: initialUuid,
@@ -140,11 +211,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         numero: assignedNumero,
         titulo: titulo || 'Relatório de Vistoria Técnica',
         projeto_id: projId,
-        projeto_nome: selectedProj?.nome || 'Obra',
+        projeto_nome: proj?.nome || 'Obra',
         visita_id: preSelectedVisitId || null,
         autor_id: user?.id || 1,
         autor_nome: user?.username || 'Responsável',
-        data_relatorio: creationDate,
+        data_relatorio: dataVisita,
         data_criacao_local: creationDate,
         descricao: '',
         observacoes_finais: '',
@@ -168,7 +239,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }
   }
 
-  // Load existing draft if editing
+  // Carregar rascunho existente
   useEffect(() => {
     if (initialReportId) {
       getLocalRelatorioById(initialReportId).then(async (r) => {
@@ -178,6 +249,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           setReportNumber(r.numero || 'Pendente Sincronização');
           setTitulo(r.titulo);
           setSelectedProjectId(r.projeto_id);
+          if (r.data_relatorio) setDataVisita(r.data_relatorio.substring(0, 10));
           setDescricao(r.descricao || '');
           setObservacoesFinais(r.observacoes_finais || '');
           setCategoria(r.categoria || 'Geral');
@@ -202,14 +274,14 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }
   }, [selectedProjectId]);
 
-  // Auto-Save Effect: saves draft locally in SQLite as the user fills the form
+  // Mecanismo de AutoSave a cada 2 segundos após parar de digitar (debounce de 2000ms conforme Regra do Manual)
   useEffect(() => {
     if (!selectedProjectId) return;
 
     const timer = setTimeout(async () => {
       try {
         setIsAutoSaving(true);
-        const selectedProj = projetos.find(p => p.id === selectedProjectId);
+        const proj = projetos.find(p => p.id === selectedProjectId);
         const draft: Relatorio = {
           id: currentReportId,
           uuid: reportUuid,
@@ -218,11 +290,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           numero: reportNumber,
           titulo: titulo.trim() || 'Rascunho de Relatório',
           projeto_id: selectedProjectId,
-          projeto_nome: selectedProj?.nome || 'Obra',
+          projeto_nome: proj?.nome || 'Obra',
           visita_id: preSelectedVisitId || null,
           autor_id: user?.id || 1,
           autor_nome: user?.username || 'Responsável',
-          data_relatorio: new Date().toISOString(),
+          data_relatorio: dataVisita,
           descricao: descricao.trim(),
           observacoes_finais: observacoesFinais.trim(),
           checklist_data: JSON.stringify(checklist),
@@ -248,13 +320,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       } finally {
         setIsAutoSaving(false);
       }
-    }, 1000);
+    }, 2000);
 
     return () => clearTimeout(timer);
-  }, [selectedProjectId, titulo, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos]);
+  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, projetos]);
 
   async function handleAddPhotoCamera() {
-    const selectedProj = projetos.find(p => p.id === selectedProjectId);
     const photo = await takePhoto(selectedProj?.nome);
     if (photo) {
       const newFoto: FotoRelatorio = {
@@ -273,7 +344,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }
 
   async function handleAddPhotoGallery() {
-    const selectedProj = projetos.find(p => p.id === selectedProjectId);
     const photo = await pickImage(selectedProj?.nome);
     if (photo) {
       const newFoto: FotoRelatorio = {
@@ -317,6 +387,20 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }
   }
 
+  function handleAddAcompanhante() {
+    if (!novoAcompNome.trim()) return;
+    const desc = `${novoAcompNome.trim()}${novoAcompCargo.trim() ? ` (${novoAcompCargo.trim()})` : ''}${novoAcompEmpresa.trim() ? ` - ${novoAcompEmpresa.trim()}` : ''}`;
+    setAcompanhantesList(prev => [...prev, desc]);
+    setNovoAcompNome('');
+    setNovoAcompCargo('');
+    setNovoAcompEmpresa('');
+    setShowAcompanhanteModal(false);
+  }
+
+  function handleRemoveAcompanhante(idx: number) {
+    setAcompanhantesList(prev => prev.filter((_, i) => i !== idx));
+  }
+
   async function handleCloseReminder(lembreteId: number) {
     await closeLocalLembrete(lembreteId, user?.username || 'Responsável');
     if (selectedProjectId) {
@@ -327,7 +411,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   async function handleAddReminder() {
     if (!novoLembreteTexto.trim() || !selectedProjectId) return;
-    const selectedProj = projetos.find(p => p.id === selectedProjectId);
     const newLemb: Lembrete = {
       id: Date.now(),
       projeto_id: selectedProjectId,
@@ -364,9 +447,20 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       return;
     }
 
+    // Regra Crítica da Tabela 16: Legenda de Fotos é Obrigatória para envio à aprovação
+    if (status === 'Aguardando Aprovação' && fotos.length > 0) {
+      const fotosSemLegenda = fotos.findIndex(f => !f.legenda || !f.legenda.trim());
+      if (fotosSemLegenda !== -1) {
+        Alert.alert(
+          'Legenda Obrigatória',
+          `A Foto #${fotosSemLegenda + 1} está sem legenda técnica. Pela regra de governança pericial, todas as fotos devem conter legenda antes do envio para aprovação.`
+        );
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      const selectedProj = projetos.find(p => p.id === selectedProjectId);
       const reportId = currentReportId;
 
       const relData: Relatorio = {
@@ -381,7 +475,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         visita_id: preSelectedVisitId || null,
         autor_id: user?.id || 1,
         autor_nome: user?.username || 'Responsável',
-        data_relatorio: new Date().toISOString(),
+        data_relatorio: dataVisita,
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
         checklist_data: JSON.stringify(checklist),
@@ -419,8 +513,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       Alert.alert(
         'Sucesso!', 
         status === 'Aguardando Aprovação' 
-          ? 'Relatório finalizado e enviado para aprovação!' 
-          : 'Relatório salvo com sucesso no dispositivo!',
+          ? 'Relatório submetido para aprovação técnica com sucesso!' 
+          : 'Relatório salvo e concluído com sucesso!',
         [{ 
           text: 'OK', 
           onPress: () => {
@@ -442,109 +536,342 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   return (
     <View style={styles.container}>
       <Header 
-        title="Novo Relatório de Obra" 
-        subtitle={reportNumber}
+        title="Relatório de Obra" 
+        subtitle={reportNumber} 
         showBack 
         onBack={() => navigation.goBack()} 
       />
       <OfflineBanner />
 
-      {/* Auto-save Status Indicator */}
+      {/* Indicador de AutoSave em Tempo Real no Topo (Seção 6 e 15.7) */}
       <View style={styles.autoSaveBar}>
         <Ionicons 
-          name={isAutoSaving ? "sync-outline" : "checkmark-circle-outline"} 
+          name={isAutoSaving ? "sync-outline" : "checkmark-circle"} 
           size={14} 
-          color={isAutoSaving ? Colors.primary : "#16A34A"} 
+          color={isAutoSaving ? "#0284C7" : "#16A34A"} 
         />
-        <Text style={styles.autoSaveText}>
+        <Text style={[styles.autoSaveText, isAutoSaving && { color: '#0284C7' }]}>
           {isAutoSaving 
-            ? "Salvando rascunho automaticamente..." 
-            : (lastSavedTime ? `Rascunho salvo automaticamente às ${lastSavedTime}` : "Salvamento automático ativado")}
+            ? "⏳ Salvando rascunho silenciosamente..." 
+            : (lastSavedTime ? `🟢 Salvo automaticamente às ${lastSavedTime}` : "🟢 Salvamento automático em tempo real ativado")}
         </Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Section 1: Basic Info */}
+        {/* Bloco 1: Data da Visita, Obra e Número */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>1. Identificação da Obra</Text>
+          <Text style={styles.sectionHeaderTitle}>Identificação da Visita</Text>
 
-          {/* Number Locked */}
-          {(() => {
-            const isOfficial = Boolean(reportNumber && reportNumber.startsWith('REL-'));
-            return (
-              <View style={styles.inputGroup}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Text style={styles.label}>Número Oficial do Relatório</Text>
-                  <View style={{ 
-                    backgroundColor: isOfficial ? '#DCFCE7' : '#FEF3C7', 
-                    paddingHorizontal: 8, 
-                    paddingVertical: 2, 
-                    borderRadius: 6 
-                  }}>
-                    <Text style={{ 
-                      fontSize: 10, 
-                      color: isOfficial ? '#15803D' : '#B45309', 
-                      fontWeight: '700' 
-                    }}>
-                      {isOfficial ? 'OFICIAL • SERVIDOR' : 'OFFLINE • PENDENTE SYNC'}
+          {/* 1º Campo: Data da Visita (Prioridade no início da página - Seção 4.1 e 15.7) */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>1. Data da Visita Técnica *</Text>
+            <View style={styles.dateInputWrapper}>
+              <Ionicons name="calendar-outline" size={18} color="#0284C7" />
+              <TextInput 
+                style={styles.dateInput} 
+                value={dataVisita} 
+                onChangeText={setDataVisita} 
+                placeholder="AAAA-MM-DD"
+              />
+            </View>
+          </View>
+
+          {/* 2º Campo: Seleção da Obra (ordenada por proximidade geográfica) */}
+          <View style={styles.inputGroup}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+              <Text style={styles.label}>2. Seleção da Obra *</Text>
+              {userLocation && (
+                <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '600' }}>
+                  📍 Ordenadas por proximidade GPS
+                </Text>
+              )}
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              {projetos.map(p => {
+                const distKm = (userLocation && p.latitude && p.longitude)
+                  ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, p.latitude, p.longitude)
+                  : null;
+
+                return (
+                  <TouchableOpacity
+                    key={p.id}
+                    style={[styles.chip, selectedProjectId === p.id && styles.chipActive]}
+                    onPress={() => setSelectedProjectId(p.id)}
+                  >
+                    <Text style={[styles.chipText, selectedProjectId === p.id && styles.chipTextActive]}>
+                      {p.numero ? `${p.numero} - ` : ''}{p.nome}
+                      {distKm !== null ? ` (${distKm.toFixed(1)} km)` : ''}
                     </Text>
-                  </View>
-                </View>
-                <View style={[styles.lockedNumberBox, isOfficial && { borderColor: '#16A34A', backgroundColor: '#F0FDF4' }]}>
-                  <Ionicons 
-                    name={isOfficial ? "checkmark-circle" : "cloud-offline-outline"} 
-                    size={18} 
-                    color={isOfficial ? "#16A34A" : Colors.warning} 
-                  />
-                  <Text style={[styles.lockedNumberText, isOfficial && { color: '#15803D', fontWeight: '700' }]}>
-                    {isOfficial ? reportNumber : `Pendente Sincronização • UUID: ${reportUuid.substring(0, 8)}`}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 4 }}>
-                  {isOfficial 
-                    ? 'Número sequencial atômico validado e atribuído pelo servidor central.' 
-                    : 'A numeração oficial (REL-0001, REL-0042, etc.) é gerada exclusivamente pelo servidor central na ordem de sincronização.'}
-                </Text>
-              </View>
-            );
-          })()}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
 
-          <Text style={styles.label}>Obra Correspondente *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-            {projetos.map(p => (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.chip, selectedProjectId === p.id && styles.chipActive]}
-                onPress={() => setSelectedProjectId(p.id)}
-              >
-                <Text style={[styles.chipText, selectedProjectId === p.id && styles.chipTextActive]}>
-                  {p.numero} - {p.nome}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {/* 3º Campo: Número do Relatório (Calculado e Não Editável) */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>3. Número do Relatório (Sequencial Automático)</Text>
+            <View style={styles.lockedNumberBox}>
+              <Ionicons name="lock-closed" size={16} color="#64748B" />
+              <Text style={styles.lockedNumberText}>{reportNumber}</Text>
+            </View>
+            <Text style={styles.helperText}>
+              Número sequencial contínuo gerado atomicamente pela regra da obra para evitar duplicidades.
+            </Text>
+          </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Título do Relatório *</Text>
+            <Text style={styles.label}>Título do Laudo</Text>
             <TextInput style={styles.input} value={titulo} onChangeText={setTitulo} />
           </View>
 
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Categoria</Text>
-              <TextInput style={styles.input} value={categoria} onChangeText={setCategoria} />
+              <Text style={styles.label}>Categoria da Obra</Text>
+              <TextInput style={styles.input} value={categoria} onChangeText={setCategoria} placeholder="Ex: Fachada Leste" />
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Local Específico</Text>
-              <TextInput style={styles.input} value={local} onChangeText={setLocal} />
+              <Text style={styles.label}>Local / Pavimento</Text>
+              <TextInput style={styles.input} value={local} onChangeText={setLocal} placeholder="Ex: 12º Pavimento" />
             </View>
           </View>
         </View>
 
-        {/* Section 2: Active Reminders */}
+        {/* 4º Sanfona Colapsável 1: Informações Técnicas da Obra (Azul-petróleo #0284C7) */}
+        <View style={styles.accordionCard}>
+          <TouchableOpacity 
+            style={styles.techAccordionHeader}
+            onPress={() => setShowTechInfo(!showTechInfo)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="information-circle" size={18} color="#FFFFFF" />
+              <Text style={styles.techAccordionTitle}>4. Informações Técnicas da Obra</Text>
+            </View>
+            <Ionicons name={showTechInfo ? "chevron-up" : "chevron-down"} size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {showTechInfo && (
+            <View style={styles.accordionBody}>
+              {selectedProj ? (
+                <View style={styles.techDetailsBox}>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Construtora: </Text>{selectedProj.construtora || 'Não informada'}</Text>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Tipo: </Text>{selectedProj.tipo_obra || 'Não informado'}</Text>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Endereço: </Text>{selectedProj.endereco || 'Não informado'}</Text>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Chapisco: </Text>{selectedProj.especificacao_chapisco_colante || selectedProj.especificacao_chapisco_alvenaria || 'Conforme projeto'}</Text>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Argamassa: </Text>{selectedProj.especificacao_argamassa_emboco || selectedProj.forma_aplicacao_argamassa || 'Projetada/Manual com aditivo'}</Text>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Peitoris: </Text>{selectedProj.acabamento_peitoris || 'Granito com pingadeira'}</Text>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Frisos e Juntas: </Text>{selectedProj.definicao_frisos_cor || 'Selante elastomérico de PU'}</Text>
+                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Caimentos: </Text>{selectedProj.definicao_face_inferior_abas || 'Mínimo de 1% para ralos'}</Text>
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>Selecione uma obra acima para consultar as especificações de fachada.</Text>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* 5º Sanfona Colapsável 2: Checklist da Obra (Grafite escuro #334155, 48px de área de toque) */}
+        <View style={styles.accordionCard}>
+          <TouchableOpacity 
+            style={styles.checklistAccordionHeader}
+            onPress={() => setShowChecklist(!showChecklist)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="checkbox" size={18} color="#FFFFFF" />
+              <Text style={styles.checklistAccordionTitle}>
+                5. Checklist de Verificação ({checklist.filter(c => c.checked).length}/{checklist.length})
+              </Text>
+            </View>
+            <Ionicons name={showChecklist ? "chevron-up" : "chevron-down"} size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          {showChecklist && (
+            <View style={styles.accordionBody}>
+              <Text style={styles.subHintText}>
+                Toque para alternar o status de inspeção (área de toque confortável de 48px):
+              </Text>
+
+              {checklist.map((item, idx) => (
+                <View key={item.id} style={styles.checkItemContainer}>
+                  <TouchableOpacity 
+                    style={[styles.checkItemRow, item.checked && styles.checkItemRowActive]}
+                    onPress={() => toggleChecklistItem(idx)}
+                  >
+                    <Ionicons 
+                      name={item.checked ? "checkbox" : "square-outline"} 
+                      size={24} 
+                      color={item.checked ? "#16A34A" : Colors.textMuted} 
+                    />
+                    <Text style={[styles.checkItemText, item.checked && styles.checkItemTextActive]}>
+                      {item.item}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {item.checked && (
+                    <View style={styles.obsBox}>
+                      <TextInput
+                        style={styles.obsInput}
+                        placeholder="Adicionar nota específica deste item..."
+                        value={item.observacao}
+                        onChangeText={txt => updateChecklistObservacao(idx, txt)}
+                        multiline
+                      />
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* 6º Card de Acompanhantes da Visita */}
         <View style={styles.card}>
           <View style={styles.cardHeaderRow}>
-            <Text style={styles.sectionTitle}>2. Lembretes da Visita Anterior</Text>
+            <Text style={styles.sectionTitle}>6. Acompanhantes da Visita ({acompanhantesList.length})</Text>
+            <TouchableOpacity 
+              style={styles.addBtnSmall}
+              onPress={() => setShowAcompanhanteModal(true)}
+            >
+              <Ionicons name="add" size={16} color="#0284C7" />
+              <Text style={styles.addBtnSmallText}>+ Adicionar</Text>
+            </TouchableOpacity>
+          </View>
+
+          {acompanhantesList.length === 0 ? (
+            <Text style={styles.emptyText}>Nenhum acompanhante cadastrado (engenheiro residente, mestre de obras, etc.).</Text>
+          ) : (
+            acompanhantesList.map((acomp, idx) => (
+              <View key={idx} style={styles.acompItemRow}>
+                <Ionicons name="person-circle-outline" size={20} color="#0284C7" />
+                <Text style={styles.acompText}>{acomp}</Text>
+                <TouchableOpacity onPress={() => handleRemoveAcompanhante(idx)}>
+                  <Ionicons name="close-circle" size={18} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* 7º Observações Gerais */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>7. Observações Gerais & Parecer Técnico</Text>
+          <View style={styles.inputGroup}>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              multiline
+              numberOfLines={4}
+              placeholder="Diagnóstico pericial, condições encontradas em campo, testes realizados..."
+              value={descricao}
+              onChangeText={setDescricao}
+            />
+          </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Recomendações e Instruções à Construtora</Text>
+            <TextInput
+              style={[styles.input, styles.textAreaSmall]}
+              multiline
+              numberOfLines={3}
+              placeholder="Prazos, diretrizes executivas e determinações técnicas..."
+              value={observacoesFinais}
+              onChangeText={setObservacoesFinais}
+            />
+          </View>
+        </View>
+
+        {/* 8º Galeria de Fotos Mobile-First com Barra Superior Adesiva (56px) */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>8. Galeria de Fotos do Laudo ({fotos.length} fotos)</Text>
+
+          {/* Barra Fixa / Adesiva de 56px de altura (Seção 15.7) */}
+          <View style={styles.stickyPhotoBar}>
+            <TouchableOpacity style={styles.cameraBigBtn} onPress={handleAddPhotoCamera}>
+              <Ionicons name="camera" size={24} color="#FFFFFF" />
+              <Text style={styles.cameraBigBtnText}>Câmera</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.galleryBigBtn} onPress={handleAddPhotoGallery}>
+              <Ionicons name="images" size={24} color="#FFFFFF" />
+              <Text style={styles.galleryBigBtnText}>Galeria</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.photoCountRow}>
+            <Text style={styles.photoCountText}>Capacidade: {fotos.length} / 200 fotos</Text>
+          </View>
+
+          {fotos.map((item, index) => (
+            <View key={item.id} style={styles.photoCard}>
+              <View style={styles.thumbWrapper}>
+                {(() => {
+                  const resolvedUri = item.uri_local || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null));
+                  return resolvedUri ? (
+                    <Image source={{ uri: resolvedUri }} style={styles.thumb} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.thumbFallback}>
+                      <Ionicons name="camera-outline" size={24} color="#94A3B8" />
+                    </View>
+                  );
+                })()}
+                <PhotoAnnotationOverlay annotationsJson={item.anotacoes_dados} />
+              </View>
+
+              <View style={styles.photoInfo}>
+                <View style={styles.photoTopRow}>
+                  <Text style={styles.photoNum}>Foto #{index + 1}</Text>
+                  <TouchableOpacity onPress={() => handleRemovePhoto(index)}>
+                    <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Legenda Obrigatória com indicação visual */}
+                <View style={{ marginBottom: 6 }}>
+                  <Text style={[styles.legendaLabel, !item.legenda && { color: '#DC2626' }]}>
+                    Legenda Técnica {!item.legenda ? '(Obrigatória *)' : '✓'}
+                  </Text>
+                  <TextInput
+                    style={[styles.legendaInput, !item.legenda && styles.legendaInputMissing]}
+                    placeholder="Digite a legenda da patologia..."
+                    value={item.legenda}
+                    onChangeText={txt => {
+                      const updated = [...fotos];
+                      updated[index].legenda = txt;
+                      setFotos(updated);
+                    }}
+                  />
+                </View>
+
+                <View style={styles.photoActionRow}>
+                  <TouchableOpacity 
+                    style={styles.editShapesBtn}
+                    onPress={() => {
+                      setEditingPhotoIndex(index);
+                      setShowEditorModal(true);
+                    }}
+                  >
+                    <Ionicons name="brush-outline" size={14} color="#7C3AED" />
+                    <Text style={styles.editShapesText}>Editar (Setas/Círculos)</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.predefBtn}
+                    onPress={() => {
+                      setSelectedPhotoIndex(index);
+                      setShowLegendModal(true);
+                    }}
+                  >
+                    <Ionicons name="list-outline" size={14} color={Colors.primary} />
+                    <Text style={styles.predefText}>Legenda Padrão</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* 9º Card de Lembrete para a Próxima Visita */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.sectionTitle}>9. Lembretes para a Próxima Visita</Text>
             <TouchableOpacity 
               style={styles.addReminderBtn}
               onPress={() => setShowNovoLembreteInput(!showNovoLembreteInput)}
@@ -558,7 +885,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             <View style={styles.newReminderBox}>
               <TextInput
                 style={styles.newReminderInput}
-                placeholder="Ex: Verificar reaperto de ancoragens..."
+                placeholder="Ex: Checar cura da argamassa no 14º andar..."
                 value={novoLembreteTexto}
                 onChangeText={setNovoLembreteTexto}
               />
@@ -591,183 +918,78 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           )}
         </View>
 
-        {/* Section 3: Checklist with Individual Observations */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>3. Checklist de Verificação em Campo</Text>
-          <Text style={styles.subHintText}>
-            Marque os itens inspecionados e adicione observações individuais quando necessário:
-          </Text>
-
-          {checklist.map((item, idx) => (
-            <View key={item.id} style={styles.checkItemContainer}>
-              <TouchableOpacity 
-                style={styles.checkItemRow}
-                onPress={() => toggleChecklistItem(idx)}
-              >
-                <Ionicons 
-                  name={item.checked ? "checkbox" : "square-outline"} 
-                  size={22} 
-                  color={item.checked ? Colors.primary : Colors.textMuted} 
-                />
-                <Text style={[styles.checkItemText, item.checked && styles.checkItemTextActive]}>
-                  {item.item}
-                </Text>
-              </TouchableOpacity>
-
-              {item.checked && (
-                <View style={styles.obsBox}>
-                  <TextInput
-                    style={styles.obsInput}
-                    placeholder="Adicionar observação específica deste item..."
-                    value={item.observacao}
-                    onChangeText={txt => updateChecklistObservacao(idx, txt)}
-                    multiline
-                  />
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
-
-        {/* Section 4: Photos with Editor (Arrows, Shapes, Text) */}
-        <View style={styles.card}>
-          <View style={styles.photoHeaderRow}>
-            <Text style={styles.sectionTitle}>4. Fotos do Canteiro ({fotos.length})</Text>
-          </View>
-
-          <View style={styles.photoButtonsRow}>
-            <TouchableOpacity style={styles.cameraBtn} onPress={handleAddPhotoCamera}>
-              <Ionicons name="camera" size={20} color="#FFFFFF" />
-              <Text style={styles.photoBtnText}>Tirar Foto (Câmera)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.galleryBtn} onPress={handleAddPhotoGallery}>
-              <Ionicons name="images" size={20} color="#FFFFFF" />
-              <Text style={styles.photoBtnText}>Galeria</Text>
-            </TouchableOpacity>
-          </View>
-
-          {fotos.map((item, index) => (
-            <View key={item.id} style={styles.photoCard}>
-              <View style={styles.thumbWrapper}>
-                {(() => {
-                  const resolvedUri = item.uri_local || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null));
-                  return resolvedUri ? (
-                    <Image source={{ uri: resolvedUri }} style={styles.thumb} resizeMode="cover" />
-                  ) : (
-                    <View style={styles.thumbFallback}>
-                      <Ionicons name="camera-outline" size={24} color="#94A3B8" />
-                    </View>
-                  );
-                })()}
-                <PhotoAnnotationOverlay annotationsJson={item.anotacoes_dados} />
-              </View>
-
-              <View style={styles.photoInfo}>
-                <View style={styles.photoTopRow}>
-                  <Text style={styles.photoNum}>Foto #{index + 1}</Text>
-                  <TouchableOpacity onPress={() => handleRemovePhoto(index)}>
-                    <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-                  </TouchableOpacity>
-                </View>
-
-                <TextInput
-                  style={styles.legendaInput}
-                  placeholder="Escreva a legenda técnica da foto..."
-                  value={item.legenda}
-                  onChangeText={txt => {
-                    const updated = [...fotos];
-                    updated[index].legenda = txt;
-                    setFotos(updated);
-                  }}
-                />
-
-                <View style={styles.photoActionRow}>
-                  <TouchableOpacity 
-                    style={styles.editShapesBtn}
-                    onPress={() => {
-                      setEditingPhotoIndex(index);
-                      setShowEditorModal(true);
-                    }}
-                  >
-                    <Ionicons name="brush-outline" size={14} color="#7C3AED" />
-                    <Text style={styles.editShapesText}>Editar (Setas / Formas)</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.predefBtn}
-                    onPress={() => {
-                      setSelectedPhotoIndex(index);
-                      setShowLegendModal(true);
-                    }}
-                  >
-                    <Ionicons name="list-outline" size={14} color={Colors.primary} />
-                    <Text style={styles.predefText}>Legenda Padrão</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Section 5: Technical Observations */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>5. Descrição & Parecer Técnico</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Descrição dos Serviços Verificados</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              multiline
-              numberOfLines={4}
-              placeholder="Descreva o andamento dos serviços, testes realizados, anomalias encontradas..."
-              value={descricao}
-              onChangeText={setDescricao}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Recomendações e Observações Finais</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              multiline
-              numberOfLines={3}
-              placeholder="Instruções para a construtora, prazos, alertas..."
-              value={observacoesFinais}
-              onChangeText={setObservacoesFinais}
-            />
-          </View>
-        </View>
-
-        {/* Botão de Ação: Enviar para Aprovação */}
+        {/* 10º Barra Inferior de Ações Finais: Regras Estritas das Seções 15.7 e 16 */}
+        {/* Lado Esquerdo: "Enviar para Aprovação" (Amarelo warning com paper-plane) */}
+        {/* Lado Direito: "Salvar / Concluir Relatório" (Azul primary com save) */}
         <View style={styles.bottomButtonsRow}>
           <TouchableOpacity 
-            style={[styles.btnActionSubmit, { flex: 1, height: 50, borderRadius: 10 }, loading && styles.btnDisabled]} 
+            style={[styles.btnWarningSubmit, loading && styles.btnDisabled]} 
             onPress={() => handleSaveReport('Aguardando Aprovação')}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#1E293B" size="small" />
+            ) : (
+              <>
+                <Ionicons name="paper-plane" size={18} color="#1E293B" />
+                <Text style={styles.btnWarningSubmitText}>
+                  Enviar para Aprovação
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.btnPrimarySave, loading && styles.btnDisabled]} 
+            onPress={() => handleSaveReport('em_andamento')}
             disabled={loading}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <>
-                <Ionicons name="paper-plane" size={20} color="#FFFFFF" />
-                <Text style={[styles.btnActionSubmitText, { fontSize: 15, fontWeight: '700' }]}>
-                  Finalizar e Enviar para Aprovação
+                <Ionicons name="save" size={18} color="#FFFFFF" />
+                <Text style={styles.btnPrimarySaveText}>
+                  Salvar / Concluir
                 </Text>
               </>
             )}
           </TouchableOpacity>
         </View>
 
-        <View style={{ alignItems: 'center', marginTop: 10, paddingHorizontal: 16 }}>
-          <Text style={{ fontSize: 12, color: Colors.textMuted, textAlign: 'center' }}>
-            ✓ Rascunho salvo continuamente no dispositivo. Você pode retornar à tela anterior a qualquer momento sem perder seus dados.
-          </Text>
-        </View>
-
-
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Modal Adicionar Acompanhante */}
+      <Modal visible={showAcompanhanteModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentSmall}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Novo Acompanhante</Text>
+              <TouchableOpacity onPress={() => setShowAcompanhanteModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Nome Completo *</Text>
+              <TextInput style={styles.input} value={novoAcompNome} onChangeText={setNovoAcompNome} placeholder="Ex: Eng. Roberto Santos" />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Cargo / Função</Text>
+              <TextInput style={styles.input} value={novoAcompCargo} onChangeText={setNovoAcompCargo} placeholder="Ex: Engenheiro Residente" />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Empresa / Construtora</Text>
+              <TextInput style={styles.input} value={novoAcompEmpresa} onChangeText={setNovoAcompEmpresa} placeholder="Ex: Construtora Alpha" />
+            </View>
+
+            <TouchableOpacity style={styles.primaryModalBtn} onPress={handleAddAcompanhante}>
+              <Text style={styles.primaryModalBtnText}>Confirmar Acompanhante</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Photo Editor Modal */}
       <PhotoEditorModal
@@ -826,15 +1048,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     ...Shadows.sm,
   },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+  sectionHeaderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 12,
   },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 10 },
+  sectionTitle: { fontSize: 15, fontWeight: 'bold', color: Colors.text, marginBottom: 10 },
   subHintText: { fontSize: 12, color: Colors.textSecondary, marginBottom: 12 },
-  chipScroll: { flexDirection: 'row', marginBottom: 14 },
+  chipScroll: { flexDirection: 'row', marginBottom: 10 },
   chip: {
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 12,
@@ -850,6 +1072,23 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 12 },
   row: { flexDirection: 'row', gap: 10 },
   label: { fontSize: 13, fontWeight: '600', color: '#334155', marginBottom: 4 },
+  helperText: { fontSize: 11, color: Colors.textMuted, marginTop: 4 },
+  dateInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 8,
+  },
+  dateInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
+  },
   lockedNumberBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -859,7 +1098,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 40,
+    height: 44,
   },
   lockedNumberText: {
     fontSize: 14,
@@ -876,7 +1115,273 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
   },
-  textArea: { height: 80, textAlignVertical: 'top', paddingVertical: 8 },
+  textArea: { height: 90, textAlignVertical: 'top', paddingVertical: 8 },
+  textAreaSmall: { height: 70, textAlignVertical: 'top', paddingVertical: 8 },
+  
+  // Accordions
+  accordionCard: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 16,
+    ...Shadows.sm,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  techAccordionHeader: {
+    backgroundColor: '#0284C7', // Azul-petróleo conforme Seção 15.7
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  techAccordionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  checklistAccordionHeader: {
+    backgroundColor: '#334155', // Grafite escuro conforme Seção 15.7
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  checklistAccordionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  accordionBody: {
+    padding: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  techDetailsBox: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    gap: 6,
+  },
+  techDetailItem: {
+    fontSize: 12,
+    color: '#0369A1',
+    lineHeight: 18,
+  },
+  techDetailBold: {
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+
+  // Checklist 48px Touch Target
+  checkItemContainer: {
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 6,
+  },
+  checkItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48, // 48px touch target
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 10,
+  },
+  checkItemRowActive: {
+    backgroundColor: '#F0FDF4',
+  },
+  checkItemText: {
+    fontSize: 13,
+    color: '#334155',
+    flex: 1,
+  },
+  checkItemTextActive: {
+    fontWeight: '600',
+    color: '#166534',
+  },
+  obsBox: {
+    marginTop: 4,
+    marginLeft: 34,
+  },
+  obsInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 12,
+    color: Colors.text,
+  },
+
+  // Acompanhantes
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  addBtnSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  addBtnSmallText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#0284C7',
+  },
+  acompItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 6,
+    gap: 8,
+  },
+  acompText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#334155',
+    fontWeight: '500',
+  },
+
+  // Sticky Photo Bar (56px)
+  stickyPhotoBar: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  cameraBigBtn: {
+    flex: 1,
+    height: 56, // 56px de altura
+    backgroundColor: '#0284C7', // Azul
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadows.sm,
+  },
+  cameraBigBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  galleryBigBtn: {
+    flex: 1,
+    height: 56, // 56px de altura
+    backgroundColor: '#16A34A', // Verde
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadows.sm,
+  },
+  galleryBigBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  photoCountRow: {
+    alignItems: 'flex-end',
+    marginBottom: 12,
+  },
+  photoCountText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  photoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  thumbWrapper: {
+    width: 86,
+    height: 86,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#E2E8F0',
+  },
+  thumbFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  thumb: { width: '100%', height: '100%', borderRadius: 8 },
+  photoInfo: { flex: 1, marginLeft: 12 },
+  photoTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  photoNum: { fontSize: 13, fontWeight: 'bold', color: Colors.text },
+  legendaLabel: { fontSize: 11, fontWeight: '600', color: '#475569', marginBottom: 2 },
+  legendaInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    height: 36,
+    fontSize: 12,
+  },
+  legendaInputMissing: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  photoActionRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 6,
+  },
+  editShapesBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.25)',
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
+  editShapesText: { fontSize: 11, color: '#7C3AED', fontWeight: '600' },
+  predefBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.25)',
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
+  predefText: { fontSize: 11, color: Colors.primary, fontWeight: '600' },
+
+  // Lembretes
   addReminderBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -886,11 +1391,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
   },
-  addReminderText: {
-    color: Colors.primary,
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
+  addReminderText: { color: Colors.primary, fontWeight: 'bold', fontSize: 12 },
   newReminderBox: {
     backgroundColor: '#F8FAFC',
     padding: 10,
@@ -915,16 +1416,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: 'center',
   },
-  saveReminderText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  emptyRemindersText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
-  },
+  saveReminderText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 12 },
+  emptyRemindersText: { fontSize: 12, color: Colors.textMuted, fontStyle: 'italic' },
   reminderCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -935,16 +1428,8 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
     marginBottom: 8,
   },
-  reminderText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#92400E',
-  },
-  reminderDate: {
-    fontSize: 11,
-    color: '#B45309',
-    marginTop: 2,
-  },
+  reminderText: { fontSize: 13, fontWeight: '600', color: '#92400E' },
+  reminderDate: { fontSize: 11, color: '#B45309', marginTop: 2 },
   closeReminderBtn: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
@@ -953,174 +1438,49 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
   },
-  closeReminderText: {
-    color: '#D97706',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  checkItemContainer: {
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    paddingBottom: 8,
-  },
-  checkItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  checkItemText: {
-    fontSize: 13,
-    color: '#334155',
-    flex: 1,
-  },
-  checkItemTextActive: {
-    fontWeight: '600',
-    color: Colors.primary,
-  },
-  obsBox: {
-    marginTop: 6,
-    marginLeft: 30,
-  },
-  obsInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontSize: 12,
-    color: Colors.text,
-  },
-  photoHeaderRow: { marginBottom: 10 },
-  photoButtonsRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  cameraBtn: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-    height: 44,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  galleryBtn: {
-    flex: 1,
-    backgroundColor: '#64748B',
-    height: 44,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  photoBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
-  photoCard: {
-    flexDirection: 'row',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  thumbWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: '#E2E8F0',
-  },
-  thumbFallback: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E2E8F0',
-  },
-  thumb: { width: '100%', height: '100%', borderRadius: 8 },
-  photoInfo: { flex: 1, marginLeft: 12 },
-  photoTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  photoNum: { fontSize: 13, fontWeight: 'bold', color: Colors.text },
-  legendaInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    height: 36,
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  photoActionRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  editShapesBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(124, 58, 237, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(124, 58, 237, 0.25)',
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderRadius: 6,
-    justifyContent: 'center',
-  },
-  editShapesText: { fontSize: 11, color: '#7C3AED', fontWeight: '600' },
-  predefBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.25)',
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderRadius: 6,
-    justifyContent: 'center',
-  },
-  predefText: { fontSize: 11, color: Colors.primary, fontWeight: '600' },
+  closeReminderText: { color: '#D97706', fontSize: 11, fontWeight: 'bold' },
+
+  // Bottom Buttons: Lado Esquerdo Amarelo Warning | Lado Direito Azul Primary (Seção 15.7 & 16)
   bottomButtonsRow: {
     flexDirection: 'row',
     gap: 12,
     marginTop: 8,
   },
-  btnActionSubmit: {
-    flex: 1.2,
-    backgroundColor: Colors.primary,
-    height: 48,
+  btnWarningSubmit: {
+    flex: 1,
+    height: 50,
+    backgroundColor: '#F59E0B', // btn-warning amarelo
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     ...Shadows.md,
   },
-  btnActionSubmitText: {
-    color: '#FFFFFF',
+  btnWarningSubmitText: {
+    color: '#1E293B', // text-dark
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
   },
-  btnActionDraft: {
+  btnPrimarySave: {
     flex: 1,
-    backgroundColor: '#E2E8F0',
-    height: 48,
+    height: 50,
+    backgroundColor: '#0284C7', // btn-primary azul
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    ...Shadows.md,
   },
-  btnActionDraftText: {
-    color: Colors.text,
+  btnPrimarySaveText: {
+    color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
   },
   btnDisabled: { opacity: 0.6 },
+
+  // Modais
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -1133,6 +1493,12 @@ const styles = StyleSheet.create({
     padding: 16,
     maxHeight: '80%',
   },
+  modalContentSmall: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1140,6 +1506,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: Colors.text },
+  primaryModalBtn: {
+    backgroundColor: '#0284C7',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  primaryModalBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1160,7 +1538,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 5,
+    paddingVertical: 6,
     paddingHorizontal: 12,
     backgroundColor: '#F0FDF4',
     borderBottomWidth: 1,
@@ -1170,6 +1548,6 @@ const styles = StyleSheet.create({
   autoSaveText: {
     fontSize: 12,
     color: '#15803D',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });

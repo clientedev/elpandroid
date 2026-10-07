@@ -680,6 +680,19 @@ export const PhotoEditorModal: React.FC<PhotoEditorModalProps> = ({
           </View>
         </ScrollView>
 
+        {/* Rodapé do Modal (Seção 15.10: Cancelar à esquerda e Salvar Edição à direita) */}
+        <View style={styles.modalFooterActionsRow}>
+          <TouchableOpacity onPress={onClose} style={styles.footerCancelBtn}>
+            <Ionicons name="close" size={18} color="#94A3B8" />
+            <Text style={styles.footerCancelBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleSave} style={styles.footerSaveBtn}>
+            <Ionicons name="checkmark-sharp" size={18} color="#FFFFFF" />
+            <Text style={styles.footerSaveBtnText}>Salvar Edição</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Text Input Modal for adding notes */}
         <Modal visible={showTextInputModal} transparent animationType="fade">
           <View style={styles.textModalOverlay}>
@@ -1275,5 +1288,44 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: 'bold',
+  },
+  modalFooterActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#0F172A',
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+  },
+  footerCancelBtn: {
+    flex: 1,
+    height: 46,
+    backgroundColor: '#334155', // btn-secondary
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  footerCancelBtnText: {
+    color: '#E2E8F0',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  footerSaveBtn: {
+    flex: 1.5,
+    height: 46,
+    backgroundColor: '#0284C7', // btn-primary fw-bold
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  footerSaveBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });

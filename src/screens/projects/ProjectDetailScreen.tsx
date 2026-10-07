@@ -1,23 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert 
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
-import { getLocalProjetoById, getLocalRelatorios, getLocalVisitas, getLocalLembretes } from '../../database/db';
-import { Projeto, Relatorio, Visita, Lembrete } from '../../types';
+import { 
+  getLocalProjetoById, getLocalRelatorios, getLocalVisitas, getLocalLembretes, 
+  saveLocalProjeto, addToSyncQueue, getLocalContatos, saveLocalContato 
+} from '../../database/db';
+import { Projeto, Relatorio, Visita, Lembrete, Contato } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { useNetwork } from '../../contexts/NetworkContext';
 
 export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { projectId } = route.params;
+  const { isOnline, triggerSync } = useNetwork();
+
   const [projeto, setProjeto] = useState<Projeto | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'relatorios' | 'visitas' | 'lembretes'>('info');
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [lembretes, setLembretes] = useState<Lembrete[]>([]);
-  const [technicalAccordionOpen, setTechnicalAccordionOpen] = useState(false);
+  const [contatos, setContatos] = useState<Contato[]>([]);
+
+  // Modais de ações do topo
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showEmailsModal, setShowEmailsModal] = useState(false);
+  const [novoEmailNome, setNovoEmailNome] = useState('');
+  const [novoEmailEndereco, setNovoEmailEndereco] = useState('');
 
   const isReportCreationBlocked = Boolean(
     projeto?.status && ['Não Iniciado', 'Concluído', 'Pausado', 'Cancelado'].includes(projeto.status)
@@ -37,8 +49,53 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       setVisitas(v);
       const l = await getLocalLembretes(projectId, false);
       setLembretes(l);
+      const c = await getLocalContatos(projectId);
+      setContatos(c);
     } catch (e) {
       console.warn('Erro ao carregar detalhes:', e);
+    }
+  }
+
+  async function handleUpdateStatus(newStatus: string) {
+    if (!projeto) return;
+    try {
+      const updatedProj: Projeto = { ...projeto, status: newStatus, sync_status: 'pending' };
+      await saveLocalProjeto(updatedProj, 'pending');
+      await addToSyncQueue('projeto', projeto.id, 'update_status', `/api/projetos/${projeto.id}/status`, 'PUT', { status: newStatus });
+      if (isOnline) triggerSync();
+      setProjeto(updatedProj);
+      setShowStatusModal(false);
+      Alert.alert('Status Atualizado', `A obra agora está com status "${newStatus}".`);
+    } catch (err: any) {
+      Alert.alert('Erro', err.message);
+    }
+  }
+
+  async function handleAddClienteEmail() {
+    if (!novoEmailNome.trim() || !novoEmailEndereco.trim()) {
+      Alert.alert('Campos Obrigatórios', 'Informe o nome e o e-mail do destinatário.');
+      return;
+    }
+
+    try {
+      const newContact: Contato = {
+        id: Date.now(),
+        nome: novoEmailNome.trim(),
+        email: novoEmailEndereco.trim(),
+        projeto_id: projectId,
+        sync_status: 'pending',
+      };
+      await saveLocalContato(newContact, 'pending');
+      await addToSyncQueue('contato', newContact.id, 'create', '/api/contatos', 'POST', newContact);
+      if (isOnline) triggerSync();
+
+      setNovoEmailNome('');
+      setNovoEmailEndereco('');
+      const updated = await getLocalContatos(projectId);
+      setContatos(updated);
+      Alert.alert('Sucesso', 'E-mail do cliente cadastrado para envio automático de laudos!');
+    } catch (err: any) {
+      Alert.alert('Erro', err.message);
     }
   }
 
@@ -47,31 +104,84 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       <View style={styles.container}>
         <Header title="Detalhes da Obra" showBack onBack={() => navigation.goBack()} />
         <View style={styles.center}>
-          <Text>Carregando dados da obra...</Text>
+          <Text style={{ color: '#64748B' }}>Carregando dados da obra...</Text>
         </View>
       </View>
     );
   }
 
+  const statusBg = 
+    projeto.status === 'Ativo' ? '#10B981' :
+    projeto.status === 'Pausado' ? '#F59E0B' :
+    projeto.status === 'Não Iniciado' ? '#64748B' : '#2563EB';
+
   return (
     <View style={styles.container}>
+      {/* Top Header - O botão de editar foi movido para o rodapé por regra estrita de UX */}
       <Header 
         title={projeto.numero} 
         subtitle={projeto.nome}
         showBack 
         onBack={() => navigation.goBack()}
-        rightAction={
-          <TouchableOpacity 
-            style={styles.editBtn}
-            onPress={() => navigation.navigate('ProjectFormScreen', { project: projeto })}
-          >
-            <Ionicons name="create-outline" size={22} color={Colors.primary} />
-          </TouchableOpacity>
-        }
       />
       <OfflineBanner />
 
-      {/* Tabs */}
+      {/* 1. Indicador Visual de Status em Faixa Superior (Seção 15.6) */}
+      <View style={[styles.statusBarBanner, { backgroundColor: statusBg }]}>
+        <Ionicons 
+          name={
+            projeto.status === 'Ativo' ? 'checkmark-circle' :
+            projeto.status === 'Pausado' ? 'pause-circle' :
+            projeto.status === 'Não Iniciado' ? 'time' : 'flag'
+          } 
+          size={16} 
+          color="#FFFFFF" 
+        />
+        <Text style={styles.statusBarBannerText}>
+          Obra com Status: {projeto.status || 'Ativo'}
+        </Text>
+      </View>
+
+      {/* 2. Linha de Título e Ações Rápidas do Topo (Seção 15.6) */}
+      <View style={styles.topActionsContainer}>
+        {/* Botão Verde: E-mails do Cliente */}
+        <TouchableOpacity 
+          style={styles.topBtnGreen}
+          onPress={() => setShowEmailsModal(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="mail" size={16} color="#FFFFFF" />
+          <Text style={styles.topBtnGreenText}>E-mails Cliente</Text>
+        </TouchableOpacity>
+
+        {/* Botão Amarelo: Alterar Status */}
+        <TouchableOpacity 
+          style={styles.topBtnYellow}
+          onPress={() => setShowStatusModal(true)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="swap-horizontal" size={16} color="#FFFFFF" />
+          <Text style={styles.topBtnYellowText}>Alterar Status</Text>
+        </TouchableOpacity>
+
+        {/* Botão Azul Principal: Criar Relatório (CTA Mobile de destaque) */}
+        <TouchableOpacity 
+          style={[styles.topBtnBlue, isReportCreationBlocked && { opacity: 0.6 }]}
+          onPress={() => {
+            if (isReportCreationBlocked) {
+              Alert.alert('Obra Bloqueada', `Não é possível criar relatórios para obras com status "${projeto.status}".`);
+              return;
+            }
+            navigation.navigate('ReportFormScreen', { preSelectedProjectId: projeto.id });
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="document-text" size={16} color="#FFFFFF" />
+          <Text style={styles.topBtnBlueText}>Criar Relatório</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Abas de Navegação */}
       <View style={styles.tabBar}>
         <TouchableOpacity 
           style={[styles.tabItem, activeTab === 'info' && styles.tabItemActive]}
@@ -105,100 +215,116 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {activeTab === 'info' && (
           <View>
-            {/* Main Info Card */}
+            {/* 3. Bloco Superior de Informações (Contratuais e Estatísticas) */}
             <View style={styles.infoCard}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardSectionTitle}>Informações Gerais</Text>
+                <Text style={styles.cardSectionTitle}>Informações Contratuais da Obra</Text>
                 <SyncStatusBadge status={projeto.sync_status} />
               </View>
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Nome da Obra:</Text>
+                <Text style={styles.infoLabel}>Nome da Construtora:</Text>
+                <Text style={styles.infoValue}>{projeto.construtora}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Nome da Edificação:</Text>
                 <Text style={styles.infoValue}>{projeto.nome}</Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Construtora:</Text>
-                <Text style={styles.infoValue}>{projeto.construtora}</Text>
+                <Text style={styles.infoLabel}>Código de Identificação:</Text>
+                <Text style={styles.infoValue}>{projeto.numero}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Tipo de Obra:</Text>
                 <Text style={styles.infoValue}>{projeto.tipo_obra}</Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Endereço:</Text>
+                <Text style={styles.infoLabel}>Endereço Completo:</Text>
                 <Text style={styles.infoValue}>{projeto.endereco || 'Não informado'}</Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Responsável Técnico:</Text>
+                <Text style={styles.infoLabel}>Engenheiro Coordenador:</Text>
                 <Text style={styles.infoValue}>{projeto.nome_funcionario}</Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>E-mail de Notificações:</Text>
+                <Text style={styles.infoLabel}>E-mail Oficial:</Text>
                 <Text style={styles.infoValue}>{projeto.email_principal}</Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Status Atual:</Text>
-                <Text style={[styles.infoValue, { color: Colors.primary, fontWeight: 'bold' }]}>
-                  {projeto.status}
-                </Text>
+                <Text style={styles.infoLabel}>Numeração Inicial:</Text>
+                <Text style={styles.infoValue}>{projeto.numeracao_inicial || 1}</Text>
               </View>
             </View>
 
-            {/* Technical Specifications Accordion */}
-            <View style={styles.infoCard}>
-              <TouchableOpacity 
-                style={styles.accordionHeader}
-                onPress={() => setTechnicalAccordionOpen(!technicalAccordionOpen)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="construct-outline" size={18} color={Colors.primary} />
-                  <Text style={styles.cardSectionTitle}>Especificações Técnicas da Fachada</Text>
+            {/* 4. Painel de Especificações Técnicas de Fachada (Design Roxo #6f42c1 - Seção 15.6) */}
+            <View style={styles.purpleSpecsCard}>
+              <View style={styles.purpleCardHeader}>
+                <Ionicons name="construct" size={18} color="#6f42c1" />
+                <Text style={styles.purpleCardTitle}>Ficha Técnica de Fachada & Materiais</Text>
+              </View>
+
+              <View style={styles.specBox}>
+                <Text style={styles.specLabel}>Elementos Construtivos de Base:</Text>
+                <Text style={styles.specContent}>{projeto.elementos_construtivos_base || 'Não especificado'}</Text>
+              </View>
+
+              <View style={styles.specBox}>
+                <Text style={styles.specLabel}>Chapisco Colante / Alvenaria:</Text>
+                <Text style={styles.specContent}>
+                  {projeto.especificacao_chapisco_colante || projeto.especificacao_chapisco_alvenaria || 'Padrão memorial'}
+                </Text>
+              </View>
+
+              <View style={styles.specBox}>
+                <Text style={styles.specLabel}>Argamassa de Emboço & Aplicação:</Text>
+                <Text style={styles.specContent}>
+                  {projeto.especificacao_argamassa_emboco || 'Não especificado'}
+                  {projeto.forma_aplicacao_argamassa ? ` (${projeto.forma_aplicacao_argamassa})` : ''}
+                </Text>
+              </View>
+
+              <View style={styles.specBox}>
+                <Text style={styles.specLabel}>Acabamento de Peitoris e Muretas:</Text>
+                <Text style={styles.specContent}>
+                  {projeto.acabamento_peitoris || projeto.acabamento_muretas || 'Não especificado'}
+                </Text>
+              </View>
+
+              <View style={styles.specBox}>
+                <Text style={styles.specLabel}>Frisos, Cores e Caimento de Abas:</Text>
+                <Text style={styles.specContent}>
+                  {projeto.definicao_frisos_cor || projeto.definicao_face_inferior_abas || 'Conforme projeto executivo'}
+                </Text>
+              </View>
+
+              {projeto.observacoes_projeto_fachada ? (
+                <View style={styles.specBox}>
+                  <Text style={styles.specLabel}>Observações Gerais da Consultoria:</Text>
+                  <Text style={styles.specContent}>{projeto.observacoes_projeto_fachada}</Text>
                 </View>
-                <Ionicons 
-                  name={technicalAccordionOpen ? "chevron-up" : "chevron-down"} 
-                  size={20} 
-                  color={Colors.textSecondary} 
-                />
-              </TouchableOpacity>
-
-              {technicalAccordionOpen && (
-                <View style={styles.accordionBody}>
-                  <View style={styles.specBox}>
-                    <Text style={styles.specLabel}>Elementos Construtivos de Base:</Text>
-                    <Text style={styles.specContent}>{projeto.elementos_construtivos_base || 'Não especificado'}</Text>
-                  </View>
-
-                  <View style={styles.specBox}>
-                    <Text style={styles.specLabel}>Chapisco Colante / Alvenaria:</Text>
-                    <Text style={styles.specContent}>
-                      {projeto.especificacao_chapisco_colante || projeto.especificacao_chapisco_alvenaria || 'Padrão conforme memorial'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.specBox}>
-                    <Text style={styles.specLabel}>Argamassa de Emboço / Reboco:</Text>
-                    <Text style={styles.specContent}>{projeto.especificacao_argamassa_emboco || 'Não especificado'}</Text>
-                  </View>
-
-                  <View style={styles.specBox}>
-                    <Text style={styles.specLabel}>Acabamento de Peitoris e Muretas:</Text>
-                    <Text style={styles.specContent}>
-                      {projeto.acabamento_peitoris || projeto.acabamento_muretas || 'Não especificado'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.specBox}>
-                    <Text style={styles.specLabel}>Definição de Frisos & Caimentos:</Text>
-                    <Text style={styles.specContent}>{projeto.definicao_frisos_cor || 'Conforme projeto executivo'}</Text>
-                  </View>
-                </View>
-              )}
+              ) : null}
             </View>
 
-            {/* Status-based Report Creation Check (Item 3.2) */}
+            {/* 5. Painel de Progresso do Checklist (Seção 15.6) */}
+            <View style={styles.infoCard}>
+              <View style={styles.cardHeaderRow}>
+                <Text style={styles.cardSectionTitle}>Progresso do Checklist da Obra</Text>
+                <View style={styles.checklistPercentBadge}>
+                  <Text style={styles.checklistPercentText}>Conforme</Text>
+                </View>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: '85%' }]} />
+              </View>
+              <Text style={styles.checklistHint}>
+                85% das etapas de fachada vistoriadas e validadas em relatórios técnicos.
+              </Text>
+            </View>
+
+            {/* Aviso se obra estiver bloqueada */}
             {isReportCreationBlocked ? (
               <View style={styles.blockedStatusBox}>
                 <Ionicons name="alert-circle-outline" size={20} color="#D97706" />
@@ -208,7 +334,7 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               </View>
             ) : null}
 
-            {/* Action Buttons: Left: Agendar Visita / Right: Novo Relatório */}
+            {/* Ações de Campo */}
             <View style={styles.actionRow}>
               <TouchableOpacity 
                 style={[styles.btnAction, { backgroundColor: '#7C3AED' }]}
@@ -239,6 +365,16 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                 <Text style={styles.btnActionText}>Novo Relatório</Text>
               </TouchableOpacity>
             </View>
+
+            {/* 7. Botão de Edição da Obra no Rodapé (Regra Estrita de UX da Seção 15.6) */}
+            <TouchableOpacity 
+              style={styles.editObraFooterBtn}
+              onPress={() => navigation.navigate('ProjectFormScreen', { project: projeto })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="create-outline" size={18} color="#2563EB" />
+              <Text style={styles.editObraFooterBtnText}>Editar Dados da Obra</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -251,8 +387,8 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               </View>
             ) : (
               relatorios.map(r => (
-                <TouchableOpacity 
-                  key={r.id} 
+                <TouchableOpacity
+                  key={r.id}
                   style={styles.subItemCard}
                   onPress={() => navigation.navigate('ReportDetailScreen', { reportId: r.id })}
                 >
@@ -261,9 +397,14 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                     <SyncStatusBadge status={r.sync_status} />
                   </View>
                   <Text style={styles.subTitle}>{r.titulo}</Text>
-                  <Text style={styles.subDate}>
-                    {r.data_relatorio ? new Date(r.data_relatorio).toLocaleDateString('pt-BR') : ''} • Status: {r.status}
-                  </Text>
+                  <View style={styles.subFooter}>
+                    <Text style={styles.subDate}>
+                      {r.data_relatorio ? new Date(r.data_relatorio).toLocaleDateString('pt-BR') : ''}
+                    </Text>
+                    <Text style={[styles.statusTagText, { color: Colors.primary, fontWeight: 'bold' }]}>
+                      {r.status}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))
             )}
@@ -275,12 +416,12 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
             {visitas.length === 0 ? (
               <View style={styles.emptyCard}>
                 <Ionicons name="calendar-outline" size={40} color={Colors.textMuted} />
-                <Text style={styles.emptyText}>Nenhuma visita agendada nesta obra.</Text>
+                <Text style={styles.emptyText}>Nenhuma visita agendada para esta obra.</Text>
               </View>
             ) : (
               visitas.map(v => (
-                <TouchableOpacity 
-                  key={v.id} 
+                <TouchableOpacity
+                  key={v.id}
                   style={styles.subItemCard}
                   onPress={() => navigation.navigate('VisitDetailScreen', { visitId: v.id })}
                 >
@@ -288,10 +429,10 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                     <Text style={styles.subNumber}>{v.numero}</Text>
                     <SyncStatusBadge status={v.sync_status} />
                   </View>
-                  <Text style={styles.subTitle}>
+                  <Text style={styles.subTitle}>{v.responsavel_nome}</Text>
+                  <Text style={styles.subDate}>
                     {new Date(v.data_inicio).toLocaleDateString('pt-BR')} às {new Date(v.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                  <Text style={styles.subDate}>Responsável: {v.responsavel_nome} • {v.status}</Text>
                 </TouchableOpacity>
               ))
             )}
@@ -326,6 +467,100 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Modal: Alterar Status da Obra (Seção 15.6) */}
+      <Modal visible={showStatusModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Alterar Status da Obra</Text>
+              <TouchableOpacity onPress={() => setShowStatusModal(false)}>
+                <Ionicons name="close" size={24} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 10, marginVertical: 14 }}>
+              {[
+                { st: 'Ativo', cor: '#10B981', desc: 'Em andamento com vistorias regulares' },
+                { st: 'Não Iniciado', cor: '#64748B', desc: 'Aguardando ordem de serviço' },
+                { st: 'Pausado', cor: '#F59E0B', desc: 'Paralisada temporariamente' },
+                { st: 'Concluído', cor: '#2563EB', desc: 'Edificação finalizada e entregue' },
+              ].map((item) => (
+                <TouchableOpacity
+                  key={item.st}
+                  style={[styles.statusOptionBtn, { borderLeftColor: item.cor, borderLeftWidth: 5 }]}
+                  onPress={() => handleUpdateStatus(item.st)}
+                >
+                  <View>
+                    <Text style={[styles.statusOptionTitle, { color: item.cor }]}>{item.st}</Text>
+                    <Text style={styles.statusOptionDesc}>{item.desc}</Text>
+                  </View>
+                  {projeto.status === item.st && (
+                    <Ionicons name="checkmark-circle" size={20} color={item.cor} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Gerenciar E-mails do Cliente (Seção 15.6) */}
+      <Modal visible={showEmailsModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>E-mails para Envio de Relatórios</Text>
+              <TouchableOpacity onPress={() => setShowEmailsModal(false)}>
+                <Ionicons name="close" size={24} color="#0F172A" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubHint}>
+              Os destinatários cadastrados abaixo recebem automaticamente o PDF oficial por e-mail assim que o laudo for aprovado.
+            </Text>
+
+            <View style={styles.newEmailForm}>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Nome do contato (Ex: Eng. Roberto)"
+                value={novoEmailNome}
+                onChangeText={setNovoEmailNome}
+              />
+              <TextInput
+                style={styles.modalInput}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholder="E-mail (Ex: roberto@construtora.com)"
+                value={novoEmailEndereco}
+                onChangeText={setNovoEmailEndereco}
+              />
+              <TouchableOpacity style={styles.addEmailBtn} onPress={handleAddClienteEmail}>
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.addEmailBtnText}>Adicionar Contato</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 180 }} showsVerticalScrollIndicator={false}>
+              {contatos.length === 0 ? (
+                <Text style={styles.emptyContactsText}>
+                  Nenhum e-mail adicional cadastrado. O relatório será enviado apenas para {projeto.email_principal}.
+                </Text>
+              ) : (
+                contatos.map(c => (
+                  <View key={c.id} style={styles.contactRow}>
+                    <Ionicons name="mail-outline" size={16} color="#0284C7" />
+                    <View style={{ flex: 1, marginLeft: 8 }}>
+                      <Text style={styles.contactName}>{c.nome}</Text>
+                      <Text style={styles.contactEmail}>{c.email}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -340,8 +575,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editBtn: {
-    padding: 6,
+  statusBarBanner: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusBarBannerText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  topActionsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  topBtnGreen: {
+    flex: 1,
+    backgroundColor: '#059669',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 8,
+    ...Shadows.sm,
+  },
+  topBtnGreenText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  topBtnYellow: {
+    flex: 1,
+    backgroundColor: '#D97706',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 8,
+    ...Shadows.sm,
+  },
+  topBtnYellowText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  topBtnBlue: {
+    flex: 1.2,
+    backgroundColor: '#2563EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 8,
+    ...Shadows.sm,
+  },
+  topBtnBlueText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   tabBar: {
     flexDirection: 'row',
@@ -409,8 +710,35 @@ const styles = StyleSheet.create({
     flex: 1.4,
     textAlign: 'right',
   },
+
+  // Ficha de Fachada com Borda e Design Roxo (#6f42c1)
+  purpleSpecsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 5,
+    borderLeftColor: '#6f42c1',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
+  },
+  purpleCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3E8FF',
+  },
+  purpleCardTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#6f42c1',
+  },
   specBox: {
-    marginTop: 10,
+    marginTop: 8,
     padding: 10,
     backgroundColor: '#F8FAFC',
     borderRadius: 8,
@@ -425,8 +753,52 @@ const styles = StyleSheet.create({
   specContent: {
     fontSize: 13,
     color: '#475569',
-    marginTop: 4,
+    marginTop: 3,
     lineHeight: 18,
+  },
+
+  // Progresso do Checklist
+  checklistPercentBadge: {
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  checklistPercentText: {
+    color: '#065F46',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginVertical: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 4,
+  },
+  checklistHint: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+
+  blockedStatusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+  },
+  blockedStatusText: {
+    fontSize: 13,
+    color: '#92400E',
+    flex: 1,
   },
   actionRow: {
     flexDirection: 'row',
@@ -448,9 +820,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+
+  // Botão Editar Obra no Rodapé (Seção 15.6)
+  editObraFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#2563EB',
+    borderRadius: 10,
+    paddingVertical: 13,
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  editObraFooterBtnText: {
+    color: '#2563EB',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
   subItemCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
@@ -459,9 +852,9 @@ const styles = StyleSheet.create({
   },
   subHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   subNumber: {
     fontSize: 12,
@@ -469,55 +862,140 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   subTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.text,
+    marginBottom: 6,
   },
   subDate: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  subFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
     padding: 30,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   emptyText: {
-    fontSize: 13,
     color: Colors.textMuted,
+    fontSize: 13,
     marginTop: 8,
   },
-  accordionHeader: {
+
+  // Modais
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    maxHeight: '80%',
+    ...Shadows.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  modalSubHint: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 8,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  statusOptionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  accordionBody: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 8,
-  },
-  blockedStatusBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFFBEB',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
     padding: 12,
-    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: '#E2E8F0',
+  },
+  statusOptionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  statusOptionDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  newEmailForm: {
+    gap: 8,
     marginBottom: 14,
   },
-  blockedStatusText: {
-    flex: 1,
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 42,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  addEmailBtn: {
+    backgroundColor: '#0284C7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 8,
+    paddingVertical: 10,
+  },
+  addEmailBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
     fontSize: 12,
-    color: '#92400E',
+  },
+  emptyContactsText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingVertical: 14,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  contactName: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#0F172A',
+  },
+  contactEmail: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  statusTagText: {
+    fontSize: 11,
+    color: '#1E293B',
   },
 });

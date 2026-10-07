@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl 
 } from 'react-native';
@@ -6,22 +6,54 @@ import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
-import { getLocalProjetos } from '../../database/db';
-import { Projeto } from '../../types';
+import { getLocalProjetos, getLocalRelatorios } from '../../database/db';
+import { Projeto, Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+
+// Reference coordinate for SP / default position if user location unavailable
+const DEFAULT_USER_LAT = -23.5505;
+const DEFAULT_USER_LON = -46.6333;
+
+function calculateHaversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
 
 export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [filteredProjetos, setFilteredProjetos] = useState<Projeto[]>([]);
+  const [relatoriosCounts, setRelatoriosCounts] = useState<{ [projId: number]: number }>({});
   const [search, setSearch] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('Todos');
+  const [selectedStatus, setSelectedStatus] = useState<'Ativo' | 'Não Iniciado' | 'Pausado' | 'Concluído' | 'Todos'>('Ativo');
   const [refreshing, setRefreshing] = useState(false);
 
   const loadProjetos = useCallback(async () => {
     try {
       const data = await getLocalProjetos();
-      setProjetos(data);
-      filterList(data, search, selectedStatus);
+      const allRels = await getLocalRelatorios();
+      
+      const counts: { [projId: number]: number } = {};
+      for (const r of allRels) {
+        counts[r.projeto_id] = (counts[r.projeto_id] || 0) + 1;
+      }
+      setRelatoriosCounts(counts);
+
+      // Sort by GPS distance (closest first)
+      const sortedByGps = [...data].sort((a, b) => {
+        const distA = a.latitude && a.longitude ? calculateHaversine(DEFAULT_USER_LAT, DEFAULT_USER_LON, a.latitude, a.longitude) : 9999;
+        const distB = b.latitude && b.longitude ? calculateHaversine(DEFAULT_USER_LAT, DEFAULT_USER_LON, b.latitude, b.longitude) : 9999;
+        return distA - distB;
+      });
+
+      setProjetos(sortedByGps);
+      filterList(sortedByGps, search, selectedStatus);
     } catch (e) {
       console.warn('Erro ao carregar projetos:', e);
     }
@@ -38,7 +70,13 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   function filterList(data: Projeto[], text: string, status: string) {
     let result = data;
     if (status !== 'Todos') {
-      result = result.filter(p => p.status === status);
+      result = result.filter(p => {
+        if (status === 'Ativo') return p.status === 'Ativo' || !p.status;
+        if (status === 'Não Iniciado') return p.status === 'Não Iniciado';
+        if (status === 'Pausado') return p.status === 'Pausado';
+        if (status === 'Concluído') return p.status === 'Concluído';
+        return true;
+      });
     }
     if (text.trim()) {
       const q = text.toLowerCase();
@@ -57,7 +95,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     filterList(projetos, text, selectedStatus);
   };
 
-  const handleStatusFilter = (status: string) => {
+  const handleStatusFilter = (status: 'Ativo' | 'Não Iniciado' | 'Pausado' | 'Concluído' | 'Todos') => {
     setSelectedStatus(status);
     filterList(projetos, search, status);
   };
@@ -68,15 +106,25 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     setRefreshing(false);
   };
 
+  const getDynamicTitle = () => {
+    if (selectedStatus === 'Ativo') return 'Obras Ativas';
+    if (selectedStatus === 'Não Iniciado') return 'Obras Não Iniciadas';
+    if (selectedStatus === 'Pausado') return 'Obras Pausadas';
+    if (selectedStatus === 'Concluído') return 'Obras Concluídas';
+    return 'Todas as Obras';
+  };
+
   return (
     <View style={styles.container}>
+      {/* Cabeçalho dinâmico com ícone de prédio (Seção 15.4) */}
       <Header 
-        title="Obras & Projetos" 
-        subtitle={`${filteredProjetos.length} obras cadastradas`}
+        title={getDynamicTitle()} 
+        subtitle={`${filteredProjetos.length} obras nesta categoria`}
         rightAction={
           <TouchableOpacity 
             style={styles.addBtn}
             onPress={() => navigation.navigate('ProjectFormScreen')}
+            activeOpacity={0.8}
           >
             <Ionicons name="add" size={24} color="#FFFFFF" />
           </TouchableOpacity>
@@ -84,13 +132,112 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
       />
       <OfflineBanner />
 
-      {/* Search Bar */}
+      {/* 4 Botões Estilizados em Grade 2x2 por Status (Seção 15.4 do Manual) */}
+      <View style={styles.gridTabsContainer}>
+        <View style={styles.gridTabsRow}>
+          {/* 1. Ativas (Verde) */}
+          <TouchableOpacity
+            style={[
+              styles.gridTabBtn,
+              styles.gridTabAtivas,
+              selectedStatus === 'Ativo' && styles.gridTabAtivasActive
+            ]}
+            onPress={() => handleStatusFilter('Ativo')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="checkmark-circle" 
+              size={18} 
+              color={selectedStatus === 'Ativo' ? '#FFFFFF' : '#059669'} 
+            />
+            <Text style={[
+              styles.gridTabText,
+              selectedStatus === 'Ativo' ? styles.gridTabTextActive : { color: '#059669' }
+            ]}>
+              Ativas
+            </Text>
+          </TouchableOpacity>
+
+          {/* 2. Não Iniciadas (Cinza Escuro) */}
+          <TouchableOpacity
+            style={[
+              styles.gridTabBtn,
+              styles.gridTabNaoIniciadas,
+              selectedStatus === 'Não Iniciado' && styles.gridTabNaoIniciadasActive
+            ]}
+            onPress={() => handleStatusFilter('Não Iniciado')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="time" 
+              size={18} 
+              color={selectedStatus === 'Não Iniciado' ? '#FFFFFF' : '#475569'} 
+            />
+            <Text style={[
+              styles.gridTabText,
+              selectedStatus === 'Não Iniciado' ? styles.gridTabTextActive : { color: '#475569' }
+            ]}>
+              Não iniciadas
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.gridTabsRow}>
+          {/* 3. Pausadas (Amarelo Alaranjado) */}
+          <TouchableOpacity
+            style={[
+              styles.gridTabBtn,
+              styles.gridTabPausadas,
+              selectedStatus === 'Pausado' && styles.gridTabPausadasActive
+            ]}
+            onPress={() => handleStatusFilter('Pausado')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="pause-circle" 
+              size={18} 
+              color={selectedStatus === 'Pausado' ? '#FFFFFF' : '#D97706'} 
+            />
+            <Text style={[
+              styles.gridTabText,
+              selectedStatus === 'Pausado' ? styles.gridTabTextActive : { color: '#D97706' }
+            ]}>
+              Pausadas
+            </Text>
+          </TouchableOpacity>
+
+          {/* 4. Concluídas (Azul Profundo) */}
+          <TouchableOpacity
+            style={[
+              styles.gridTabBtn,
+              styles.gridTabConcluidas,
+              selectedStatus === 'Concluído' && styles.gridTabConcluidasActive
+            ]}
+            onPress={() => handleStatusFilter('Concluído')}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="flag" 
+              size={18} 
+              color={selectedStatus === 'Concluído' ? '#FFFFFF' : '#1E3A8A'} 
+            />
+            <Text style={[
+              styles.gridTabText,
+              selectedStatus === 'Concluído' ? styles.gridTabTextActive : { color: '#1E3A8A' }
+            ]}>
+              Concluídas
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Barra de Busca Rápida (Seção 15.4) */}
       <View style={styles.searchContainer}>
         <View style={styles.searchWrapper}>
           <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Buscar por obra, construtora, número..."
+            placeholder="🔍 Digite o nome, número ou construtora da obra..."
             placeholderTextColor={Colors.textMuted}
             value={search}
             onChangeText={handleSearch}
@@ -103,22 +250,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
         </View>
       </View>
 
-      {/* Status Filters */}
-      <View style={styles.filterRow}>
-        {['Todos', 'Ativo', 'Concluído', 'Cancelado'].map(st => (
-          <TouchableOpacity
-            key={st}
-            style={[styles.filterChip, selectedStatus === st && styles.filterChipActive]}
-            onPress={() => handleStatusFilter(st)}
-          >
-            <Text style={[styles.filterText, selectedStatus === st && styles.filterTextActive]}>
-              {st}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Projects List */}
+      {/* Grid de Cards de Obras (Design Clicável - Seção 15.4) */}
       <FlatList
         data={filteredProjetos}
         keyExtractor={item => item.id.toString()}
@@ -131,46 +263,83 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
             <Text style={styles.emptySub}>Toque no botão + acima para cadastrar uma nova obra no aplicativo.</Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.card}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('ProjectDetailScreen', { projectId: item.id })}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.numBadge}>
-                <Text style={styles.numText}>{item.numero}</Text>
-              </View>
-              <View style={styles.headerRight}>
-                <SyncStatusBadge status={item.sync_status} />
-                <View style={[
-                  styles.statusTag, 
-                  item.status === 'Ativo' ? styles.statusActive : styles.statusDone
-                ]}>
-                  <Text style={styles.statusTagText}>{item.status}</Text>
+        renderItem={({ item }) => {
+          const distanceKm = item.latitude && item.longitude 
+            ? calculateHaversine(DEFAULT_USER_LAT, DEFAULT_USER_LON, item.latitude, item.longitude) 
+            : 1.2;
+          const totalRels = relatoriosCounts[item.id] || 0;
+
+          return (
+            <TouchableOpacity 
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('ProjectDetailScreen', { projectId: item.id })}
+            >
+              {/* Topo do Card: Nome em negrito, código único e construtora */}
+              <View style={styles.cardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle}>{item.nome}</Text>
+                  <Text style={styles.cardConstrutora}>
+                    <Ionicons name="business" size={13} color="#64748B" /> {item.construtora}
+                  </Text>
+                </View>
+
+                <View style={styles.headerRight}>
+                  <View style={styles.numBadge}>
+                    <Text style={styles.numText}>{item.numero}</Text>
+                  </View>
+                  <SyncStatusBadge status={item.sync_status} />
                 </View>
               </View>
-            </View>
 
-            <Text style={styles.cardTitle}>{item.nome}</Text>
-            <Text style={styles.cardConstrutora}>
-              <Ionicons name="briefcase-outline" size={13} color={Colors.textSecondary} /> {item.construtora}
-            </Text>
+              {/* Tag de Proximidade GPS (Seção 15.4) */}
+              <View style={styles.gpsBadgeRow}>
+                <View style={styles.gpsDistanceBadge}>
+                  <Text style={styles.gpsDistanceText}>
+                    📍 A {distanceKm} km de você
+                  </Text>
+                </View>
 
-            {item.endereco ? (
-              <Text style={styles.cardAddress} numberOfLines={1}>
-                <Ionicons name="location-outline" size={13} color={Colors.textSecondary} /> {item.endereco}
-              </Text>
-            ) : null}
+                <View style={[
+                  styles.statusTag, 
+                  item.status === 'Ativo' ? styles.statusActive : 
+                  item.status === 'Pausado' ? styles.statusPausado :
+                  item.status === 'Não Iniciado' ? styles.statusNaoIniciado : styles.statusDone
+                ]}>
+                  <Text style={styles.statusTagText}>{item.status || 'Ativo'}</Text>
+                </View>
+              </View>
 
-            <View style={styles.cardFooter}>
-              <Text style={styles.footerText}>
-                Responsável: <Text style={styles.bold}>{item.nome_funcionario}</Text>
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
-            </View>
-          </TouchableOpacity>
-        )}
+              {/* Corpo do Card: Responsável, e-mail e contador de relatórios */}
+              <View style={styles.cardBody}>
+                <View style={styles.cardInfoRow}>
+                  <Ionicons name="person-outline" size={14} color="#64748B" />
+                  <Text style={styles.cardInfoText}>
+                    Responsável: <Text style={styles.boldText}>{item.nome_funcionario}</Text>
+                  </Text>
+                </View>
+
+                <View style={styles.cardInfoRow}>
+                  <Ionicons name="mail-outline" size={14} color="#64748B" />
+                  <Text style={styles.cardInfoText} numberOfLines={1}>
+                    {item.email_principal}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Rodapé do Card com contador de relatórios emitidos */}
+              <View style={styles.cardFooter}>
+                <View style={styles.relatoriosCountBox}>
+                  <Ionicons name="document-text-outline" size={14} color={Colors.primary} />
+                  <Text style={styles.relatoriosCountText}>
+                    {totalRels} {totalRels === 1 ? 'relatório emitido' : 'relatórios emitidos'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={Colors.primary} />
+              </View>
+            </TouchableOpacity>
+          );
+        }}
       />
     </View>
   );
@@ -210,35 +379,67 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
   },
-  filterRow: {
-    flexDirection: 'row',
+  gridTabsContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 12,
     gap: 8,
   },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: Colors.border,
+  gridTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+  gridTabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    gap: 6,
   },
-  filterText: {
+  gridTabAtivas: {
+    borderColor: '#059669',
+    backgroundColor: '#ECFDF5',
+  },
+  gridTabAtivasActive: {
+    backgroundColor: '#059669',
+    ...Shadows.md,
+  },
+  gridTabNaoIniciadas: {
+    borderColor: '#475569',
+    backgroundColor: '#F8FAFC',
+  },
+  gridTabNaoIniciadasActive: {
+    backgroundColor: '#475569',
+    ...Shadows.md,
+  },
+  gridTabPausadas: {
+    borderColor: '#D97706',
+    backgroundColor: '#FFFBEB',
+  },
+  gridTabPausadasActive: {
+    backgroundColor: '#D97706',
+    ...Shadows.md,
+  },
+  gridTabConcluidas: {
+    borderColor: '#1E3A8A',
+    backgroundColor: '#EFF6FF',
+  },
+  gridTabConcluidasActive: {
+    backgroundColor: '#1E3A8A',
+    ...Shadows.md,
+  },
+  gridTabText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: Colors.textSecondary,
+    fontWeight: 'bold',
   },
-  filterTextActive: {
+  gridTabTextActive: {
     color: '#FFFFFF',
   },
   listContent: {
     padding: 16,
-    paddingTop: 4,
+    paddingTop: 8,
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -251,7 +452,7 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
@@ -271,6 +472,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  gpsBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 6,
+  },
+  gpsDistanceBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  gpsDistanceText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#92400E',
+  },
   statusTag: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -280,12 +498,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#D1FAE5',
   },
   statusDone: {
+    backgroundColor: '#E0E7FF',
+  },
+  statusPausado: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusNaoIniciado: {
     backgroundColor: '#F1F5F9',
   },
   statusTagText: {
     fontSize: 11,
     fontWeight: '600',
     color: '#1E293B',
+  },
+  cardBody: {
+    gap: 4,
+    marginVertical: 6,
+  },
+  cardInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cardInfoText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  boldText: {
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  relatoriosCountBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  relatoriosCountText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   cardTitle: {
     fontSize: 17,

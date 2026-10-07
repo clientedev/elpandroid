@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.8',
-        'versionCode': 9,
+        'version': '1.0.9',
+        'versionCode': 10,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização 1.0.8: Gestão completa de usuários integrada no APK (exclusiva para Administradores e Masters) com todos os perfis de acesso; Sincronização em tempo real sem duplicação de relatórios; Relatórios Express 100% integrados com captura e salvamento de fotos na galeria e álbuns; Logotipo oficial da ELP fixo no cabeçalho superior do aplicativo e renderizado em alta definição nos relatórios em PDF.',
+        'notes': 'Atualização 1.0.9: Nova Splash Screen com logotipo oficial limpo e centralizado da ELP Consultoria (removida imagem estranha anterior); Módulo de Obras com ordenação GPS e especificações de fachada; Fluxo de aprovação com legendas obrigatórias; Reembolsos com upload de comprovantes fiscais e homologação Master; UI/UX 100% atualizada.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 

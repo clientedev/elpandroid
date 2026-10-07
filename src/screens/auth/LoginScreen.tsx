@@ -122,7 +122,13 @@ export const LoginScreen: React.FC = () => {
 
         {/* Card Form */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Acessar Conta</Text>
+          <View style={styles.cardHeaderArea}>
+            <View style={styles.helmetCircle}>
+              <Ionicons name="construct" size={28} color="#0891B2" />
+            </View>
+            <Text style={styles.cardTitle}>Sistema de Obras</Text>
+            <Text style={styles.cardSubtitle}>ELP Consultoria e Engenharia Diagnóstica</Text>
+          </View>
 
           {errorMessage ? (
             <View style={styles.errorBox}>
@@ -133,12 +139,12 @@ export const LoginScreen: React.FC = () => {
 
           {/* Username Input */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Usuário</Text>
+            <Text style={styles.label}>Usuário *</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="person-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Seu usuário"
+                placeholder="Informe seu usuário corporativo"
                 placeholderTextColor={Colors.textMuted}
                 value={username}
                 onChangeText={setUsername}
@@ -150,12 +156,12 @@ export const LoginScreen: React.FC = () => {
 
           {/* Password Input with Eye Icon */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Senha</Text>
+            <Text style={styles.label}>Senha *</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Sua senha"
+                placeholder="Digite sua senha de acesso"
                 placeholderTextColor={Colors.textMuted}
                 secureTextEntry={!showPassword}
                 value={password}
@@ -191,7 +197,7 @@ export const LoginScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Submit Button */}
+          {/* Submit Button - 100% width py-2 fw-bold */}
           <TouchableOpacity 
             style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
             onPress={handleLogin}
@@ -201,7 +207,7 @@ export const LoginScreen: React.FC = () => {
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <>
-                <Text style={styles.submitText}>Entrar no Sistema</Text>
+                <Text style={styles.submitText}>Entrar</Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </>
             )}
@@ -362,11 +368,30 @@ const styles = StyleSheet.create({
     padding: 24,
     ...Shadows.lg,
   },
+  cardHeaderArea: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  helmetCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#ECFEFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 16,
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 2,
   },
   errorBox: {
     flexDirection: 'row',

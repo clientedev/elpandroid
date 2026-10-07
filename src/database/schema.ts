@@ -184,6 +184,10 @@ CREATE TABLE IF NOT EXISTS reembolsos (
   total REAL DEFAULT 0,
   status TEXT DEFAULT 'Pendente',
   observacoes TEXT,
+  comprovante_uri TEXT,
+  comprovante_base64 TEXT,
+  aprovado_por_nome TEXT,
+  aprovado_em TEXT,
   sync_status TEXT DEFAULT 'synced'
 );
 

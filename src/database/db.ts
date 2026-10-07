@@ -44,6 +44,20 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
   try {
     await db.execAsync('ALTER TABLE relatorios ADD COLUMN data_sincronizacao TEXT;');
   } catch {}
+
+  // Migration: ensure comprovante and approval fields exist in reembolsos
+  try {
+    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN comprovante_uri TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN comprovante_base64 TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN aprovado_por_nome TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN aprovado_em TEXT;');
+  } catch {}
   
   // Seed initial legendas if empty
   const countRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM legendas_predefinidas');
@@ -400,15 +414,26 @@ export async function saveLocalReembolso(rem: Reembolso, syncStatus: 'synced' | 
     `INSERT OR REPLACE INTO reembolsos (
       id, usuario_id, usuario_nome, projeto_id, projeto_nome, periodo_inicio,
       periodo_fim, quilometragem, valor_km, alimentacao, hospedagem, outros_gastos,
-      total, status, observacoes, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      total, status, observacoes, comprovante_uri, comprovante_base64,
+      aprovado_por_nome, aprovado_em, sync_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       rem.id, rem.usuario_id, rem.usuario_nome || '', rem.projeto_id || null,
       rem.projeto_nome || '', rem.periodo_inicio, rem.periodo_fim,
       rem.quilometragem || 0, rem.valor_km || 0, rem.alimentacao || 0,
       rem.hospedagem || 0, rem.outros_gastos || 0, total,
-      rem.status || 'Pendente', rem.observacoes || '', syncStatus
+      rem.status || 'Pendente', rem.observacoes || '',
+      rem.comprovante_uri || null, rem.comprovante_base64 || null,
+      rem.aprovado_por_nome || null, rem.aprovado_em || null, syncStatus
     ]
+  );
+}
+
+export async function updateLocalReembolsoStatus(id: number, status: string, aprovadoPorNome?: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE reembolsos SET status = ?, aprovado_por_nome = ?, aprovado_em = ?, sync_status = 'pending' WHERE id = ?`,
+    [status, aprovadoPorNome || 'Gestor Master', new Date().toISOString(), id]
   );
 }
 
@@ -479,18 +504,60 @@ export async function closeLocalLembrete(id: number, userName: string): Promise<
 }
 
 // ================= NOTIFICAÇÕES =================
-export async function getLocalNotificacoes(userId: number): Promise<Notificacao[]> {
+export async function getLocalNotificacoes(userId?: number): Promise<Notificacao[]> {
   const db = await getDatabase();
-  const rows = await db.getAllAsync<any>(
-    'SELECT * FROM notificacoes WHERE user_id = ? ORDER BY created_at DESC LIMIT 50',
-    [userId]
-  );
+  let query = 'SELECT * FROM notificacoes';
+  const params: any[] = [];
+  if (userId) {
+    query += ' WHERE user_id = ? OR user_id = 0';
+    params.push(userId);
+  }
+  query += ' ORDER BY created_at DESC LIMIT 50';
+  const rows = await db.getAllAsync<any>(query, params);
   return rows.map(r => ({ ...r, lida: Boolean(r.lida) }));
+}
+
+export async function saveLocalNotificacao(n: Partial<Notificacao>): Promise<number> {
+  const db = await getDatabase();
+  const id = n.id || Date.now();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO notificacoes (id, user_id, titulo, mensagem, tipo, lida, link, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      n.user_id || 1,
+      n.titulo || 'Notificação',
+      n.mensagem || '',
+      n.tipo || 'info',
+      n.lida ? 1 : 0,
+      n.link || '',
+      n.created_at || new Date().toISOString()
+    ]
+  );
+  return id;
 }
 
 export async function markNotificacaoAsRead(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('UPDATE notificacoes SET lida = 1 WHERE id = ?', [id]);
+}
+
+export async function markAllNotificacoesAsRead(userId?: number): Promise<void> {
+  const db = await getDatabase();
+  if (userId) {
+    await db.runAsync('UPDATE notificacoes SET lida = 1 WHERE user_id = ? OR user_id = 0', [userId]);
+  } else {
+    await db.runAsync('UPDATE notificacoes SET lida = 1');
+  }
+}
+
+export async function clearLocalNotificacoes(userId?: number): Promise<void> {
+  const db = await getDatabase();
+  if (userId) {
+    await db.runAsync('DELETE FROM notificacoes WHERE user_id = ? OR user_id = 0', [userId]);
+  } else {
+    await db.runAsync('DELETE FROM notificacoes');
+  }
 }
 
 // ================= LEGENDAS =================

@@ -9,6 +9,7 @@ export interface User {
   telefone?: string;
   cor_agenda?: string;
   ativo?: boolean;
+  primeiro_login?: boolean;
   tipo_acesso?: 'admin' | 'master' | 'aprovador' | 'funcionario' | 'visualizador';
   created_at?: string;
   token?: string;
@@ -29,7 +30,7 @@ export interface Projeto {
   email_principal: string;
   data_inicio?: string;
   data_previsao_fim?: string;
-  status: 'Ativo' | 'Concluído' | 'Cancelado' | string;
+  status: 'Ativo' | 'Não Iniciado' | 'Pausado' | 'Concluído' | 'Cancelado' | string;
   numeracao_inicial?: number;
   created_at?: string;
   elementos_construtivos_base?: string;
@@ -168,6 +169,7 @@ export interface FotoRelatorioExpress {
   descricao?: string;
   local?: string;
   base64?: string;
+  anotacoes_dados?: string;
   ordem: number;
   sync_status?: 'synced' | 'pending' | 'error';
 }
@@ -188,6 +190,10 @@ export interface Reembolso {
   total?: number;
   status: 'Pendente' | 'Aprovado' | 'Rejeitado' | string;
   observacoes?: string;
+  comprovante_uri?: string;
+  comprovante_base64?: string;
+  aprovado_por_nome?: string;
+  aprovado_em?: string;
   sync_status?: 'synced' | 'pending' | 'error';
 }
 
