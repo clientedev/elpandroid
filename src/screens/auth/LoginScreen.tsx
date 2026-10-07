@@ -115,7 +115,7 @@ export const LoginScreen: React.FC = () => {
           <View style={[styles.networkPill, isOnline ? styles.onlinePill : styles.offlinePill]}>
             <View style={[styles.pillDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
             <Text style={[styles.pillText, isOnline ? styles.onlineText : styles.offlineText]}>
-              {isOnline ? 'Conectado à Nuvem (Railway)' : 'Modo Offline (Banco Local)'}
+              {isOnline ? 'Conectado à Nuvem' : 'Modo Offline'}
             </Text>
           </View>
         </View>
@@ -217,7 +217,7 @@ export const LoginScreen: React.FC = () => {
           <View style={styles.fixedServerBox}>
             <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
             <Text style={styles.fixedServerText}>
-              Servidor Oficial: elpandroid-production.up.railway.app
+              Servidor Central Conectado
             </Text>
           </View>
         </View>
@@ -225,7 +225,7 @@ export const LoginScreen: React.FC = () => {
         {/* Footer info */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Aplicativo Nativo Android • Sincronização Automática com Railway PostgreSQL
+            Aplicativo Nativo Android • Sincronização Automática em Nuvem
           </Text>
         </View>
       </ScrollView>

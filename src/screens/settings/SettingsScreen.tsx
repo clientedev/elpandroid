@@ -379,7 +379,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               <Text style={styles.statusLabel}>Status de Conexão:</Text>
               <View style={[styles.pill, isOnline ? styles.pillOnline : styles.pillOffline]}>
                 <Text style={[styles.pillText, isOnline ? styles.pillTextOnline : styles.pillTextOffline]}>
-                  {isOnline ? 'Online (Railway)' : 'Offline (Banco Local)'}
+                  {isOnline ? 'Online' : 'Offline'}
                 </Text>
               </View>
             </View>

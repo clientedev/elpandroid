@@ -1,47 +1,12 @@
-﻿import React from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNetwork } from '../contexts/NetworkContext';
 import { Colors } from '../theme/colors';
 
 export const OfflineBanner: React.FC = () => {
-  const { isOnline, syncState, pendingCount, triggerSync } = useNetwork();
-
-  if (isOnline && pendingCount === 0 && syncState !== 'syncing') {
-    return null;
-  }
-
-  return (
-    <View style={[
-      styles.banner, 
-      !isOnline ? styles.offlineBg : styles.pendingBg
-    ]}>
-      <View style={styles.left}>
-        <Ionicons 
-          name={!isOnline ? "cloud-offline-outline" : "sync-outline"} 
-          size={18} 
-          color={!isOnline ? "#B91C1C" : "#C2410C"} 
-        />
-        <Text style={[styles.text, !isOnline ? styles.offlineText : styles.pendingText]}>
-          {!isOnline 
-            ? `Modo Offline Ativo (${pendingCount} alteraçõ${pendingCount === 1 ? 'o' : 'es'} pendentes)` 
-            : syncState === 'syncing' 
-              ? 'Sincronizando com o servidor Railway...' 
-              : `${pendingCount} item(ns) aguardando sincronização`}
-        </Text>
-      </View>
-
-      {isOnline && syncState !== 'syncing' && (
-        <TouchableOpacity style={styles.button} onPress={() => triggerSync()}>
-          <Text style={styles.buttonText}>Sincronizar</Text>
-        </TouchableOpacity>
-      )}
-
-      {syncState === 'syncing' && (
-        <ActivityIndicator size="small" color="#2563EB" />
-      )}
-    </View>
-  );
+  // A faixa invasiva de sincronização foi removida a pedido do usuário em favor de um indicador discreto no Header superior.
+  return null;
 };
 
 const styles = StyleSheet.create({

@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.14',
-        'versionCode': 15,
+        'version': '1.0.15',
+        'versionCode': 16,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.14: Ordenação estrita por data mais recente na aba Relatórios, deduplicação completa de fotos no SQLite e PDF, garantia de renderização da Logo oficial da ELP no PDF exportado.',
+        'notes': 'Atualização v1.0.15: Ordenação estrita por data mais recente na aba Relatórios, interface minimalista e limpa, remoção de faixas intrusivas com status discreto de sincronização no topo.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12919,6 +12919,7 @@ def api_relatorios_collection():
                 'observacoes_finais': r.observacoes_finais,
                 'fotos': fotos_list,
                 'created_at': r.created_at.isoformat() if r.created_at else None,
+                'updated_at': r.updated_at.isoformat() if r.updated_at else (r.created_at.isoformat() if r.created_at else None),
             })
         return jsonify(result), 200
     except Exception as e:

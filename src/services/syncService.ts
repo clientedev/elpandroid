@@ -259,7 +259,7 @@ class SyncService {
       this.notify('idle', pendingCount);
 
       const msg = processedCount > 0 
-        ? `Sincronização concluída! ${processedCount} alteração(ões) enviada(s) com sucesso para o Railway.`
+        ? `Sincronização concluída! ${processedCount} alteração(ões) enviada(s) com sucesso para o servidor.`
         : 'Sincronização concluída! Todos os dados estão atualizados no servidor.';
 
       return { success: true, message: msg };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Image, 
-  Modal, ScrollView, Dimensions 
+  Modal, ScrollView, Dimensions, ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   rightAction 
 }) => {
   const { user } = useAuth();
-  const { isOnline } = useNetwork();
+  const { isOnline, syncState, pendingCount, triggerSync } = useNetwork();
   
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -103,14 +103,39 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <View style={styles.statusIndicator}>
               <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-              <Text style={styles.statusText}>{isOnline ? 'Online (Railway)' : 'Offline (Local)'}</Text>
+              <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
             </View>
           )}
         </View>
       </View>
 
       <View style={styles.right}>
-        {/* Sino de Notificações com Badge Vermelho Flutuante (Seção 12.1 & 15.1) */}
+        {/* Ícone Discreto de Sincronização na parte superior */}
+        <TouchableOpacity 
+          style={styles.syncIconButton} 
+          onPress={() => triggerSync()}
+          disabled={syncState === 'syncing'}
+          activeOpacity={0.7}
+        >
+          {syncState === 'syncing' ? (
+            <ActivityIndicator size="small" color={Colors.primary} />
+          ) : (
+            <Ionicons 
+              name={!isOnline ? "cloud-offline-outline" : (pendingCount > 0 ? "cloud-upload-outline" : "cloud-done-outline")} 
+              size={20} 
+              color={!isOnline ? "#94A3B8" : (pendingCount > 0 ? "#D97706" : "#10B981")} 
+            />
+          )}
+          {pendingCount > 0 && syncState !== 'syncing' && (
+            <View style={styles.syncBadge}>
+              <Text style={styles.syncBadgeText}>
+                {pendingCount > 9 ? '9+' : pendingCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* Sino de Notificações com Badge Vermelho Flutuante */}
         <TouchableOpacity 
           style={styles.bellButton} 
           onPress={() => {
@@ -130,7 +155,7 @@ export const Header: React.FC<HeaderProps> = ({
         </TouchableOpacity>
 
         {rightAction ? (
-          <View style={{ marginLeft: 8 }}>{rightAction}</View>
+          <View style={{ marginLeft: 4 }}>{rightAction}</View>
         ) : (
           <View style={styles.userBadge}>
             <View style={styles.avatar}>
@@ -297,7 +322,37 @@ const styles = StyleSheet.create({
   right: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+  },
+  syncIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+  syncBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#F59E0B',
+    minWidth: 15,
+    height: 15,
+    borderRadius: 7.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  syncBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
   },
   bellButton: {
     width: 38,

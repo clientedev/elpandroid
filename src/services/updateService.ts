@@ -107,7 +107,7 @@ class UpdateService {
               available: true,
               isOta: true,
               version: this.getCurrentVersion(),
-              notes: 'Nova versão publicada via deploy no Railway.',
+              notes: 'Nova versão publicada na nuvem.',
             };
             this.notifyUpdateAvailable(info);
             return info;
@@ -117,7 +117,7 @@ class UpdateService {
         }
       }
 
-      // 2. Check Railway Backend Deploy & App Version
+      // 2. Check Backend Deploy & App Version
       try {
         const res = await apiClient.axios.get('/api/app-version', { timeout: 6000 });
         if (res.data) {
@@ -155,7 +155,7 @@ class UpdateService {
               isOta: false,
               version: serverVersion,
               deployId: serverDeployId,
-              notes: res.data.notes || 'Atualização recente sincronizada no Railway.',
+              notes: res.data.notes || 'Atualização recente sincronizada na nuvem.',
               downloadUrl: res.data.downloadUrl || 'https://elpandroid-production.up.railway.app/download/ELP.apk',
             };
             this.notifyUpdateAvailable(info);
@@ -169,7 +169,7 @@ class UpdateService {
       if (manual) {
         Alert.alert(
           'ELP Atualizado',
-          `O aplicativo já está na versão mais recente (${this.getCurrentVersion()}) e sincronizado com o Railway.`
+          `O aplicativo já está na versão mais recente (${this.getCurrentVersion()}) e sincronizado com a nuvem.`
         );
       }
 
@@ -259,7 +259,7 @@ class UpdateService {
       } else {
         Alert.alert(
           'Atualização Concluída',
-          'O aplicativo foi sincronizado com sucesso com o Railway.'
+          'O aplicativo foi sincronizado com sucesso com a nuvem.'
         );
         return true;
       }

@@ -203,7 +203,7 @@ export async function getLocalRelatorios(projetoId?: number): Promise<Relatorio[
     query += ' WHERE r.projeto_id = ?';
     params.push(projetoId);
   }
-  query += ' GROUP BY r.id ORDER BY COALESCE(NULLIF(r.updated_at, ""), NULLIF(r.data_criacao_local, ""), NULLIF(r.created_at, ""), NULLIF(r.data_sincronizacao, ""), r.data_relatorio) DESC, r.id DESC';
+  query += ' GROUP BY r.id ORDER BY CASE WHEN r.status = \'em_andamento\' THEN 0 ELSE 1 END ASC, COALESCE(NULLIF(r.data_criacao_local, ""), NULLIF(r.created_at, ""), NULLIF(r.updated_at, ""), NULLIF(r.data_sincronizacao, ""), r.data_relatorio) DESC, r.id DESC';
   return await db.getAllAsync<Relatorio>(query, params);
 }
 
@@ -262,7 +262,7 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       r.categoria || '', r.local || '', r.lembrete_proxima_visita || null,
       r.observacoes_finais || '', r.status || 'em_andamento', r.comentario_aprovacao || '',
       r.acompanhantes || '[]', r.created_at || new Date().toISOString(),
-      new Date().toISOString(), r.uuid || r.uuid_local || '',
+      r.updated_at || r.data_criacao_local || r.created_at || new Date().toISOString(), r.uuid || r.uuid_local || '',
       r.data_criacao_local || r.created_at || new Date().toISOString(),
       r.data_sincronizacao || null, syncStatus
     ]

@@ -324,7 +324,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               </View>
               <View style={styles.onlinePill}>
                 <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-                <Text style={styles.onlinePillText}>{isOnline ? 'Online (Railway)' : 'Offline (Local)'}</Text>
+                <Text style={styles.onlinePillText}>{isOnline ? 'Online' : 'Offline'}</Text>
               </View>
             </View>
 
