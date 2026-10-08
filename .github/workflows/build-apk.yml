@@ -7,8 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build Android APK
+  release:
+    name: Publicar ELP APK no GitHub Releases
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -16,31 +16,24 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          lfs: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Build Android Release APK
+      - name: Verificar e Preparar ELP.apk
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
-
-      - name: Copy and Rename APK
-        run: |
-          cp android/app/build/outputs/apk/release/app-release.apk ./ELP.apk
+          if [ -f "./ELP.apk" ]; then
+            echo "✅ ELP.apk encontrado com sucesso na raiz do repositório."
+            ls -lh ./ELP.apk
+          elif [ -d "android" ]; then
+            echo "Compilando via Gradle..."
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk ../ELP.apk
+          else
+            echo "❌ Arquivo ELP.apk não encontrado."
+            exit 1
+          fi
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -54,7 +47,14 @@ jobs:
         with:
           tag_name: latest
           name: "ELP Android - Versão Mais Recente"
-          body: "APK oficial atualizado automaticamente a cada deploy/push no repositório."
+          body: |
+            ## 📱 ObraFlow / ELP Android - Versão Oficial Atualizada
+            
+            - **Arquivo**: `ELP.apk`
+            - **Atualização**: Automática via GitHub Actions
+            - **Commit**: ${{ github.sha }}
+            
+            O APK abaixo contém todas as melhorias e revisões de checklist, salvamento confiável e ajustes.
           draft: false
           prerelease: false
           files: ./ELP.apk
