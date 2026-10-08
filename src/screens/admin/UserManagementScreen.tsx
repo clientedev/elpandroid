@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { User } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { getLocalUsers, saveLocalUsers } from '../../database/db';
 
 type TipoAcesso = 'admin' | 'master' | 'aprovador' | 'funcionario' | 'visualizador';
 
@@ -98,24 +99,43 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
   );
 
   const fetchUsers = useCallback(async () => {
+    // 1. Carrega imediatamente do SQLite local para resposta instantânea
+    try {
+      const localUsers = await getLocalUsers();
+      if (localUsers && localUsers.length > 0) {
+        setUsers(localUsers);
+        setLoading(false);
+      }
+    } catch {}
+
     if (!isOnline) {
       setLoading(false);
       setRefreshing(false);
       return;
     }
     try {
-      const res = await apiClient.axios.get('/api/users');
+      const res = await apiClient.axios.get('/api/users', {
+        params: {
+          user_id: currentUser?.id,
+          username: currentUser?.username,
+        },
+        timeout: 10000,
+      });
       if (Array.isArray(res.data)) {
         setUsers(res.data);
+        await saveLocalUsers(res.data);
       }
     } catch (err: any) {
       console.warn('Erro ao carregar usuários:', err.message);
-      Alert.alert('Aviso', 'Não foi possível carregar a lista de usuários do servidor.');
+      const localUsers = await getLocalUsers();
+      if (!localUsers || localUsers.length === 0) {
+        Alert.alert('Aviso', 'Não foi possível carregar a lista de usuários do servidor.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isOnline]);
+  }, [isOnline, currentUser]);
 
   useEffect(() => {
     fetchUsers();

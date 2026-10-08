@@ -210,11 +210,6 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
       await MediaLibrary.requestPermissionsAsync();
     } catch {}
 
-    // Solicita pasta no celular caso ainda não esteja definida
-    try {
-      await promptSelectStorageDirectory(false);
-    } catch {}
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.88,
@@ -271,11 +266,6 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
       alert('Permissão para galeria é necessária para anexar fotos de obras.');
       return null;
     }
-
-    // Solicita pasta no celular caso ainda não esteja definida
-    try {
-      await promptSelectStorageDirectory(false);
-    } catch {}
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,

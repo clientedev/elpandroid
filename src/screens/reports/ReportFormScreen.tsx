@@ -12,7 +12,8 @@ import {
   addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
   closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
   migrateLocalFotosRelatorioId, getDatabase, getLocalChecklistTemplate,
-  getChecklistProgressoObra, saveBatchChecklistProgressoObra, getLocalRelatorios
+  getChecklistProgressoObra, saveBatchChecklistProgressoObra, getLocalRelatorios,
+  updateLocalProjetoInfoTecnica
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -183,6 +184,74 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [projetos]);
 
   const selectedProj = projetos.find(p => p.id === selectedProjectId);
+
+  // 12 Campos de Informações Técnicas da Obra
+  const [techElementosBase, setTechElementosBase] = useState('');
+  const [techChapiscoColante, setTechChapiscoColante] = useState('');
+  const [techChapiscoAlvenaria, setTechChapiscoAlvenaria] = useState('');
+  const [techArgamassaEmboco, setTechArgamassaEmboco] = useState('');
+  const [techFormaAplicacaoArgamassa, setTechFormaAplicacaoArgamassa] = useState('');
+  const [techAcabamentosRevestimento, setTechAcabamentosRevestimento] = useState('');
+  const [techAcabamentoPeitoris, setTechAcabamentoPeitoris] = useState('');
+  const [techAcabamentoMuretas, setTechAcabamentoMuretas] = useState('');
+  const [techDefinicaoFrisosCor, setTechDefinicaoFrisosCor] = useState('');
+  const [techDefinicaoFaceInferiorAbas, setTechDefinicaoFaceInferiorAbas] = useState('');
+  const [techObservacoesFachada, setTechObservacoesFachada] = useState('');
+  const [techOutrasObservacoes, setTechOutrasObservacoes] = useState('');
+
+  // Sincroniza informações técnicas com a obra selecionada
+  useEffect(() => {
+    if (selectedProj) {
+      setTechElementosBase(selectedProj.elementos_construtivos_base || '');
+      setTechChapiscoColante(selectedProj.especificacao_chapisco_colante || '');
+      setTechChapiscoAlvenaria(selectedProj.especificacao_chapisco_alvenaria || '');
+      setTechArgamassaEmboco(selectedProj.especificacao_argamassa_emboco || '');
+      setTechFormaAplicacaoArgamassa(selectedProj.forma_aplicacao_argamassa || '');
+      setTechAcabamentosRevestimento(selectedProj.acabamentos_revestimento || '');
+      setTechAcabamentoPeitoris(selectedProj.acabamento_peitoris || '');
+      setTechAcabamentoMuretas(selectedProj.acabamento_muretas || '');
+      setTechDefinicaoFrisosCor(selectedProj.definicao_frisos_cor || '');
+      setTechDefinicaoFaceInferiorAbas(selectedProj.definicao_face_inferior_abas || '');
+      setTechObservacoesFachada(selectedProj.observacoes_projeto_fachada || '');
+      setTechOutrasObservacoes(selectedProj.outras_observacoes || '');
+    }
+  }, [selectedProj]);
+
+  const handleSaveTechInfo = useCallback(async () => {
+    if (!selectedProjectId) {
+      Alert.alert('Aviso', 'Nenhuma obra associada a este relatório.');
+      return;
+    }
+    try {
+      const infoPayload = {
+        elementos_construtivos_base: techElementosBase.trim(),
+        especificacao_chapisco_colante: techChapiscoColante.trim(),
+        especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+        especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+        forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+        acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+        acabamento_peitoris: techAcabamentoPeitoris.trim(),
+        acabamento_muretas: techAcabamentoMuretas.trim(),
+        definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+        definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+        observacoes_projeto_fachada: techObservacoesFachada.trim(),
+        outras_observacoes: techOutrasObservacoes.trim(),
+      };
+
+      await updateLocalProjetoInfoTecnica(selectedProjectId, infoPayload);
+
+      if (isOnline) {
+        apiClient.axios.put(`/api/projetos/${selectedProjectId}`, infoPayload).catch(err => {
+          console.warn('[ReportForm] Aviso de sincronização técnica:', err);
+        });
+      }
+
+      setProjetos(prev => prev.map(p => p.id === selectedProjectId ? { ...p, ...infoPayload } : p));
+      Alert.alert('Sucesso', 'Informações técnicas da obra atualizadas com sucesso!');
+    } catch (err: any) {
+      Alert.alert('Erro', 'Não foi possível salvar as informações técnicas: ' + err.message);
+    }
+  }, [selectedProjectId, techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa, techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor, techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, isOnline]);
 
   // Função central para persistência imediata de rascunho
   const saveDraftImmediately = useCallback(async () => {
@@ -819,6 +888,22 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             }))
           ).catch(cpErr => console.warn('[ReportForm] Erro ao salvar progresso cumulativo:', cpErr));
         }
+
+        // Salva simultaneamente as informações técnicas da obra preenchidas no formulário
+        updateLocalProjetoInfoTecnica(selectedProjectId, {
+          elementos_construtivos_base: techElementosBase.trim(),
+          especificacao_chapisco_colante: techChapiscoColante.trim(),
+          especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+          especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+          forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+          acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+          acabamento_peitoris: techAcabamentoPeitoris.trim(),
+          acabamento_muretas: techAcabamentoMuretas.trim(),
+          definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+          definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+          observacoes_projeto_fachada: techObservacoesFachada.trim(),
+          outras_observacoes: techOutrasObservacoes.trim(),
+        }).catch(err => console.warn('[ReportForm] Erro ao salvar info técnica da obra:', err));
       }
 
       // 2. Save all Photos to SQLite
@@ -932,37 +1017,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         </Text>
       </View>
 
-      {/* Indicador do Usuário Interagindo no Relatório (Identificação do operador e status ativo) */}
-      <View style={styles.userInteractingCard}>
-        <View style={styles.userAvatarBox}>
-          <Text style={styles.userAvatarInitials}>
-            {(user?.nome_completo || user?.username || 'U').substring(0, 2).toUpperCase()}
-          </Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.userInteractingStatus}>Interagindo agora neste relatório</Text>
-          </View>
-          <Text style={styles.userInteractingName}>
-            {user?.nome_completo || user?.username || 'Usuário Responsável'}
-          </Text>
-          <Text style={styles.userInteractingRole}>
-            {user?.cargo || (user?.is_master ? 'Administrador Master' : 'Responsável Técnico / Engenheiro')}
-          </Text>
-        </View>
-        <View style={styles.reportBadgeMini}>
-          <Ionicons name="document-text-outline" size={13} color="#0F2027" />
-          <Text style={styles.reportBadgeMiniText}>{reportNumber}</Text>
-        </View>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Bloco 1: Data da Visita, Obra e Número */}
         <View style={styles.card}>
           <Text style={styles.sectionHeaderTitle}>Identificação da Visita</Text>
 
-          {/* 1º Campo: Data da Visita (Prioridade no início da página - Seção 4.1 e 15.7) */}
+          {/* 1º Campo: Data da Visita */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>1. Data da Visita Técnica *</Text>
             <View style={styles.dateInputWrapper}>
@@ -976,138 +1036,44 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             </View>
           </View>
 
-          {/* 2º Campo: Seleção da Obra (Lista Completa de Obras Disponíveis) */}
+          {/* 2º Campo: Obra do Relatório (Valor Fixo) */}
           <View style={styles.inputGroup}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <Text style={styles.label}>2. Obra do Relatório *</Text>
-              {userLocation && (
-                <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '600' }}>
-                  📍 Proximidade GPS
-                </Text>
-              )}
-            </View>
-
-            {/* Card da Obra Selecionada com Ação de Troca */}
-            {selectedProj ? (
-              <TouchableOpacity 
-                style={styles.selectedProjectCard} 
-                onPress={() => setShowProjectPickerModal(true)}
-              >
-                <View style={styles.selectedProjectIconWrap}>
-                  <Ionicons name="business" size={24} color="#0284C7" />
-                </View>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.selectedProjectName}>
-                    {selectedProj.numero ? `[${selectedProj.numero}] ` : ''}{selectedProj.nome}
-                  </Text>
-                  <Text style={styles.selectedProjectSub}>
-                    {selectedProj.construtora || 'Obra Geral'} • {selectedProj.tipo_obra || 'Edificação'}
-                  </Text>
-                  {(() => {
-                    const distKm = (userLocation && selectedProj.latitude && selectedProj.longitude)
-                      ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, selectedProj.latitude, selectedProj.longitude)
-                      : null;
-                    return distKm !== null ? (
-                      <Text style={styles.selectedProjectGps}>📍 A {distKm.toFixed(1)} km do seu local</Text>
-                    ) : null;
-                  })()}
-                </View>
-                <View style={styles.changeProjectBtnBadge}>
-                  <Ionicons name="swap-horizontal" size={16} color="#0284C7" />
-                  <Text style={styles.changeProjectBtnText}>Trocar</Text>
-                </View>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity 
-                style={styles.emptyProjectSelectorBtn}
-                onPress={() => setShowProjectPickerModal(true)}
-              >
-                <Ionicons name="business-outline" size={22} color="#64748B" />
-                <Text style={styles.emptyProjectSelectorText}>Toque para selecionar uma obra da lista...</Text>
-                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
-              </TouchableOpacity>
-            )}
-
-            {/* Lista Vertical de Obras Disponíveis com Seleção Direta */}
-            <View style={styles.quickProjectsContainer}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <Text style={styles.quickProjectsHeader}>Obras Disponíveis ({projetos.length}):</Text>
-                <TouchableOpacity onPress={() => setShowProjectPickerModal(true)}>
-                  <Text style={{ fontSize: 12, color: '#0284C7', fontWeight: 'bold' }}>Ver Lista Completa</Text>
-                </TouchableOpacity>
+            <Text style={styles.label}>2. Obra do Relatório</Text>
+            <View style={styles.fixedProjectCard}>
+              <View style={styles.fixedProjectIconWrap}>
+                <Ionicons name="business" size={22} color="#0284C7" />
               </View>
-
-              {projetos.slice(0, 5).map(p => {
-                const isSel = selectedProjectId === p.id;
-                const distKm = (userLocation && p.latitude && p.longitude)
-                  ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, p.latitude, p.longitude)
-                  : null;
-
-                return (
-                  <TouchableOpacity
-                    key={p.id}
-                    style={[styles.projectListItemRow, isSel && styles.projectListItemRowActive]}
-                    onPress={() => setSelectedProjectId(p.id)}
-                  >
-                    <Ionicons 
-                      name={isSel ? "checkmark-circle" : "ellipse-outline"} 
-                      size={20} 
-                      color={isSel ? "#16A34A" : "#94A3B8"} 
-                    />
-                    <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={[styles.projectListItemName, isSel && styles.projectListItemNameActive]}>
-                        {p.numero ? `${p.numero} - ` : ''}{p.nome}
-                      </Text>
-                      <Text style={styles.projectListItemSub}>
-                        {p.construtora || 'Obra'} {distKm !== null ? ` • 📍 ${distKm.toFixed(1)} km` : ''}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-
-              {projetos.length > 5 && (
-                <TouchableOpacity 
-                  style={styles.seeAllProjectsBtn}
-                  onPress={() => setShowProjectPickerModal(true)}
-                >
-                  <Ionicons name="list" size={16} color="#0284C7" />
-                  <Text style={styles.seeAllProjectsBtnText}>Ver todas as {projetos.length} obras da lista...</Text>
-                </TouchableOpacity>
-              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fixedProjectName}>
+                  {selectedProj?.numero ? `[${selectedProj.numero}] ` : ''}{selectedProj?.nome || 'Obra Selecionada'}
+                </Text>
+                <Text style={styles.fixedProjectSub}>
+                  {selectedProj?.construtora || 'ObraFlow'} • {selectedProj?.tipo_obra || 'Edificação'}
+                </Text>
+              </View>
+              <View style={styles.fixedProjectLockBadge}>
+                <Ionicons name="lock-closed" size={13} color="#64748B" />
+                <Text style={styles.fixedProjectLockText}>Fixo</Text>
+              </View>
             </View>
           </View>
 
-          {/* 3º Campo: Número do Relatório (Calculado e Não Editável) */}
+          {/* 3º Campo: Número do Relatório */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>3. Número do Relatório (Sequencial Automático)</Text>
+            <Text style={styles.label}>3. Número do Relatório</Text>
             <View style={styles.lockedNumberBox}>
               <Ionicons name="lock-closed" size={16} color="#64748B" />
               <Text style={styles.lockedNumberText}>{reportNumber}</Text>
             </View>
-            <Text style={styles.helperText}>
-              Número sequencial contínuo gerado atomicamente pela regra da obra para evitar duplicidades.
-            </Text>
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Título do Laudo</Text>
             <TextInput style={styles.input} value={titulo} onChangeText={setTitulo} />
           </View>
-
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Categoria da Obra</Text>
-              <TextInput style={styles.input} value={categoria} onChangeText={setCategoria} placeholder="Ex: Fachada Leste" />
-            </View>
-            <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>Local / Pavimento</Text>
-              <TextInput style={styles.input} value={local} onChangeText={setLocal} placeholder="Ex: 12º Pavimento" />
-            </View>
-          </View>
         </View>
 
-        {/* 4º Sanfona Colapsável 1: Informações Técnicas da Obra (Azul-petróleo #0284C7) */}
+        {/* 4º Sanfona Colapsável 1: Informações Técnicas da Obra (Preenchível e Editável) */}
         <View style={styles.accordionCard}>
           <TouchableOpacity 
             style={styles.techAccordionHeader}
@@ -1122,20 +1088,137 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
           {showTechInfo && (
             <View style={styles.accordionBody}>
-              {selectedProj ? (
-                <View style={styles.techDetailsBox}>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Construtora: </Text>{selectedProj.construtora || 'Não informada'}</Text>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Tipo: </Text>{selectedProj.tipo_obra || 'Não informado'}</Text>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Endereço: </Text>{selectedProj.endereco || 'Não informado'}</Text>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Chapisco: </Text>{selectedProj.especificacao_chapisco_colante || selectedProj.especificacao_chapisco_alvenaria || 'Conforme projeto'}</Text>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Argamassa: </Text>{selectedProj.especificacao_argamassa_emboco || selectedProj.forma_aplicacao_argamassa || 'Projetada/Manual com aditivo'}</Text>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Peitoris: </Text>{selectedProj.acabamento_peitoris || 'Granito com pingadeira'}</Text>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Frisos e Juntas: </Text>{selectedProj.definicao_frisos_cor || 'Selante elastomérico de PU'}</Text>
-                  <Text style={styles.techDetailItem}><Text style={styles.techDetailBold}>Caimentos: </Text>{selectedProj.definicao_face_inferior_abas || 'Mínimo de 1% para ralos'}</Text>
+              <View style={styles.techFormContainer}>
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Elementos construtivos da base</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techElementosBase} 
+                    onChangeText={setTechElementosBase} 
+                    placeholder="Ex: Estrutura em concreto armado e alvenaria..."
+                  />
                 </View>
-              ) : (
-                <Text style={styles.emptyText}>Selecione uma obra acima para consultar as especificações de fachada.</Text>
-              )}
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Especificação chapisco colante</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techChapiscoColante} 
+                    onChangeText={setTechChapiscoColante} 
+                    placeholder="Ex: Chapisco com aditivo polimérico..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Especificação chapisco da alvenaria</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techChapiscoAlvenaria} 
+                    onChangeText={setTechChapiscoAlvenaria} 
+                    placeholder="Ex: Traço 1:3 com areia média..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Especificação da argamassa de emboço</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techArgamassaEmboco} 
+                    onChangeText={setTechArgamassaEmboco} 
+                    placeholder="Ex: Argamassa com fibras anti-fissuras..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Forma da aplicação da argamassa de emboço</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techFormaAplicacaoArgamassa} 
+                    onChangeText={setTechFormaAplicacaoArgamassa} 
+                    placeholder="Ex: Projeção mecânica / sarrafeamento..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Acabamentos do revestimento</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techAcabamentosRevestimento} 
+                    onChangeText={setTechAcabamentosRevestimento} 
+                    placeholder="Ex: Textura acrílica / pastilha cerâmica..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Acabamento em peitoris de janela</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techAcabamentoPeitoris} 
+                    onChangeText={setTechAcabamentoPeitoris} 
+                    placeholder="Ex: Granito com pingadeira e caimento..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Acabamento em muretas de terraços</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techAcabamentoMuretas} 
+                    onChangeText={setTechAcabamentoMuretas} 
+                    placeholder="Ex: Rufo com vedação e pingadeira..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Definição sobre frisos de mudança de cor de textura</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techDefinicaoFrisosCor} 
+                    onChangeText={setTechDefinicaoFrisosCor} 
+                    placeholder="Ex: Frisos de 2x2cm com selante..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Definição sobre face inferior das abas (friso pingadeira ou caimento invertido)</Text>
+                  <TextInput 
+                    style={styles.techInput} 
+                    value={techDefinicaoFaceInferiorAbas} 
+                    onChangeText={setTechDefinicaoFaceInferiorAbas} 
+                    placeholder="Ex: Pingadeira com corte inferior a 3cm..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Caso haja projeto de fachada, especificar o projetista e fazer observações sobre procedimentos específicos ou divergências de orientações</Text>
+                  <TextInput 
+                    style={[styles.techInput, styles.techInputMultiline]} 
+                    value={techObservacoesFachada} 
+                    onChangeText={setTechObservacoesFachada} 
+                    multiline
+                    placeholder="Ex: Projetista / Observações de procedimentos..."
+                  />
+                </View>
+
+                <View style={styles.techInputGroup}>
+                  <Text style={styles.techInputLabel}>Outras observações</Text>
+                  <TextInput 
+                    style={[styles.techInput, styles.techInputMultiline]} 
+                    value={techOutrasObservacoes} 
+                    onChangeText={setTechOutrasObservacoes} 
+                    multiline
+                    placeholder="Observações adicionais..."
+                  />
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.saveTechInfoBtn}
+                  onPress={handleSaveTechInfo}
+                >
+                  <Ionicons name="save-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.saveTechInfoBtnText}>Salvar Informações da Obra</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -1184,10 +1267,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                       <View style={[styles.checklistProgressBarFillLarge, { width: `${progressPercent}%` }]} />
                     </View>
                   </View>
-
-                  <Text style={styles.subHintText}>
-                    Etapas técnicas em ordem numeral. Toque para marcar ou inspecionar:
-                  </Text>
 
                   {checklist.map((item, idx) => (
                     <View key={item.id} style={styles.checkItemContainer}>
@@ -1278,17 +1357,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               placeholder="Diagnóstico pericial, condições encontradas em campo, testes realizados..."
               value={descricao}
               onChangeText={setDescricao}
-            />
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Recomendações e Instruções à Construtora</Text>
-            <TextInput
-              style={[styles.input, styles.textAreaSmall]}
-              multiline
-              numberOfLines={3}
-              placeholder="Prazos, diretrizes executivas e determinações técnicas..."
-              value={observacoesFinais}
-              onChangeText={setObservacoesFinais}
             />
           </View>
         </View>
@@ -2458,5 +2526,88 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#64748B',
     marginTop: 2,
+  },
+  fixedProjectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    gap: 12,
+  },
+  fixedProjectIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fixedProjectName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  fixedProjectSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  fixedProjectLockBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  fixedProjectLockText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  techFormContainer: {
+    paddingVertical: 8,
+    gap: 14,
+  },
+  techInputGroup: {
+    gap: 6,
+  },
+  techInputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  techInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  techInputMultiline: {
+    minHeight: 70,
+    textAlignVertical: 'top',
+  },
+  saveTechInfoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0284C7',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  saveTechInfoBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

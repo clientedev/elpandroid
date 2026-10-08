@@ -136,20 +136,16 @@ class UpdateService {
           const serverVersionCode = Number(res.data.versionCode || 0);
           const currentVersionCode = Number(Constants.expoConfig?.android?.versionCode ?? 11);
 
-          // A genuinely new deploy is detected if:
-          // 1. The server deploy ID changed from what we previously saw, and has not been dismissed
-          // 2. OR server has a strictly higher semver version or versionCode than the installed app
-          const isNewDeploy = Boolean(
-            lastSeenDeployId && 
-            lastSeenDeployId !== serverDeployId && 
-            dismissedDeployId !== serverDeployId
-          );
+          // Atualização de APK só deve ser disparada se houver versão semântica estritamente MAIOR
+          // ou versionCode maior, evitando falso-positivos por simples reinício do servidor Railway.
           const hasHigherVersion = isVersionGreater(serverVersion, currentVersion) || (serverVersionCode > currentVersionCode);
 
-          // Prompt if manual check, newer version available, or new un-dismissed deploy
-          const shouldPrompt = manual || hasHigherVersion || isNewDeploy;
+          if (serverDeployId) {
+            await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
+          }
 
-          if (shouldPrompt) {
+          // Dispara notificação se houver nova versão real disponível
+          if (hasHigherVersion) {
             const info: UpdateInfo = {
               available: true,
               isOta: false,

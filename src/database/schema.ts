@@ -259,14 +259,26 @@ export const SEED_CHECKLIST = [
 ];
 
 export const SEED_LEGENDAS = [
-  { categoria: 'Acabamentos', texto: 'Fissura superficial no revestimento de argamassa', ordem: 1 },
-  { categoria: 'Acabamentos', texto: 'Descolamento cerâmico observado na fachada', ordem: 2 },
-  { categoria: 'Acabamentos', texto: 'Falha de rejuntamento em pastilhas', ordem: 3 },
-  { categoria: 'Estrutural', texto: 'Trinca estrutural com abertura superior a 1mm', ordem: 1 },
-  { categoria: 'Estrutural', texto: 'Armadura exposta com sinais de corrosão', ordem: 2 },
-  { categoria: 'Estrutural', texto: 'Desaprumo aparente em viga / pilar', ordem: 3 },
-  { categoria: 'Geral', texto: 'Limpeza e organização do canteiro adequadas', ordem: 1 },
-  { categoria: 'Geral', texto: 'Impermeabilização em conformidade com projeto', ordem: 2 },
-  { categoria: 'Segurança', texto: 'Guarda-corpo provisório instalado corretamente', ordem: 1 },
-  { categoria: 'Segurança', texto: 'EPIs em uso obrigatório por todos colaboradores', ordem: 2 }
+  { categoria: 'Informações Técnicas', texto: 'Elementos construtivos da base', ordem: 1 },
+  { categoria: 'Informações Técnicas', texto: 'Especificação chapisco colante', ordem: 2 },
+  { categoria: 'Informações Técnicas', texto: 'Especificação chapisco da alvenaria', ordem: 3 },
+  { categoria: 'Informações Técnicas', texto: 'Especificação da argamassa de emboço', ordem: 4 },
+  { categoria: 'Informações Técnicas', texto: 'Forma da aplicação da argamassa de emboço', ordem: 5 },
+  { categoria: 'Informações Técnicas', texto: 'Acabamentos do revestimento', ordem: 6 },
+  { categoria: 'Informações Técnicas', texto: 'Acabamento em peitoris de janela', ordem: 7 },
+  { categoria: 'Informações Técnicas', texto: 'Acabamento em muretas de terraços', ordem: 8 },
+  { categoria: 'Informações Técnicas', texto: 'Definição sobre frisos de mudança de cor de textura', ordem: 9 },
+  { categoria: 'Informações Técnicas', texto: 'Definição sobre face inferior das abas (friso pingadeira ou caimento invertido)', ordem: 10 },
+  { categoria: 'Informações Técnicas', texto: 'Caso haja projeto de fachada, especificar o projetista e fazer observações sobre procedimentos específicos ou divergências de orientações', ordem: 11 },
+  { categoria: 'Informações Técnicas', texto: 'Outras observações', ordem: 12 },
+  { categoria: 'Acabamentos', texto: 'Fissura superficial no revestimento de argamassa', ordem: 13 },
+  { categoria: 'Acabamentos', texto: 'Descolamento cerâmico observado na fachada', ordem: 14 },
+  { categoria: 'Acabamentos', texto: 'Falha de rejuntamento em pastilhas', ordem: 15 },
+  { categoria: 'Estrutural', texto: 'Trinca estrutural com abertura superior a 1mm', ordem: 16 },
+  { categoria: 'Estrutural', texto: 'Armadura exposta com sinais de corrosão', ordem: 17 },
+  { categoria: 'Estrutural', texto: 'Desaprumo aparente em viga / pilar', ordem: 18 },
+  { categoria: 'Geral', texto: 'Limpeza e organização do canteiro adequadas', ordem: 19 },
+  { categoria: 'Geral', texto: 'Impermeabilização em conformidade com projeto', ordem: 20 },
+  { categoria: 'Segurança', texto: 'Guarda-corpo provisório instalado corretamente', ordem: 21 },
+  { categoria: 'Segurança', texto: 'EPIs em uso obrigatório por todos colaboradores', ordem: 22 }
 ];

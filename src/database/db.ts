@@ -8,6 +8,7 @@ import {
 } from '../types';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
+let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export function sanitizeSqlParams(params?: any): any {
   if (params === undefined || params === null) return [];
@@ -25,33 +26,61 @@ export function sanitizeSqlParams(params?: any): any {
 }
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (!dbInstance) {
-    const rawDb = await SQLite.openDatabaseAsync('obraflow.db');
-    await rawDb.execAsync('PRAGMA foreign_keys = ON;');
-
-    // Intercepta métodos para blindar contra qualquer parâmetro 'undefined' que causa java.lang.NullPointerException no NativeDatabase.prepareAsync
-    const origRun = rawDb.runAsync.bind(rawDb);
-    (rawDb as any).runAsync = (sql: string, ...args: any[]) => {
-      const sanitized = args.map(a => sanitizeSqlParams(a));
-      return (origRun as any)(sql, ...sanitized);
-    };
-
-    const origGetAll = rawDb.getAllAsync.bind(rawDb);
-    (rawDb as any).getAllAsync = (sql: string, ...args: any[]) => {
-      const sanitized = args.map(a => sanitizeSqlParams(a));
-      return (origGetAll as any)(sql, ...sanitized);
-    };
-
-    const origGetFirst = rawDb.getFirstAsync.bind(rawDb);
-    (rawDb as any).getFirstAsync = (sql: string, ...args: any[]) => {
-      const sanitized = args.map(a => sanitizeSqlParams(a));
-      return (origGetFirst as any)(sql, ...sanitized);
-    };
-
-    dbInstance = rawDb;
-    await initDatabase(dbInstance);
+  if (dbInstance) {
+    return dbInstance;
   }
-  return dbInstance;
+  if (!dbInitPromise) {
+    dbInitPromise = (async () => {
+      try {
+        const rawDb = await SQLite.openDatabaseAsync('obraflow.db');
+        await rawDb.execAsync('PRAGMA foreign_keys = ON;');
+
+        // Intercepta prepareAsync / runAsync / getAllAsync / getFirstAsync para blindar contra qualquer parâmetro 'undefined' ou query nula
+        const origPrepare = rawDb.prepareAsync.bind(rawDb);
+        (rawDb as any).prepareAsync = async (source: string) => {
+          if (!source || typeof source !== 'string') {
+            throw new Error(`[SQLite] Query inválida passada para prepareAsync: ${source}`);
+          }
+          return await origPrepare(source);
+        };
+
+        const origRun = rawDb.runAsync.bind(rawDb);
+        (rawDb as any).runAsync = async (sql: string, ...args: any[]) => {
+          if (!sql || typeof sql !== 'string') {
+            throw new Error(`[SQLite] SQL inválido para runAsync: ${sql}`);
+          }
+          const sanitized = args.map(a => sanitizeSqlParams(a));
+          return await (origRun as any)(sql, ...sanitized);
+        };
+
+        const origGetAll = rawDb.getAllAsync.bind(rawDb);
+        (rawDb as any).getAllAsync = async (sql: string, ...args: any[]) => {
+          if (!sql || typeof sql !== 'string') {
+            throw new Error(`[SQLite] SQL inválido para getAllAsync: ${sql}`);
+          }
+          const sanitized = args.map(a => sanitizeSqlParams(a));
+          return await (origGetAll as any)(sql, ...sanitized);
+        };
+
+        const origGetFirst = rawDb.getFirstAsync.bind(rawDb);
+        (rawDb as any).getFirstAsync = async (sql: string, ...args: any[]) => {
+          if (!sql || typeof sql !== 'string') {
+            throw new Error(`[SQLite] SQL inválido para getFirstAsync: ${sql}`);
+          }
+          const sanitized = args.map(a => sanitizeSqlParams(a));
+          return await (origGetFirst as any)(sql, ...sanitized);
+        };
+
+        await initDatabase(rawDb);
+        dbInstance = rawDb;
+        return rawDb;
+      } catch (err) {
+        dbInitPromise = null;
+        throw err;
+      }
+    })();
+  }
+  return dbInitPromise;
 }
 
 async function initDatabase(db: SQLite.SQLiteDatabase) {
@@ -95,15 +124,20 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
     await db.execAsync('ALTER TABLE relatorios ADD COLUMN em_edicao_em TEXT;');
   } catch {}
   
-  // Seed initial legendas if empty
-  const countRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM legendas_predefinidas');
-  if (!countRes || countRes.count === 0) {
-    for (const leg of SEED_LEGENDAS) {
-      await db.runAsync(
-        'INSERT INTO legendas_predefinidas (categoria, texto, ordem) VALUES (?, ?, ?)',
-        [leg.categoria, leg.texto, leg.ordem]
+  // Seed/Sync legendas predefinidas garantindo todas as 12 categorias tecnicas solicitadas
+  for (const leg of SEED_LEGENDAS) {
+    try {
+      const exists = await db.getFirstAsync<{ id: number }>(
+        'SELECT id FROM legendas_predefinidas WHERE texto = ? LIMIT 1',
+        [leg.texto]
       );
-    }
+      if (!exists) {
+        await db.runAsync(
+          'INSERT INTO legendas_predefinidas (categoria, texto, ordem) VALUES (?, ?, ?)',
+          [leg.categoria, leg.texto, leg.ordem]
+        );
+      }
+    } catch {}
   }
 
   // Seed initial checklist template if empty
@@ -342,25 +376,35 @@ export async function getActiveDraft(projetoId: number, autorId: number): Promis
 
 export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
+  const safeId = Number(r.id) || Date.now();
+  const safeUuid = String(r.uuid || r.uuid_local || `rel_uuid_${safeId}`);
 
   // Deduplicação segura: apenas reconcilia se UUID do registro DIFERENTE do ID atual
   // Evita apagar registros legítimos quando IDs locais temporários coincidem
   try {
-    if (r.uuid && r.uuid.length > 0) {
+    if (safeUuid && safeUuid.length > 0) {
       const byUuid = await db.getFirstAsync<{ id: number }>(
         'SELECT id FROM relatorios WHERE uuid = ? AND id != ?', 
-        [r.uuid, r.id]
+        [safeUuid, safeId]
       );
-      if (byUuid) {
+      if (byUuid && byUuid.id) {
         // Migra fotos do registro duplicado para o atual
-        await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [r.id, byUuid.id]);
+        await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [safeId, byUuid.id]);
         await db.runAsync('DELETE FROM relatorios WHERE id = ?', [byUuid.id]);
-        console.log(`[db] Dedup: registro ${byUuid.id} mesclado no ${r.id}`);
+        console.log(`[db] Dedup: registro ${byUuid.id} mesclado no ${safeId}`);
       }
     }
   } catch (dedupErr) {
     console.warn('[db] Aviso na deduplicação de relatório:', dedupErr);
   }
+
+  const safeNumero = String(r.numero || `REL-${safeId}`);
+  const safeProjetoId = Number(r.projeto_id) || 0;
+  const safeTitulo = String(r.titulo || 'Relatório de Obra');
+  const safeDataRelatorio = String(r.data_relatorio || new Date().toISOString().substring(0, 10));
+  const safeChecklistData = typeof r.checklist_data === 'string' ? r.checklist_data : JSON.stringify(r.checklist_data || []);
+  const safeAcompanhantes = typeof r.acompanhantes === 'string' ? r.acompanhantes : JSON.stringify(r.acompanhantes || []);
+  const now = new Date().toISOString();
 
   await db.runAsync(
     `INSERT OR REPLACE INTO relatorios (
@@ -371,16 +415,35 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       acompanhantes, created_at, updated_at, uuid, data_criacao_local, data_sincronizacao, sync_status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      r.id || Date.now(), r.numero || '', r.numero_projeto || null, r.titulo || 'Relatório de Obra', r.projeto_id || 0,
-      r.projeto_nome || '', r.visita_id || null, r.autor_id || 1, r.autor_nome || '',
-      r.aprovador_id || null, r.aprovador_nome || '', r.data_relatorio || new Date().toISOString(),
-      r.data_aprovacao || null, r.conteudo || '', r.descricao || '', r.checklist_data || '[]',
-      r.categoria || '', r.local || '', r.lembrete_proxima_visita || null,
-      r.observacoes_finais || '', r.status || 'em_andamento', r.comentario_aprovacao || '',
-      r.acompanhantes || '[]', r.created_at || new Date().toISOString(),
-      r.updated_at || r.data_criacao_local || r.created_at || new Date().toISOString(), r.uuid || r.uuid_local || '',
-      r.data_criacao_local || r.created_at || new Date().toISOString(),
-      r.data_sincronizacao || null, syncStatus || 'pending'
+      safeId,
+      safeNumero,
+      r.numero_projeto ? Number(r.numero_projeto) : null,
+      safeTitulo,
+      safeProjetoId,
+      String(r.projeto_nome || 'Obra'),
+      r.visita_id ? Number(r.visita_id) : null,
+      Number(r.autor_id) || 1,
+      String(r.autor_nome || 'Responsável'),
+      r.aprovador_id ? Number(r.aprovador_id) : null,
+      String(r.aprovador_nome || ''),
+      safeDataRelatorio,
+      r.data_aprovacao ? String(r.data_aprovacao) : null,
+      String(r.conteudo || ''),
+      String(r.descricao || ''),
+      safeChecklistData,
+      String(r.categoria || ''),
+      String(r.local || ''),
+      r.lembrete_proxima_visita ? String(r.lembrete_proxima_visita) : null,
+      String(r.observacoes_finais || ''),
+      String(r.status || 'em_andamento'),
+      String(r.comentario_aprovacao || ''),
+      safeAcompanhantes,
+      String(r.created_at || now),
+      String(r.updated_at || now),
+      safeUuid,
+      String(r.data_criacao_local || r.created_at || now),
+      r.data_sincronizacao ? String(r.data_sincronizacao) : null,
+      String(syncStatus || r.sync_status || 'pending')
     ]
   );
 }
@@ -526,15 +589,30 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
     console.warn('[db] Aviso de limpeza de duplicatas:', cleanErr);
   }
 
+  const safeId = Number(f.id) || Date.now();
+  const safeRelId = Number(f.relatorio_id) || 0;
+
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (
       id, relatorio_id, relatorio_uuid, url, filename, uri_local, titulo, legenda, descricao,
       tipo_servico, local, ordem, anotacoes_dados, base64, sync_status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      f.id || Date.now(), f.relatorio_id || 0, f.relatorio_uuid || null, f.url || '', f.filename || '', f.uri_local || '',
-      f.titulo || '', f.legenda || '', f.descricao || '', f.tipo_servico || '',
-      f.local || '', f.ordem ?? 0, f.anotacoes_dados || '', finalBase64 || '', syncStatus || 'pending'
+      safeId,
+      safeRelId,
+      f.relatorio_uuid ? String(f.relatorio_uuid) : null,
+      String(f.url || ''),
+      String(f.filename || ''),
+      String(f.uri_local || ''),
+      String(f.titulo || ''),
+      String(f.legenda || ''),
+      String(f.descricao || ''),
+      String(f.tipo_servico || ''),
+      String(f.local || ''),
+      Number(f.ordem) || 0,
+      String(f.anotacoes_dados || ''),
+      String(finalBase64 || ''),
+      String(syncStatus || f.sync_status || 'pending')
     ]
   );
 }
@@ -555,6 +633,96 @@ export async function migrateLocalFotosRelatorioId(oldRelatorioId: number, newRe
     console.log(`[db] Fotos migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId} (uuid: ${uuid || 'none'})`);
   } catch (err) {
     console.warn('[db] Erro ao migrar fotos entre relatórios:', err);
+  }
+}
+
+/** Atualiza especificações técnicas de uma obra no banco local SQLite */
+export async function updateLocalProjetoInfoTecnica(
+  projetoId: number,
+  info: {
+    elementos_construtivos_base?: string;
+    especificacao_chapisco_colante?: string;
+    especificacao_chapisco_alvenaria?: string;
+    especificacao_argamassa_emboco?: string;
+    forma_aplicacao_argamassa?: string;
+    acabamentos_revestimento?: string;
+    acabamento_peitoris?: string;
+    acabamento_muretas?: string;
+    definicao_frisos_cor?: string;
+    definicao_face_inferior_abas?: string;
+    observacoes_projeto_fachada?: string;
+    outras_observacoes?: string;
+  }
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE projetos SET
+      elementos_construtivos_base = ?,
+      especificacao_chapisco_colante = ?,
+      especificacao_chapisco_alvenaria = ?,
+      especificacao_argamassa_emboco = ?,
+      forma_aplicacao_argamassa = ?,
+      acabamentos_revestimento = ?,
+      acabamento_peitoris = ?,
+      acabamento_muretas = ?,
+      definicao_frisos_cor = ?,
+      definicao_face_inferior_abas = ?,
+      observacoes_projeto_fachada = ?,
+      outras_observacoes = ?,
+      local_updated_at = ?
+    WHERE id = ?`,
+    [
+      info.elementos_construtivos_base || null,
+      info.especificacao_chapisco_colante || null,
+      info.especificacao_chapisco_alvenaria || null,
+      info.especificacao_argamassa_emboco || null,
+      info.forma_aplicacao_argamassa || null,
+      info.acabamentos_revestimento || null,
+      info.acabamento_peitoris || null,
+      info.acabamento_muretas || null,
+      info.definicao_frisos_cor || null,
+      info.definicao_face_inferior_abas || null,
+      info.observacoes_projeto_fachada || null,
+      info.outras_observacoes || null,
+      new Date().toISOString(),
+      Number(projetoId)
+    ]
+  );
+}
+
+export async function getLocalUsers(): Promise<User[]> {
+  const db = await getDatabase();
+  try {
+    return await db.getAllAsync<User>('SELECT * FROM users ORDER BY username ASC');
+  } catch {
+    return [];
+  }
+}
+
+export async function saveLocalUsers(users: User[]): Promise<void> {
+  const db = await getDatabase();
+  for (const u of users) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO users (
+        id, username, email, nome_completo, is_master, is_aprovador_express,
+        cargo, telefone, cor_agenda, ativo, primeiro_login, tipo_acesso, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        Number(u.id) || Date.now(),
+        String(u.username || ''),
+        String(u.email || ''),
+        String(u.nome_completo || u.username || ''),
+        u.is_master ? 1 : 0,
+        u.is_aprovador_express ? 1 : 0,
+        String(u.cargo || ''),
+        String(u.telefone || ''),
+        String(u.cor_agenda || ''),
+        u.ativo !== false ? 1 : 0,
+        u.primeiro_login ? 1 : 0,
+        String(u.tipo_acesso || 'funcionario'),
+        String(u.created_at || new Date().toISOString())
+      ]
+    );
   }
 }
 

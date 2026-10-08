@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, FlatList, TouchableOpacity, 
   Alert, RefreshControl, Modal, TextInput 
@@ -8,8 +8,10 @@ import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
-  getLocalRelatorios, updateLocalRelatorioStatus, addToSyncQueue 
+  getLocalRelatorios, updateLocalRelatorioStatus, addToSyncQueue,
+  getLocalFotos, saveBatchChecklistProgressoObra 
 } from '../../database/db';
+import { generateReportPDF } from '../../services/pdfService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Relatorio } from '../../types';
@@ -61,11 +63,44 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
       await addToSyncQueue(
         'relatorio',
         selectedReport.id,
-        'approval',
-        `/api/reports/${selectedReport.id}/${modalAction === 'Aprovado' ? 'approve' : 'reject'}`,
+        modalAction === 'Aprovado' ? 'approve' : 'reject',
+        `/api/relatorios/${selectedReport.id}/status`,
         'POST',
-        { status: modalAction, comentario: comment.trim() }
+        { status: modalAction, comentario: comment.trim(), aprovador_id: user?.id }
       );
+
+      // Se for aprovado, salva histórico do checklist e PDF em background
+      if (modalAction === 'Aprovado') {
+        if (selectedReport.checklist_data) {
+          try {
+            const chkItems = typeof selectedReport.checklist_data === 'string'
+              ? JSON.parse(selectedReport.checklist_data)
+              : selectedReport.checklist_data;
+            if (Array.isArray(chkItems)) {
+              const aprovados = chkItems
+                .filter((item: any) => item.checked)
+                .map((item: any, idx: number) => ({
+                  item_texto: item.item,
+                  ordem: item.ordem || idx + 1,
+                  aprovado_em_relatorio_id: selectedReport.id,
+                  aprovado_em_relatorio_numero: selectedReport.numero || `REL-${selectedReport.id}`,
+                  data_aprovacao: new Date().toISOString(),
+                  observacao: item.observacao || null
+                }));
+              if (aprovados.length > 0) {
+                await saveBatchChecklistProgressoObra(selectedReport.projeto_id, aprovados);
+              }
+            }
+          } catch (chkErr) {
+            console.warn('[ApprovalDashboard] Erro ao salvar progresso de checklist:', chkErr);
+          }
+        }
+
+        // Gera PDF em segundo plano sem travar nem exibir alertas modais
+        getLocalFotos(selectedReport.id, selectedReport.uuid)
+          .then(fotos => generateReportPDF({ ...selectedReport, status: 'Aprovado' }, fotos))
+          .catch(() => null);
+      }
 
       if (isOnline) triggerSync();
 

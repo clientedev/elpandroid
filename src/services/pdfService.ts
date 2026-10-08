@@ -1,8 +1,8 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Relatorio, FotoRelatorio, RelatorioExpress } from '../types';
+import { saveApprovedPdfToProjectFolder } from './appFilesService';
 import { ELP_LOGO_BASE64 } from './logoBase64';
-import { saveApprovedPdfToProjectFolder, promptSelectStorageDirectory } from './appFilesService';
 
 export async function generateReportPDF(
   relatorio: Relatorio | RelatorioExpress,
@@ -250,7 +250,6 @@ export async function generateReportPDF(
   const finalObra = obraNome || (relatorio as any).projeto_nome || (relatorio as any).obra || 'Obra_Geral';
   (async () => {
     try {
-      await promptSelectStorageDirectory(false);
       await saveApprovedPdfToProjectFolder(finalObra, numero, uri);
     } catch (err) {
       console.warn('[pdfService] Erro ao salvar PDF na pasta Relatórios:', err);
