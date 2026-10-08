@@ -1,15 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
-import { saveLocalProjeto, addToSyncQueue } from '../../database/db';
+import { saveLocalProjeto, addToSyncQueue, getNextProjectNumber } from '../../database/db';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Projeto } from '../../types';
 import { Colors } from '../../theme/colors';
+import * as Location from 'expo-location';
 
 const TIPOS_OBRA_OPCOES = [
   'Edifício Residencial Multifamiliar',
@@ -28,11 +29,19 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   // 1º Campo: Construtora (em estrito atendimento à regra do manual)
   const [construtora, setConstrutora] = useState(existingProject?.construtora || '');
 
-  // 2º Campo: Nome da Obra e Número de Identificação
+  // 2º Campo: Nome da Obra e Número de Identificação (Regra OBRA-0001 em diante)
   const [nome, setNome] = useState(existingProject?.nome || '');
-  const [numero, setNumero] = useState(
-    existingProject?.numero || `OBR-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`
-  );
+  const [numero, setNumero] = useState(existingProject?.numero || 'OBRA-0001');
+
+  useEffect(() => {
+    if (!existingProject) {
+      getNextProjectNumber().then(nextNum => {
+        setNumero(nextNum);
+      }).catch(err => {
+        console.warn('Erro ao obter próximo código OBRA-0001:', err);
+      });
+    }
+  }, [existingProject]);
 
   // 3º Campo: Tipo de Obra
   const [tipoObra, setTipoObra] = useState(existingProject?.tipo_obra || 'Edifício Residencial Multifamiliar');
@@ -77,21 +86,94 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
   const [loading, setLoading] = useState(false);
 
-  // Captura de GPS atual
-  function handleCapturarGps() {
+  // Captura de GPS de hardware de alta precisão do dispositivo móvel + Geocodificação Reversa para endereço
+  async function handleCapturarGps() {
     setLoadingGps(true);
-    setTimeout(() => {
-      // Coordenadas simuladas de alta precisão
-      const newLat = -23.5505 + (Math.random() - 0.5) * 0.05;
-      const newLon = -46.6333 + (Math.random() - 0.5) * 0.05;
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão de GPS Necessária',
+          'Permita o acesso à localização precisa do dispositivo para capturar o endereço exato da obra.'
+        );
+        return;
+      }
+
+      // Obtém coordenadas reais com precisão máxima do hardware do celular (não por rede)
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+
+      const newLat = location.coords.latitude;
+      const newLon = location.coords.longitude;
       setLatitude(newLat);
       setLongitude(newLon);
-      if (!endereco.trim()) {
-        setEndereco('Av. das Nações Unidas, 14401 - Chácara Santo Antônio, São Paulo - SP');
+
+      // Realiza geocodificação reversa para obter o endereço legível (rua, número, bairro, cidade, UF, CEP)
+      let resolvedAddress = '';
+      try {
+        const reverseGeocode = await Location.reverseGeocodeAsync({
+          latitude: newLat,
+          longitude: newLon,
+        });
+
+        if (reverseGeocode && reverseGeocode.length > 0) {
+          const item = reverseGeocode[0];
+          const parts: string[] = [];
+
+          const logradouro = item.street || item.name || '';
+          const num = item.streetNumber || '';
+          if (logradouro) {
+            parts.push(num ? `${logradouro}, ${num}` : logradouro);
+          }
+
+          if (item.district || item.subregion) {
+            parts.push(item.district || item.subregion || '');
+          }
+
+          const cidade = item.city || item.subregion || '';
+          const uf = item.region || '';
+          if (cidade && uf) {
+            parts.push(`${cidade} - ${uf}`);
+          } else if (cidade || uf) {
+            parts.push(cidade || uf);
+          }
+
+          if (item.postalCode) {
+            parts.push(`CEP ${item.postalCode}`);
+          }
+
+          resolvedAddress = parts.filter(Boolean).join(', ');
+        }
+      } catch (revErr) {
+        console.warn('[GPS] Erro no geocoding reverso:', revErr);
       }
+
+      if (resolvedAddress) {
+        setEndereco(resolvedAddress);
+        Alert.alert(
+          'Localização do Dispositivo Obtida',
+          `Endereço identificado com sucesso pelo GPS do dispositivo:\n\n${resolvedAddress}\n\nCoordenadas do Dispositivo:\nLat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`
+        );
+      } else {
+        const fallbackCoord = `Lat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`;
+        if (!endereco.trim()) {
+          setEndereco(fallbackCoord);
+        }
+        Alert.alert(
+          'GPS do Dispositivo Capturado',
+          `Coordenadas de alta precisão do hardware obtidas:\n${fallbackCoord}\n(Você pode complementar o nome da rua manualmente).`
+        );
+      }
+    } catch (err: any) {
+      console.warn('[GPS] Falha ao capturar localização:', err);
+      Alert.alert(
+        'Falha no GPS',
+        'Não foi possível obter a localização do dispositivo no momento. Verifique se o GPS (Localização) do aparelho está ativado.'
+      );
+    } finally {
       setLoadingGps(false);
-      Alert.alert('GPS Capturado', `Latitude: ${newLat.toFixed(5)}, Longitude: ${newLon.toFixed(5)} gravados com sucesso!`);
-    }, 700);
+    }
   }
 
   async function handleSave() {
@@ -216,8 +298,13 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
             <TextInput 
               style={[styles.input, styles.readOnlyInput]} 
               value={numero} 
+              placeholder="OBRA-0001"
+              placeholderTextColor="#94A3B8"
               onChangeText={setNumero} 
             />
+            <Text style={styles.hintText}>
+              Regra de indexação: Sequencial automático OBRA-0001 em diante.
+            </Text>
           </View>
 
           {/* 3. Tipo de Obra */}
@@ -292,11 +379,11 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
           {/* 7. Endereço Completo e Geolocalização */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>7. Endereço Completo e Coordenadas GPS</Text>
+            <Text style={styles.label}>7. Endereço Completo e Localização GPS (Dispositivo)</Text>
             <View style={styles.addressRow}>
               <TextInput 
                 style={[styles.input, { flex: 1 }]} 
-                placeholder="Rua, número, bairro, cidade, CEP" 
+                placeholder="Rua, número, bairro, cidade, CEP (ou toque no GPS)" 
                 placeholderTextColor="#94A3B8"
                 value={endereco} 
                 onChangeText={setEndereco} 
@@ -311,7 +398,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
                 ) : (
                   <>
                     <Ionicons name="location" size={16} color="#FFFFFF" />
-                    <Text style={styles.gpsBtnText}>GPS</Text>
+                    <Text style={styles.gpsBtnText}>GPS Físico</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -319,9 +406,9 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
             {latitude && longitude ? (
               <View style={styles.coordinatesTag}>
-                <Ionicons name="navigate-outline" size={14} color="#0369A1" />
+                <Ionicons name="shield-checkmark" size={14} color="#0369A1" />
                 <Text style={styles.coordinatesText}>
-                  Lat: {latitude.toFixed(5)} • Lon: {longitude.toFixed(5)}
+                  GPS do Dispositivo (Alta Precisão) • Lat: {latitude.toFixed(6)} | Lon: {longitude.toFixed(6)}
                 </Text>
               </View>
             ) : null}

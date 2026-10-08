@@ -10,7 +10,7 @@ import {
   saveLocalReembolso, getLocalFotos, saveLocalFoto, 
   getLocalFotosExpress, saveLocalFotoExpress,
   updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase,
-  getLocalProjetos, getLocalRelatorios, getLocalVisitas, deleteLocalProjetoCascade
+  getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
 import { notificationService } from './notificationService';
@@ -134,10 +134,31 @@ class SyncService {
     try {
       // 1. Process Outbound Sync Queue (Local SQLite -> Railway Server)
       const queue = await getPendingSyncQueue();
+      const syncedEntitiesInBatch = new Set<string>();
+
       for (const item of queue) {
         try {
-          await updateSyncQueueItem(item.id, 'processing');
           let payload = JSON.parse(item.payload || '{}');
+          const entityKey = `${item.entity_type}_${item.entity_id}`;
+          const uuidKey = payload.uuid ? `${item.entity_type}_uuid_${payload.uuid}` : '';
+
+          // Deduplicação: se a mesma entidade já foi processada neste lote, conclui o item redundante
+          if (syncedEntitiesInBatch.has(entityKey) || (uuidKey && syncedEntitiesInBatch.has(uuidKey))) {
+            console.log(`[SyncService] Pulando item redundante na fila já processado: ${entityKey}`);
+            await updateSyncQueueItem(item.id, 'completed');
+            continue;
+          }
+
+          await updateSyncQueueItem(item.id, 'processing');
+
+          // Verificação inteligente para relatórios criados offline: se já foi sincronizado, evita duplicar POST
+          if (item.entity_type === 'relatorio' && item.method === 'POST') {
+            const localRel = await getLocalRelatorioById(item.entity_id);
+            if (localRel && localRel.id < 2000000000 && localRel.sync_status === 'synced') {
+              item.method = 'PUT';
+              item.endpoint = `/api/relatorios/${localRel.id}`;
+            }
+          }
 
           // Enrich report payload with local photos and convert them to base64 if needed
           if (item.entity_type === 'relatorio') {
@@ -208,6 +229,8 @@ class SyncService {
           // Mark completed
           await updateSyncQueueItem(item.id, 'completed');
           processedCount++;
+          syncedEntitiesInBatch.add(entityKey);
+          if (uuidKey) syncedEntitiesInBatch.add(uuidKey);
 
           // Update local entity sync_status to 'synced'
           const db = await getDatabase();
@@ -220,6 +243,9 @@ class SyncService {
             const syncedAt = response?.data?.data_sincronizacao || new Date().toISOString();
             const serverId = response?.data?.id;
             const serverUuid = response?.data?.uuid || payload.uuid;
+            if (serverId) syncedEntitiesInBatch.add(`relatorio_${serverId}`);
+            if (serverUuid) syncedEntitiesInBatch.add(`relatorio_uuid_${serverUuid}`);
+
             if (officialNumero) {
               await updateLocalRelatorioNumero(item.entity_id, officialNumero, syncedAt);
             }

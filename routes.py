@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.18',
-        'versionCode': 19,
+        'version': '1.0.19',
+        'versionCode': 20,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.18: Sincronização e expurgo de obras e relatórios excluídos entre todos os aparelhos e remoção de dados fictícios residuais.',
+        'notes': 'Atualização v1.0.19: Regra de indexação OBRA-0001, priorização de relatórios por ordem de sincronização sem duplicidade, rascunhos 100% silenciosos, seletor de diretório local para fotos e GPS de alta precisão do hardware com endereço legível.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12477,9 +12477,23 @@ def api_projetos_collection():
                 # Atualizar existente
                 projeto = existing
             else:
-                if not numero:
-                    total_proj = Projeto.query.count() + 1
-                    numero = f"OBR-{total_proj:04d}"
+                if not numero or numero.startswith('OBR-'):
+                    # Regra de indexação oficial: OBRA-0001 em diante
+                    max_seq = 0
+                    all_obras = Projeto.query.all()
+                    for p in all_obras:
+                        if p.numero:
+                            import re
+                            m = re.search(r'OBRA[-_ ]*(\d+)', p.numero, re.IGNORECASE)
+                            if m:
+                                try:
+                                    v = int(m.group(1))
+                                    if v > max_seq:
+                                        max_seq = v
+                                except Exception:
+                                    pass
+                    next_seq = max_seq + 1
+                    numero = f"OBRA-{next_seq:04d}"
                 projeto = Projeto(numero=numero)
                 db.session.add(projeto)
 

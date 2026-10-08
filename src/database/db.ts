@@ -119,6 +119,24 @@ export async function getLocalProjetos(status?: string): Promise<Projeto[]> {
   return await db.getAllAsync<Projeto>(query, params);
 }
 
+export async function getNextProjectNumber(): Promise<string> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ numero: string }>('SELECT numero FROM projetos');
+  let maxSeq = 0;
+  for (const row of rows) {
+    if (!row.numero) continue;
+    const match = row.numero.match(/OBRA[-_ ]*(\d+)/i);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      if (!isNaN(val) && val > maxSeq) {
+        maxSeq = val;
+      }
+    }
+  }
+  const nextSeq = maxSeq + 1;
+  return `OBRA-${String(nextSeq).padStart(4, '0')}`;
+}
+
 export async function getLocalProjetoById(id: number): Promise<Projeto | null> {
   const db = await getDatabase();
   return await db.getFirstAsync<Projeto>('SELECT * FROM projetos WHERE id = ?', [id]);
@@ -729,6 +747,34 @@ export async function addToSyncQueue(
   payload: any
 ): Promise<number> {
   const db = await getDatabase();
+  
+  // Verifica se já existe um item pendente para a mesma entidade
+  const existing = await db.getFirstAsync<{ id: number; action: string; method: string }>(
+    "SELECT id, action, method FROM sync_queue WHERE entity_type = ? AND entity_id = ? AND status = 'pending' LIMIT 1",
+    [entityType, entityId]
+  );
+
+  if (existing) {
+    // Se nova ação é delete, prevalece o delete
+    if (action === 'delete') {
+      await db.runAsync(
+        "UPDATE sync_queue SET action = 'delete', endpoint = ?, method = 'DELETE', payload = ?, created_at = ? WHERE id = ?",
+        [endpoint, JSON.stringify(payload), new Date().toISOString(), existing.id]
+      );
+      return existing.id;
+    }
+    // Se o item existente era 'create' e o novo é 'update', mantém 'create' para cadastrar no servidor com o payload mais recente
+    const finalAction = existing.action === 'create' ? 'create' : action;
+    const finalMethod = existing.action === 'create' ? existing.method : method;
+    const finalEndpoint = existing.action === 'create' ? endpoint : endpoint;
+    
+    await db.runAsync(
+      "UPDATE sync_queue SET action = ?, endpoint = ?, method = ?, payload = ?, created_at = ? WHERE id = ?",
+      [finalAction, finalEndpoint, finalMethod, JSON.stringify(payload), new Date().toISOString(), existing.id]
+    );
+    return existing.id;
+  }
+
   const res = await db.runAsync(
     `INSERT INTO sync_queue (entity_type, entity_id, action, endpoint, method, payload, created_at, status, retries)
      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0)`,

@@ -21,6 +21,7 @@ import { notificationService } from '../../services/notificationService';
 
 import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import * as Location from 'expo-location';
 
 interface ChecklistItemState {
   id: number;
@@ -121,24 +122,26 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [loading, setLoading] = useState(false);
   const initializedDraftRef = React.useRef(false);
 
-  // Localização do dispositivo para ordenação inteligente por proximidade
+  // Localização do dispositivo via GPS de hardware para ordenação inteligente por proximidade
   useEffect(() => {
-    try {
-      if (typeof navigator !== 'undefined' && (navigator as any)?.geolocation) {
-        (navigator as any).geolocation.getCurrentPosition(
-          (pos: any) => {
-            if (pos?.coords) {
-              setUserLocation({
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude
-              });
-            }
-          },
-          () => null,
-          { timeout: 5000 }
-        );
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const pos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Highest,
+          });
+          if (pos?.coords) {
+            setUserLocation({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude
+            });
+          }
+        }
+      } catch (locErr) {
+        console.warn('[ReportForm] Falha ao capturar GPS de hardware:', locErr);
       }
-    } catch {}
+    })();
   }, []);
 
   useEffect(() => {
@@ -225,15 +228,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
       const d = new Date();
       setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-
-      // Notifica o sistema de notificações para alimentar o sino no cabeçalho
-      notificationService.notify({
-        titulo: 'Rascunho Salvo',
-        mensagem: `Rascunho de "${draftObj.titulo}" salvo localmente.`,
-        tipo: 'relatorio',
-        userId: user?.id,
-        silent: true,
-      });
+      // Rascunho salvo silenciosamente sem emitir notificações
     } catch (e) {
       console.warn('Erro ao salvar rascunho imediatamente:', e);
     } finally {

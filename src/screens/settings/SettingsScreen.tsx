@@ -16,6 +16,10 @@ import {
   getPendingSyncQueue, getLocalLegendas, saveLocalLegenda, 
   deleteLocalLegenda, addToSyncQueue 
 } from '../../database/db';
+import { 
+  getPhotoDirectoryConfig, savePhotoDirectoryConfig, 
+  PhotoDirectoryConfig, PhotoDirectoryType, DEFAULT_PHOTO_DIR_CONFIG 
+} from '../../services/imageService';
 import { LegendaPredefinida } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
@@ -49,6 +53,12 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [saveInDedicatedFolder, setSaveInDedicatedFolder] = useState(true);
   const [highQualityPhotos, setHighQualityPhotos] = useState(true);
 
+  // Diretório de Salvamento Local de Imagens
+  const [photoDirConfig, setPhotoDirConfig] = useState<PhotoDirectoryConfig>(DEFAULT_PHOTO_DIR_CONFIG);
+  const [showDirPickerModal, setShowDirPickerModal] = useState(false);
+  const [selectedDirType, setSelectedDirType] = useState<PhotoDirectoryType>('dcim');
+  const [customSubfolder, setCustomSubfolder] = useState('ELP_Obras');
+
   // Notificações no Celular
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
   const [testingNotification, setTestingNotification] = useState(false);
@@ -57,7 +67,38 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     loadDiagnostics();
     loadLegendas();
     checkNotificationStatus();
+    loadPhotoDirConfig();
   }, [pendingCount, selectedCategoria]);
+
+  async function loadPhotoDirConfig() {
+    const cfg = await getPhotoDirectoryConfig();
+    setPhotoDirConfig(cfg);
+    setSelectedDirType(cfg.type);
+    setCustomSubfolder(cfg.subfolder || 'ELP_Obras');
+  }
+
+  async function handleConfirmDirectory() {
+    let label = '';
+    const folder = customSubfolder.trim() || 'ELP_Obras';
+    if (selectedDirType === 'dcim') label = `DCIM / ${folder} (Galeria e Câmera)`;
+    else if (selectedDirType === 'pictures') label = `Pictures / ${folder} (Imagens)`;
+    else if (selectedDirType === 'documents') label = `Documents / ${folder} (Documentos)`;
+    else if (selectedDirType === 'app_internal') label = `Armazenamento Seguro Interno / ${folder}`;
+    else label = `Personalizado / ${folder}`;
+
+    const newCfg: PhotoDirectoryConfig = {
+      type: selectedDirType,
+      label: label,
+      subfolder: folder,
+    };
+    await savePhotoDirectoryConfig(newCfg);
+    setPhotoDirConfig(newCfg);
+    setShowDirPickerModal(false);
+    Alert.alert(
+      'Diretório Local Configurado',
+      `Toda foto capturada no aplicativo agora será salva neste diretório:\n\n${label}`
+    );
+  }
 
   async function checkNotificationStatus() {
     const granted = await notificationService.checkPermission();
@@ -436,7 +477,39 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         <View style={styles.card}>
           <View style={styles.cardTitleRow}>
             <Ionicons name="camera-outline" size={20} color={Colors.primary} />
-            <Text style={styles.cardTitle}>Câmera & Armazenamento</Text>
+            <Text style={styles.cardTitle}>Câmera & Armazenamento de Fotos</Text>
+          </View>
+
+          {/* Diretório Local de Salvamento de Fotos */}
+          <View style={styles.photoDirContainer}>
+            <View style={styles.photoDirHeader}>
+              <View style={styles.photoDirIconBox}>
+                <Ionicons name="folder" size={22} color="#0284C7" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.photoDirTitle}>Diretório Local das Fotos</Text>
+                <Text style={styles.photoDirValue} numberOfLines={2}>
+                  {photoDirConfig.label}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.photoDirDesc}>
+              Toda foto tirada no app é salva diretamente neste diretório local do dispositivo.
+            </Text>
+
+            <TouchableOpacity 
+              style={styles.chooseDirBtn}
+              onPress={() => {
+                setSelectedDirType(photoDirConfig.type);
+                setCustomSubfolder(photoDirConfig.subfolder || 'ELP_Obras');
+                setShowDirPickerModal(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="folder-open-outline" size={18} color="#FFFFFF" />
+              <Text style={styles.chooseDirBtnText}>Escolher Diretório das Fotos</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity 
@@ -444,9 +517,9 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             onPress={() => setSaveInDedicatedFolder(!saveInDedicatedFolder)}
           >
             <View style={{ flex: 1 }}>
-              <Text style={styles.settingToggleTitle}>Salvar fotos na pasta dedicada (ELP/)</Text>
+              <Text style={styles.settingToggleTitle}>Organizar Fotos por Pasta da Obra</Text>
               <Text style={styles.settingToggleSub}>
-                Organiza as fotos tiradas em pasta própria no dispositivo móvel em vez da galeria geral.
+                Cria automaticamente uma subpasta com o nome de cada obra para organizar os registros.
               </Text>
             </View>
             <Ionicons 
@@ -636,6 +709,109 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
 
             <TouchableOpacity style={styles.modalSaveBtn} onPress={handleAddLegenda}>
               <Text style={styles.modalSaveBtnText}>Salvar Legenda</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Escolha de Diretório Local para Fotos */}
+      <Modal visible={showDirPickerModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '88%' }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="folder-open" size={22} color={Colors.primary} />
+                <Text style={styles.modalTitle}>Diretório Local das Fotos</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDirPickerModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.desc}>
+              Selecione o diretório do dispositivo onde toda foto tirada no app será gravada localmente:
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
+              {[
+                {
+                  id: 'dcim',
+                  icon: 'camera-outline',
+                  title: 'DCIM (Câmera & Galeria)',
+                  desc: 'Pasta padrão de fotos da câmera. Visível diretamente na galeria do celular.',
+                },
+                {
+                  id: 'pictures',
+                  icon: 'images-outline',
+                  title: 'Pictures (Imagens)',
+                  desc: 'Pasta pública de imagens do Android para relatórios e laudos.',
+                },
+                {
+                  id: 'documents',
+                  icon: 'document-text-outline',
+                  title: 'Documents (Documentos)',
+                  desc: 'Pasta pública de documentos técnicos do aparelho.',
+                },
+                {
+                  id: 'app_internal',
+                  icon: 'shield-checkmark-outline',
+                  title: 'Armazenamento Seguro do App',
+                  desc: 'Pasta isolada exclusiva e segura do aplicativo no celular.',
+                },
+                {
+                  id: 'custom',
+                  icon: 'create-outline',
+                  title: 'Pasta Personalizada',
+                  desc: 'Defina o nome da sua pasta no armazenamento local.',
+                },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    styles.dirOptionRow,
+                    selectedDirType === opt.id && styles.dirOptionRowSelected,
+                  ]}
+                  onPress={() => setSelectedDirType(opt.id as PhotoDirectoryType)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.dirOptionIcon, selectedDirType === opt.id && styles.dirOptionIconSelected]}>
+                    <Ionicons 
+                      name={opt.icon as any} 
+                      size={20} 
+                      color={selectedDirType === opt.id ? '#FFFFFF' : Colors.primary} 
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.dirOptionTitle, selectedDirType === opt.id && styles.dirOptionTitleSelected]}>
+                      {opt.title}
+                    </Text>
+                    <Text style={styles.dirOptionDesc}>{opt.desc}</Text>
+                  </View>
+                  <Ionicons 
+                    name={selectedDirType === opt.id ? "radio-button-on" : "radio-button-off"} 
+                    size={20} 
+                    color={selectedDirType === opt.id ? Colors.primary : Colors.textMuted} 
+                  />
+                </TouchableOpacity>
+              ))}
+
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.modalLabel}>Nome da Subpasta no Celular:</Text>
+                <TextInput
+                  style={styles.modalInputSingle}
+                  placeholder="Ex: ELP_Obras"
+                  placeholderTextColor="#94A3B8"
+                  value={customSubfolder}
+                  onChangeText={setCustomSubfolder}
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.modalSaveBtn, { marginTop: 14 }]} 
+              onPress={handleConfirmDirectory}
+            >
+              <Text style={styles.modalSaveBtnText}>Salvar e Aplicar Diretório</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1030,5 +1206,108 @@ const styles = StyleSheet.create({
     color: '#2563EB',
     fontWeight: 'bold',
     fontSize: 12,
+  },
+  photoDirContainer: {
+    backgroundColor: '#F0F9FF',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    marginBottom: 16,
+  },
+  photoDirHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  photoDirIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoDirTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#0369A1',
+  },
+  photoDirValue: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  photoDirDesc: {
+    fontSize: 12,
+    color: '#475569',
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  chooseDirBtn: {
+    backgroundColor: '#0284C7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 8,
+    ...Shadows.sm,
+  },
+  chooseDirBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  dirOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    gap: 10,
+  },
+  dirOptionRowSelected: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+  },
+  dirOptionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dirOptionIconSelected: {
+    backgroundColor: '#2563EB',
+  },
+  dirOptionTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  dirOptionTitleSelected: {
+    color: '#1D4ED8',
+  },
+  dirOptionDesc: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  modalInputSingle: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 42,
+    fontSize: 13,
+    color: Colors.text,
   },
 });
