@@ -9,8 +9,21 @@ import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalProjetoById, getLocalRelatorios, getLocalVisitas, getLocalLembretes, 
   saveLocalProjeto, addToSyncQueue, getLocalContatos, saveLocalContato,
-  deleteLocalProjetoCascade
+  deleteLocalProjetoCascade, getLocalChecklistTemplate, getChecklistProgressoObra
 } from '../../database/db';
+
+const DEFAULT_OBRA_CHECKLIST = [
+  'Execução de Chapisco e Aderência',
+  'Aplicação de Emboço Técnico',
+  'Instalação de Telas de Reforço',
+  'Juntas de Movimentação e Dessolidarização',
+  'Tratamento de Peitoris e Pingadeiras',
+  'Regularização de Superfície',
+  'Assentamento de Revestimento Cerâmico/Pastilha',
+  'Aplicação de Rejunte Técnico',
+  'Vedação Perimétrica de Esquadrias',
+  'Lavagem e Limpeza Final da Fachada',
+];
 import { Projeto, Relatorio, Visita, Lembrete, Contato } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 import { useNetwork } from '../../contexts/NetworkContext';
@@ -48,6 +61,22 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
     projeto?.status && ['Não Iniciado', 'Concluído', 'Pausado', 'Cancelado'].includes(projeto.status)
   );
 
+  // Progresso do Checklist da Obra (Real e cumulativo)
+  const [checklistStats, setChecklistStats] = useState<{
+    total: number;
+    validados: number;
+    percent: number;
+    itens: Array<{
+      ordem: number;
+      texto: string;
+      aprovado: boolean;
+      relatorioNumero?: string;
+      dataAprovacao?: string;
+      observacao?: string;
+    }>;
+  }>({ total: 0, validados: 0, percent: 0, itens: [] });
+  const [showChecklistDetails, setShowChecklistDetails] = useState(false);
+
   useEffect(() => {
     loadDetails();
   }, [projectId]);
@@ -70,6 +99,73 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       setLembretes(l);
       const c = await getLocalContatos(projectId);
       setContatos(c);
+
+      // Carrega o template e histórico cumulativo de checklist da obra
+      const [template, progressoObra] = await Promise.all([
+        getLocalChecklistTemplate(),
+        getChecklistProgressoObra(projectId),
+      ]);
+
+      const baseItems: Array<{ id?: number; item: string; ordem: number }> = template.length > 0 
+        ? template.map((t, idx) => ({ id: t.id, item: t.item, ordem: t.ordem || idx + 1 }))
+        : DEFAULT_OBRA_CHECKLIST.map((texto, idx) => ({ id: idx + 1, item: texto, ordem: idx + 1 }));
+
+      const aprovacoesMap = new Map<string, { aprovado: boolean; relatorioNumero?: string; dataAprovacao?: string; obs?: string }>();
+
+      // 1. Considera registros de checklist_obra_progresso
+      for (const po of progressoObra) {
+        if (po.aprovado) {
+          aprovacoesMap.set(po.item_texto.trim().toLowerCase(), {
+            aprovado: true,
+            relatorioNumero: po.aprovado_em_relatorio_numero || undefined,
+            dataAprovacao: po.data_aprovacao || undefined,
+            obs: po.observacao || undefined,
+          });
+        }
+      }
+
+      // 2. Considera relatórios salvos da obra que contenham checklist aprovado
+      for (const rel of r) {
+        const rawChecklist = (rel as any).checklist;
+        if (rawChecklist) {
+          try {
+            const parsed = typeof rawChecklist === 'string' ? JSON.parse(rawChecklist) : rawChecklist;
+            if (Array.isArray(parsed)) {
+              for (const item of parsed) {
+                if (item && item.checked && item.item) {
+                  const key = String(item.item).trim().toLowerCase();
+                  if (!aprovacoesMap.has(key)) {
+                    aprovacoesMap.set(key, {
+                      aprovado: true,
+                      relatorioNumero: rel.numero || undefined,
+                      dataAprovacao: rel.data_relatorio || rel.created_at || undefined,
+                      obs: item.observacao || undefined,
+                    });
+                  }
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+
+      const listaFinal = baseItems.map((base: { id?: number; item: string; ordem: number }, idx: number) => {
+        const info = aprovacoesMap.get(base.item.trim().toLowerCase());
+        return {
+          ordem: idx + 1,
+          texto: base.item,
+          aprovado: Boolean(info?.aprovado),
+          relatorioNumero: info?.relatorioNumero,
+          dataAprovacao: info?.dataAprovacao,
+          observacao: info?.obs,
+        };
+      });
+
+      const total = listaFinal.length;
+      const validados = listaFinal.filter((i: { aprovado: boolean }) => i.aprovado).length;
+      const percent = total > 0 ? Math.round((validados / total) * 100) : 0;
+
+      setChecklistStats({ total, validados, percent, itens: listaFinal });
     } catch (e) {
       console.warn('Erro ao carregar detalhes:', e);
     }
@@ -388,20 +484,93 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               ) : null}
             </View>
 
-            {/* 5. Painel de Progresso do Checklist (Seção 15.6) */}
+            {/* 5. Painel Real de Progresso do Checklist */}
             <View style={styles.infoCard}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardSectionTitle}>Progresso do Checklist da Obra</Text>
-                <View style={styles.checklistPercentBadge}>
-                  <Text style={styles.checklistPercentText}>Conforme</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                  <Ionicons name="checkbox-outline" size={18} color="#2563EB" />
+                  <Text style={styles.cardSectionTitle}>Progresso do Checklist da Obra</Text>
+                </View>
+                <View style={[
+                  styles.checklistPercentBadge,
+                  checklistStats.percent === 100 
+                    ? styles.badgeAllDone 
+                    : checklistStats.percent > 0 
+                    ? styles.badgeInProgress 
+                    : styles.badgeNone
+                ]}>
+                  <Text style={[
+                    styles.checklistPercentText,
+                    checklistStats.percent === 100 
+                      ? styles.badgeAllDoneText 
+                      : checklistStats.percent > 0 
+                      ? styles.badgeInProgressText 
+                      : styles.badgeNoneText
+                  ]}>
+                    {checklistStats.percent}% Concluído
+                  </Text>
                 </View>
               </View>
+
               <View style={styles.progressBarBg}>
-                <View style={[styles.progressBarFill, { width: '85%' }]} />
+                <View style={[styles.progressBarFill, { width: `${Math.max(4, checklistStats.percent)}%` }]} />
               </View>
+
               <Text style={styles.checklistHint}>
-                85% das etapas de fachada vistoriadas e validadas em relatórios técnicos.
+                {checklistStats.validados} de {checklistStats.total} etapas técnicas validadas em relatórios desta obra.
               </Text>
+
+              {/* Botão para Expandir/Recolher Detalhes das Etapas */}
+              <TouchableOpacity
+                style={styles.btnToggleChecklistDetails}
+                activeOpacity={0.7}
+                onPress={() => setShowChecklistDetails(prev => !prev)}
+              >
+                <Text style={styles.btnToggleChecklistDetailsText}>
+                  {showChecklistDetails ? 'Ocultar Etapas Técnicas' : 'Ver Detalhes das Etapas'}
+                </Text>
+                <Ionicons
+                  name={showChecklistDetails ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color="#2563EB"
+                />
+              </TouchableOpacity>
+
+              {/* Lista Detalhada das Etapas */}
+              {showChecklistDetails && (
+                <View style={styles.checklistDetailsContainer}>
+                  {checklistStats.itens.map((item) => (
+                    <View key={item.ordem} style={styles.checkItemRow}>
+                      <View style={[
+                        styles.checkStatusIcon,
+                        item.aprovado ? styles.checkIconApproved : styles.checkIconPending
+                      ]}>
+                        <Ionicons
+                          name={item.aprovado ? 'checkmark-circle' : 'time-outline'}
+                          size={18}
+                          color={item.aprovado ? '#10B981' : '#94A3B8'}
+                        />
+                      </View>
+                      <View style={styles.checkItemTextCol}>
+                        <Text style={[
+                          styles.checkItemTitle,
+                          item.aprovado && styles.checkItemTitleApproved
+                        ]}>
+                          {item.ordem}. {item.texto}
+                        </Text>
+                        <Text style={styles.checkItemMeta}>
+                          {item.aprovado
+                            ? `Validado ${item.relatorioNumero ? `no Relatório #${item.relatorioNumero}` : ''}${item.dataAprovacao ? ` em ${new Date(item.dataAprovacao).toLocaleDateString('pt-BR')}` : ''}`
+                            : 'Pendente de validação em campo'}
+                        </Text>
+                        {item.observacao ? (
+                          <Text style={styles.checkItemObs}>Obs: {item.observacao}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* Aviso se obra estiver bloqueada */}
@@ -965,13 +1134,35 @@ const styles = StyleSheet.create({
 
   // Progresso do Checklist
   checklistPercentBadge: {
-    backgroundColor: '#D1FAE5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
+  badgeAllDone: {
+    backgroundColor: '#DCFCE7',
+  },
+  badgeAllDoneText: {
+    color: '#166534',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  badgeInProgress: {
+    backgroundColor: '#EFF6FF',
+  },
+  badgeInProgressText: {
+    color: '#1E40AF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  badgeNone: {
+    backgroundColor: '#F1F5F9',
+  },
+  badgeNoneText: {
+    color: '#64748B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   checklistPercentText: {
-    color: '#065F46',
     fontSize: 11,
     fontWeight: 'bold',
   },
@@ -984,12 +1175,78 @@ const styles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: '#2563EB',
     borderRadius: 4,
   },
   checklistHint: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  btnToggleChecklistDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  btnToggleChecklistDetailsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2563EB',
+  },
+  checklistDetailsContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  checkItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+  },
+  checkStatusIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkIconApproved: {
+    backgroundColor: '#DCFCE7',
+  },
+  checkIconPending: {
+    backgroundColor: '#F1F5F9',
+  },
+  checkItemTextCol: {
+    flex: 1,
+  },
+  checkItemTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  checkItemTitleApproved: {
+    color: '#0F172A',
+  },
+  checkItemMeta: {
     fontSize: 11,
     color: '#64748B',
+    marginTop: 2,
+  },
+  checkItemObs: {
+    fontSize: 11,
+    color: '#475569',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
 
   blockedStatusBox: {

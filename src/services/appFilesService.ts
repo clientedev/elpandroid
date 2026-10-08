@@ -1,11 +1,14 @@
 import { Platform, Alert } from 'react-native';
 import * as FileSystem from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocalProjetos } from '../database/db';
 
-const StorageAccessFramework = (FileSystem as any).StorageAccessFramework || {};
+const StorageAccessFramework =
+  (LegacyFileSystem as any)?.StorageAccessFramework ||
+  (FileSystem as any)?.StorageAccessFramework;
 
 // Chaves de armazenamento do Storage Access Framework (SAF)
 export const KEY_SAF_DIRECTORY_URI = '@obraflow_saf_directory_uri';
@@ -101,7 +104,16 @@ export async function requestAppStorageDirectory(): Promise<{
   }
 
   try {
-    // 1. Abre a interface nativa do Android para o usuário escolher o diretório
+    // 1. Verifica se a API do SAF está disponível
+    if (!StorageAccessFramework || typeof StorageAccessFramework.requestDirectoryPermissionsAsync !== 'function') {
+      Alert.alert(
+        'Armazenamento do App',
+        'O seletor nativo de diretórios não está disponível neste dispositivo. O app continuará salvando os arquivos no armazenamento interno com segurança.'
+      );
+      return { success: false };
+    }
+
+    // 2. Abre a interface nativa do Android para o usuário escolher o diretório
     const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
 
     if (!permissions.granted || !permissions.directoryUri) {
