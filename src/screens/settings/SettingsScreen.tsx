@@ -319,7 +319,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Verificar Atualizações</Text>
-            <Text style={styles.menuSubtitle}>Versão 2.4.0 • Build de Produção</Text>
+            <Text style={styles.menuSubtitle}>Versão {updateService.getCurrentVersion() || '1.0.21'} • Build de Produção</Text>
           </View>
           {checkingUpdates ? (
             <ActivityIndicator size="small" color="#2563EB" />

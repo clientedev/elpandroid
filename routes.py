@@ -12356,12 +12356,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.19',
-        'versionCode': 20,
+        'version': '1.0.21',
+        'versionCode': 22,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.19: Regra de indexação OBRA-0001, priorização de relatórios por ordem de sincronização sem duplicidade, rascunhos 100% silenciosos, seletor de diretório local para fotos e GPS de alta precisão do hardware com endereço legível.',
+        'notes': 'Atualização v1.0.21: Storage Access Framework com pastas Imagens e Relatórios separadas no celular.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
