@@ -391,48 +391,50 @@ export async function saveImageToProjectFolder(
     console.warn('[appFilesService] Cópia interna de imagem:', errCopy);
   }
 
-  // 2. Salva no diretório SAF público do usuário (pasta "Imagens")
+  // 2. Salva em background no diretório SAF público do usuário (pasta "Imagens")
   if (Platform.OS === 'android') {
-    try {
-      let imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
+    (async () => {
+      try {
+        let imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
 
-      // Se ainda não tiver imagensUri mas tiver directoryUri, tenta recriar/obter a pasta Imagens
-      if (!imagensUri) {
-        const rootDirUri = await AsyncStorage.getItem(KEY_SAF_DIRECTORY_URI);
-        if (rootDirUri) {
-          try {
-            imagensUri = await StorageAccessFramework.makeDirectoryAsync(rootDirUri, 'Imagens');
-            if (imagensUri) await AsyncStorage.setItem(KEY_SAF_IMAGENS_URI, imagensUri);
-          } catch {}
+        // Se ainda não tiver imagensUri mas tiver directoryUri, tenta recriar/obter a pasta Imagens
+        if (!imagensUri) {
+          const rootDirUri = await AsyncStorage.getItem(KEY_SAF_DIRECTORY_URI);
+          if (rootDirUri) {
+            try {
+              imagensUri = await StorageAccessFramework.makeDirectoryAsync(rootDirUri, 'Imagens');
+              if (imagensUri) await AsyncStorage.setItem(KEY_SAF_IMAGENS_URI, imagensUri);
+            } catch {}
+          }
         }
+
+        if (imagensUri) {
+          // Lê o conteúdo da foto em Base64 a partir do destino interno
+          const base64 = await FileSystem.readAsStringAsync(internalDest, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          // Cria o arquivo físico na pasta Imagens escolhida pelo usuário
+          const targetFileUri = await StorageAccessFramework.createFileAsync(
+            imagensUri,
+            `${cleanObra}_${safeFilename}`,
+            'image/jpeg'
+          );
+
+          // Grava o arquivo físico
+          await FileSystem.writeAsStringAsync(targetFileUri, base64, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          console.log(`[appFilesService] ✅ Imagem salva fisicamente na pasta Imagens via SAF: ${targetFileUri}`);
+        }
+      } catch (safErr) {
+        console.warn('[appFilesService] Erro ao gravar foto via SAF na pasta Imagens:', safErr);
       }
-
-      if (imagensUri) {
-        // Lê o conteúdo da foto em Base64
-        const base64 = await FileSystem.readAsStringAsync(sourceUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        // Cria o arquivo físico na pasta Imagens escolhida pelo usuário
-        const targetFileUri = await StorageAccessFramework.createFileAsync(
-          imagensUri,
-          `${cleanObra}_${safeFilename}`,
-          'image/jpeg'
-        );
-
-        // Grava o arquivo físico
-        await FileSystem.writeAsStringAsync(targetFileUri, base64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        console.log(`[appFilesService] ✅ Imagem salva fisicamente na pasta Imagens via SAF: ${targetFileUri}`);
-        return targetFileUri;
-      }
-    } catch (safErr) {
-      console.warn('[appFilesService] Erro ao gravar foto via SAF na pasta Imagens:', safErr);
-    }
+    })().catch(() => null);
   }
 
+  // SEMPRE retorna a URI do arquivo local interno (file://...) para exibição IMEDIATA (60fps) e offline-first!
   return internalDest || sourceUri;
 }
 

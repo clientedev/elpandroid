@@ -8,6 +8,7 @@ import { saveImageToProjectFolder, promptSelectStorageDirectory } from './appFil
 export interface CapturedPhoto {
   uri: string;
   base64?: string;
+  filename?: string;
 }
 
 export type PhotoDirectoryType = 'dcim' | 'pictures' | 'documents' | 'app_internal' | 'custom';
@@ -252,7 +253,7 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
       console.warn('[Camera] Erro ao salvar na galeria (background):', err)
     );
 
-    return { uri: permanentUri, base64: b64 };
+    return { uri: permanentUri, base64: b64, filename };
   } catch (error) {
     console.error('[Camera] Erro ao tirar foto:', error);
     return null;
@@ -299,7 +300,7 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
       console.warn('[Gallery] Fallback para uri original:', copyErr);
     }
 
-    return { uri: permanentUri, base64: asset.base64 || undefined };
+    return { uri: permanentUri, base64: asset.base64 || undefined, filename };
   } catch (error) {
     console.error('[Gallery] Erro ao selecionar foto:', error);
     return null;

@@ -125,6 +125,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+  const isProcessingPhotoRef = useRef(false);
   const initializedDraftRef = React.useRef(false);
 
   // Localização do dispositivo via GPS de hardware para ordenação inteligente por proximidade
@@ -396,7 +398,19 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           await loadChecklistForProject(r.projeto_id, r.checklist_data);
           const savedFotos = await getLocalFotos(r.id, r.uuid);
           if (savedFotos && savedFotos.length > 0) {
-            setFotos(savedFotos);
+            // Deduplica estritamente para não exibir duplicadas ao reabrir relatório
+            const seenFp = new Set<string>();
+            const uniqueSaved = savedFotos.filter(sf => {
+              const rawName = sf.filename 
+                || (sf.uri_local ? sf.uri_local.split('/').pop()?.split('?')[0] : null)
+                || (sf.url ? sf.url.split('/').pop()?.split('?')[0] : null);
+              const m = rawName ? rawName.match(/elp_(?:foto|import)_[0-9]+_[0-9]+\.jpg/i) : null;
+              const fp = m ? m[0].toLowerCase() : (rawName ? rawName.toLowerCase() : `id_${sf.id}`);
+              if (seenFp.has(fp)) return false;
+              seenFp.add(fp);
+              return true;
+            });
+            setFotos(uniqueSaved);
           }
         }
       });
@@ -528,50 +542,106 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, acompanhantesList, fotos, categoria, local, reportNumber, currentReportId, isOnline]);
 
   async function handleAddPhotoCamera() {
-    const photo = await takePhoto(selectedProj?.nome);
-    if (photo) {
-      let b64 = photo.base64;
-      if (!b64 && photo.uri) {
-        b64 = await readPhotoBase64(photo.uri);
+    if (isProcessingPhotoRef.current) return;
+    isProcessingPhotoRef.current = true;
+    setIsProcessingPhoto(true);
+
+    try {
+      const photo = await takePhoto(selectedProj?.nome);
+      if (photo && photo.uri) {
+        let b64 = photo.base64;
+        if (!b64 && photo.uri) {
+          b64 = await readPhotoBase64(photo.uri);
+        }
+        const photoFilename = photo.filename || `elp_foto_${Date.now()}_${Math.floor(100 + Math.random() * 900)}.jpg`;
+        const newFoto: FotoRelatorio = {
+          id: Date.now(),
+          relatorio_id: currentReportId,
+          relatorio_uuid: reportUuid,
+          filename: photoFilename,
+          uri_local: photo.uri,
+          base64: b64,
+          ordem: fotos.length,
+          legenda: '',
+          local: local,
+          anotacoes_dados: '',
+          sync_status: isOnline ? 'synced' : 'pending',
+        };
+
+        // Prevenção rigorosa de duplicidade no estado em tempo real
+        setFotos(prev => {
+          const isDuplicate = prev.some(existing => {
+            if (newFoto.filename && existing.filename && existing.filename.toLowerCase() === newFoto.filename.toLowerCase()) return true;
+            if (newFoto.uri_local && existing.uri_local && existing.uri_local === newFoto.uri_local) return true;
+            if (newFoto.base64 && existing.base64 && existing.base64.length > 50 && existing.base64 === newFoto.base64) return true;
+            return false;
+          });
+          if (isDuplicate) {
+            console.log('[ReportForm] Foto já existente no formulário. Duplicação evitada.');
+            return prev;
+          }
+          return [...prev, newFoto];
+        });
+
+        await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
       }
-      const newFoto: FotoRelatorio = {
-        id: Date.now(),
-        relatorio_id: currentReportId,
-        relatorio_uuid: reportUuid,
-        uri_local: photo.uri,
-        base64: b64,
-        ordem: fotos.length,
-        legenda: '',
-        local: local,
-        anotacoes_dados: '',
-        sync_status: isOnline ? 'synced' : 'pending',
-      };
-      await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
-      setFotos(prev => [...prev, newFoto]);
+    } catch (errCam) {
+      console.warn('[ReportForm] Erro ao adicionar foto da câmera:', errCam);
+    } finally {
+      isProcessingPhotoRef.current = false;
+      setIsProcessingPhoto(false);
     }
   }
 
   async function handleAddPhotoGallery() {
-    const photo = await pickImage(selectedProj?.nome);
-    if (photo) {
-      let b64 = photo.base64;
-      if (!b64 && photo.uri) {
-        b64 = await readPhotoBase64(photo.uri);
+    if (isProcessingPhotoRef.current) return;
+    isProcessingPhotoRef.current = true;
+    setIsProcessingPhoto(true);
+
+    try {
+      const photo = await pickImage(selectedProj?.nome);
+      if (photo && photo.uri) {
+        let b64 = photo.base64;
+        if (!b64 && photo.uri) {
+          b64 = await readPhotoBase64(photo.uri);
+        }
+        const photoFilename = photo.filename || `elp_import_${Date.now()}_${Math.floor(100 + Math.random() * 900)}.jpg`;
+        const newFoto: FotoRelatorio = {
+          id: Date.now(),
+          relatorio_id: currentReportId,
+          relatorio_uuid: reportUuid,
+          filename: photoFilename,
+          uri_local: photo.uri,
+          base64: b64,
+          ordem: fotos.length,
+          legenda: '',
+          local: local,
+          anotacoes_dados: '',
+          sync_status: isOnline ? 'synced' : 'pending',
+        };
+
+        // Prevenção rigorosa de duplicidade no estado em tempo real
+        setFotos(prev => {
+          const isDuplicate = prev.some(existing => {
+            if (newFoto.filename && existing.filename && existing.filename.toLowerCase() === newFoto.filename.toLowerCase()) return true;
+            if (newFoto.uri_local && existing.uri_local && existing.uri_local === newFoto.uri_local) return true;
+            if (newFoto.base64 && existing.base64 && existing.base64.length > 50 && existing.base64 === newFoto.base64) return true;
+            return false;
+          });
+          if (isDuplicate) {
+            console.log('[ReportForm] Foto já existente no formulário. Duplicação evitada.');
+            return prev;
+          }
+          return [...prev, newFoto];
+        });
+
+        await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
       }
-      const newFoto: FotoRelatorio = {
-        id: Date.now(),
-        relatorio_id: currentReportId,
-        relatorio_uuid: reportUuid,
-        uri_local: photo.uri,
-        base64: b64,
-        ordem: fotos.length,
-        legenda: '',
-        local: local,
-        anotacoes_dados: '',
-        sync_status: isOnline ? 'synced' : 'pending',
-      };
-      await saveLocalFoto(newFoto, isOnline ? 'synced' : 'pending');
-      setFotos(prev => [...prev, newFoto]);
+    } catch (errGal) {
+      console.warn('[ReportForm] Erro ao selecionar foto da galeria:', errGal);
+    } finally {
+      isProcessingPhotoRef.current = false;
+      setIsProcessingPhoto(false);
     }
   }
 
@@ -1111,14 +1181,22 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
           {/* Barra Fixa / Adesiva de 56px de altura (Seção 15.7) */}
           <View style={styles.stickyPhotoBar}>
-            <TouchableOpacity style={styles.cameraBigBtn} onPress={handleAddPhotoCamera}>
+            <TouchableOpacity 
+              style={[styles.cameraBigBtn, isProcessingPhoto && { opacity: 0.6 }]} 
+              onPress={handleAddPhotoCamera}
+              disabled={isProcessingPhoto}
+            >
               <Ionicons name="camera" size={24} color="#FFFFFF" />
-              <Text style={styles.cameraBigBtnText}>Câmera</Text>
+              <Text style={styles.cameraBigBtnText}>{isProcessingPhoto ? 'Processando...' : 'Câmera'}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.galleryBigBtn} onPress={handleAddPhotoGallery}>
+            <TouchableOpacity 
+              style={[styles.galleryBigBtn, isProcessingPhoto && { opacity: 0.6 }]} 
+              onPress={handleAddPhotoGallery}
+              disabled={isProcessingPhoto}
+            >
               <Ionicons name="images" size={24} color="#FFFFFF" />
-              <Text style={styles.galleryBigBtnText}>Galeria</Text>
+              <Text style={styles.galleryBigBtnText}>{isProcessingPhoto ? 'Processando...' : 'Galeria'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -1127,12 +1205,15 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           </View>
 
           {fotos.map((item, index) => (
-            <View key={item.id} style={styles.photoCard}>
+            <View key={`${item.id}_${item.filename || index}`} style={styles.photoCard}>
               <View style={styles.thumbWrapper}>
                 {(() => {
-                  const resolvedUri = item.uri_local 
-                    || (item.base64 ? (item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`) : null)
-                    || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null));
+                  // Carregamento instantâneo ("na hora"): prioriza URI de arquivo local file:// ou base64
+                  const resolvedUri = (item.uri_local && item.uri_local.startsWith('file://'))
+                    ? item.uri_local
+                    : (item.base64
+                        ? (item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`)
+                        : (item.uri_local || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null))));
                   return resolvedUri ? (
                     <Image source={{ uri: resolvedUri }} style={styles.thumb} resizeMode="cover" />
                   ) : (

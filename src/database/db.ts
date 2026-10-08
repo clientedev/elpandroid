@@ -401,23 +401,44 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
     );
   }
 
-  // DEDUPLICAÇÃO RIGOROSA: se houver duas fotos com mesma imagem, mantém apenas uma
-  const seen = new Set<string>();
-  const unique: FotoRelatorio[] = [];
+  // DEDUPLICAÇÃO RIGOROSA: se houver duas fotos com mesma imagem, mescla e mantém apenas uma
+  const seen = new Map<string, FotoRelatorio>();
   for (const f of rows) {
-    const fp = (f.filename && f.filename.length > 3) ? f.filename 
-      : (f.uri_local && !f.uri_local.startsWith('http') ? f.uri_local.split('/').pop() : null)
-      || (f.base64 && f.base64.length > 50 ? f.base64.substring(0, 80) : null)
-      || (f.url ? f.url.split('/').pop() : null)
-      || `ordem_${f.ordem}`;
-    
-    if (fp && seen.has(fp)) {
-      continue;
+    let key = '';
+    const rawName = f.filename 
+      || (f.uri_local ? f.uri_local.split('/').pop()?.split('?')[0] : null)
+      || (f.url ? f.url.split('/').pop()?.split('?')[0] : null);
+
+    if (rawName) {
+      // Normaliza removendo prefixos de pasta como "Obra_X_"
+      const match = rawName.match(/elp_(?:foto|import)_[0-9]+_[0-9]+\.jpg/i);
+      key = match ? match[0].toLowerCase() : rawName.toLowerCase();
+    } else if (f.base64 && f.base64.length > 50) {
+      key = `b64_${f.base64.substring(0, 80)}`;
+    } else {
+      key = `id_${f.id}`;
     }
-    if (fp) seen.add(fp);
-    unique.push(f);
+
+    if (seen.has(key)) {
+      const existing = seen.get(key)!;
+      // Mescla priorizando a foto que tiver uri_local nativo file:// ou base64 para carregar imediatamente
+      const merged: FotoRelatorio = {
+        ...existing,
+        ...f,
+        uri_local: (f.uri_local && f.uri_local.startsWith('file://')) 
+          ? f.uri_local 
+          : (existing.uri_local && existing.uri_local.startsWith('file://') ? existing.uri_local : (f.uri_local || existing.uri_local)),
+        base64: (f.base64 && f.base64.length > 50) ? f.base64 : existing.base64,
+        filename: f.filename || existing.filename,
+        legenda: f.legenda || existing.legenda || '',
+        anotacoes_dados: f.anotacoes_dados || existing.anotacoes_dados || '',
+      };
+      seen.set(key, merged);
+    } else {
+      seen.set(key, f);
+    }
   }
-  return unique;
+  return Array.from(seen.values());
 }
 
 export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
@@ -442,17 +463,31 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
     } catch {}
   }
 
-  // Se esta foto está vindo com ID do servidor (f.id < 2000000000), limpa fotos temporárias locais equivalentes
+  // Deduplicação no SQLite: se já existe foto com mesmo filename ou mesma uri_local no relatório, limpa o ID duplicado
   try {
-    if (f.relatorio_id && f.id && f.id < 2000000000) {
-      await db.runAsync(
-        `DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id >= 2000000000 AND (
-          ordem = ? OR (filename IS NOT NULL AND filename = ?) OR (uri_local IS NOT NULL AND uri_local = ?)
-        )`,
-        [f.relatorio_id, f.ordem || 0, f.filename || '', f.uri_local || '']
-      );
+    if (f.relatorio_id) {
+      if (f.filename && f.filename.length > 3) {
+        await db.runAsync(
+          'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id != ? AND filename = ?',
+          [f.relatorio_id, f.id, f.filename]
+        );
+      }
+      if (f.uri_local && f.uri_local.startsWith('file://')) {
+        await db.runAsync(
+          'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id != ? AND uri_local = ?',
+          [f.relatorio_id, f.id, f.uri_local]
+        );
+      }
+      if (f.id && f.id < 2000000000) {
+        await db.runAsync(
+          'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id >= 2000000000 AND ordem = ?',
+          [f.relatorio_id, f.ordem || 0]
+        );
+      }
     }
-  } catch {}
+  } catch (cleanErr) {
+    console.warn('[db] Aviso de limpeza de duplicatas:', cleanErr);
+  }
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (

@@ -382,13 +382,24 @@ class SyncService {
               const fullUrl = f.url?.startsWith('http') 
                 ? f.url 
                 : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
+              let targetUri = fullUrl;
+              try {
+                const existingFoto = await db.getFirstAsync<{ uri_local?: string }>(
+                  'SELECT uri_local FROM fotos_relatorio WHERE (filename IS NOT NULL AND filename = ?) OR (id = ?)',
+                  [f.filename || '', f.id]
+                );
+                if (existingFoto?.uri_local && existingFoto.uri_local.startsWith('file://')) {
+                  targetUri = existingFoto.uri_local;
+                }
+              } catch {}
+
               await saveLocalFoto({
                 id: f.id,
                 relatorio_id: r.id,
                 relatorio_uuid: r.uuid,
                 url: fullUrl,
                 filename: f.filename,
-                uri_local: fullUrl,
+                uri_local: targetUri,
                 titulo: f.titulo || '',
                 legenda: f.legenda || '',
                 descricao: f.descricao || '',
