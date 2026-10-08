@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator 
 } from 'react-native';
@@ -81,7 +82,7 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
     loadDetails();
   }, [projectId]);
 
-  async function loadDetails() {
+  const loadDetails = useCallback(async () => {
     try {
       const p = await getLocalProjetoById(projectId);
       setProjeto(p);
@@ -169,7 +170,13 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
     } catch (e) {
       console.warn('Erro ao carregar detalhes:', e);
     }
-  }
+  }, [projectId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadDetails();
+    }, [loadDetails])
+  );
 
   async function handleUpdateStatus(newStatus: string) {
     if (!projeto) return;
@@ -654,7 +661,13 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                 <TouchableOpacity
                   key={r.id}
                   style={styles.subItemCard}
-                  onPress={() => navigation.navigate('ReportDetailScreen', { reportId: r.id })}
+                  onPress={() => {
+                    if (r.status === 'em_andamento') {
+                      navigation.navigate('ReportFormScreen', { reportId: r.id });
+                    } else {
+                      navigation.navigate('ReportDetailScreen', { reportId: r.id });
+                    }
+                  }}
                 >
                   <View style={styles.subHeader}>
                     <Text style={styles.subNumber}>{r.numero}</Text>

@@ -140,7 +140,7 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
     } catch {}
   }
 
-  // Seed initial checklist template if empty
+  // Seed initial checklist template if empty and remove duplicate rows
   try {
     const chkCount = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM checklist_custom_template');
     if (!chkCount || chkCount.count === 0) {
@@ -150,6 +150,14 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
           [it.item, it.ordem]
         );
       }
+    } else {
+      // Limpeza preventiva de itens duplicados no template
+      await db.runAsync(`
+        DELETE FROM checklist_custom_template 
+        WHERE id NOT IN (
+          SELECT MIN(id) FROM checklist_custom_template GROUP BY LOWER(TRIM(item))
+        )
+      `);
     }
   } catch {}
 
@@ -500,44 +508,53 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
     );
   }
 
-  // DEDUPLICAÇÃO RIGOROSA: se houver duas fotos com mesma imagem, mescla e mantém apenas uma
-  const seen = new Map<string, FotoRelatorio>();
-  for (const f of rows) {
-    let key = '';
-    const rawName = f.filename 
-      || (f.uri_local ? f.uri_local.split('/').pop()?.split('?')[0] : null)
-      || (f.url ? f.url.split('/').pop()?.split('?')[0] : null);
+  // DEDUPLICAÇÃO RIGOROSA MULTIDIMENSIONAL: mescla fotos duplicadas por ordem, nome, uri ou base64
+  const seenByOrdem = new Map<number, FotoRelatorio>();
+  const seenByName = new Map<string, FotoRelatorio>();
+  const seenByUri = new Map<string, FotoRelatorio>();
+  const seenByB64 = new Map<string, FotoRelatorio>();
 
-    if (rawName) {
-      // Normaliza removendo prefixos de pasta como "Obra_X_"
-      const match = rawName.match(/elp_(?:foto|import)_[0-9]+_[0-9]+\.jpg/i);
-      key = match ? match[0].toLowerCase() : rawName.toLowerCase();
-    } else if (f.base64 && f.base64.length > 50) {
-      key = `b64_${f.base64.substring(0, 80)}`;
-    } else {
-      key = `id_${f.id}`;
+  const result: FotoRelatorio[] = [];
+
+  for (const f of rows) {
+    const rawName = (f.filename 
+      || (f.uri_local ? f.uri_local.split('/').pop()?.split('?')[0] : null)
+      || (f.url ? f.url.split('/').pop()?.split('?')[0] : null) || '').toLowerCase();
+    const uriKey = (f.uri_local || '').trim();
+    const b64Key = (f.base64 && f.base64.length > 50) ? f.base64.substring(0, 80) : '';
+    const ordem = (typeof f.ordem === 'number' && !isNaN(f.ordem)) ? f.ordem : null;
+
+    let existing: FotoRelatorio | undefined;
+    if (rawName && rawName.length > 3 && seenByName.has(rawName)) {
+      existing = seenByName.get(rawName);
+    } else if (uriKey && uriKey.length > 5 && seenByUri.has(uriKey)) {
+      existing = seenByUri.get(uriKey);
+    } else if (b64Key && seenByB64.has(b64Key)) {
+      existing = seenByB64.get(b64Key);
+    } else if (ordem !== null && seenByOrdem.has(ordem)) {
+      existing = seenByOrdem.get(ordem);
     }
 
-    if (seen.has(key)) {
-      const existing = seen.get(key)!;
+    if (existing) {
       // Mescla priorizando a foto que tiver uri_local nativo file:// ou base64 para carregar imediatamente
-      const merged: FotoRelatorio = {
-        ...existing,
-        ...f,
-        uri_local: (f.uri_local && f.uri_local.startsWith('file://')) 
-          ? f.uri_local 
-          : (existing.uri_local && existing.uri_local.startsWith('file://') ? existing.uri_local : (f.uri_local || existing.uri_local)),
-        base64: (f.base64 && f.base64.length > 50) ? f.base64 : existing.base64,
-        filename: f.filename || existing.filename,
-        legenda: f.legenda || existing.legenda || '',
-        anotacoes_dados: f.anotacoes_dados || existing.anotacoes_dados || '',
-      };
-      seen.set(key, merged);
+      if (f.uri_local && f.uri_local.startsWith('file://')) {
+        existing.uri_local = f.uri_local;
+      }
+      if (!existing.base64 && f.base64) existing.base64 = f.base64;
+      if (!existing.legenda && f.legenda) existing.legenda = f.legenda;
+      if (!existing.anotacoes_dados && f.anotacoes_dados) existing.anotacoes_dados = f.anotacoes_dados;
+      if (f.id && f.id < 2000000000) existing.id = f.id; // prioriza ID oficial do servidor
+      if (f.url) existing.url = f.url;
     } else {
-      seen.set(key, f);
+      result.push(f);
+      if (rawName && rawName.length > 3) seenByName.set(rawName, f);
+      if (uriKey && uriKey.length > 5) seenByUri.set(uriKey, f);
+      if (b64Key) seenByB64.set(b64Key, f);
+      if (ordem !== null) seenByOrdem.set(ordem, f);
     }
   }
-  return Array.from(seen.values());
+
+  return result.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 }
 
 export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {

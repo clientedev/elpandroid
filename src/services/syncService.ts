@@ -1,6 +1,6 @@
 import { AppState, AppStateStatus } from 'react-native';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { apiClient } from './api';
 import { readPhotoBase64 } from './imageService';
 import { 

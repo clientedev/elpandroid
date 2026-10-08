@@ -15,6 +15,7 @@ import {
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio 
 } from '../../database/db';
 import { Projeto, Visita, Relatorio } from '../../types';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Shadows } from '../../theme/colors';
 
 const WIDGETS_CONFIG_KEY = '@elp_dashboard_widgets_v2';
@@ -163,6 +164,12 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

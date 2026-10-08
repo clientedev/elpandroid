@@ -12810,7 +12810,7 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list, allow_delete=True):
             foto.imagem_size = len(img_bytes)
             foto.content_type = 'image/jpeg'
 
-            fname = foto.filename or f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+            fname = foto.filename or f_data.get('filename') or f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
             fpath = os.path.join(upload_dir, fname)
             try:
                 with open(fpath, 'wb') as f_out:
@@ -12963,6 +12963,15 @@ def api_relatorios_collection():
             relatorio.local = data.get('local')
             relatorio.observacoes_finais = data.get('observacoes_finais')
             relatorio.checklist_data = data.get('checklist_data') or '[]'
+            if 'acompanhantes' in data and data['acompanhantes'] is not None:
+                acomp_val = data['acompanhantes']
+                if isinstance(acomp_val, str):
+                    try:
+                        relatorio.acompanhantes = json.loads(acomp_val)
+                    except Exception:
+                        relatorio.acompanhantes = [acomp_val]
+                else:
+                    relatorio.acompanhantes = acomp_val
             relatorio.updated_at = brazil_now()
 
             db.session.flush()
@@ -13044,6 +13053,7 @@ def api_relatorios_collection():
                 'categoria': r.categoria,
                 'local': r.local,
                 'observacoes_finais': r.observacoes_finais,
+                'acompanhantes': json.dumps(r.acompanhantes) if isinstance(r.acompanhantes, list) else (r.acompanhantes or '[]'),
                 'fotos': fotos_list,
                 'created_at': r.created_at.isoformat() if r.created_at else None,
                 'updated_at': r.updated_at.isoformat() if r.updated_at else (r.created_at.isoformat() if r.created_at else None),
@@ -13116,6 +13126,16 @@ def api_relatorio_detail_sync(relatorio_id):
                 if field in data and data[field] is not None:
                     setattr(relatorio, field, data[field])
             
+            if 'acompanhantes' in data and data['acompanhantes'] is not None:
+                acomp_val = data['acompanhantes']
+                if isinstance(acomp_val, str):
+                    try:
+                        relatorio.acompanhantes = json.loads(acomp_val)
+                    except Exception:
+                        relatorio.acompanhantes = [acomp_val]
+                else:
+                    relatorio.acompanhantes = acomp_val
+
             if 'fotos' in data and isinstance(data['fotos'], list):
                 _save_fotos_for_relatorio(relatorio.id, data['fotos'])
 
@@ -13172,6 +13192,7 @@ def api_relatorio_detail_sync(relatorio_id):
             'categoria': relatorio.categoria,
             'local': relatorio.local,
             'observacoes_finais': relatorio.observacoes_finais,
+            'acompanhantes': json.dumps(relatorio.acompanhantes) if isinstance(relatorio.acompanhantes, list) else (relatorio.acompanhantes or '[]'),
             'fotos': fotos_list,
             'em_edicao_por_id': lock_info['user_id'] if lock_info else getattr(relatorio, 'em_edicao_por_id', None),
             'em_edicao_por_nome': lock_info['user_nome'] if lock_info else getattr(relatorio, 'em_edicao_por_nome', None),

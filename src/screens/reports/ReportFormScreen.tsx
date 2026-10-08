@@ -122,10 +122,33 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [editingPhotoIndex, setEditingPhotoIndex] = useState<number | null>(null);
   const [showEditorModal, setShowEditorModal] = useState(false);
 
-  // Legend picker modal
+  // Legend picker modal com filtro de categorias
   const [legendas, setLegendas] = useState<LegendaPredefinida[]>([]);
   const [showLegendModal, setShowLegendModal] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [selectedLegendCategory, setSelectedLegendCategory] = useState<string>('Todas');
+  const [legendSearchText, setLegendSearchText] = useState<string>('');
+
+  const legendCategories = React.useMemo(() => {
+    const cats = new Set<string>();
+    cats.add('Todas');
+    for (const l of legendas) {
+      if (l.categoria && l.categoria.trim()) {
+        cats.add(l.categoria.trim());
+      }
+    }
+    return Array.from(cats);
+  }, [legendas]);
+
+  const filteredLegendas = React.useMemo(() => {
+    return legendas.filter(l => {
+      const matchCat = selectedLegendCategory === 'Todas' || (l.categoria || '').trim() === selectedLegendCategory;
+      const matchSearch = !legendSearchText.trim() || 
+        (l.texto && l.texto.toLowerCase().includes(legendSearchText.toLowerCase())) ||
+        (l.categoria && l.categoria.toLowerCase().includes(legendSearchText.toLowerCase()));
+      return matchCat && matchSearch;
+    });
+  }, [legendas, selectedLegendCategory, legendSearchText]);
 
   const [loading, setLoading] = useState(false);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
@@ -261,6 +284,28 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       const projId = selectedProjectId || proj?.id || 1;
       const projNome = proj?.nome || 'Obra';
 
+      // 1. Salva informações técnicas da obra no SQLite se houver obra selecionada
+      if (selectedProjectId) {
+        const infoPayload = {
+          elementos_construtivos_base: techElementosBase.trim(),
+          especificacao_chapisco_colante: techChapiscoColante.trim(),
+          especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+          especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+          forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+          acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+          acabamento_peitoris: techAcabamentoPeitoris.trim(),
+          acabamento_muretas: techAcabamentoMuretas.trim(),
+          definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+          definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+          observacoes_projeto_fachada: techObservacoesFachada.trim(),
+          outras_observacoes: techOutrasObservacoes.trim(),
+        };
+        await updateLocalProjetoInfoTecnica(selectedProjectId, infoPayload);
+        if (isOnline) {
+          apiClient.axios.put(`/api/projetos/${selectedProjectId}`, infoPayload).catch(() => null);
+        }
+      }
+
       const draftObj: Relatorio = {
         id: currentReportId,
         uuid: reportUuid,
@@ -285,10 +330,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         updated_at: new Date().toISOString(),
       };
 
-      // 1. Salva no SQLite local
+      // 2. Salva no SQLite local
       await saveLocalRelatorio(draftObj, 'pending');
 
-      // 2. Persistir fotos atuais no SQLite
+      // 3. Persistir fotos atuais no SQLite
       for (let i = 0; i < fotos.length; i++) {
         let b64 = fotos[i].base64;
         if (!b64 && fotos[i].uri_local && !fotos[i].uri_local?.startsWith('http')) {
@@ -316,7 +361,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [
     currentReportId, reportUuid, reportNumber, titulo, selectedProjectId,
     preSelectedVisitId, user, dataVisita, descricao, observacoesFinais,
-    checklist, acompanhantesList, categoria, local, fotos
+    checklist, acompanhantesList, categoria, local, fotos, isOnline,
+    techElementosBase, techChapiscoColante, techChapiscoAlvenaria,
+    techArgamassaEmboco, techFormaAplicacaoArgamassa, techAcabamentosRevestimento,
+    techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor,
+    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes
   ]);
 
   // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
@@ -331,26 +380,33 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   useEffect(() => {
     const onHardwareBack = () => {
       saveDraftImmediately().finally(() => {
+        const targetId = currentReportId || initialReportId;
+        if (targetId && isOnline) {
+          apiClient.axios
+            .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
+            .catch(() => null);
+        }
         navigation.goBack();
       });
       return true;
     };
     const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
     return () => sub.remove();
-  }, [saveDraftImmediately, navigation]);
+  }, [saveDraftImmediately, navigation, currentReportId, initialReportId, isOnline, user]);
 
   // Intercepta qualquer saída da navegação (incluindo gestos e pop)
   useEffect(() => {
     const unsub = navigation.addListener('beforeRemove', () => {
       saveDraftImmediately().catch(() => null);
-      if (initialReportId) {
+      const targetId = currentReportId || initialReportId;
+      if (targetId && isOnline) {
         apiClient.axios
-          .post(`/api/relatorios/${initialReportId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
+          .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
           .catch(() => null);
       }
     });
     return unsub;
-  }, [navigation, saveDraftImmediately, initialReportId, user]);
+  }, [navigation, saveDraftImmediately, initialReportId, currentReportId, isOnline, user]);
 
   // Bloqueio Colaborativo: Impede entrar no relatório se outro usuário estiver preenchendo
   useEffect(() => {
@@ -389,13 +445,14 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
     return () => {
       isCancelled = true;
-      if (initialReportId) {
+      const targetId = currentReportId || initialReportId;
+      if (targetId && isOnline) {
         apiClient.axios
-          .post(`/api/relatorios/${initialReportId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
+          .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
           .catch(() => null);
       }
     };
-  }, [initialReportId, user, navigation]);
+  }, [initialReportId, currentReportId, isOnline, user, navigation]);
 
   // Carrega e mescla o checklist (template configurado + histórico de aprovações da obra)
   const loadChecklistForProject = useCallback(async (projId: number, existingChecklistJson?: string) => {
@@ -438,9 +495,30 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         } catch {}
       }
 
-      const baseItems = template.length > 0 
+      // Deduplica baseItems rigorosamente por texto normalizado para evitar duplicações
+      const uniqueBaseMap = new Map<string, { id: number; item: string; ordem: number }>();
+      const rawBase = template.length > 0 
         ? template.map((t, idx) => ({ id: t.id, item: t.item, ordem: t.ordem || idx + 1 }))
         : DEFAULT_CHECKLIST.map((d, idx) => ({ id: d.id, item: d.item, ordem: idx + 1 }));
+
+      for (const b of rawBase) {
+        if (!b.item) continue;
+        const normKey = b.item.trim().toLowerCase();
+        if (!uniqueBaseMap.has(normKey)) {
+          uniqueBaseMap.set(normKey, b);
+        }
+      }
+
+      // Adiciona itens que estavam no rascunho anterior e não estão no template
+      for (const s of savedChecks) {
+        if (!s.item) continue;
+        const normKey = s.item.trim().toLowerCase();
+        if (!uniqueBaseMap.has(normKey)) {
+          uniqueBaseMap.set(normKey, { id: s.id || (uniqueBaseMap.size + 1), item: s.item, ordem: uniqueBaseMap.size + 1 });
+        }
+      }
+
+      const baseItems = Array.from(uniqueBaseMap.values());
 
       const merged: ChecklistItemState[] = baseItems.map((base, idx) => {
         // Verifica se já foi aprovado em algum relatório anterior desta obra
@@ -456,7 +534,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         const isChecked = Boolean(savedItem ? savedItem.checked : (prevAppr && prevAppr.aprovado));
 
         return {
-          id: base.id,
+          id: idx + 1,
           item: base.item,
           ordem: idx + 1,
           checked: isChecked,
@@ -557,6 +635,28 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           sync_status: 'pending',
         };
 
+        // 0. Salva informações técnicas da obra no SQLite se houver obra selecionada
+        if (selectedProjectId) {
+          const infoPayload = {
+            elementos_construtivos_base: techElementosBase.trim(),
+            especificacao_chapisco_colante: techChapiscoColante.trim(),
+            especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+            especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+            forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+            acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+            acabamento_peitoris: techAcabamentoPeitoris.trim(),
+            acabamento_muretas: techAcabamentoMuretas.trim(),
+            definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+            definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+            observacoes_projeto_fachada: techObservacoesFachada.trim(),
+            outras_observacoes: techOutrasObservacoes.trim(),
+          };
+          await updateLocalProjetoInfoTecnica(selectedProjectId, infoPayload);
+          if (isOnline) {
+            apiClient.axios.put(`/api/projetos/${selectedProjectId}`, infoPayload).catch(() => null);
+          }
+        }
+
         // 1. Salva SEMPRE no SQLite local primeiro (garantia de persistência offline)
         await saveLocalRelatorio(draft, 'pending');
 
@@ -638,7 +738,14 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, acompanhantesList, fotos, categoria, local, reportNumber, currentReportId, isOnline]);
+  }, [
+    selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist,
+    acompanhantesList, fotos, categoria, local, reportNumber, currentReportId, isOnline,
+    techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco,
+    techFormaAplicacaoArgamassa, techAcabamentosRevestimento, techAcabamentoPeitoris,
+    techAcabamentoMuretas, techDefinicaoFrisosCor, techDefinicaoFaceInferiorAbas,
+    techObservacoesFachada, techOutrasObservacoes
+  ]);
 
   async function handleAddPhotoCamera() {
     if (isProcessingPhotoRef.current) return;
@@ -976,6 +1083,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         [{ 
           text: 'OK', 
           onPress: () => {
+            const targetId = currentReportId || initialReportId;
+            if (targetId && isOnline) {
+              apiClient.axios
+                .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
+                .catch(() => null);
+            }
             if (preSelectedProjectId) {
               navigation.navigate('ProjectDetailScreen', { projectId: preSelectedProjectId });
             } else {
@@ -999,6 +1112,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         showBack 
         onBack={async () => {
           await saveDraftImmediately();
+          const targetId = currentReportId || initialReportId;
+          if (targetId && isOnline) {
+            apiClient.axios
+              .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
+              .catch(() => null);
+          }
           navigation.goBack();
         }} 
       />
@@ -1600,19 +1719,59 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         onSave={handleSavePhotoAnnotations}
       />
 
-      {/* Legendas Modal */}
+      {/* Legendas Modal com Filtro de Categorias e Pesquisa */}
       <Modal visible={showLegendModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { maxHeight: '85%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Legendas Predefinidas</Text>
+              <View>
+                <Text style={styles.modalTitle}>Legendas Predefinidas</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Filtre por categoria ou pesquise o termo</Text>
+              </View>
               <TouchableOpacity onPress={() => setShowLegendModal(false)}>
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
 
+            {/* Barra de Pesquisa de Legendas */}
+            <View style={styles.legendSearchBox}>
+              <Ionicons name="search" size={18} color="#64748B" />
+              <TextInput
+                style={styles.legendSearchInput}
+                placeholder="Pesquisar legendas técnicas..."
+                value={legendSearchText}
+                onChangeText={setLegendSearchText}
+                placeholderTextColor="#94A3B8"
+              />
+              {legendSearchText.length > 0 && (
+                <TouchableOpacity onPress={() => setLegendSearchText('')}>
+                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Chips de Categorias Horizontal */}
+            <View style={{ marginBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.legendCategoryScroll}>
+                {legendCategories.map(cat => {
+                  const isActive = selectedLegendCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.legendCategoryChip, isActive && styles.legendCategoryChipActive]}
+                      onPress={() => setSelectedLegendCategory(cat)}
+                    >
+                      <Text style={[styles.legendCategoryChipText, isActive && styles.legendCategoryChipTextActive]}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
             <FlatList
-              data={legendas}
+              data={filteredLegendas}
               keyExtractor={item => item.id.toString()}
               renderItem={({ item }) => (
                 <TouchableOpacity 
@@ -1625,6 +1784,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                   <Text style={styles.legendItemText}>{item.texto}</Text>
                 </TouchableOpacity>
               )}
+              ListEmptyComponent={
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text style={{ color: Colors.textMuted, fontSize: 14 }}>Nenhuma legenda encontrada para esta categoria ou busca.</Text>
+                </View>
+              }
             />
           </View>
         </View>
@@ -2279,6 +2443,47 @@ const styles = StyleSheet.create({
   },
   legendCategoryText: { fontSize: 11, color: '#0369A1', fontWeight: 'bold' },
   legendItemText: { fontSize: 14, color: Colors.text, flex: 1 },
+  legendSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 10,
+  },
+  legendSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.text,
+    marginLeft: 8,
+    paddingVertical: 0,
+  },
+  legendCategoryScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  legendCategoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  legendCategoryChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  legendCategoryChipText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  legendCategoryChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
   autoSaveBar: {
     flexDirection: 'row',
     alignItems: 'center',
