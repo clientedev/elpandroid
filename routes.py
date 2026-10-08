@@ -12355,12 +12355,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.17',
-        'versionCode': 18,
+        'version': '1.0.18',
+        'versionCode': 19,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.17: Notificações no celular com banner e vibração, tela de gestão de usuários profissional e exclusão definitiva de obras pelo usuário Master com contagem de segurança.',
+        'notes': 'Atualização v1.0.18: Sincronização e expurgo de obras e relatórios excluídos entre todos os aparelhos e remoção de dados fictícios residuais.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12521,7 +12521,7 @@ def api_projetos_collection():
 
     # GET
     try:
-        projetos = Projeto.query.filter_by(status='Ativo').all()
+        projetos = Projeto.query.order_by(Projeto.id.desc()).all()
         result = []
         for p in projetos:
             result.append({

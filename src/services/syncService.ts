@@ -9,7 +9,8 @@ import {
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
   saveLocalReembolso, getLocalFotos, saveLocalFoto, 
   getLocalFotosExpress, saveLocalFotoExpress,
-  updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase
+  updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase,
+  getLocalProjetos, getLocalRelatorios, getLocalVisitas, deleteLocalProjetoCascade
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
 import { notificationService } from './notificationService';
@@ -284,30 +285,71 @@ class SyncService {
   }
 
   /**
-   * Pulls remote changes from Railway down to the local SQLite database
+   * Puxa alterações remotas da nuvem (Railway) para o SQLite local
+   * com reconciliação bidirecional de exclusões (se uma obra ou laudo foi excluído
+   * no servidor pelo Master, ele é automaticamente expurgado em cascata de todos os celulares)
    */
   private async pullFromServer(): Promise<void> {
     try {
-      // 1. Pull Projetos
+      const db = await getDatabase();
+
+      // 1. Pull Projetos com Reconciliação de Exclusão
       const projectsRes = await apiClient.axios.get('/api/projetos', { timeout: 8000 }).catch(() => null);
       if (projectsRes && Array.isArray(projectsRes.data)) {
-        for (const p of projectsRes.data) {
+        const serverProjects = projectsRes.data;
+        const serverProjectIds = new Set(serverProjects.map((p: any) => p.id));
+
+        // Reconciliação: se a obra estava sincronizada no aparelho mas não existe mais no servidor, apaga em cascata!
+        const localProjetos = await getLocalProjetos('Todos');
+        for (const lp of localProjetos) {
+          if (lp.sync_status === 'synced' && !serverProjectIds.has(lp.id)) {
+            console.log(`[SyncService] Obra ${lp.id} (${lp.nome}) excluída na nuvem. Apagando em cascata do aparelho.`);
+            await deleteLocalProjetoCascade(lp.id);
+          }
+        }
+
+        // Salvar/atualizar obras ativas do servidor
+        for (const p of serverProjects) {
           await saveLocalProjeto(p, 'synced');
         }
       }
 
-      // 2. Pull Visitas
+      // 2. Pull Visitas com Reconciliação
       const visitsRes = await apiClient.axios.get('/api/visits', { timeout: 8000 }).catch(() => null);
       if (visitsRes && Array.isArray(visitsRes.data)) {
-        for (const v of visitsRes.data) {
+        const serverVisits = visitsRes.data;
+        const serverVisitIds = new Set(serverVisits.map((v: any) => v.id));
+
+        const localVisits = await getLocalVisitas();
+        for (const lv of localVisits) {
+          if (lv.sync_status === 'synced' && !serverVisitIds.has(lv.id)) {
+            console.log(`[SyncService] Visita ${lv.id} excluída na nuvem. Removendo do dispositivo.`);
+            await db.runAsync('DELETE FROM visita_participantes WHERE visita_id = ?;', [lv.id]);
+            await db.runAsync('DELETE FROM visitas WHERE id = ?;', [lv.id]);
+          }
+        }
+
+        for (const v of serverVisits) {
           await saveLocalVisita(v, 'synced');
         }
       }
 
-      // 3. Pull Relatorios & Fotos
+      // 3. Pull Relatorios & Fotos com Reconciliação
       const reportsRes = await apiClient.axios.get('/api/relatorios', { timeout: 12000 }).catch(() => null);
       if (reportsRes && Array.isArray(reportsRes.data)) {
-        for (const r of reportsRes.data) {
+        const serverReports = reportsRes.data;
+        const serverReportIds = new Set(serverReports.map((r: any) => r.id));
+
+        const localReports = await getLocalRelatorios();
+        for (const lr of localReports) {
+          if (lr.sync_status === 'synced' && !serverReportIds.has(lr.id)) {
+            console.log(`[SyncService] Relatório ${lr.id} (${lr.numero}) excluído na nuvem. Removendo do dispositivo.`);
+            await db.runAsync('DELETE FROM fotos_relatorio WHERE relatorio_id = ?;', [lr.id]);
+            await db.runAsync('DELETE FROM relatorios WHERE id = ?;', [lr.id]);
+          }
+        }
+
+        for (const r of serverReports) {
           await saveLocalRelatorio(r, 'synced');
           if (Array.isArray(r.fotos)) {
             for (const f of r.fotos) {
@@ -335,18 +377,39 @@ class SyncService {
         }
       }
 
-      // 4. Pull Lembretes
+      // 4. Pull Lembretes com Reconciliação
       const remindersRes = await apiClient.axios.get('/api/lembretes', { timeout: 8000 }).catch(() => null);
       if (remindersRes && Array.isArray(remindersRes.data)) {
-        for (const l of remindersRes.data) {
+        const serverReminders = remindersRes.data;
+        const serverReminderIds = new Set(serverReminders.map((l: any) => l.id));
+
+        const localReminders = await db.getAllAsync<{ id: number; sync_status: string }>('SELECT id, sync_status FROM lembretes');
+        for (const lr of localReminders) {
+          if (lr.sync_status === 'synced' && !serverReminderIds.has(lr.id)) {
+            await db.runAsync('DELETE FROM lembretes WHERE id = ?;', [lr.id]);
+          }
+        }
+
+        for (const l of serverReminders) {
           await saveLocalLembrete(l, 'synced');
         }
       }
 
-      // 5. Pull Relatórios Express & Fotos
+      // 5. Pull Relatórios Express & Fotos com Reconciliação
       const expressRes = await apiClient.axios.get('/api/relatorios-express', { timeout: 10000 }).catch(() => null);
       if (expressRes && Array.isArray(expressRes.data)) {
-        for (const exp of expressRes.data) {
+        const serverExpress = expressRes.data;
+        const serverExpressIds = new Set(serverExpress.map((exp: any) => exp.id));
+
+        const localExpress = await db.getAllAsync<{ id: number; sync_status: string }>('SELECT id, sync_status FROM relatorios_express');
+        for (const le of localExpress) {
+          if (le.sync_status === 'synced' && !serverExpressIds.has(le.id)) {
+            await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ?;', [le.id]);
+            await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [le.id]);
+          }
+        }
+
+        for (const exp of serverExpress) {
           await saveLocalRelatorioExpress(exp, 'synced');
           if (Array.isArray(exp.fotos)) {
             for (const f of exp.fotos) {
@@ -370,6 +433,14 @@ class SyncService {
           }
         }
       }
+
+      // 6. Limpeza de integridade referencial: garantir que nenhum registro órfão permaneça
+      await db.runAsync('DELETE FROM fotos_relatorio WHERE relatorio_id IN (SELECT id FROM relatorios WHERE projeto_id NOT IN (SELECT id FROM projetos));');
+      await db.runAsync('DELETE FROM relatorios WHERE projeto_id NOT IN (SELECT id FROM projetos);');
+      await db.runAsync('DELETE FROM visita_participantes WHERE visita_id IN (SELECT id FROM visitas WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos));');
+      await db.runAsync('DELETE FROM visitas WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
+      await db.runAsync('DELETE FROM lembretes WHERE projeto_id NOT IN (SELECT id FROM projetos);');
+      await db.runAsync('DELETE FROM contatos WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
     } catch (pullErr) {
       console.warn('[SyncService] Inbound pull notice:', pullErr);
     }

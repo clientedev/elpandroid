@@ -146,70 +146,15 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       const v = await getLocalVisitas();
       const r = await getLocalRelatorios();
 
-      if (p.length === 0) {
-        const sampleProj: Projeto = {
-          id: 1,
-          numero: 'OBR-2026-001',
-          nome: 'Residencial Alphaville Horizon',
-          tipo_obra: 'Edifício Residencial',
-          construtora: 'Construtora Monteiro & Associados',
-          nome_funcionario: 'Eng. Gabriel Eduardo',
-          responsavel_id: user?.id || 1,
-          email_principal: 'engenharia@monteiro.com.br',
-          endereco: 'Av. das Nações, 1500 - Alphaville',
-          status: 'Ativo',
-          elementos_construtivos_base: 'Estrutura em concreto armado convencional',
-          especificacao_chapisco_colante: 'Argamassa colante AC-III para fachada externa',
-          especificacao_argamassa_emboco: 'Traço 1:1:6 com aditivo impermeabilizante',
-          sync_status: 'synced',
-        };
-        await saveLocalProjeto(sampleProj);
-
-        const sampleVisita: Visita = {
-          id: 1,
-          numero: 'VIS-001',
-          projeto_id: 1,
-          projeto_nome: 'Residencial Alphaville Horizon',
-          responsavel_id: user?.id || 1,
-          responsavel_nome: user?.username || 'Gabriel Eduardo',
-          data_inicio: new Date().toISOString(),
-          data_fim: new Date(Date.now() + 7200000).toISOString(),
-          status: 'Agendada',
-          observacoes: 'Inspeção de aderência de reboco e conferência de prumo',
-          sync_status: 'synced',
-        };
-        await saveLocalVisita(sampleVisita);
-
-        const sampleRel: Relatorio = {
-          id: 1,
-          numero: 'REL-001',
-          titulo: 'Vistoria Técnica de Fachada - Etapa 2',
-          projeto_id: 1,
-          projeto_nome: 'Residencial Alphaville Horizon',
-          autor_id: user?.id || 1,
-          autor_nome: user?.username || 'Gabriel Eduardo',
-          data_relatorio: new Date().toISOString(),
-          status: 'Aguardando Aprovação',
-          descricao: 'Verificação do ensaio de percussão nas pastilhas cerâmicas e juntas de dilatação.',
-          observacoes_finais: 'Recomenda-se tratamento imediato dos pontos demarcados no 5º pavimento.',
-          sync_status: 'synced',
-        };
-        await saveLocalRelatorio(sampleRel);
-
-        setProjetos([sampleProj]);
-        setVisitas([sampleVisita]);
-        setRelatorios([sampleRel]);
-      } else {
-        setProjetos(p);
-        setVisitas(v);
-        r.sort((a, b) => {
-          const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
-          const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
-          if (timeB !== timeA) return timeB - timeA;
-          return (b.id || 0) - (a.id || 0);
-        });
-        setRelatorios(r);
-      }
+      setProjetos(p);
+      setVisitas(v);
+      r.sort((a, b) => {
+        const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
+        const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
+        if (timeB !== timeA) return timeB - timeA;
+        return (b.id || 0) - (a.id || 0);
+      });
+      setRelatorios(r);
     } catch (err) {
       console.warn('Erro ao carregar dados do SQLite:', err);
     }
