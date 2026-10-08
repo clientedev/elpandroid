@@ -12356,12 +12356,12 @@ def get_app_version_info():
         _SERVER_BOOT_TIME
     )
     return jsonify({
-        'version': '1.0.21',
+        'version': '1.0.22',
         'versionCode': 22,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.21: Storage Access Framework com pastas Imagens e Relatórios separadas no celular.',
+        'notes': 'Atualização v1.0.22: Versão oficial com modal executivo de notificações, checklist dinâmico e Storage Access Framework.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12371,6 +12371,8 @@ def download_official_apk():
     """Permite download direto do executavel ELP.apk"""
     from flask import send_file
     apk_file = os.path.join(os.getcwd(), 'ELP.apk')
+    if not os.path.exists(apk_file):
+        apk_file = os.path.join(os.getcwd(), 'static', 'ELP.apk')
     if os.path.exists(apk_file):
         return send_file(
             apk_file,
