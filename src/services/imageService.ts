@@ -3,7 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { saveImageToProjectFolder } from './appFilesService';
+import { saveImageToProjectFolder, promptSelectStorageDirectory } from './appFilesService';
 
 export interface CapturedPhoto {
   uri: string;
@@ -209,6 +209,11 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
       await MediaLibrary.requestPermissionsAsync();
     } catch {}
 
+    // Solicita pasta no celular caso ainda não esteja definida
+    try {
+      await promptSelectStorageDirectory(false);
+    } catch {}
+
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.88,
@@ -265,6 +270,11 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
       alert('Permissão para galeria é necessária para anexar fotos de obras.');
       return null;
     }
+
+    // Solicita pasta no celular caso ainda não esteja definida
+    try {
+      await promptSelectStorageDirectory(false);
+    } catch {}
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
