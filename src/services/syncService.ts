@@ -7,13 +7,14 @@ import {
   getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
-  saveLocalReembolso, getLocalFotos, saveLocalFoto, 
+  getLocalFotos, saveLocalFoto, 
   getLocalFotosExpress, saveLocalFotoExpress,
   updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase,
   getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade
 } from '../database/db';
-import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Reembolso } from '../types';
+import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato } from '../types';
 import { notificationService } from './notificationService';
+import { ensureProjectFolders } from './appFilesService';
 
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'error';
 
@@ -264,8 +265,6 @@ class SyncService {
             await db.runAsync('UPDATE relatorios_express SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'lembrete') {
             await db.runAsync('UPDATE lembretes SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
-          } else if (item.entity_type === 'reembolso') {
-            await db.runAsync('UPDATE reembolsos SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'contato') {
             await db.runAsync('UPDATE contatos SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           }
@@ -337,6 +336,7 @@ class SyncService {
         // Salvar/atualizar obras ativas do servidor
         for (const p of serverProjects) {
           await saveLocalProjeto(p, 'synced');
+          await ensureProjectFolders(p.nome, p.numero || p.codigo).catch(() => null);
         }
       }
 

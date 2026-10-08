@@ -264,9 +264,59 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   useEffect(() => {
     const unsub = navigation.addListener('beforeRemove', () => {
       saveDraftImmediately().catch(() => null);
+      if (initialReportId) {
+        apiClient.axios
+          .post(`/api/relatorios/${initialReportId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
+          .catch(() => null);
+      }
     });
     return unsub;
-  }, [navigation, saveDraftImmediately]);
+  }, [navigation, saveDraftImmediately, initialReportId, user]);
+
+  // Bloqueio Colaborativo: Impede entrar no relatório se outro usuário estiver preenchendo
+  useEffect(() => {
+    if (!initialReportId) return;
+
+    let isCancelled = false;
+    async function acquireLock() {
+      try {
+        const userName = (user as any)?.nome_completo || user?.username || 'Outro Usuário';
+        const res = await apiClient.axios.post(
+          `/api/relatorios/${initialReportId}/lock`,
+          { user_id: user?.id, user_nome: userName },
+          { timeout: 5000 }
+        );
+
+        if (res?.data?.locked && !isCancelled) {
+          const editor = res.data.usuario_em_edicao_nome || 'outro usuário';
+          Alert.alert(
+            'Relatório em Preenchimento',
+            `Este relatório já está aberto e sendo preenchido no momento por:\n\n👤 ${editor}\n\nVocê não pode entrar neste relatório até que ele finalize e saia para evitar perda ou sobrescrita de dados.`,
+            [
+              {
+                text: 'OK, Voltar',
+                onPress: () => navigation.goBack(),
+              },
+            ],
+            { cancelable: false }
+          );
+        }
+      } catch (e) {
+        console.warn('[ReportForm] Verificação de lock colaborativo offline:', e);
+      }
+    }
+
+    acquireLock();
+
+    return () => {
+      isCancelled = true;
+      if (initialReportId) {
+        apiClient.axios
+          .post(`/api/relatorios/${initialReportId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
+          .catch(() => null);
+      }
+    };
+  }, [initialReportId, user, navigation]);
 
   // Carregar rascunho existente
   useEffect(() => {

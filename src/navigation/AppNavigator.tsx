@@ -23,7 +23,6 @@ import { ReportDetailScreen } from '../screens/reports/ReportDetailScreen';
 import { ReportFormScreen } from '../screens/reports/ReportFormScreen';
 import { ExpressReportsScreen } from '../screens/express/ExpressReportsScreen';
 import { ApprovalDashboardScreen } from '../screens/approvals/ApprovalDashboardScreen';
-import { ExpensesScreen } from '../screens/expenses/ExpensesScreen';
 import { RemindersScreen } from '../screens/reminders/RemindersScreen';
 import { ContactsScreen } from '../screens/contacts/ContactsScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
@@ -136,7 +135,6 @@ export const AppNavigator: React.FC = () => {
             <Stack.Screen name="ReportFormScreen" component={ReportFormScreen} />
             <Stack.Screen name="ExpressReportsScreen" component={ExpressReportsScreen} />
             <Stack.Screen name="ApprovalDashboardScreen" component={ApprovalDashboardScreen} />
-            <Stack.Screen name="ExpensesScreen" component={ExpensesScreen} />
             <Stack.Screen name="LembretesScreen" component={RemindersScreen} />
             <Stack.Screen name="ContactsScreen" component={ContactsScreen} />
             <Stack.Screen name="SettingsScreen" component={SettingsScreen} />

@@ -175,29 +175,6 @@ export interface FotoRelatorioExpress {
   sync_status?: 'synced' | 'pending' | 'error';
 }
 
-export interface Reembolso {
-  id: number;
-  usuario_id: number;
-  usuario_nome?: string;
-  projeto_id?: number;
-  projeto_nome?: string;
-  periodo_inicio: string;
-  periodo_fim: string;
-  quilometragem: number;
-  valor_km: number;
-  alimentacao: number;
-  hospedagem: number;
-  outros_gastos: number;
-  total?: number;
-  status: 'Pendente' | 'Aprovado' | 'Rejeitado' | string;
-  observacoes?: string;
-  comprovante_uri?: string;
-  comprovante_base64?: string;
-  aprovado_por_nome?: string;
-  aprovado_em?: string;
-  sync_status?: 'synced' | 'pending' | 'error';
-}
-
 export interface Contato {
   id: number;
   nome: string;

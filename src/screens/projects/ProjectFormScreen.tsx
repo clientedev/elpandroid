@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { saveLocalProjeto, addToSyncQueue, getNextProjectNumber } from '../../database/db';
+import { ensureProjectFolders } from '../../services/appFilesService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Projeto } from '../../types';
@@ -227,6 +228,9 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
       // 1. Salva no SQLite local
       await saveLocalProjeto(projData, 'pending');
+
+      // 2. Regra: Criou obra -> Criou pasta (com subpastas Imagens e Relatorios_Aprovados_PDF)
+      await ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
 
       // 2. Fila de sincronização Railway
       await addToSyncQueue(

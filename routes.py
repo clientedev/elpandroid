@@ -13128,6 +13128,15 @@ def api_relatorio_detail_sync(relatorio_id):
                 'anotacoes_dados': f.anotacoes_dados,
             })
 
+        # Inclui informacao de lock colaborativo se ativo
+        lock_info = _REPORT_LOCKS.get(relatorio_id)
+        if lock_info:
+            now_dt = brazil_now()
+            # Validade do lock de 15 minutos
+            if (now_dt - lock_info['locked_at']).total_seconds() > 900:
+                _REPORT_LOCKS.pop(relatorio_id, None)
+                lock_info = None
+
         return jsonify({
             'id': relatorio.id,
             'numero': relatorio.numero,
@@ -13145,10 +13154,102 @@ def api_relatorio_detail_sync(relatorio_id):
             'local': relatorio.local,
             'observacoes_finais': relatorio.observacoes_finais,
             'fotos': fotos_list,
+            'em_edicao_por_id': lock_info['user_id'] if lock_info else getattr(relatorio, 'em_edicao_por_id', None),
+            'em_edicao_por_nome': lock_info['user_nome'] if lock_info else getattr(relatorio, 'em_edicao_por_nome', None),
         }), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# Dicionario em memoria thread-safe para locks ativos de relatorios
+_REPORT_LOCKS = {}
+_LOCK_THREAD_LOCK = threading.Lock()
+
+@app.route('/api/relatorios/<int:relatorio_id>/lock', methods=['POST'])
+@csrf.exempt
+def api_relatorio_acquire_lock(relatorio_id):
+    """Bloqueia o relatorio para edicao exclusiva por um usuario, impedindo outros usuarios de entrarem"""
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        user_id = data.get('user_id')
+        user_nome = data.get('user_nome') or 'Outro Usuário'
+
+        if not user_id:
+            return jsonify({'success': False, 'error': 'user_id obrigatório'}), 400
+
+        user_id = int(user_id)
+        now_dt = brazil_now()
+
+        with _LOCK_THREAD_LOCK:
+            existing = _REPORT_LOCKS.get(relatorio_id)
+            if existing:
+                # Verifica se expirou (15 minutos)
+                time_diff = (now_dt - existing['locked_at']).total_seconds()
+                if time_diff < 900 and existing['user_id'] != user_id:
+                    # Relatorio ocupado por outro usuario
+                    return jsonify({
+                        'success': False,
+                        'locked': True,
+                        'usuario_em_edicao_id': existing['user_id'],
+                        'usuario_em_edicao_nome': existing['user_nome'],
+                        'message': f"Este relatório está sendo preenchido no momento por {existing['user_nome']}. Aguarde até ele sair para poder editar."
+                    }), 200
+
+            # Adquire ou renova o lock
+            _REPORT_LOCKS[relatorio_id] = {
+                'user_id': user_id,
+                'user_nome': user_nome,
+                'locked_at': now_dt
+            }
+
+        return jsonify({
+            'success': True,
+            'locked': False,
+            'message': 'Lock adquirido com sucesso'
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/relatorios/<int:relatorio_id>/unlock', methods=['POST'])
+@csrf.exempt
+def api_relatorio_release_lock(relatorio_id):
+    """Libera o lock do relatorio quando o usuario sai da tela de edicao"""
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        user_id = data.get('user_id')
+        force = data.get('force', False)
+
+        with _LOCK_THREAD_LOCK:
+            existing = _REPORT_LOCKS.get(relatorio_id)
+            if existing:
+                if force or not user_id or existing['user_id'] == int(user_id):
+                    _REPORT_LOCKS.pop(relatorio_id, None)
+
+        return jsonify({'success': True, 'message': 'Relatório liberado para edição'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/relatorios/<int:relatorio_id>/lock-status', methods=['GET'])
+@csrf.exempt
+def api_relatorio_check_lock(relatorio_id):
+    """Consulta se o relatorio esta atualmente travado por outro usuario"""
+    now_dt = brazil_now()
+    with _LOCK_THREAD_LOCK:
+        lock_info = _REPORT_LOCKS.get(relatorio_id)
+        if lock_info:
+            if (now_dt - lock_info['locked_at']).total_seconds() > 900:
+                _REPORT_LOCKS.pop(relatorio_id, None)
+                lock_info = None
+
+    if lock_info:
+        return jsonify({
+            'locked': True,
+            'usuario_em_edicao_id': lock_info['user_id'],
+            'usuario_em_edicao_nome': lock_info['user_nome'],
+            'message': f"Este relatório está sendo preenchido no momento por {lock_info['user_nome']}."
+        }), 200
+
+    return jsonify({'locked': False}), 200
 
 @app.route('/api/relatorios/<int:relatorio_id>/fotos', methods=['GET', 'POST'])
 @csrf.exempt

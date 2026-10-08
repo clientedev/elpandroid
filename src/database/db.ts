@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import { CREATE_TABLES_SQL, SEED_LEGENDAS } from './schema';
 import { 
   Projeto, Visita, Relatorio, FotoRelatorio, 
-  RelatorioExpress, FotoRelatorioExpress, Reembolso, 
+  RelatorioExpress, FotoRelatorioExpress, 
   Contato, Lembrete, Notificacao, LegendaPredefinida, 
   SyncQueueItem, User 
 } from '../types';
@@ -48,18 +48,15 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
     await db.execAsync('ALTER TABLE relatorios ADD COLUMN data_sincronizacao TEXT;');
   } catch {}
 
-  // Migration: ensure comprovante and approval fields exist in reembolsos
+  // Migration: ensure lock columns exist in relatorios para controle de preenchimento concorrente
   try {
-    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN comprovante_uri TEXT;');
+    await db.execAsync('ALTER TABLE relatorios ADD COLUMN em_edicao_por_id INTEGER;');
   } catch {}
   try {
-    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN comprovante_base64 TEXT;');
+    await db.execAsync('ALTER TABLE relatorios ADD COLUMN em_edicao_por_nome TEXT;');
   } catch {}
   try {
-    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN aprovado_por_nome TEXT;');
-  } catch {}
-  try {
-    await db.execAsync('ALTER TABLE reembolsos ADD COLUMN aprovado_em TEXT;');
+    await db.execAsync('ALTER TABLE relatorios ADD COLUMN em_edicao_em TEXT;');
   } catch {}
   
   // Seed initial legendas if empty
@@ -197,10 +194,7 @@ export async function deleteLocalProjetoCascade(projetoId: number): Promise<void
   // 6. Categorias personalizadas da obra
   await db.runAsync('DELETE FROM categorias_obra WHERE projeto_id = ?;', [projetoId]);
 
-  // 7. Reembolsos vinculados à obra
-  await db.runAsync('DELETE FROM reembolsos WHERE projeto_id = ?;', [projetoId]);
-
-  // 8. Fila de sincronização desta obra
+  // 7. Fila de sincronização desta obra
   await db.runAsync('DELETE FROM sync_queue WHERE entity_type = "projeto" AND entity_id = ?;', [projetoId]);
 
   // 9. Registro da Obra
@@ -550,39 +544,20 @@ export async function deleteLocalRelatorioExpress(id: number): Promise<void> {
   await db.runAsync('DELETE FROM relatorios_express WHERE id = ?', [id]);
 }
 
-// ================= REEMBOLSOS =================
-export async function getLocalReembolsos(): Promise<Reembolso[]> {
+// ================= LOCK COLABORATIVO DE RELATÓRIOS =================
+export async function setLocalRelatorioLock(reportId: number, userId: number, userName: string): Promise<void> {
   const db = await getDatabase();
-  return await db.getAllAsync<Reembolso>('SELECT * FROM reembolsos ORDER BY periodo_inicio DESC');
-}
-
-export async function saveLocalReembolso(rem: Reembolso, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
-  const db = await getDatabase();
-  const total = (rem.quilometragem * rem.valor_km) + rem.alimentacao + rem.hospedagem + rem.outros_gastos;
   await db.runAsync(
-    `INSERT OR REPLACE INTO reembolsos (
-      id, usuario_id, usuario_nome, projeto_id, projeto_nome, periodo_inicio,
-      periodo_fim, quilometragem, valor_km, alimentacao, hospedagem, outros_gastos,
-      total, status, observacoes, comprovante_uri, comprovante_base64,
-      aprovado_por_nome, aprovado_em, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      rem.id, rem.usuario_id, rem.usuario_nome || '', rem.projeto_id || null,
-      rem.projeto_nome || '', rem.periodo_inicio, rem.periodo_fim,
-      rem.quilometragem || 0, rem.valor_km || 0, rem.alimentacao || 0,
-      rem.hospedagem || 0, rem.outros_gastos || 0, total,
-      rem.status || 'Pendente', rem.observacoes || '',
-      rem.comprovante_uri || null, rem.comprovante_base64 || null,
-      rem.aprovado_por_nome || null, rem.aprovado_em || null, syncStatus
-    ]
+    'UPDATE relatorios SET em_edicao_por_id = ?, em_edicao_por_nome = ?, em_edicao_em = ? WHERE id = ?',
+    [userId, userName, new Date().toISOString(), reportId]
   );
 }
 
-export async function updateLocalReembolsoStatus(id: number, status: string, aprovadoPorNome?: string): Promise<void> {
+export async function clearLocalRelatorioLock(reportId: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
-    `UPDATE reembolsos SET status = ?, aprovado_por_nome = ?, aprovado_em = ?, sync_status = 'pending' WHERE id = ?`,
-    [status, aprovadoPorNome || 'Gestor Master', new Date().toISOString(), id]
+    'UPDATE relatorios SET em_edicao_por_id = NULL, em_edicao_por_nome = NULL, em_edicao_em = NULL WHERE id = ?',
+    [reportId]
   );
 }
 

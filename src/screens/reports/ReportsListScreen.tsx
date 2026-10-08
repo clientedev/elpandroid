@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl 
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, Alert 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -9,11 +9,14 @@ import { Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
 import { useNetwork } from '../../contexts/NetworkContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiClient } from '../../services/api';
 import { syncService } from '../../services/syncService';
 import { useFocusEffect } from '@react-navigation/native';
 
 export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isOnline } = useNetwork();
+  const { user } = useAuth();
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [filteredRelatorios, setFilteredRelatorios] = useState<Relatorio[]>([]);
   const [search, setSearch] = useState('');
@@ -209,8 +212,21 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
             <TouchableOpacity 
               style={styles.card}
               activeOpacity={0.7}
-              onPress={() => {
+              onPress={async () => {
                 if (isDraft) {
+                  if (isOnline) {
+                    try {
+                      const res = await apiClient.axios.get(`/api/relatorios/${item.id}/lock-status`, { timeout: 3000 });
+                      if (res?.data?.locked && res.data.usuario_em_edicao_id !== user?.id) {
+                        const editor = res.data.usuario_em_edicao_nome || 'outro usuário';
+                        Alert.alert(
+                          'Relatório em Preenchimento',
+                          `Este relatório já está aberto e sendo preenchido no momento por:\n\n👤 ${editor}\n\nVocê não pode entrar neste relatório até que ele conclua e saia para não sobrescrever dados.`
+                        );
+                        return;
+                      }
+                    } catch {}
+                  }
                   navigation.navigate('ReportFormScreen', { reportId: item.id });
                 } else {
                   navigation.navigate('ReportDetailScreen', { reportId: item.id });

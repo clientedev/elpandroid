@@ -384,14 +384,6 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <Text style={styles.secondaryActionText}>Cadastrar Obra</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.secondaryActionChip}
-                onPress={() => navigation.navigate('ExpensesScreen')}
-              >
-                <Ionicons name="receipt-outline" size={16} color="#475569" />
-                <Text style={styles.secondaryActionText}>Reembolsos</Text>
-              </TouchableOpacity>
-
               {isMasterOrAdmin && (
                 <TouchableOpacity 
                   style={styles.secondaryActionChip}

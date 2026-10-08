@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { saveImageToProjectFolder } from './appFilesService';
 
 export interface CapturedPhoto {
   uri: string;
@@ -224,15 +225,11 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
     const filename = `elp_foto_${timestamp}_${rand}.jpg`;
     const obraName = safeName(projectName);
 
-    // 1. Salva permanentemente no armazenamento interno seguro do app
+    // 1. Salva permanentemente no dispositivo na pasta da Obra -> Imagens/
     let permanentUri = asset.uri;
     try {
-      const appDir = await ensureObraDirectory(projectName);
-      if (appDir) {
-        const dest = `${appDir}${filename}`;
-        await (FileSystem as any).copyAsync({ from: asset.uri, to: dest });
-        permanentUri = dest;
-      }
+      const projName = projectName && projectName.trim() ? projectName : 'Obra_Geral';
+      permanentUri = await saveImageToProjectFolder(projName, asset.uri, filename);
     } catch (copyErr) {
       console.warn('[Camera] Fallback para uri original:', copyErr);
     }
@@ -283,15 +280,11 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
     const rand = Math.floor(100 + Math.random() * 900);
     const filename = `elp_import_${timestamp}_${rand}.jpg`;
 
-    // Copia para o diretório permanente do app
+    // Copia para a pasta da obra -> Imagens/
     let permanentUri = asset.uri;
     try {
-      const appDir = await ensureObraDirectory(projectName);
-      if (appDir) {
-        const dest = `${appDir}${filename}`;
-        await (FileSystem as any).copyAsync({ from: asset.uri, to: dest });
-        permanentUri = dest;
-      }
+      const projName = projectName && projectName.trim() ? projectName : 'Obra_Geral';
+      permanentUri = await saveImageToProjectFolder(projName, asset.uri, filename);
     } catch (copyErr) {
       console.warn('[Gallery] Fallback para uri original:', copyErr);
     }

@@ -705,7 +705,7 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                 </View>
                 <View style={styles.deleteImpactItem}>
                   <Ionicons name="server" size={14} color="#DC2626" />
-                  <Text style={styles.deleteImpactText}>Reembolsos, categorias personalizadas e checklists</Text>
+                  <Text style={styles.deleteImpactText}>Categorias personalizadas e checklists técnicos</Text>
                 </View>
               </View>
             </ScrollView>

@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS relatorios (
   uuid TEXT,
   data_criacao_local TEXT,
   data_sincronizacao TEXT,
+  em_edicao_por_id INTEGER,
+  em_edicao_por_nome TEXT,
+  em_edicao_em TEXT,
   sync_status TEXT DEFAULT 'synced'
 );
 
@@ -166,29 +169,6 @@ CREATE TABLE IF NOT EXISTS fotos_relatorio_express (
   legenda TEXT,
   descricao TEXT,
   ordem INTEGER DEFAULT 0,
-  sync_status TEXT DEFAULT 'synced'
-);
-
-CREATE TABLE IF NOT EXISTS reembolsos (
-  id INTEGER PRIMARY KEY,
-  usuario_id INTEGER NOT NULL,
-  usuario_nome TEXT,
-  projeto_id INTEGER,
-  projeto_nome TEXT,
-  periodo_inicio TEXT NOT NULL,
-  periodo_fim TEXT NOT NULL,
-  quilometragem REAL DEFAULT 0,
-  valor_km REAL DEFAULT 0,
-  alimentacao REAL DEFAULT 0,
-  hospedagem REAL DEFAULT 0,
-  outros_gastos REAL DEFAULT 0,
-  total REAL DEFAULT 0,
-  status TEXT DEFAULT 'Pendente',
-  observacoes TEXT,
-  comprovante_uri TEXT,
-  comprovante_base64 TEXT,
-  aprovado_por_nome TEXT,
-  aprovado_em TEXT,
   sync_status TEXT DEFAULT 'synced'
 );
 

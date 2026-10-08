@@ -98,8 +98,10 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
         { status: 'Aprovado', aprovador_id: user?.id }
       );
       if (isOnline) triggerSync();
+      // Salva automaticamente o PDF do relatório aprovado na pasta da obra no dispositivo
+      generateReportPDF({ ...relatorio, status: 'Aprovado' }, fotos).catch(() => null);
       await loadReport();
-      Alert.alert('Sucesso', 'Relatório aprovado com sucesso!');
+      Alert.alert('Sucesso', 'Relatório aprovado com sucesso! Cópia em PDF salva na pasta da obra.');
     } catch (err: any) {
       Alert.alert('Erro', err.message);
     } finally {
@@ -207,6 +209,22 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     );
   }
 
+  async function handleNavigateToEdit(reportId: number, preProjId?: number) {
+    if (isOnline) {
+      try {
+        const res = await apiClient.axios.get(`/api/relatorios/${reportId}/lock-status`, { timeout: 4000 });
+        if (res?.data?.locked && res.data.usuario_em_edicao_id !== user?.id) {
+          const editor = res.data.usuario_em_edicao_nome || 'outro usuário';
+          Alert.alert(
+            'Relatório em Preenchimento',
+            `Este relatório já está aberto e sendo preenchido no momento por:\n\n👤 ${editor}\n\nVocê não pode entrar neste relatório até que ele saia para não sobrescrever dados.`
+          );
+          return;
+        }
+      } catch {}
+    }
+    navigation.navigate('ReportFormScreen', { reportId, preSelectedProjectId: preProjId });
+  }
 
   if (!relatorio) {
     return (
@@ -233,7 +251,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     <View style={styles.container}>
       <Header 
         title={relatorio.numero} 
-        subtitle={relatorio.projeto_nome || 'Relatório'}
+        subtitle={relatorio.projeto_nome || 'Relatório'} 
         showBack 
         onBack={() => navigation.goBack()} 
       />
@@ -262,7 +280,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           {(relatorio.status === 'em_andamento' || relatorio.status === 'Rejeitado') && (
             <TouchableOpacity 
               style={styles.presenceEditBtn}
-              onPress={() => navigation.navigate('ReportFormScreen', { reportId: relatorio.id })}
+              onPress={() => handleNavigateToEdit(relatorio.id, relatorio.projeto_id)}
             >
               <Ionicons name="create-outline" size={15} color="#FFFFFF" />
               <Text style={styles.presenceEditBtnText}>Editar</Text>
@@ -345,7 +363,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           {relatorio.status === 'em_andamento' && (
             <TouchableOpacity 
               style={styles.continueDraftBtn}
-              onPress={() => navigation.navigate('ReportFormScreen', { reportId: relatorio.id })}
+              onPress={() => handleNavigateToEdit(relatorio.id, relatorio.projeto_id)}
             >
               <Ionicons name="create-outline" size={18} color="#FFFFFF" />
               <Text style={styles.continueDraftBtnText}>Continuar Preenchendo Rascunho</Text>
@@ -513,7 +531,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                 {/* 2. Botão "Editar Relatório" (Azul sólido - Correção técnica pontual) */}
                 <TouchableOpacity 
                   style={[styles.btnActionFull, styles.editReportBtn]} 
-                  onPress={() => navigation.navigate('ReportFormScreen', { reportId: relatorio.id, preSelectedProjectId: relatorio.projeto_id })}
+                  onPress={() => handleNavigateToEdit(relatorio.id, relatorio.projeto_id)}
                   disabled={approving}
                 >
                   <Ionicons name="create-outline" size={20} color="#FFFFFF" />

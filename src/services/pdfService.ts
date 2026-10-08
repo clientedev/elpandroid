@@ -2,6 +2,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Relatorio, FotoRelatorio, RelatorioExpress } from '../types';
 import { ELP_LOGO_BASE64 } from './logoBase64';
+import { saveApprovedPdfToProjectFolder } from './appFilesService';
 
 export async function generateReportPDF(
   relatorio: Relatorio | RelatorioExpress,
@@ -244,6 +245,14 @@ export async function generateReportPDF(
   `;
 
   const { uri } = await Print.printToFileAsync({ html });
+
+  // Se o relatório estiver aprovado (ou ao gerar laudo da obra), salva permanentemente na subpasta Relatorios_Aprovados_PDF
+  if (obraNome && (relatorio.status === 'Aprovado' || (relatorio as any).status === 'aprovado')) {
+    saveApprovedPdfToProjectFolder(obraNome, numero, uri).catch(err =>
+      console.warn('[pdfService] Erro ao salvar PDF aprovado na pasta da obra:', err)
+    );
+  }
+
   return uri;
 }
 

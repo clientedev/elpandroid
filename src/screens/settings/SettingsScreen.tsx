@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, 
-  Alert, ActivityIndicator, Image, Modal, FlatList 
+  Alert, ActivityIndicator, Image, Modal, FlatList, Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -17,9 +17,9 @@ import {
   deleteLocalLegenda, addToSyncQueue 
 } from '../../database/db';
 import { 
-  getPhotoDirectoryConfig, savePhotoDirectoryConfig, 
-  PhotoDirectoryConfig, PhotoDirectoryType, DEFAULT_PHOTO_DIR_CONFIG 
-} from '../../services/imageService';
+  getProjectsFoldersSummary, ProjectFolderSummary, openRootFolderExternally, 
+  viewOrShareFile, getAppFilesRootDir, FileItem 
+} from '../../services/appFilesService';
 import { LegendaPredefinida } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
@@ -53,11 +53,13 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [saveInDedicatedFolder, setSaveInDedicatedFolder] = useState(true);
   const [highQualityPhotos, setHighQualityPhotos] = useState(true);
 
-  // Diretório de Salvamento Local de Imagens
-  const [photoDirConfig, setPhotoDirConfig] = useState<PhotoDirectoryConfig>(DEFAULT_PHOTO_DIR_CONFIG);
-  const [showDirPickerModal, setShowDirPickerModal] = useState(false);
-  const [selectedDirType, setSelectedDirType] = useState<PhotoDirectoryType>('dcim');
-  const [customSubfolder, setCustomSubfolder] = useState('ELP_Obras');
+  // Arquivos do App (Estrutura Local: 1 Pasta por Obra > Imagens e Relatorios_Aprovados_PDF)
+  const [showAppFilesModal, setShowAppFilesModal] = useState(false);
+  const [projectSummaries, setProjectSummaries] = useState<ProjectFolderSummary[]>([]);
+  const [loadingAppFiles, setLoadingAppFiles] = useState(false);
+  const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [expandedSubfolder, setExpandedSubfolder] = useState<string | null>(null);
+  const [appFilesRootDir, setAppFilesRootDir] = useState<string>('');
 
   // Notificações no Celular
   const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
@@ -67,37 +69,28 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
     loadDiagnostics();
     loadLegendas();
     checkNotificationStatus();
-    loadPhotoDirConfig();
+    loadAppFiles();
   }, [pendingCount, selectedCategoria]);
 
-  async function loadPhotoDirConfig() {
-    const cfg = await getPhotoDirectoryConfig();
-    setPhotoDirConfig(cfg);
-    setSelectedDirType(cfg.type);
-    setCustomSubfolder(cfg.subfolder || 'ELP_Obras');
+  async function loadAppFiles() {
+    setLoadingAppFiles(true);
+    try {
+      const root = await getAppFilesRootDir();
+      setAppFilesRootDir(root);
+      const summaries = await getProjectsFoldersSummary();
+      setProjectSummaries(summaries);
+    } catch (err) {
+      console.warn('Erro ao carregar arquivos do app:', err);
+    } finally {
+      setLoadingAppFiles(false);
+    }
   }
 
-  async function handleConfirmDirectory() {
-    let label = '';
-    const folder = customSubfolder.trim() || 'ELP_Obras';
-    if (selectedDirType === 'dcim') label = `DCIM / ${folder} (Galeria e Câmera)`;
-    else if (selectedDirType === 'pictures') label = `Pictures / ${folder} (Imagens)`;
-    else if (selectedDirType === 'documents') label = `Documents / ${folder} (Documentos)`;
-    else if (selectedDirType === 'app_internal') label = `Armazenamento Seguro Interno / ${folder}`;
-    else label = `Personalizado / ${folder}`;
-
-    const newCfg: PhotoDirectoryConfig = {
-      type: selectedDirType,
-      label: label,
-      subfolder: folder,
-    };
-    await savePhotoDirectoryConfig(newCfg);
-    setPhotoDirConfig(newCfg);
-    setShowDirPickerModal(false);
-    Alert.alert(
-      'Diretório Local Configurado',
-      `Toda foto capturada no aplicativo agora será salva neste diretório:\n\n${label}`
-    );
+  function formatFileSize(bytes?: number): string {
+    if (!bytes || bytes === 0) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   async function checkNotificationStatus() {
@@ -473,78 +466,55 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
         </View>
 
-        {/* ================= AJUSTES DE CÂMERA & STORAGE ================= */}
+        {/* ================= ARQUIVOS DO APP ================= */}
         <View style={styles.card}>
-          <View style={styles.cardTitleRow}>
-            <Ionicons name="camera-outline" size={20} color={Colors.primary} />
-            <Text style={styles.cardTitle}>Câmera & Armazenamento de Fotos</Text>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="folder-open" size={22} color={Colors.primary} />
+              <Text style={styles.cardTitle}>Arquivos do App</Text>
+            </View>
+            <View style={styles.appFilesBadge}>
+              <Text style={styles.appFilesBadgeText}>Salvo Localmente</Text>
+            </View>
           </View>
 
-          {/* Diretório Local de Salvamento de Fotos */}
-          <View style={styles.photoDirContainer}>
-            <View style={styles.photoDirHeader}>
-              <View style={styles.photoDirIconBox}>
-                <Ionicons name="folder" size={22} color="#0284C7" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.photoDirTitle}>Diretório Local das Fotos</Text>
-                <Text style={styles.photoDirValue} numberOfLines={2}>
-                  {photoDirConfig.label}
-                </Text>
-              </View>
-            </View>
+          <Text style={styles.desc}>
+            Todos os arquivos são guardados localmente no dispositivo. Para cada obra criada, existe uma pasta dedicada contendo duas subpastas: <Text style={{ fontWeight: '700' }}>Imagens</Text> e <Text style={{ fontWeight: '700' }}>Relatórios Aprovados em PDF</Text>.
+          </Text>
 
-            <Text style={styles.photoDirDesc}>
-              Toda foto tirada no app é salva diretamente neste diretório local do dispositivo.
+          <View style={styles.appFilesPathBox}>
+            <Ionicons name="phone-portrait-outline" size={16} color="#0284C7" />
+            <Text style={styles.appFilesPathText} numberOfLines={1}>
+              {appFilesRootDir ? appFilesRootDir.replace('file://', '') : 'Armazenamento Interno/ELP_Arquivos/'}
             </Text>
+          </View>
 
+          <View style={{ gap: 10, marginTop: 14 }}>
+            {/* Botão 1: Exibir Pastas por Obra */}
             <TouchableOpacity 
-              style={styles.chooseDirBtn}
+              style={styles.openAppFilesExplorerBtn}
               onPress={() => {
-                setSelectedDirType(photoDirConfig.type);
-                setCustomSubfolder(photoDirConfig.subfolder || 'ELP_Obras');
-                setShowDirPickerModal(true);
+                loadAppFiles();
+                setShowAppFilesModal(true);
               }}
               activeOpacity={0.8}
             >
-              <Ionicons name="folder-open-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.chooseDirBtnText}>Escolher Diretório das Fotos</Text>
+              <Ionicons name="folder" size={18} color="#FFFFFF" />
+              <Text style={styles.openAppFilesExplorerText}>
+                Exibir Pastas das Obras ({projectSummaries.length} {projectSummaries.length === 1 ? 'obra' : 'obras'})
+              </Text>
+            </TouchableOpacity>
+
+            {/* Botão 2: Abrir externamente no Gerenciador de Arquivos do celular */}
+            <TouchableOpacity 
+              style={styles.openExternalExplorerBtn}
+              onPress={openRootFolderExternally}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="open-outline" size={18} color={Colors.primary} />
+              <Text style={styles.openExternalExplorerText}>Abrir no Gerenciador de Arquivos do Celular</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity 
-            style={styles.settingToggleRow}
-            onPress={() => setSaveInDedicatedFolder(!saveInDedicatedFolder)}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.settingToggleTitle}>Organizar Fotos por Pasta da Obra</Text>
-              <Text style={styles.settingToggleSub}>
-                Cria automaticamente uma subpasta com o nome de cada obra para organizar os registros.
-              </Text>
-            </View>
-            <Ionicons 
-              name={saveInDedicatedFolder ? "toggle" : "toggle-outline"} 
-              size={32} 
-              color={saveInDedicatedFolder ? Colors.primary : Colors.textMuted} 
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.settingToggleRow}
-            onPress={() => setHighQualityPhotos(!highQualityPhotos)}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.settingToggleTitle}>Compressão Inteligente de Fotos</Text>
-              <Text style={styles.settingToggleSub}>
-                Otimiza imagens para sincronização rápida em conexões 3G/4G e economia de memória.
-              </Text>
-            </View>
-            <Ionicons 
-              name={highQualityPhotos ? "toggle" : "toggle-outline"} 
-              size={32} 
-              color={highQualityPhotos ? Colors.primary : Colors.textMuted} 
-            />
-          </TouchableOpacity>
         </View>
 
         {/* ================= SYNC CONTROLS ================= */}
@@ -714,104 +684,198 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         </View>
       </Modal>
 
-      {/* Modal de Escolha de Diretório Local para Fotos */}
-      <Modal visible={showDirPickerModal} transparent animationType="slide">
+      {/* Modal de Arquivos do App (Pastas das Obras, Imagens e Relatórios Aprovados) */}
+      <Modal visible={showAppFilesModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '88%' }]}>
+          <View style={[styles.modalContent, { maxHeight: '92%', height: '88%' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Ionicons name="folder-open" size={22} color={Colors.primary} />
-                <Text style={styles.modalTitle}>Diretório Local das Fotos</Text>
+                <View>
+                  <Text style={styles.modalTitle}>Arquivos do App</Text>
+                  <Text style={{ fontSize: 11, color: Colors.textSecondary }}>
+                    1 Pasta por Obra • Imagens e Laudos PDF
+                  </Text>
+                </View>
               </View>
-              <TouchableOpacity onPress={() => setShowDirPickerModal(false)}>
+              <TouchableOpacity onPress={() => setShowAppFilesModal(false)}>
                 <Ionicons name="close" size={24} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.desc}>
-              Selecione o diretório do dispositivo onde toda foto tirada no app será gravada localmente:
-            </Text>
+            {/* Botão no topo do Modal para acesso externo ao gerenciador do aparelho */}
+            <TouchableOpacity 
+              style={styles.modalExternalTopBtn}
+              onPress={openRootFolderExternally}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="open-outline" size={17} color="#FFFFFF" />
+              <Text style={styles.modalExternalTopBtnText}>Abrir no Gerenciador de Arquivos do Celular</Text>
+            </TouchableOpacity>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 340 }}>
-              {[
-                {
-                  id: 'dcim',
-                  icon: 'camera-outline',
-                  title: 'DCIM (Câmera & Galeria)',
-                  desc: 'Pasta padrão de fotos da câmera. Visível diretamente na galeria do celular.',
-                },
-                {
-                  id: 'pictures',
-                  icon: 'images-outline',
-                  title: 'Pictures (Imagens)',
-                  desc: 'Pasta pública de imagens do Android para relatórios e laudos.',
-                },
-                {
-                  id: 'documents',
-                  icon: 'document-text-outline',
-                  title: 'Documents (Documentos)',
-                  desc: 'Pasta pública de documentos técnicos do aparelho.',
-                },
-                {
-                  id: 'app_internal',
-                  icon: 'shield-checkmark-outline',
-                  title: 'Armazenamento Seguro do App',
-                  desc: 'Pasta isolada exclusiva e segura do aplicativo no celular.',
-                },
-                {
-                  id: 'custom',
-                  icon: 'create-outline',
-                  title: 'Pasta Personalizada',
-                  desc: 'Defina o nome da sua pasta no armazenamento local.',
-                },
-              ].map(opt => (
-                <TouchableOpacity
-                  key={opt.id}
-                  style={[
-                    styles.dirOptionRow,
-                    selectedDirType === opt.id && styles.dirOptionRowSelected,
-                  ]}
-                  onPress={() => setSelectedDirType(opt.id as PhotoDirectoryType)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.dirOptionIcon, selectedDirType === opt.id && styles.dirOptionIconSelected]}>
-                    <Ionicons 
-                      name={opt.icon as any} 
-                      size={20} 
-                      color={selectedDirType === opt.id ? '#FFFFFF' : Colors.primary} 
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.dirOptionTitle, selectedDirType === opt.id && styles.dirOptionTitleSelected]}>
-                      {opt.title}
-                    </Text>
-                    <Text style={styles.dirOptionDesc}>{opt.desc}</Text>
-                  </View>
-                  <Ionicons 
-                    name={selectedDirType === opt.id ? "radio-button-on" : "radio-button-off"} 
-                    size={20} 
-                    color={selectedDirType === opt.id ? Colors.primary : Colors.textMuted} 
-                  />
-                </TouchableOpacity>
-              ))}
-
-              <View style={{ marginTop: 12 }}>
-                <Text style={styles.modalLabel}>Nome da Subpasta no Celular:</Text>
-                <TextInput
-                  style={styles.modalInputSingle}
-                  placeholder="Ex: ELP_Obras"
-                  placeholderTextColor="#94A3B8"
-                  value={customSubfolder}
-                  onChangeText={setCustomSubfolder}
-                />
+            {loadingAppFiles ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={{ marginTop: 12, fontSize: 13, color: Colors.textSecondary }}>
+                  Carregando pastas e arquivos salvos...
+                </Text>
               </View>
-            </ScrollView>
+            ) : projectSummaries.length === 0 ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                <Ionicons name="folder-open-outline" size={48} color="#CBD5E1" />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.text, marginTop: 12 }}>
+                  Nenhuma Obra com Pasta Criada
+                </Text>
+                <Text style={{ fontSize: 12, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
+                  Ao cadastrar ou sincronizar uma obra, a pasta local e suas subpastas serão geradas automaticamente.
+                </Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 8 }}>
+                <Text style={{ fontSize: 12, color: Colors.textSecondary, marginBottom: 10 }}>
+                  Toque em uma obra para visualizar as subpastas <Text style={{ fontWeight: '600' }}>Imagens</Text> e <Text style={{ fontWeight: '600' }}>Relatórios Aprovados em PDF</Text>:
+                </Text>
+
+                {projectSummaries.map((summary) => {
+                  const isExpanded = expandedProject === summary.projectName;
+                  const isImagensOpen = expandedSubfolder === `${summary.projectName}_imagens`;
+                  const isPdfsOpen = expandedSubfolder === `${summary.projectName}_pdfs`;
+
+                  return (
+                    <View key={summary.projectName} style={styles.projectFolderCard}>
+                      {/* Linha da Pasta da Obra */}
+                      <TouchableOpacity 
+                        style={styles.projectFolderHeader}
+                        onPress={() => setExpandedProject(isExpanded ? null : summary.projectName)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.projectFolderIconBox}>
+                          <Ionicons name={isExpanded ? "folder-open" : "folder"} size={22} color="#0284C7" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.projectFolderName} numberOfLines={1}>
+                            {summary.projectName}
+                          </Text>
+                          <Text style={styles.projectFolderStats}>
+                            {summary.imagens.length} foto(s) • {summary.pdfs.length} PDF(s) • {formatFileSize(summary.totalSize)}
+                          </Text>
+                        </View>
+                        <Ionicons 
+                          name={isExpanded ? "chevron-up" : "chevron-down"} 
+                          size={20} 
+                          color="#64748B" 
+                        />
+                      </TouchableOpacity>
+
+                      {/* Conteúdo Expandido da Obra: As 2 Subpastas */}
+                      {isExpanded && (
+                        <View style={styles.subfoldersContainer}>
+                          {/* 1. Subpasta Imagens */}
+                          <View style={styles.subfolderBlock}>
+                            <TouchableOpacity 
+                              style={styles.subfolderHeader}
+                              onPress={() => setExpandedSubfolder(isImagensOpen ? null : `${summary.projectName}_imagens`)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="images" size={18} color="#D97706" />
+                                <Text style={styles.subfolderTitle}>Imagens</Text>
+                                <View style={styles.fileCountPill}>
+                                  <Text style={styles.fileCountPillText}>{summary.imagens.length}</Text>
+                                </View>
+                              </View>
+                              <Ionicons 
+                                name={isImagensOpen ? "chevron-up" : "chevron-down"} 
+                                size={16} 
+                                color="#64748B" 
+                              />
+                            </TouchableOpacity>
+
+                            {isImagensOpen && (
+                              <View style={styles.filesList}>
+                                {summary.imagens.length === 0 ? (
+                                  <Text style={styles.emptyFilesText}>Nenhuma imagem salva ainda nesta obra.</Text>
+                                ) : (
+                                  summary.imagens.map((file) => (
+                                    <TouchableOpacity 
+                                      key={file.uri} 
+                                      style={styles.fileItemRow}
+                                      onPress={() => viewOrShareFile(file.uri, 'image/jpeg')}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Ionicons name="image-outline" size={16} color="#0284C7" />
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={styles.fileNameText} numberOfLines={1}>{file.name}</Text>
+                                        <Text style={styles.fileSizeText}>{formatFileSize(file.size)}</Text>
+                                      </View>
+                                      <Ionicons name="eye-outline" size={16} color="#64748B" />
+                                    </TouchableOpacity>
+                                  ))
+                                )}
+                              </View>
+                            )}
+                          </View>
+
+                          {/* 2. Subpasta Relatórios Aprovados em PDF */}
+                          <View style={styles.subfolderBlock}>
+                            <TouchableOpacity 
+                              style={styles.subfolderHeader}
+                              onPress={() => setExpandedSubfolder(isPdfsOpen ? null : `${summary.projectName}_pdfs`)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Ionicons name="document-text" size={18} color="#DC2626" />
+                                <Text style={styles.subfolderTitle}>Relatórios Aprovados em PDF</Text>
+                                <View style={[styles.fileCountPill, { backgroundColor: '#FEE2E2' }]}>
+                                  <Text style={[styles.fileCountPillText, { color: '#DC2626' }]}>
+                                    {summary.pdfs.length}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Ionicons 
+                                name={isPdfsOpen ? "chevron-up" : "chevron-down"} 
+                                size={16} 
+                                color="#64748B" 
+                              />
+                            </TouchableOpacity>
+
+                            {isPdfsOpen && (
+                              <View style={styles.filesList}>
+                                {summary.pdfs.length === 0 ? (
+                                  <Text style={styles.emptyFilesText}>Nenhum relatório PDF aprovado nesta obra.</Text>
+                                ) : (
+                                  summary.pdfs.map((file) => (
+                                    <TouchableOpacity 
+                                      key={file.uri} 
+                                      style={styles.fileItemRow}
+                                      onPress={() => viewOrShareFile(file.uri, 'application/pdf')}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Ionicons name="document-text-outline" size={16} color="#DC2626" />
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={styles.fileNameText} numberOfLines={1}>{file.name}</Text>
+                                        <Text style={styles.fileSizeText}>{formatFileSize(file.size)}</Text>
+                                      </View>
+                                      <Ionicons name="share-outline" size={16} color="#64748B" />
+                                    </TouchableOpacity>
+                                  ))
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
 
             <TouchableOpacity 
-              style={[styles.modalSaveBtn, { marginTop: 14 }]} 
-              onPress={handleConfirmDirectory}
+              style={[styles.modalSaveBtn, { marginTop: 12 }]} 
+              onPress={() => setShowAppFilesModal(false)}
             >
-              <Text style={styles.modalSaveBtnText}>Salvar e Aplicar Diretório</Text>
+              <Text style={styles.modalSaveBtnText}>Fechar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1310,4 +1374,183 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.text,
   },
+  // Estilos de Arquivos do App
+  appFilesBadge: {
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  appFilesBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0369A1',
+  },
+  appFilesPathBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+  },
+  appFilesPathText: {
+    fontSize: 11,
+    color: '#475569',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    flex: 1,
+  },
+  openAppFilesExplorerBtn: {
+    backgroundColor: Colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    ...Shadows.sm,
+  },
+  openAppFilesExplorerText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  openExternalExplorerBtn: {
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1.5,
+    borderColor: '#BAE6FD',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  openExternalExplorerText: {
+    color: Colors.primary,
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  modalExternalTopBtn: {
+    backgroundColor: '#0284C7',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 10,
+    marginBottom: 6,
+    ...Shadows.sm,
+  },
+  modalExternalTopBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  projectFolderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  projectFolderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  projectFolderIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  projectFolderName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  projectFolderStats: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  subfoldersContainer: {
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+    gap: 8,
+  },
+  subfolderBlock: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  subfolderHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+  },
+  subfolderTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  fileCountPill: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  fileCountPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  filesList: {
+    padding: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    gap: 6,
+  },
+  emptyFilesText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+    padding: 4,
+  },
+  fileItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 6,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  fileNameText: {
+    fontSize: 12,
+    color: Colors.text,
+    fontWeight: '500',
+  },
+  fileSizeText: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
 });
+
