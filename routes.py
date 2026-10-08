@@ -12350,18 +12350,34 @@ _SERVER_BOOT_TIME = now_brt().strftime('%Y%m%d%H%M%S')
 @app.route('/api/app-version', methods=['GET'])
 def get_app_version_info():
     """Retorna versao mais recente do aplicativo ELP e dados de deploy para sincronizacao"""
+    import json
     deploy_id = (
         os.environ.get('RAILWAY_DEPLOYMENT_ID') or 
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
+    current_v = '1.0.23'
+    current_vc = 23
+    try:
+        app_json_path = os.path.join(os.getcwd(), 'app.json')
+        if os.path.exists(app_json_path):
+            with open(app_json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                expo_data = data.get('expo', {})
+                if 'version' in expo_data:
+                    current_v = str(expo_data['version'])
+                if 'android' in expo_data and 'versionCode' in expo_data['android']:
+                    current_vc = int(expo_data['android']['versionCode'])
+    except Exception as e:
+        print(f"[app-version] Erro ao ler versao de app.json: {e}")
+
     return jsonify({
-        'version': '1.0.22',
-        'versionCode': 22,
+        'version': current_v,
+        'versionCode': current_vc,
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.22: Versão oficial com modal executivo de notificações, checklist dinâmico e Storage Access Framework.',
+        'notes': f'Atualização v{current_v}: Carregamento instantâneo de fotos no relatório, trava de concorrência e deduplicação canônica.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
