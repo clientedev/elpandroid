@@ -126,7 +126,7 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
 
       // 2. Considera relatórios salvos da obra que contenham checklist aprovado
       for (const rel of r) {
-        const rawChecklist = (rel as any).checklist;
+        const rawChecklist = (rel as any).checklist_data || (rel as any).checklist;
         if (rawChecklist) {
           try {
             const parsed = typeof rawChecklist === 'string' ? JSON.parse(rawChecklist) : rawChecklist;

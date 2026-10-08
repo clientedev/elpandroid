@@ -70,12 +70,13 @@ export function formatDirectoryDisplayName(uri: string | null): string {
   if (!uri) return 'Armazenamento Padrão do App';
   try {
     const decoded = decodeURIComponent(uri);
-    const parts = decoded.split(':');
-    if (parts.length > 1) {
-      return parts[parts.length - 1] || 'Pasta Selecionada';
-    }
     const slashParts = decoded.split('/');
-    return slashParts[slashParts.length - 1] || 'Pasta Selecionada';
+    const lastPart = slashParts[slashParts.length - 1];
+    if (lastPart && lastPart.includes(':')) {
+      const colParts = lastPart.split(':');
+      return colParts[colParts.length - 1] || lastPart;
+    }
+    return lastPart || 'Pasta Selecionada';
   } catch {
     return 'Pasta Selecionada';
   }
@@ -233,41 +234,11 @@ export async function promptSelectStorageDirectory(force: boolean = false): Prom
  * Obtém a configuração atual de armazenamento e contagem de arquivos.
  */
 export async function getStorageConfig(): Promise<StorageConfig> {
-  let directoryUri = await AsyncStorage.getItem(KEY_SAF_DIRECTORY_URI);
-  let imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
-  let relatoriosUri = await AsyncStorage.getItem(KEY_SAF_RELATORIOS_URI);
+  const directoryUri = await AsyncStorage.getItem(KEY_SAF_DIRECTORY_URI);
+  const imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
+  const relatoriosUri = await AsyncStorage.getItem(KEY_SAF_RELATORIOS_URI);
 
-  let totalImagensCount = 0;
-  let totalRelatoriosCount = 0;
-
-  if (directoryUri && Platform.OS === 'android') {
-    if (imagensUri) {
-      try {
-        const imgs = await StorageAccessFramework.readDirectoryAsync(imagensUri);
-        totalImagensCount = imgs.length;
-      } catch {}
-    }
-    if (relatoriosUri) {
-      try {
-        const rels = await StorageAccessFramework.readDirectoryAsync(relatoriosUri);
-        totalRelatoriosCount = rels.length;
-      } catch {}
-    }
-  } else {
-    // Contagem no diretório interno de fallback
-    try {
-      const imgInfo = await FileSystem.getInfoAsync(INTERNAL_IMAGENS);
-      if (imgInfo.exists) {
-        const list = await FileSystem.readDirectoryAsync(INTERNAL_IMAGENS);
-        totalImagensCount = list.length;
-      }
-      const relInfo = await FileSystem.getInfoAsync(INTERNAL_RELATORIOS);
-      if (relInfo.exists) {
-        const list = await FileSystem.readDirectoryAsync(INTERNAL_RELATORIOS);
-        totalRelatoriosCount = list.length;
-      }
-    } catch {}
-  }
+  const { imagens, relatorios } = await getStoredPhysicalFiles();
 
   return {
     isConfigured: Boolean(directoryUri),
@@ -275,8 +246,8 @@ export async function getStorageConfig(): Promise<StorageConfig> {
     directoryName: formatDirectoryDisplayName(directoryUri),
     imagensUri,
     relatoriosUri,
-    totalImagensCount,
-    totalRelatoriosCount,
+    totalImagensCount: imagens.length,
+    totalRelatoriosCount: relatorios.length,
   };
 }
 
@@ -287,64 +258,88 @@ export async function getStoredPhysicalFiles(): Promise<{
   imagens: FileItem[];
   relatorios: FileItem[];
 }> {
-  const imagens: FileItem[] = [];
-  const relatorios: FileItem[] = [];
+  await ensureInternalDirs();
 
-  const imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
-  const relatoriosUri = await AsyncStorage.getItem(KEY_SAF_RELATORIOS_URI);
+  const imagensMap = new Map<string, FileItem>();
+  const relatoriosMap = new Map<string, FileItem>();
 
-  if (Platform.OS === 'android' && imagensUri) {
-    try {
-      const entries = await StorageAccessFramework.readDirectoryAsync(imagensUri);
-      for (const uri of entries) {
-        const name = formatDirectoryDisplayName(uri);
-        imagens.push({ name, uri });
+  // 1. Lê arquivos locais internos (garantia offline e exibição imediata)
+  try {
+    const imgInfo = await FileSystem.getInfoAsync(INTERNAL_IMAGENS);
+    if (imgInfo.exists) {
+      const files = await FileSystem.readDirectoryAsync(INTERNAL_IMAGENS);
+      for (const f of files) {
+        const fUri = `${INTERNAL_IMAGENS}${f}`;
+        const fStat = await FileSystem.getInfoAsync(fUri);
+        imagensMap.set(f.toLowerCase(), {
+          name: f,
+          uri: fUri,
+          size: (fStat as any).size || 0,
+        });
       }
-    } catch (e) {
-      console.warn('[appFilesService] Erro ao ler imagens do SAF:', e);
+    }
+  } catch (errIntImgs) {
+    console.warn('[appFilesService] Leitura de imagens internas:', errIntImgs);
+  }
+
+  try {
+    const relInfo = await FileSystem.getInfoAsync(INTERNAL_RELATORIOS);
+    if (relInfo.exists) {
+      const files = await FileSystem.readDirectoryAsync(INTERNAL_RELATORIOS);
+      for (const f of files) {
+        const fUri = `${INTERNAL_RELATORIOS}${f}`;
+        const fStat = await FileSystem.getInfoAsync(fUri);
+        relatoriosMap.set(f.toLowerCase(), {
+          name: f,
+          uri: fUri,
+          size: (fStat as any).size || 0,
+        });
+      }
+    }
+  } catch (errIntRels) {
+    console.warn('[appFilesService] Leitura de relatórios internos:', errIntRels);
+  }
+
+  // 2. Lê arquivos do SAF (diretório público escolhido pelo usuário)
+  if (Platform.OS === 'android') {
+    const imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
+    const relatoriosUri = await AsyncStorage.getItem(KEY_SAF_RELATORIOS_URI);
+
+    if (imagensUri) {
+      try {
+        const entries = await StorageAccessFramework.readDirectoryAsync(imagensUri);
+        for (const uri of entries) {
+          const name = formatDirectoryDisplayName(uri);
+          const key = name.toLowerCase();
+          if (!imagensMap.has(key)) {
+            imagensMap.set(key, { name, uri });
+          }
+        }
+      } catch (e) {
+        console.warn('[appFilesService] Erro ao ler imagens do SAF:', e);
+      }
+    }
+
+    if (relatoriosUri) {
+      try {
+        const entries = await StorageAccessFramework.readDirectoryAsync(relatoriosUri);
+        for (const uri of entries) {
+          const name = formatDirectoryDisplayName(uri);
+          const key = name.toLowerCase();
+          if (!relatoriosMap.has(key)) {
+            relatoriosMap.set(key, { name, uri });
+          }
+        }
+      } catch (e) {
+        console.warn('[appFilesService] Erro ao ler relatórios do SAF:', e);
+      }
     }
   }
 
-  if (Platform.OS === 'android' && relatoriosUri) {
-    try {
-      const entries = await StorageAccessFramework.readDirectoryAsync(relatoriosUri);
-      for (const uri of entries) {
-        const name = formatDirectoryDisplayName(uri);
-        relatorios.push({ name, uri });
-      }
-    } catch (e) {
-      console.warn('[appFilesService] Erro ao ler relatórios do SAF:', e);
-    }
-  }
-
-  // Se o SAF estiver vazio ou não configurado, lê também os internos
-  if (imagens.length === 0) {
-    try {
-      const info = await FileSystem.getInfoAsync(INTERNAL_IMAGENS);
-      if (info.exists) {
-        const files = await FileSystem.readDirectoryAsync(INTERNAL_IMAGENS);
-        for (const f of files) {
-          const fUri = `${INTERNAL_IMAGENS}${f}`;
-          imagens.push({ name: f, uri: fUri });
-        }
-      }
-    } catch {}
-  }
-
-  if (relatorios.length === 0) {
-    try {
-      const info = await FileSystem.getInfoAsync(INTERNAL_RELATORIOS);
-      if (info.exists) {
-        const files = await FileSystem.readDirectoryAsync(INTERNAL_RELATORIOS);
-        for (const f of files) {
-          const fUri = `${INTERNAL_RELATORIOS}${f}`;
-          relatorios.push({ name: f, uri: fUri });
-        }
-      }
-    } catch {}
-  }
-
-  return { imagens, relatorios };
+  return {
+    imagens: Array.from(imagensMap.values()),
+    relatorios: Array.from(relatoriosMap.values()),
+  };
 }
 
 /**
@@ -564,46 +559,38 @@ export async function ensureAllProjectsFolders(): Promise<void> {
  * Retorna o resumo das pastas de obras cadastradas.
  */
 export async function getProjectsFoldersSummary(): Promise<ProjectFolderSummary[]> {
-  await ensureAllProjectsFolders();
   const projetos = await getLocalProjetos('Todos');
+  const { imagens: allImgs, relatorios: allRels } = await getStoredPhysicalFiles();
   const summaries: ProjectFolderSummary[] = [];
 
   for (const p of projetos) {
+    const cleanName = cleanFolderName(p.nome, 'Obra');
     const { projectDir, imagensDir, pdfsDir } = await ensureProjectFolders(p.nome, (p as any).codigo || p.numero);
-    const imagens: FileItem[] = [];
-    const pdfs: FileItem[] = [];
+    
+    // Filtra fotos e PDFs que pertencem a esta obra
+    const projImgs = allImgs.filter(img => 
+      img.name.toLowerCase().includes(cleanName.toLowerCase()) || 
+      (p.nome && img.name.toLowerCase().includes(cleanFolderName(p.nome).toLowerCase()))
+    );
+
+    const projPdfs = allRels.filter(pdf => 
+      pdf.name.toLowerCase().includes(cleanName.toLowerCase()) || 
+      (p.nome && pdf.name.toLowerCase().includes(cleanFolderName(p.nome).toLowerCase())) ||
+      (p.numero && pdf.name.toLowerCase().includes(cleanFolderName(p.numero).toLowerCase()))
+    );
+
     let totalSize = 0;
-
-    try {
-      const imgFiles = await FileSystem.readDirectoryAsync(imagensDir);
-      for (const f of imgFiles) {
-        const fUri = `${imagensDir}${f}`;
-        const fInfo = await FileSystem.getInfoAsync(fUri);
-        const size = (fInfo as any).size || 0;
-        totalSize += size;
-        imagens.push({ name: f, uri: fUri, size });
-      }
-    } catch {}
-
-    try {
-      const pdfFiles = await FileSystem.readDirectoryAsync(pdfsDir);
-      for (const f of pdfFiles) {
-        const fUri = `${pdfsDir}${f}`;
-        const fInfo = await FileSystem.getInfoAsync(fUri);
-        const size = (fInfo as any).size || 0;
-        totalSize += size;
-        pdfs.push({ name: f, uri: fUri, size });
-      }
-    } catch {}
+    projImgs.forEach(i => totalSize += (i.size || 0));
+    projPdfs.forEach(r => totalSize += (r.size || 0));
 
     summaries.push({
       projectName: p.nome,
       projectDir,
       imagensDir,
       pdfsDir,
-      imagens,
-      pdfs,
-      totalFiles: imagens.length + pdfs.length,
+      imagens: projImgs,
+      pdfs: projPdfs,
+      totalFiles: projImgs.length + projPdfs.length,
       totalSize,
     });
   }

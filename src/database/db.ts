@@ -9,10 +9,46 @@ import {
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
+export function sanitizeSqlParams(params?: any): any {
+  if (params === undefined || params === null) return [];
+  if (Array.isArray(params)) {
+    return params.map(p => (p === undefined ? null : p));
+  }
+  if (typeof params === 'object') {
+    const cleaned: Record<string, any> = {};
+    for (const [k, v] of Object.entries(params)) {
+      cleaned[k] = v === undefined ? null : v;
+    }
+    return cleaned;
+  }
+  return params;
+}
+
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (!dbInstance) {
-    dbInstance = await SQLite.openDatabaseAsync('obraflow.db');
-    await dbInstance.execAsync('PRAGMA foreign_keys = ON;');
+    const rawDb = await SQLite.openDatabaseAsync('obraflow.db');
+    await rawDb.execAsync('PRAGMA foreign_keys = ON;');
+
+    // Intercepta métodos para blindar contra qualquer parâmetro 'undefined' que causa java.lang.NullPointerException no NativeDatabase.prepareAsync
+    const origRun = rawDb.runAsync.bind(rawDb);
+    (rawDb as any).runAsync = (sql: string, ...args: any[]) => {
+      const sanitized = args.map(a => sanitizeSqlParams(a));
+      return (origRun as any)(sql, ...sanitized);
+    };
+
+    const origGetAll = rawDb.getAllAsync.bind(rawDb);
+    (rawDb as any).getAllAsync = (sql: string, ...args: any[]) => {
+      const sanitized = args.map(a => sanitizeSqlParams(a));
+      return (origGetAll as any)(sql, ...sanitized);
+    };
+
+    const origGetFirst = rawDb.getFirstAsync.bind(rawDb);
+    (rawDb as any).getFirstAsync = (sql: string, ...args: any[]) => {
+      const sanitized = args.map(a => sanitizeSqlParams(a));
+      return (origGetFirst as any)(sql, ...sanitized);
+    };
+
+    dbInstance = rawDb;
     await initDatabase(dbInstance);
   }
   return dbInstance;
@@ -335,8 +371,8 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       acompanhantes, created_at, updated_at, uuid, data_criacao_local, data_sincronizacao, sync_status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      r.id, r.numero, r.numero_projeto || null, r.titulo, r.projeto_id,
-      r.projeto_nome || '', r.visita_id || null, r.autor_id, r.autor_nome || '',
+      r.id || Date.now(), r.numero || '', r.numero_projeto || null, r.titulo || 'Relatório de Obra', r.projeto_id || 0,
+      r.projeto_nome || '', r.visita_id || null, r.autor_id || 1, r.autor_nome || '',
       r.aprovador_id || null, r.aprovador_nome || '', r.data_relatorio || new Date().toISOString(),
       r.data_aprovacao || null, r.conteudo || '', r.descricao || '', r.checklist_data || '[]',
       r.categoria || '', r.local || '', r.lembrete_proxima_visita || null,
@@ -344,7 +380,7 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       r.acompanhantes || '[]', r.created_at || new Date().toISOString(),
       r.updated_at || r.data_criacao_local || r.created_at || new Date().toISOString(), r.uuid || r.uuid_local || '',
       r.data_criacao_local || r.created_at || new Date().toISOString(),
-      r.data_sincronizacao || null, syncStatus
+      r.data_sincronizacao || null, syncStatus || 'pending'
     ]
   );
 }
@@ -466,19 +502,20 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
   // Deduplicação no SQLite: se já existe foto com mesmo filename ou mesma uri_local no relatório, limpa o ID duplicado
   try {
     if (f.relatorio_id) {
+      const fotoId = f.id || 0;
       if (f.filename && f.filename.length > 3) {
         await db.runAsync(
           'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id != ? AND filename = ?',
-          [f.relatorio_id, f.id, f.filename]
+          [f.relatorio_id, fotoId, f.filename]
         );
       }
       if (f.uri_local && f.uri_local.startsWith('file://')) {
         await db.runAsync(
           'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id != ? AND uri_local = ?',
-          [f.relatorio_id, f.id, f.uri_local]
+          [f.relatorio_id, fotoId, f.uri_local]
         );
       }
-      if (f.id && f.id < 2000000000) {
+      if (fotoId && fotoId < 2000000000) {
         await db.runAsync(
           'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id >= 2000000000 AND ordem = ?',
           [f.relatorio_id, f.ordem || 0]
@@ -495,9 +532,9 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
       tipo_servico, local, ordem, anotacoes_dados, base64, sync_status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      f.id, f.relatorio_id, f.relatorio_uuid || null, f.url || '', f.filename || '', f.uri_local || '',
+      f.id || Date.now(), f.relatorio_id || 0, f.relatorio_uuid || null, f.url || '', f.filename || '', f.uri_local || '',
       f.titulo || '', f.legenda || '', f.descricao || '', f.tipo_servico || '',
-      f.local || '', f.ordem || 0, f.anotacoes_dados || '', finalBase64, syncStatus
+      f.local || '', f.ordem ?? 0, f.anotacoes_dados || '', finalBase64 || '', syncStatus || 'pending'
     ]
   );
 }

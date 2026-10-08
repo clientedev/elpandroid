@@ -173,9 +173,10 @@ export interface AnnotationItem {
   color: string;
 }
 
-interface PhotoEditorModalProps {
+export interface PhotoEditorModalProps {
   visible: boolean;
   photoUri: string | null;
+  base64?: string | null;
   initialAnnotations?: string; // JSON string
   onClose: () => void;
   onSave: (annotationsJson: string) => void;
@@ -204,6 +205,7 @@ const QUICK_TEXT_TAGS = [
 export const PhotoEditorModal: React.FC<PhotoEditorModalProps> = ({
   visible,
   photoUri,
+  base64,
   initialAnnotations,
   onClose,
   onSave,
@@ -409,12 +411,21 @@ export const PhotoEditorModal: React.FC<PhotoEditorModalProps> = ({
 
   if (!visible) return null;
 
-  // Resolve valid URI
-  const resolvedPhotoUri = photoUri 
-    ? (photoUri.startsWith('file://') || photoUri.startsWith('content://') || photoUri.startsWith('http')
-        ? photoUri 
-        : `https://elpandroid-production.up.railway.app${photoUri.startsWith('/') ? '' : '/'}${photoUri}`)
-    : null;
+  // Resolve valid URI com suporte integral a file://, data:image, base64 e URLs
+  const resolvedPhotoUri = (() => {
+    if (photoUri && photoUri.startsWith('data:image')) return photoUri;
+    if (photoUri && photoUri.startsWith('file://')) return photoUri;
+    if (base64 && base64.length > 50) {
+      return base64.startsWith('data:') ? base64 : `data:image/jpeg;base64,${base64}`;
+    }
+    if (photoUri && photoUri.startsWith('content://')) return photoUri;
+    if (photoUri && (photoUri.startsWith('http://') || photoUri.startsWith('https://'))) return photoUri;
+    if (photoUri && photoUri.trim()) {
+      const clean = photoUri.trim();
+      return `https://elpandroid-production.up.railway.app${clean.startsWith('/') ? '' : '/'}${clean}`;
+    }
+    return null;
+  })();
 
   return (
     <Modal visible={visible} animationType="slide" transparent={false}>

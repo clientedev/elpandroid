@@ -12,7 +12,7 @@ import {
   addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
   closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
   migrateLocalFotosRelatorioId, getDatabase, getLocalChecklistTemplate,
-  getChecklistProgressoObra
+  getChecklistProgressoObra, saveBatchChecklistProgressoObra, getLocalRelatorios
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -79,6 +79,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   // 2º Campo: Obra Selecionada (ordenada por proximidade geográfica do GPS)
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(preSelectedProjectId || null);
+  const [showProjectPickerModal, setShowProjectPickerModal] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number }>({
     latitude: DEFAULT_USER_LAT,
     longitude: DEFAULT_USER_LON
@@ -331,6 +333,34 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     try {
       const template = await getLocalChecklistTemplate();
       const progressoObra = await getChecklistProgressoObra(projId);
+
+      // Complementa com o histórico de relatórios anteriores desta obra
+      try {
+        const relsObra = await getLocalRelatorios(projId);
+        for (const rel of relsObra) {
+          const raw = rel.checklist_data || (rel as any).checklist;
+          if (raw) {
+            const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (Array.isArray(arr)) {
+              for (const it of arr) {
+                if (it && it.checked && it.item) {
+                  const k = String(it.item).trim().toLowerCase();
+                  if (!progressoObra.some(p => p.item_texto.trim().toLowerCase() === k)) {
+                    progressoObra.push({
+                      projeto_id: projId,
+                      item_texto: it.item,
+                      aprovado: true,
+                      aprovado_em_relatorio_numero: rel.numero || undefined,
+                      data_aprovacao: rel.data_relatorio || rel.created_at || undefined,
+                      observacao: it.observacao || undefined,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch {}
 
       let savedChecks: ChecklistItemState[] = [];
       if (existingChecklistJson) {
@@ -773,6 +803,24 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       // 1. Save Relatorio to SQLite
       await saveLocalRelatorio(relData, 'pending');
 
+      // Salva progresso cumulativo das etapas de checklist checadas para a obra
+      if (selectedProjectId) {
+        const checkedItems = checklist.filter(c => c.checked);
+        if (checkedItems.length > 0) {
+          await saveBatchChecklistProgressoObra(
+            selectedProjectId,
+            checkedItems.map(c => ({
+              item_texto: c.item,
+              ordem: c.ordem || c.id,
+              aprovado_em_relatorio_id: reportId,
+              aprovado_em_relatorio_numero: reportNumber,
+              data_aprovacao: dataVisita || new Date().toISOString(),
+              observacao: c.observacao || '',
+            }))
+          ).catch(cpErr => console.warn('[ReportForm] Erro ao salvar progresso cumulativo:', cpErr));
+        }
+      }
+
       // 2. Save all Photos to SQLite
       for (let i = 0; i < fotos.length; i++) {
         const f = fotos[i];
@@ -928,18 +976,69 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             </View>
           </View>
 
-          {/* 2º Campo: Seleção da Obra (ordenada por proximidade geográfica) */}
+          {/* 2º Campo: Seleção da Obra (Lista Completa de Obras Disponíveis) */}
           <View style={styles.inputGroup}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <Text style={styles.label}>2. Seleção da Obra *</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={styles.label}>2. Obra do Relatório *</Text>
               {userLocation && (
                 <Text style={{ fontSize: 11, color: '#16A34A', fontWeight: '600' }}>
-                  📍 Ordenadas por proximidade GPS
+                  📍 Proximidade GPS
                 </Text>
               )}
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {projetos.map(p => {
+
+            {/* Card da Obra Selecionada com Ação de Troca */}
+            {selectedProj ? (
+              <TouchableOpacity 
+                style={styles.selectedProjectCard} 
+                onPress={() => setShowProjectPickerModal(true)}
+              >
+                <View style={styles.selectedProjectIconWrap}>
+                  <Ionicons name="business" size={24} color="#0284C7" />
+                </View>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.selectedProjectName}>
+                    {selectedProj.numero ? `[${selectedProj.numero}] ` : ''}{selectedProj.nome}
+                  </Text>
+                  <Text style={styles.selectedProjectSub}>
+                    {selectedProj.construtora || 'Obra Geral'} • {selectedProj.tipo_obra || 'Edificação'}
+                  </Text>
+                  {(() => {
+                    const distKm = (userLocation && selectedProj.latitude && selectedProj.longitude)
+                      ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, selectedProj.latitude, selectedProj.longitude)
+                      : null;
+                    return distKm !== null ? (
+                      <Text style={styles.selectedProjectGps}>📍 A {distKm.toFixed(1)} km do seu local</Text>
+                    ) : null;
+                  })()}
+                </View>
+                <View style={styles.changeProjectBtnBadge}>
+                  <Ionicons name="swap-horizontal" size={16} color="#0284C7" />
+                  <Text style={styles.changeProjectBtnText}>Trocar</Text>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={styles.emptyProjectSelectorBtn}
+                onPress={() => setShowProjectPickerModal(true)}
+              >
+                <Ionicons name="business-outline" size={22} color="#64748B" />
+                <Text style={styles.emptyProjectSelectorText}>Toque para selecionar uma obra da lista...</Text>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+
+            {/* Lista Vertical de Obras Disponíveis com Seleção Direta */}
+            <View style={styles.quickProjectsContainer}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <Text style={styles.quickProjectsHeader}>Obras Disponíveis ({projetos.length}):</Text>
+                <TouchableOpacity onPress={() => setShowProjectPickerModal(true)}>
+                  <Text style={{ fontSize: 12, color: '#0284C7', fontWeight: 'bold' }}>Ver Lista Completa</Text>
+                </TouchableOpacity>
+              </View>
+
+              {projetos.slice(0, 5).map(p => {
+                const isSel = selectedProjectId === p.id;
                 const distKm = (userLocation && p.latitude && p.longitude)
                   ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, p.latitude, p.longitude)
                   : null;
@@ -947,17 +1046,36 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                 return (
                   <TouchableOpacity
                     key={p.id}
-                    style={[styles.chip, selectedProjectId === p.id && styles.chipActive]}
+                    style={[styles.projectListItemRow, isSel && styles.projectListItemRowActive]}
                     onPress={() => setSelectedProjectId(p.id)}
                   >
-                    <Text style={[styles.chipText, selectedProjectId === p.id && styles.chipTextActive]}>
-                      {p.numero ? `${p.numero} - ` : ''}{p.nome}
-                      {distKm !== null ? ` (${distKm.toFixed(1)} km)` : ''}
-                    </Text>
+                    <Ionicons 
+                      name={isSel ? "checkmark-circle" : "ellipse-outline"} 
+                      size={20} 
+                      color={isSel ? "#16A34A" : "#94A3B8"} 
+                    />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={[styles.projectListItemName, isSel && styles.projectListItemNameActive]}>
+                        {p.numero ? `${p.numero} - ` : ''}{p.nome}
+                      </Text>
+                      <Text style={styles.projectListItemSub}>
+                        {p.construtora || 'Obra'} {distKm !== null ? ` • 📍 ${distKm.toFixed(1)} km` : ''}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
+
+              {projetos.length > 5 && (
+                <TouchableOpacity 
+                  style={styles.seeAllProjectsBtn}
+                  onPress={() => setShowProjectPickerModal(true)}
+                >
+                  <Ionicons name="list" size={16} color="#0284C7" />
+                  <Text style={styles.seeAllProjectsBtnText}>Ver todas as {projetos.length} obras da lista...</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* 3º Campo: Número do Relatório (Calculado e Não Editável) */}
@@ -1405,6 +1523,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       <PhotoEditorModal
         visible={showEditorModal}
         photoUri={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? (fotos[editingPhotoIndex].uri_local || fotos[editingPhotoIndex].url || null) : null}
+        base64={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? fotos[editingPhotoIndex].base64 : undefined}
         initialAnnotations={editingPhotoIndex !== null && fotos[editingPhotoIndex] ? fotos[editingPhotoIndex].anotacoes_dados : undefined}
         onClose={() => {
           setShowEditorModal(false);
@@ -1438,6 +1557,87 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                   <Text style={styles.legendItemText}>{item.texto}</Text>
                 </TouchableOpacity>
               )}
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal Completo de Seleção de Obra em Lista */}
+      <Modal visible={showProjectPickerModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Obras Disponíveis</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Toque em uma obra para selecionar</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowProjectPickerModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Barra de Pesquisa de Obras */}
+            <View style={styles.projectModalSearchBox}>
+              <Ionicons name="search" size={18} color="#64748B" />
+              <TextInput
+                style={styles.projectModalSearchInput}
+                placeholder="Buscar por nome, número ou construtora..."
+                value={projectSearchQuery}
+                onChangeText={setProjectSearchQuery}
+                clearButtonMode="while-editing"
+              />
+              {projectSearchQuery ? (
+                <TouchableOpacity onPress={() => setProjectSearchQuery('')}>
+                  <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Lista Completa das Obras */}
+            <FlatList
+              data={projetos.filter(p => {
+                if (!projectSearchQuery.trim()) return true;
+                const q = projectSearchQuery.toLowerCase();
+                return (
+                  p.nome.toLowerCase().includes(q) ||
+                  (p.numero && p.numero.toLowerCase().includes(q)) ||
+                  (p.construtora && p.construtora.toLowerCase().includes(q))
+                );
+              })}
+              keyExtractor={item => item.id.toString()}
+              contentContainerStyle={{ paddingBottom: 16 }}
+              renderItem={({ item }) => {
+                const isSel = selectedProjectId === item.id;
+                const distKm = (userLocation && item.latitude && item.longitude)
+                  ? calculateDistanceKm(userLocation.latitude, userLocation.longitude, item.latitude, item.longitude)
+                  : null;
+
+                return (
+                  <TouchableOpacity
+                    style={[styles.projectModalItemRow, isSel && styles.projectModalItemRowActive]}
+                    onPress={() => {
+                      setSelectedProjectId(item.id);
+                      setShowProjectPickerModal(false);
+                      setProjectSearchQuery('');
+                    }}
+                  >
+                    <Ionicons 
+                      name={isSel ? "checkmark-circle" : "ellipse-outline"} 
+                      size={22} 
+                      color={isSel ? "#16A34A" : "#94A3B8"} 
+                    />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[styles.projectModalItemName, isSel && styles.projectModalItemNameActive]}>
+                        {item.numero ? `[${item.numero}] ` : ''}{item.nome}
+                      </Text>
+                      <Text style={styles.projectModalItemSub}>
+                        {item.construtora || 'ObraFlow'} • {item.tipo_obra || 'Edificação'}
+                        {distKm !== null ? ` • 📍 ${distKm.toFixed(1)} km` : ''}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
             />
           </View>
         </View>
@@ -2092,5 +2292,171 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#0F2027',
+  },
+  selectedProjectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#0284C7',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  selectedProjectIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  selectedProjectName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  selectedProjectSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  selectedProjectGps: {
+    fontSize: 11,
+    color: '#16A34A',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  changeProjectBtnBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 4,
+  },
+  changeProjectBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  emptyProjectSelectorBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  emptyProjectSelectorText: {
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
+    marginLeft: 10,
+    flex: 1,
+  },
+  quickProjectsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    marginTop: 4,
+  },
+  quickProjectsHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  projectListItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  projectListItemRowActive: {
+    backgroundColor: '#F0FDF4',
+  },
+  projectListItemName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  projectListItemNameActive: {
+    color: '#15803D',
+    fontWeight: '700',
+  },
+  projectListItemSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  seeAllProjectsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#F8FAFC',
+    gap: 4,
+  },
+  seeAllProjectsBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0284C7',
+  },
+  projectModalSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  projectModalSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+    padding: 0,
+  },
+  projectModalItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  projectModalItemRowActive: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+  },
+  projectModalItemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  projectModalItemNameActive: {
+    color: '#15803D',
+    fontWeight: '700',
+  },
+  projectModalItemSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
 });

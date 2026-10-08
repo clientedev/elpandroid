@@ -12356,8 +12356,8 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.23'
-    current_vc = 23
+    current_v = '1.0.24'
+    current_vc = 24
     try:
         app_json_path = os.path.join(os.getcwd(), 'app.json')
         if os.path.exists(app_json_path):
@@ -12377,7 +12377,7 @@ def get_app_version_info():
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': f'Atualização v{current_v}: Carregamento instantâneo de fotos no relatório, trava de concorrência e deduplicação canônica.',
+        'notes': f'Atualização v{current_v}: Correção de salvamento SQLite (prepareAsync), prévia no editor de fotos, contabilização de arquivos/PDFs, checklist e seleção de obras em lista.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
