@@ -31,35 +31,35 @@ interface UserFormData {
 const ROLES_INFO: { [key in TipoAcesso]: { label: string; desc: string; color: string; bg: string; icon: any } } = {
   admin: {
     label: 'Administrador Geral',
-    desc: 'Controle total do sistema, edição de usuários e configurações',
+    desc: 'Controle absoluto de usuários, ajustes de sistema e configurações globais',
     color: '#7C3AED',
     bg: '#F5F3FF',
     icon: 'shield-checkmark',
   },
   master: {
     label: 'Usuário Master',
-    desc: 'Privilégio total em relatórios, aprovação técnica e exclusão',
+    desc: 'Privilégio total em relatórios, aprovação técnica, controle e exclusão de obras',
     color: '#2563EB',
     bg: '#EFF6FF',
     icon: 'star',
   },
   aprovador: {
     label: 'Engenheiro Aprovador',
-    desc: 'Aprovação de relatórios técnicos e inspeções express',
+    desc: 'Assinatura e aprovação de laudos técnicos e inspeções express',
     color: '#059669',
     bg: '#ECFDF5',
-    icon: 'checkmark-circle',
+    icon: 'ribbon',
   },
   funcionario: {
     label: 'Técnico de Campo',
-    desc: 'Criação de relatórios, anotações de fotos e vistorias',
+    desc: 'Criação de vistorias, anotações fotográficas e relatórios técnicos',
     color: '#D97706',
     bg: '#FFFBEB',
     icon: 'hammer',
   },
   visualizador: {
     label: 'Visualizador / Cliente',
-    desc: 'Apenas consulta e download de relatórios em PDF',
+    desc: 'Apenas consulta, leitura e download de laudos finalizados em PDF',
     color: '#475569',
     bg: '#F8FAFC',
     icon: 'eye',
@@ -80,6 +80,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<UserFormData | null>(null);
   const [formLoading, setFormLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form Fields
   const [formNome, setFormNome] = useState('');
@@ -134,6 +135,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
     setFormCargo('');
     setFormTipoAcesso('funcionario');
     setFormPassword('');
+    setShowPassword(false);
     setFormAtivo(true);
     setFormAprovadorExpress(false);
     setModalVisible(true);
@@ -166,6 +168,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
     setFormCargo(userToEdit.cargo || '');
     setFormTipoAcesso(tipo);
     setFormPassword('');
+    setShowPassword(false);
     setFormAtivo(Boolean(userToEdit.ativo !== false));
     setFormAprovadorExpress(Boolean(userToEdit.is_aprovador_express));
     setModalVisible(true);
@@ -173,12 +176,12 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
 
   async function handleSaveUser() {
     if (!formNome.trim() || !formUsername.trim() || !formEmail.trim()) {
-      Alert.alert('Atenção', 'Preencha Nome Completo, Usuário e E-mail.');
+      Alert.alert('Campos Obrigatórios', 'Por favor, informe Nome Completo, Login de Usuário e E-mail.');
       return;
     }
 
     if (!editingUser && !formPassword.trim()) {
-      Alert.alert('Atenção', 'Defina uma senha de acesso inicial para o novo usuário.');
+      Alert.alert('Senha Obrigatória', 'Defina uma senha de acesso inicial para o novo usuário.');
       return;
     }
 
@@ -192,7 +195,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
         cargo: formCargo.trim(),
         tipo_acesso: formTipoAcesso,
         ativo: formAtivo,
-        is_aprovador_express: formAprovadorExpress,
+        is_aprovador_express: formAprovadorExpress || formTipoAcesso === 'admin' || formTipoAcesso === 'master' || formTipoAcesso === 'aprovador',
       };
 
       if (formPassword.trim()) {
@@ -200,19 +203,17 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
       }
 
       if (editingUser?.id) {
-        // PUT
         await apiClient.axios.put(`/api/users/${editingUser.id}`, payload);
-        Alert.alert('Sucesso', `Usuário ${formUsername} atualizado com sucesso!`);
+        Alert.alert('Sucesso', `Perfil do usuário @${formUsername} atualizado com êxito!`);
       } else {
-        // POST
         await apiClient.axios.post('/api/users', payload);
-        Alert.alert('Sucesso', `Novo usuário ${formUsername} cadastrado com sucesso!`);
+        Alert.alert('Sucesso', `Novo usuário @${formUsername} cadastrado no sistema!`);
       }
 
       setModalVisible(false);
       fetchUsers();
     } catch (err: any) {
-      const msg = err.response?.data?.error || err.message || 'Erro ao salvar usuário.';
+      const msg = err.response?.data?.error || err.message || 'Erro ao processar dados do usuário.';
       Alert.alert('Erro ao Salvar', msg);
     } finally {
       setFormLoading(false);
@@ -221,7 +222,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
 
   async function handleToggleStatus(u: User) {
     if (u.username === 'admin') {
-      Alert.alert('Operação Negada', 'O usuário admin principal não pode ser inativado.');
+      Alert.alert('Operação Negada', 'O administrador master do sistema não pode ser inativado.');
       return;
     }
 
@@ -230,7 +231,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
       await apiClient.axios.put(`/api/users/${u.id}`, { ativo: nextStatus });
       fetchUsers();
     } catch (err: any) {
-      Alert.alert('Erro', err.response?.data?.error || 'Não foi possível alterar o status.');
+      Alert.alert('Erro', err.response?.data?.error || 'Não foi possível alterar o status do usuário.');
     }
   }
 
@@ -242,7 +243,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
 
     Alert.alert(
       'Desativar Usuário',
-      `Deseja realmente desativar o acesso de ${u.nome_completo || u.username}?`,
+      `Deseja realmente desativar o acesso de ${u.nome_completo || u.username} ao sistema?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { 
@@ -251,7 +252,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
           onPress: async () => {
             try {
               await apiClient.axios.delete(`/api/users/${u.id}`);
-              Alert.alert('Concluído', `Usuário ${u.username} foi desativado.`);
+              Alert.alert('Concluído', `Usuário @${u.username} foi desativado.`);
               fetchUsers();
             } catch (err: any) {
               Alert.alert('Erro', err.response?.data?.error || 'Erro ao desativar usuário.');
@@ -262,7 +263,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
     );
   }
 
-  // Filtragem
+  // Filtragem da lista
   const filteredUsers = users.filter(u => {
     const q = search.toLowerCase();
     const matchesSearch = 
@@ -283,18 +284,26 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
     return true;
   });
 
+  // Estatísticas calculadas
+  const totalCount = users.length;
+  const adminMasterCount = users.filter(u => u.is_master || u.username === 'admin').length;
+  const aprovadorCount = users.filter(u => u.is_aprovador_express || u.tipo_acesso === 'aprovador').length;
+  const ativoCount = users.filter(u => u.ativo !== false).length;
+
   if (!isMasterOrAdmin) {
     return (
       <View style={styles.container}>
         <Header title="Gestão de Usuários" showBack onBack={() => navigation.goBack()} />
         <View style={styles.unauthorizedBox}>
-          <Ionicons name="lock-closed" size={56} color={Colors.danger} />
+          <View style={styles.unauthorizedIconCircle}>
+            <Ionicons name="lock-closed" size={38} color="#DC2626" />
+          </View>
           <Text style={styles.unauthorizedTitle}>Acesso Restrito</Text>
           <Text style={styles.unauthorizedDesc}>
-            A gestão de usuários e perfis de acesso é exclusiva para Administradores e Usuários Master do sistema.
+            A gestão de usuários e concessão de privilégios é restrita a Administradores Gerais e Usuários Master.
           </Text>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.backBtnText}>Voltar ao Início</Text>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
+            <Text style={styles.backBtnText}>Voltar ao Painel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -314,82 +323,110 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
             onPress={handleOpenCreate}
             activeOpacity={0.8}
           >
-            <Ionicons name="person-add" size={18} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>Novo</Text>
+            <Ionicons name="person-add" size={16} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>Novo Usuário</Text>
           </TouchableOpacity>
         }
       />
       <OfflineBanner />
 
-      {/* Estatísticas Rápidas */}
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statNum}>{users.length}</Text>
-          <Text style={styles.statLabel}>Total</Text>
+      {/* KPI CARDS: Estatísticas com Design Moderno */}
+      <View style={styles.kpiContainer}>
+        <View style={[styles.kpiCard, { borderLeftColor: '#2563EB' }]}>
+          <View style={styles.kpiHeader}>
+            <Text style={styles.kpiLabel}>Total</Text>
+            <View style={[styles.kpiIconBox, { backgroundColor: '#EFF6FF' }]}>
+              <Ionicons name="people" size={14} color="#2563EB" />
+            </View>
+          </View>
+          <Text style={styles.kpiValue}>{totalCount}</Text>
         </View>
-        <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: '#7C3AED' }]}>
-            {users.filter(u => u.is_master || u.username === 'admin').length}
-          </Text>
-          <Text style={styles.statLabel}>Admins/Masters</Text>
+
+        <View style={[styles.kpiCard, { borderLeftColor: '#7C3AED' }]}>
+          <View style={styles.kpiHeader}>
+            <Text style={styles.kpiLabel}>Admins/Master</Text>
+            <View style={[styles.kpiIconBox, { backgroundColor: '#F5F3FF' }]}>
+              <Ionicons name="shield-checkmark" size={14} color="#7C3AED" />
+            </View>
+          </View>
+          <Text style={[styles.kpiValue, { color: '#7C3AED' }]}>{adminMasterCount}</Text>
         </View>
-        <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: '#059669' }]}>
-            {users.filter(u => u.is_aprovador_express).length}
-          </Text>
-          <Text style={styles.statLabel}>Aprovadores</Text>
+
+        <View style={[styles.kpiCard, { borderLeftColor: '#059669' }]}>
+          <View style={styles.kpiHeader}>
+            <Text style={styles.kpiLabel}>Aprovadores</Text>
+            <View style={[styles.kpiIconBox, { backgroundColor: '#ECFDF5' }]}>
+              <Ionicons name="ribbon" size={14} color="#059669" />
+            </View>
+          </View>
+          <Text style={[styles.kpiValue, { color: '#059669' }]}>{aprovadorCount}</Text>
         </View>
-        <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: '#2563EB' }]}>
-            {users.filter(u => u.ativo !== false).length}
-          </Text>
-          <Text style={styles.statLabel}>Ativos</Text>
+
+        <View style={[styles.kpiCard, { borderLeftColor: '#0EA5E9' }]}>
+          <View style={styles.kpiHeader}>
+            <Text style={styles.kpiLabel}>Ativos</Text>
+            <View style={[styles.kpiIconBox, { backgroundColor: '#F0F9FF' }]}>
+              <Ionicons name="checkmark-circle" size={14} color="#0EA5E9" />
+            </View>
+          </View>
+          <Text style={[styles.kpiValue, { color: '#0EA5E9' }]}>{ativoCount}</Text>
         </View>
       </View>
 
-      {/* Barra de Pesquisa */}
-      <View style={styles.searchBox}>
-        <Ionicons name="search" size={18} color={Colors.textMuted} />
-        <TextInput 
-          style={styles.searchInput}
-          placeholder="Buscar por nome, login, e-mail ou cargo..."
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
-          </TouchableOpacity>
-        )}
+      {/* Barra de Pesquisa Profissional */}
+      <View style={styles.searchWrapper}>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={18} color="#94A3B8" />
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Buscar por nome, login @, e-mail ou cargo..."
+            placeholderTextColor="#94A3B8"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
-      {/* Filtros de Tipo de Acesso */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
-        {[
-          { key: 'todos', label: 'Todos' },
-          { key: 'admin', label: '👑 Admin' },
-          { key: 'master', label: '⭐ Master' },
-          { key: 'aprovador', label: '🛡️ Aprovador' },
-          { key: 'funcionario', label: '🛠️ Técnico' },
-          { key: 'visualizador', label: '👁️ Visualizador' },
-        ].map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.filterChip, roleFilter === tab.key && styles.filterChipActive]}
-            onPress={() => setRoleFilter(tab.key as any)}
-          >
-            <Text style={[styles.filterChipText, roleFilter === tab.key && styles.filterChipTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {/* Filtros em Chips Horizontais com Indicadores de Quantidade */}
+      <View style={styles.filterBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {[
+            { key: 'todos', label: 'Todos', count: totalCount },
+            { key: 'admin', label: '👑 Admin', count: users.filter(u => u.username === 'admin' || (u.is_master && u.tipo_acesso === 'admin')).length },
+            { key: 'master', label: '⭐ Master', count: users.filter(u => u.is_master && u.username !== 'admin').length },
+            { key: 'aprovador', label: '🛡️ Aprovador', count: aprovadorCount },
+            { key: 'funcionario', label: '🛠️ Técnico', count: users.filter(u => !u.is_master && !u.is_aprovador_express && u.tipo_acesso !== 'visualizador').length },
+            { key: 'visualizador', label: '👁️ Visualizador', count: users.filter(u => u.tipo_acesso === 'visualizador').length },
+          ].map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.filterChip, roleFilter === tab.key && styles.filterChipActive]}
+              onPress={() => setRoleFilter(tab.key as any)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.filterChipText, roleFilter === tab.key && styles.filterChipTextActive]}>
+                {tab.label}
+              </Text>
+              <View style={[styles.filterChipBadge, roleFilter === tab.key && styles.filterChipBadgeActive]}>
+                <Text style={[styles.filterChipBadgeText, roleFilter === tab.key && styles.filterChipBadgeTextActive]}>
+                  {tab.count}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       {/* Lista de Usuários */}
       {loading ? (
         <View style={styles.centerBox}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={{ marginTop: 10, color: Colors.textMuted }}>Carregando usuários do servidor...</Text>
+          <Text style={styles.loadingText}>Sincronizando usuários com a nuvem...</Text>
         </View>
       ) : (
         <FlatList 
@@ -399,10 +436,14 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color={Colors.textMuted} />
+              <View style={styles.emptyIconCircle}>
+                <Ionicons name="people-outline" size={36} color="#94A3B8" />
+              </View>
               <Text style={styles.emptyTitle}>Nenhum usuário encontrado</Text>
               <Text style={styles.emptySub}>
-                Toque em "+ Novo" no canto superior direito para cadastrar um novo usuário.
+                {search.length > 0 
+                  ? 'Nenhum resultado corresponde à sua pesquisa.' 
+                  : 'Toque no botão "+ Novo Usuário" no topo para criar o primeiro cadastro.'}
               </Text>
             </View>
           }
@@ -413,24 +454,28 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
               item.is_aprovador_express ? 'aprovador' : 'funcionario'
             );
             const roleMeta = ROLES_INFO[tipo] || ROLES_INFO.funcionario;
+            const isSelf = currentUser?.id === item.id || currentUser?.username === item.username;
 
             return (
               <View style={[styles.userCard, item.ativo === false && styles.userCardInactive]}>
+                {/* Header do Card */}
                 <View style={styles.userCardHeader}>
-                  <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>
+                  <View style={[styles.userAvatarContainer, { borderColor: roleMeta.color }]}>
+                    <Text style={[styles.userAvatarText, { color: roleMeta.color }]}>
                       {(item.nome_completo || item.username).substring(0, 2).toUpperCase()}
                     </Text>
+                    {/* Indicador de Status Ativo/Inativo */}
+                    <View style={[styles.statusDot, { backgroundColor: item.ativo !== false ? '#10B981' : '#94A3B8' }]} />
                   </View>
 
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={styles.userMainInfo}>
+                    <View style={styles.userNameRow}>
                       <Text style={styles.userName} numberOfLines={1}>
                         {item.nome_completo || item.username}
                       </Text>
-                      {item.ativo === false && (
-                        <View style={styles.inactiveBadge}>
-                          <Text style={styles.inactiveBadgeText}>Inativo</Text>
+                      {isSelf && (
+                        <View style={styles.selfBadge}>
+                          <Text style={styles.selfBadgeText}>Você</Text>
                         </View>
                       )}
                     </View>
@@ -438,64 +483,75 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                   </View>
 
                   <View style={[styles.roleBadge, { backgroundColor: roleMeta.bg, borderColor: roleMeta.color }]}>
-                    <Ionicons name={roleMeta.icon} size={12} color={roleMeta.color} />
+                    <Ionicons name={roleMeta.icon} size={13} color={roleMeta.color} />
                     <Text style={[styles.roleBadgeText, { color: roleMeta.color }]}>
                       {roleMeta.label}
                     </Text>
                   </View>
                 </View>
 
-                {/* Detalhes de Contato */}
-                <View style={styles.userDetailsRow}>
-                  <View style={styles.detailItem}>
-                    <Ionicons name="mail-outline" size={13} color={Colors.textMuted} />
+                {/* Detalhes de Cargo e Contato */}
+                <View style={styles.userDetailsGrid}>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="mail-outline" size={13} color="#64748B" />
                     <Text style={styles.detailText} numberOfLines={1}>{item.email}</Text>
                   </View>
+
                   {item.cargo ? (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="briefcase-outline" size={13} color={Colors.textMuted} />
+                    <View style={styles.detailRow}>
+                      <Ionicons name="briefcase-outline" size={13} color="#64748B" />
                       <Text style={styles.detailText} numberOfLines={1}>{item.cargo}</Text>
                     </View>
                   ) : null}
+
                   {item.telefone ? (
-                    <View style={styles.detailItem}>
-                      <Ionicons name="call-outline" size={13} color={Colors.textMuted} />
+                    <View style={styles.detailRow}>
+                      <Ionicons name="call-outline" size={13} color="#64748B" />
                       <Text style={styles.detailText}>{item.telefone}</Text>
                     </View>
                   ) : null}
                 </View>
 
-                {/* Barra de Ações */}
-                <View style={styles.userActionsRow}>
+                {/* Barra de Ações do Card */}
+                <View style={styles.cardActionsRow}>
                   <TouchableOpacity 
-                    style={styles.editActionBtn}
+                    style={styles.editBtn}
                     onPress={() => handleOpenEdit(item)}
+                    activeOpacity={0.7}
                   >
-                    <Ionicons name="pencil" size={14} color={Colors.primary} />
-                    <Text style={styles.editActionText}>Editar Perfil</Text>
+                    <Ionicons name="create-outline" size={14} color="#2563EB" />
+                    <Text style={styles.editBtnText}>Editar Perfil</Text>
                   </TouchableOpacity>
 
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={styles.secondaryActions}>
                     <TouchableOpacity 
-                      style={[styles.statusToggleBtn, item.ativo === false ? styles.activateBtn : styles.deactivateBtn]}
+                      style={[
+                        styles.statusToggleBtn, 
+                        item.ativo === false ? styles.statusBtnActivate : styles.statusBtnDeactivate
+                      ]}
                       onPress={() => handleToggleStatus(item)}
+                      activeOpacity={0.7}
                     >
                       <Ionicons 
                         name={item.ativo === false ? "checkmark-circle-outline" : "ban-outline"} 
                         size={14} 
                         color={item.ativo === false ? "#059669" : "#D97706"} 
                       />
-                      <Text style={[styles.statusToggleText, { color: item.ativo === false ? "#059669" : "#D97706" }]}>
+                      <Text style={[
+                        styles.statusToggleText, 
+                        { color: item.ativo === false ? "#059669" : "#D97706" }
+                      ]}>
                         {item.ativo === false ? 'Ativar' : 'Desativar'}
                       </Text>
                     </TouchableOpacity>
 
                     {item.username !== 'admin' && (
                       <TouchableOpacity 
-                        style={styles.deleteActionBtn}
+                        style={styles.deleteUserBtn}
                         onPress={() => handleDeleteUser(item)}
+                        activeOpacity={0.7}
                       >
-                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -506,89 +562,104 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
         />
       )}
 
-      {/* MODAL DE CRIAÇÃO / EDIÇÃO DE USUÁRIO COM TODOS OS TIPOS DE ACESSO */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      {/* MODAL PROFISSIONAL DE CRIAÇÃO / EDIÇÃO DE USUÁRIO */}
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={styles.modalTitle}>
                   {editingUser ? `Editar: @${editingUser.username}` : 'Cadastrar Novo Usuário'}
                 </Text>
                 <Text style={styles.modalSubtitle}>
-                  Atribua permissões e tipo de acesso no sistema
+                  Atribua permissões e nível de acesso no ObraFlow / ELP
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+                <Ionicons name="close" size={22} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              {/* 1. Nome Completo */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nome Completo *</Text>
-                <TextInput 
-                  style={styles.input}
-                  placeholder="Ex: Gabriel Eduardo Silva"
-                  value={formNome}
-                  onChangeText={setFormNome}
-                />
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              {/* SEÇÃO 1: DADOS PESSOAIS */}
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="person-outline" size={16} color="#2563EB" />
+                  <Text style={styles.sectionTitle}>1. Identificação & Contato</Text>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Nome Completo *</Text>
+                  <TextInput 
+                    style={styles.input}
+                    placeholder="Ex: Gabriel Eduardo Silva"
+                    placeholderTextColor="#94A3B8"
+                    value={formNome}
+                    onChangeText={setFormNome}
+                  />
+                </View>
+
+                <View style={styles.rowInputs}>
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>Login @ (Usuário) *</Text>
+                    <TextInput 
+                      style={styles.input}
+                      placeholder="gabriel.silva"
+                      placeholderTextColor="#94A3B8"
+                      value={formUsername}
+                      onChangeText={setFormUsername}
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                    <Text style={styles.inputLabel}>E-mail Corporativo *</Text>
+                    <TextInput 
+                      style={styles.input}
+                      placeholder="email@empresa.com"
+                      placeholderTextColor="#94A3B8"
+                      value={formEmail}
+                      onChangeText={setFormEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.rowInputs}>
+                  <View style={[styles.inputGroup, { flex: 1.2 }]}>
+                    <Text style={styles.inputLabel}>Cargo / Função</Text>
+                    <TextInput 
+                      style={styles.input}
+                      placeholder="Ex: Engenheiro Fiscal"
+                      placeholderTextColor="#94A3B8"
+                      value={formCargo}
+                      onChangeText={setFormCargo}
+                    />
+                  </View>
+
+                  <View style={[styles.inputGroup, { flex: 1 }]}>
+                    <Text style={styles.inputLabel}>Telefone / WhatsApp</Text>
+                    <TextInput 
+                      style={styles.input}
+                      placeholder="(11) 99999-9999"
+                      placeholderTextColor="#94A3B8"
+                      value={formTelefone}
+                      onChangeText={setFormTelefone}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                </View>
               </View>
 
-              {/* 2. Login e E-mail */}
-              <View style={styles.rowInputs}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.inputLabel}>Login / Usuário *</Text>
-                  <TextInput 
-                    style={styles.input}
-                    placeholder="Ex: gabriel.silva"
-                    value={formUsername}
-                    onChangeText={setFormUsername}
-                    autoCapitalize="none"
-                  />
+              {/* SEÇÃO 2: SELEÇÃO DO TIPO DE ACESSO */}
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="shield-outline" size={16} color="#7C3AED" />
+                  <Text style={styles.sectionTitle}>2. Nível de Hierarquia & Permissões *</Text>
                 </View>
 
-                <View style={[styles.inputGroup, { flex: 1.2 }]}>
-                  <Text style={styles.inputLabel}>E-mail *</Text>
-                  <TextInput 
-                    style={styles.input}
-                    placeholder="email@empresa.com"
-                    value={formEmail}
-                    onChangeText={setFormEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* 3. Cargo e Telefone */}
-              <View style={styles.rowInputs}>
-                <View style={[styles.inputGroup, { flex: 1.2 }]}>
-                  <Text style={styles.inputLabel}>Cargo / Função</Text>
-                  <TextInput 
-                    style={styles.input}
-                    placeholder="Ex: Engenheiro Fiscal"
-                    value={formCargo}
-                    onChangeText={setFormCargo}
-                  />
-                </View>
-
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <Text style={styles.inputLabel}>Telefone</Text>
-                  <TextInput 
-                    style={styles.input}
-                    placeholder="(11) 99999-9999"
-                    value={formTelefone}
-                    onChangeText={setFormTelefone}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-              </View>
-
-              {/* 4. SELEÇÃO DO TIPO DE ACESSO (TODOS OS TIPOS DO SISTEMA) */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Tipo de Acesso & Hierarquia *</Text>
                 <View style={styles.rolesGrid}>
                   {(Object.keys(ROLES_INFO) as TipoAcesso[]).map((rKey) => {
                     const rMeta = ROLES_INFO[rKey];
@@ -598,15 +669,16 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                         key={rKey}
                         style={[
                           styles.roleSelectCard,
-                          isSelected && { borderColor: rMeta.color, backgroundColor: rMeta.bg }
+                          isSelected && { borderColor: rMeta.color, backgroundColor: rMeta.bg, borderWidth: 1.5 }
                         ]}
                         onPress={() => setFormTipoAcesso(rKey)}
+                        activeOpacity={0.8}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={styles.roleCardHeader}>
                           <Ionicons 
                             name={isSelected ? "radio-button-on" : "radio-button-off"} 
                             size={18} 
-                            color={isSelected ? rMeta.color : Colors.textMuted} 
+                            color={isSelected ? rMeta.color : "#94A3B8"} 
                           />
                           <Text style={[styles.roleSelectTitle, isSelected && { color: rMeta.color, fontWeight: 'bold' }]}>
                             {rMeta.label}
@@ -619,65 +691,102 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                 </View>
               </View>
 
-              {/* 5. Senha */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>
-                  {editingUser ? 'Alterar Senha (deixe em branco para manter)' : 'Senha de Acesso Inicial *'}
-                </Text>
-                <TextInput 
-                  style={styles.input}
-                  placeholder={editingUser ? "Digite nova senha ou deixe vazio" : "Mínimo 6 caracteres"}
-                  value={formPassword}
-                  onChangeText={setFormPassword}
-                  secureTextEntry
-                />
-              </View>
-
-              {/* 6. Opções adicionais */}
-              <View style={styles.switchGroup}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.switchTitle}>Aprovador de Relatórios Express</Text>
-                  <Text style={styles.switchSub}>Permite aprovar vistorias técnicas express pelo app</Text>
+              {/* SEÇÃO 3: CREDENCIAIS DE ACESSO */}
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="key-outline" size={16} color="#059669" />
+                  <Text style={styles.sectionTitle}>3. Senha de Acesso</Text>
                 </View>
-                <Switch 
-                  value={formAprovadorExpress || formTipoAcesso === 'admin' || formTipoAcesso === 'master' || formTipoAcesso === 'aprovador'}
-                  onValueChange={setFormAprovadorExpress}
-                  trackColor={{ true: Colors.primary, false: '#CBD5E1' }}
-                  disabled={formTipoAcesso === 'admin' || formTipoAcesso === 'master' || formTipoAcesso === 'aprovador'}
-                />
-              </View>
 
-              <View style={styles.switchGroup}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.switchTitle}>Usuário Ativo</Text>
-                  <Text style={styles.switchSub}>Usuários inativos não conseguem realizar login</Text>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>
+                    {editingUser ? 'Alterar Senha (deixe vazio para manter a atual)' : 'Senha Inicial *'}
+                  </Text>
+                  <View style={styles.passwordInputContainer}>
+                    <TextInput 
+                      style={styles.passwordInput}
+                      placeholder={editingUser ? "Digite para alterar" : "Mínimo 6 caracteres"}
+                      placeholderTextColor="#94A3B8"
+                      value={formPassword}
+                      onChangeText={setFormPassword}
+                      secureTextEntry={!showPassword}
+                    />
+                    <TouchableOpacity 
+                      onPress={() => setShowPassword(!showPassword)} 
+                      style={styles.eyeBtn}
+                    >
+                      <Ionicons 
+                        name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                        size={20} 
+                        color="#64748B" 
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <Switch 
-                  value={formAtivo}
-                  onValueChange={setFormAtivo}
-                  trackColor={{ true: '#10B981', false: '#CBD5E1' }}
-                  disabled={formUsername === 'admin'}
-                />
               </View>
 
-              {/* Botão Salvar */}
+              {/* SEÇÃO 4: CONFIGURAÇÕES EXTRAS */}
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="options-outline" size={16} color="#D97706" />
+                  <Text style={styles.sectionTitle}>4. Configurações Adicionais</Text>
+                </View>
+
+                <View style={styles.switchGroup}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={styles.switchTitle}>Aprovador de Relatórios Express</Text>
+                    <Text style={styles.switchSub}>Permite homologar inspeções técnicas express pelo app</Text>
+                  </View>
+                  <Switch 
+                    value={formAprovadorExpress || formTipoAcesso === 'admin' || formTipoAcesso === 'master' || formTipoAcesso === 'aprovador'}
+                    onValueChange={setFormAprovadorExpress}
+                    trackColor={{ true: Colors.primary, false: '#CBD5E1' }}
+                    disabled={formTipoAcesso === 'admin' || formTipoAcesso === 'master' || formTipoAcesso === 'aprovador'}
+                  />
+                </View>
+
+                <View style={[styles.switchGroup, { borderBottomWidth: 0 }]}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={styles.switchTitle}>Usuário Ativo</Text>
+                    <Text style={styles.switchSub}>Permite login e sincronização no aplicativo</Text>
+                  </View>
+                  <Switch 
+                    value={formAtivo}
+                    onValueChange={setFormAtivo}
+                    trackColor={{ true: '#10B981', false: '#CBD5E1' }}
+                    disabled={editingUser?.username === 'admin'}
+                  />
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={styles.modalFooter}>
               <TouchableOpacity 
-                style={styles.saveUserBtn}
+                style={styles.modalCancelBtn}
+                onPress={() => setModalVisible(false)}
+                disabled={formLoading}
+              >
+                <Text style={styles.modalCancelBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.modalSubmitBtn, formLoading && { opacity: 0.7 }]}
                 onPress={handleSaveUser}
                 disabled={formLoading}
               >
                 {formLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Ionicons name="checkmark-done" size={20} color="#FFFFFF" />
-                    <Text style={styles.saveUserBtnText}>
+                    <Ionicons name="checkmark-sharp" size={18} color="#FFFFFF" />
+                    <Text style={styles.modalSubmitBtnText}>
                       {editingUser ? 'Salvar Alterações' : 'Cadastrar Usuário'}
                     </Text>
                   </>
                 )}
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
         </View>
       </Modal>
@@ -690,98 +799,223 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  addBtn: {
+  unauthorizedBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  unauthorizedIconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  unauthorizedTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  unauthorizedDesc: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  backBtn: {
     backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+  },
+  backBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  addBtn: {
+    backgroundColor: '#2563EB',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
+    ...Shadows.sm,
   },
   addBtnText: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 12,
   },
-  statsRow: {
+  // KPI Analytics
+  kpiContainer: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    justifyContent: 'space-between',
+    paddingTop: 12,
+    paddingBottom: 6,
+    gap: 8,
   },
-  statBox: {
-    alignItems: 'center',
+  kpiCard: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderLeftWidth: 4,
+    ...Shadows.sm,
   },
-  statNum: {
+  kpiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  kpiLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  kpiIconBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kpiValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#0F172A',
   },
-  statLabel: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 2,
+  // Search
+  searchWrapper: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginTop: 12,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    height: 42,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
+    height: 44,
     gap: 8,
+    ...Shadows.sm,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
-    color: Colors.text,
+    color: '#0F172A',
+  },
+  // Filter Bar
+  filterBar: {
+    paddingBottom: 8,
   },
   filterScroll: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
     gap: 8,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    gap: 6,
   },
   filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
   },
   filterChipText: {
     fontSize: 12,
-    color: Colors.textSecondary,
     fontWeight: '600',
+    color: '#475569',
   },
   filterChipTextActive: {
     color: '#FFFFFF',
   },
-  list: {
-    padding: 16,
-    paddingTop: 4,
-    paddingBottom: 40,
+  filterChipBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
+  filterChipBadgeActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  filterChipBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#475569',
+  },
+  filterChipBadgeTextActive: {
+    color: '#FFFFFF',
+  },
+  // List
+  list: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  centerBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#64748B',
+    fontSize: 13,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 24,
+  },
+  emptyIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    marginBottom: 6,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  // User Card
   userCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 14,
-    marginBottom: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
     ...Shadows.sm,
   },
   userCardInactive: {
@@ -791,206 +1025,214 @@ const styles = StyleSheet.create({
   userCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
   },
-  userAvatar: {
+  userAvatarContainer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primaryBackground,
-    borderWidth: 1.5,
-    borderColor: Colors.primaryLight,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    position: 'relative',
   },
   userAvatarText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.primary,
+  },
+  statusDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+  },
+  userMainInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   userName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#0F172A',
+    flexShrink: 1,
+  },
+  selfBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  selfBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#2563EB',
   },
   userHandle: {
     fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 1,
-  },
-  inactiveBadge: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  inactiveBadgeText: {
-    color: '#DC2626',
-    fontSize: 10,
-    fontWeight: 'bold',
+    color: '#64748B',
+    marginTop: 2,
   },
   roleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
   },
   roleBadgeText: {
     fontSize: 11,
     fontWeight: 'bold',
   },
-  userDetailsRow: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    gap: 4,
+  userDetailsGrid: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    gap: 6,
+    marginBottom: 12,
   },
-  detailItem: {
+  detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
   },
   detailText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: '#475569',
+    flex: 1,
   },
-  userActionsRow: {
+  cardActionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    justifyContent: 'space-between',
+    paddingTop: 4,
   },
-  editActionBtn: {
+  editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
-  editActionText: {
+  editBtnText: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: '#2563EB',
+  },
+  secondaryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   statusToggleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  activateBtn: {
+  statusBtnActivate: {
     backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
   },
-  deactivateBtn: {
+  statusBtnDeactivate: {
     backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
   },
   statusToggleText: {
     fontSize: 11,
     fontWeight: 'bold',
   },
-  deleteActionBtn: {
-    padding: 6,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 6,
-  },
-  centerBox: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    marginTop: 40,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginTop: 12,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  unauthorizedBox: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 30,
-  },
-  unauthorizedTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginTop: 16,
-  },
-  unauthorizedDesc: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  backBtn: {
-    marginTop: 20,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  deleteUserBtn: {
+    padding: 7,
     borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
   },
-  backBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  // Modal Styles
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    maxHeight: '90%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '92%',
+    paddingBottom: 20,
+    ...Shadows.lg,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingBottom: 14,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    marginBottom: 14,
+    borderBottomColor: '#F1F5F9',
   },
   modalTitle: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: '#0F172A',
   },
   modalSubtitle: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: '#64748B',
     marginTop: 2,
   },
+  modalCloseBtn: {
+    padding: 6,
+  },
+  modalScroll: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 16,
+  },
+  formSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    gap: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
   inputGroup: {
-    marginBottom: 12,
+    gap: 4,
   },
   rowInputs: {
     flexDirection: 'row',
@@ -998,77 +1240,118 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 6,
+    fontWeight: '600',
+    color: '#475569',
   },
   input: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
     height: 42,
     fontSize: 13,
-    color: Colors.text,
+    color: '#0F172A',
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    height: 42,
+    paddingHorizontal: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#0F172A',
+    height: '100%',
+  },
+  eyeBtn: {
+    padding: 6,
   },
   rolesGrid: {
     gap: 8,
   },
   roleSelectCard: {
-    borderWidth: 1.5,
-    borderColor: Colors.border,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 10,
     padding: 10,
-    backgroundColor: '#FFFFFF',
+    gap: 4,
+  },
+  roleCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   roleSelectTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.text,
+    color: '#334155',
   },
   roleSelectDesc: {
     fontSize: 11,
-    color: Colors.textMuted,
-    marginTop: 4,
+    color: '#64748B',
+    lineHeight: 15,
     marginLeft: 26,
   },
   switchGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   switchTitle: {
     fontSize: 13,
-    fontWeight: 'bold',
-    color: Colors.text,
+    fontWeight: '600',
+    color: '#1E293B',
   },
   switchSub: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: '#64748B',
     marginTop: 2,
   },
-  saveUserBtn: {
-    backgroundColor: Colors.primary,
-    height: 48,
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
     borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  modalSubmitBtn: {
+    flex: 1.5,
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
-    marginBottom: 20,
-    ...Shadows.md,
+    gap: 6,
+    ...Shadows.sm,
   },
-  saveUserBtnText: {
-    color: '#FFFFFF',
+  modalSubmitBtnText: {
+    fontSize: 13,
     fontWeight: 'bold',
-    fontSize: 14,
+    color: '#FFFFFF',
   },
 });

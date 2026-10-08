@@ -54,10 +54,19 @@ export const Header: React.FC<HeaderProps> = ({
         list = await getLocalNotificacoes(user?.id);
       }
       setNotificacoes(list);
+
+      // Sincronizar em segundo plano com as notificações do servidor Railway se online
+      if (isOnline) {
+        notificationService.syncServerNotifications(user?.id).then((newCount) => {
+          if (newCount > 0) {
+            getLocalNotificacoes(user?.id).then(updated => setNotificacoes(updated));
+          }
+        }).catch(() => null);
+      }
     } catch (e) {
       console.warn('Erro ao carregar notificacoes:', e);
     }
-  }, [user?.id]);
+  }, [user?.id, isOnline]);
 
   useEffect(() => {
     loadNotificacoes();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput 
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, TextInput, ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -8,14 +8,18 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalProjetoById, getLocalRelatorios, getLocalVisitas, getLocalLembretes, 
-  saveLocalProjeto, addToSyncQueue, getLocalContatos, saveLocalContato 
+  saveLocalProjeto, addToSyncQueue, getLocalContatos, saveLocalContato,
+  deleteLocalProjetoCascade
 } from '../../database/db';
 import { Projeto, Relatorio, Visita, Lembrete, Contato } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 import { useNetwork } from '../../contexts/NetworkContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiClient } from '../../services/api';
 
 export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { projectId } = route.params;
+  const { user: currentUser } = useAuth();
   const { isOnline, triggerSync } = useNetwork();
 
   const [projeto, setProjeto] = useState<Projeto | null>(null);
@@ -30,6 +34,15 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   const [showEmailsModal, setShowEmailsModal] = useState(false);
   const [novoEmailNome, setNovoEmailNome] = useState('');
   const [novoEmailEndereco, setNovoEmailEndereco] = useState('');
+
+  // Exclusão de Obra pelo Master com contagem regressiva
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteCountdown, setDeleteCountdown] = useState(5);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isMasterOrAdmin = Boolean(
+    currentUser?.is_master || currentUser?.username === 'admin'
+  );
 
   const isReportCreationBlocked = Boolean(
     projeto?.status && ['Não Iniciado', 'Concluído', 'Pausado', 'Cancelado'].includes(projeto.status)
@@ -102,6 +115,67 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       Alert.alert('Sucesso', 'E-mail do cliente cadastrado para envio automático de laudos!');
     } catch (err: any) {
       Alert.alert('Erro', err.message);
+    }
+  }
+
+  // Timer decrescente de segurança para exclusão pelo Master
+  useEffect(() => {
+    let timer: any = null;
+    if (showDeleteModal && deleteCountdown > 0) {
+      timer = setInterval(() => {
+        setDeleteCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [showDeleteModal, deleteCountdown]);
+
+  function handleOpenDeleteModal() {
+    setDeleteCountdown(5);
+    setShowDeleteModal(true);
+  }
+
+  async function handleConfirmDelete() {
+    if (!projeto) return;
+    setIsDeleting(true);
+    try {
+      if (isOnline) {
+        try {
+          await apiClient.axios.delete(`/api/projetos/${projeto.id}`);
+        } catch (apiErr: any) {
+          console.warn('Aviso ao excluir no servidor:', apiErr);
+          if (apiErr.response?.data?.error) {
+            throw new Error(apiErr.response.data.error);
+          }
+        }
+      }
+      // Cascata completa no banco SQLite local
+      await deleteLocalProjetoCascade(projeto.id);
+      setShowDeleteModal(false);
+      Alert.alert(
+        'Obra Excluída',
+        `A obra "${projeto.nome}" e todos os relatórios, fotos, visitas e dados relacionados foram apagados com sucesso.`,
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              if (isOnline) triggerSync();
+              navigation.goBack();
+            } 
+          }
+        ]
+      );
+    } catch (err: any) {
+      Alert.alert('Erro ao Excluir', err.message || 'Falha ao excluir a obra.');
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -381,6 +455,21 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               <Ionicons name="create-outline" size={18} color="#2563EB" />
               <Text style={styles.editObraFooterBtnText}>Editar Dados da Obra</Text>
             </TouchableOpacity>
+
+            {/* 8. Botão de Exclusão da Obra - Exclusivo para Usuário Master com Cascata e Contagem */}
+            {isMasterOrAdmin && (
+              <TouchableOpacity 
+                style={styles.deleteObraFooterBtn}
+                onPress={handleOpenDeleteModal}
+                activeOpacity={0.8}
+              >
+                <View style={styles.masterBadgeIcon}>
+                  <Ionicons name="star" size={11} color="#DC2626" />
+                </View>
+                <Ionicons name="trash-outline" size={17} color="#DC2626" />
+                <Text style={styles.deleteObraFooterBtnText}>Excluir Obra (Acesso Master)</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -564,6 +653,117 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                 ))
               )}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal: Exclusão de Obra com Contagem Regressiva de Confirmação (Master) */}
+      <Modal 
+        visible={showDeleteModal} 
+        animationType="fade" 
+        transparent 
+        onRequestClose={() => !isDeleting && setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModalBox}>
+            {/* Header de Alerta Destrutivo */}
+            <View style={styles.deleteModalHeader}>
+              <View style={styles.deleteWarningIconCircle}>
+                <Ionicons name="warning" size={32} color="#DC2626" />
+              </View>
+              <Text style={styles.deleteModalTitle}>Excluir Obra Definitivamente</Text>
+              <View style={styles.masterPill}>
+                <Ionicons name="star" size={12} color="#DC2626" />
+                <Text style={styles.masterPillText}>PRIVILÉGIO MASTER • AÇÃO IRREVERSÍVEL</Text>
+              </View>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300, marginVertical: 12 }}>
+              <Text style={styles.deleteWarningDescription}>
+                Você está prestes a excluir permanentemente a obra <Text style={{ fontWeight: 'bold', color: '#0F172A' }}>"{projeto.nome}" ({projeto.numero})</Text>.
+              </Text>
+
+              <View style={styles.deleteImpactCard}>
+                <Text style={styles.deleteImpactTitle}>
+                  ⚠️ Ao confirmar, todos os dados vinculados serão APAGADOS:
+                </Text>
+                <View style={styles.deleteImpactItem}>
+                  <Ionicons name="document-text" size={14} color="#DC2626" />
+                  <Text style={styles.deleteImpactText}>{relatorios.length} Relatórios técnicos e todas as fotos registradas</Text>
+                </View>
+                <View style={styles.deleteImpactItem}>
+                  <Ionicons name="calendar" size={14} color="#DC2626" />
+                  <Text style={styles.deleteImpactText}>{visitas.length} Visitas técnicas e agendamentos</Text>
+                </View>
+                <View style={styles.deleteImpactItem}>
+                  <Ionicons name="notifications" size={14} color="#DC2626" />
+                  <Text style={styles.deleteImpactText}>{lembretes.length} Lembretes e anotações ativas</Text>
+                </View>
+                <View style={styles.deleteImpactItem}>
+                  <Ionicons name="mail" size={14} color="#DC2626" />
+                  <Text style={styles.deleteImpactText}>{contatos.length} E-mails e contatos cadastrados</Text>
+                </View>
+                <View style={styles.deleteImpactItem}>
+                  <Ionicons name="server" size={14} color="#DC2626" />
+                  <Text style={styles.deleteImpactText}>Reembolsos, categorias personalizadas e checklists</Text>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Caixa da Contagem Regressiva de Segurança */}
+            <View style={styles.countdownContainer}>
+              {deleteCountdown > 0 ? (
+                <View style={styles.countdownActiveRow}>
+                  <View style={styles.countdownBadge}>
+                    <Text style={styles.countdownNumber}>{deleteCountdown}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.countdownWarningText}>
+                      Aguarde <Text style={{ fontWeight: 'bold', color: '#DC2626' }}>{deleteCountdown} segundo{deleteCountdown > 1 ? 's' : ''}</Text> para desbloquear a confirmação de segurança.
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.countdownUnlockedRow}>
+                  <Ionicons name="shield-checkmark" size={20} color="#16A34A" />
+                  <Text style={styles.countdownUnlockedText}>
+                    Tempo de segurança cumprido. A confirmação foi liberada.
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Botões de Ação */}
+            <View style={styles.deleteActionButtons}>
+              <TouchableOpacity 
+                style={styles.cancelDeleteBtn} 
+                onPress={() => setShowDeleteModal(false)}
+                disabled={isDeleting}
+              >
+                <Text style={styles.cancelDeleteBtnText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[
+                  styles.confirmDeleteBtn, 
+                  (deleteCountdown > 0 || isDeleting) && styles.confirmDeleteBtnDisabled
+                ]} 
+                onPress={handleConfirmDelete}
+                disabled={deleteCountdown > 0 || isDeleting}
+                activeOpacity={0.8}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="trash" size={16} color="#FFFFFF" />
+                    <Text style={styles.confirmDeleteBtnText}>
+                      {deleteCountdown > 0 ? `Aguarde (${deleteCountdown}s)` : 'Confirmar e Excluir'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1003,5 +1203,190 @@ const styles = StyleSheet.create({
   statusTagText: {
     fontSize: 11,
     color: '#1E293B',
+  },
+  // Master Delete Button & Modal Styles
+  deleteObraFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 10,
+  },
+  deleteObraFooterBtnText: {
+    color: '#DC2626',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  masterBadgeIcon: {
+    backgroundColor: '#FEE2E2',
+    padding: 3,
+    borderRadius: 4,
+  },
+  deleteModalBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '92%',
+    maxWidth: 440,
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    ...Shadows.lg,
+  },
+  deleteModalHeader: {
+    alignItems: 'center',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FEE2E2',
+  },
+  deleteWarningIconCircle: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#DC2626',
+    textAlign: 'center',
+  },
+  masterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginTop: 6,
+  },
+  masterPillText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#DC2626',
+    letterSpacing: 0.5,
+  },
+  deleteWarningDescription: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  deleteImpactCard: {
+    backgroundColor: '#FFF1F2',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    gap: 6,
+  },
+  deleteImpactTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#9F1239',
+    marginBottom: 4,
+  },
+  deleteImpactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  deleteImpactText: {
+    fontSize: 11,
+    color: '#881337',
+    fontWeight: '500',
+    flex: 1,
+  },
+  countdownContainer: {
+    marginVertical: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  countdownActiveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  countdownBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 2,
+    borderColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countdownNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#DC2626',
+  },
+  countdownWarningText: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  countdownUnlockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    justifyContent: 'center',
+    paddingVertical: 4,
+  },
+  countdownUnlockedText: {
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: '600',
+  },
+  deleteActionButtons: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  cancelDeleteBtn: {
+    flex: 1,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelDeleteBtnText: {
+    color: '#475569',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  confirmDeleteBtn: {
+    flex: 1.5,
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    ...Shadows.sm,
+  },
+  confirmDeleteBtnDisabled: {
+    backgroundColor: '#94A3B8',
+    opacity: 0.6,
+  },
+  confirmDeleteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
 });

@@ -12553,14 +12553,108 @@ def api_projetos_collection():
         current_app.logger.error(f'Erro ao listar projetos na API: {e}')
         return jsonify([]), 200
 
-@app.route('/api/projetos/<int:projeto_id>', methods=['GET', 'PUT', 'POST'])
+@app.route('/api/projetos/<int:projeto_id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
 @csrf.exempt
 def api_projeto_detail_sync(projeto_id):
-    """Atualizacao e consulta de projeto por ID"""
+    """Atualizacao, consulta e exclusao em cascata de projeto por ID (Master/Admin)"""
     try:
         projeto = Projeto.query.get(projeto_id)
         if not projeto:
             return jsonify({'success': False, 'error': 'Projeto nao encontrado'}), 404
+
+        if request.method == 'DELETE':
+            # Validação estrita de privilégio: apenas Master ou Admin geral pode excluir obra
+            req_user = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+            is_master_or_admin = (
+                (req_user and req_user.is_master) or
+                (req_user and req_user.username == 'admin') or
+                (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
+            )
+            if not is_master_or_admin:
+                return jsonify({'success': False, 'error': 'Operação negada: apenas Usuário Master ou Administrador pode excluir obras.'}), 403
+
+            current_app.logger.info(f"🗑️ [CASCADE DELETE] Iniciando exclusão completa da obra {projeto.id} - {projeto.nome} ({projeto.numero})")
+
+            # 1. Relatórios e Fotos vinculadas
+            relatorios = Relatorio.query.filter_by(projeto_id=projeto.id).all()
+            for rel in relatorios:
+                fotos = FotoRelatorio.query.filter_by(relatorio_id=rel.id).all()
+                for foto in fotos:
+                    try:
+                        if foto.filename:
+                            fp = os.path.join(app.config.get('UPLOAD_FOLDER', 'uploads'), foto.filename)
+                            if os.path.exists(fp):
+                                os.remove(fp)
+                    except Exception:
+                        pass
+                    db.session.delete(foto)
+                try:
+                    EnvioRelatorio.query.filter_by(relatorio_id=rel.id).delete(synchronize_session=False)
+                except Exception:
+                    pass
+                db.session.delete(rel)
+
+            # 2. Visitas, Participantes e Comunicações
+            visitas = Visita.query.filter_by(projeto_id=projeto.id).all()
+            for v in visitas:
+                try:
+                    VisitaParticipante.query.filter_by(visita_id=v.id).delete(synchronize_session=False)
+                    ComunicacaoVisita.query.filter_by(visita_id=v.id).delete(synchronize_session=False)
+                except Exception:
+                    pass
+                db.session.delete(v)
+
+            # 3. Categorias da Obra
+            try:
+                CategoriaObra.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+            except Exception:
+                pass
+
+            # 4. Contatos, Vínculos e E-mails
+            try:
+                ContatoProjeto.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+                EmailCliente.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+                FuncionarioProjeto.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+            except Exception:
+                pass
+
+            # 5. Lembretes da Obra
+            try:
+                Lembrete.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+            except Exception:
+                pass
+
+            # 6. Reembolsos vinculados à obra
+            try:
+                Reembolso.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+            except Exception:
+                pass
+
+            # 7. Checklists e configurações da obra
+            try:
+                ChecklistObra.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+                ProjetoChecklistConfig.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+            except Exception:
+                pass
+
+            # 8. Logs e Aprovadores Padrão
+            try:
+                LogEnvioEmail.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+                AprovadorPadrao.query.filter_by(projeto_id=projeto.id).delete(synchronize_session=False)
+            except Exception:
+                pass
+
+            # 9. O Projeto em si
+            proj_nome = projeto.nome
+            proj_num = projeto.numero
+            db.session.delete(projeto)
+            db.session.commit()
+
+            current_app.logger.info(f"✅ [CASCADE DELETE] Obra {projeto_id} ({proj_nome}) excluída com sucesso em cascata.")
+            return jsonify({
+                'success': True,
+                'message': f'Obra {proj_nome} ({proj_num}) e todos os dados vinculados foram excluídos definitivamente.'
+            }), 200
 
         if request.method in ['PUT', 'POST']:
             data = request.get_json(silent=True) or request.form or {}

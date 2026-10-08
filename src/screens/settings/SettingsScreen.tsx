@@ -10,6 +10,7 @@ import { apiClient, DEFAULT_API_URL } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { updateService } from '../../services/updateService';
+import { notificationService } from '../../services/notificationService';
 import { 
   getLocalProjetos, getLocalVisitas, getLocalRelatorios, 
   getPendingSyncQueue, getLocalLegendas, saveLocalLegenda, 
@@ -48,10 +49,47 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [saveInDedicatedFolder, setSaveInDedicatedFolder] = useState(true);
   const [highQualityPhotos, setHighQualityPhotos] = useState(true);
 
+  // Notificações no Celular
+  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
+  const [testingNotification, setTestingNotification] = useState(false);
+
   useEffect(() => {
     loadDiagnostics();
     loadLegendas();
+    checkNotificationStatus();
   }, [pendingCount, selectedCategoria]);
+
+  async function checkNotificationStatus() {
+    const granted = await notificationService.checkPermission();
+    setHasNotificationPermission(granted);
+  }
+
+  async function handleToggleNotificationPermission() {
+    const granted = await notificationService.requestPermission();
+    setHasNotificationPermission(granted);
+    if (!granted) {
+      Alert.alert(
+        'Permissão de Notificação',
+        'As notificações estão desativadas no Android. Deseja abrir as configurações do celular para ativá-las?',
+        [
+          { text: 'Agora Não', style: 'cancel' },
+          { text: 'Abrir Configurações', onPress: () => notificationService.openSettings() }
+        ]
+      );
+    } else {
+      Alert.alert('Notificações Ativas', 'Permissão confirmada com sucesso no Android.');
+    }
+  }
+
+  async function handleTestNotification() {
+    setTestingNotification(true);
+    try {
+      const granted = await notificationService.sendTestNotification();
+      setHasNotificationPermission(granted);
+    } finally {
+      setTestingNotification(false);
+    }
+  }
 
   async function loadDiagnostics() {
     try {
@@ -238,6 +276,75 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
             </View>
           </TouchableOpacity>
         )}
+
+        {/* ================= NOTIFICAÇÕES NO CELULAR ================= */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardTitleRow}>
+              <Ionicons name="notifications-outline" size={22} color={Colors.primary} />
+              <Text style={styles.cardTitle}>Notificações no Celular</Text>
+            </View>
+            <View style={[
+              styles.notifBadge, 
+              hasNotificationPermission ? styles.notifBadgeActive : styles.notifBadgePending
+            ]}>
+              <Ionicons 
+                name={hasNotificationPermission ? "checkmark-circle" : "alert-circle"} 
+                size={12} 
+                color={hasNotificationPermission ? "#059669" : "#D97706"} 
+              />
+              <Text style={[
+                styles.notifBadgeText,
+                hasNotificationPermission ? styles.notifBadgeTextActive : styles.notifBadgeTextPending
+              ]}>
+                {hasNotificationPermission ? 'Ativada no Celular' : 'Pendente de Ativação'}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.notifDescription}>
+            Receba avisos instantâneos com vibração e banner na tela sobre laudos aprovados, relatórios criados, vistorias agendadas e status da sincronização.
+          </Text>
+
+          <View style={styles.notifActionsRow}>
+            <TouchableOpacity 
+              style={[
+                styles.notifBtnPermission, 
+                hasNotificationPermission && styles.notifBtnPermissionGranted
+              ]}
+              onPress={handleToggleNotificationPermission}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name={hasNotificationPermission ? "settings-outline" : "notifications-circle"} 
+                size={17} 
+                color={hasNotificationPermission ? "#0F766E" : "#FFFFFF"} 
+              />
+              <Text style={[
+                styles.notifBtnPermissionText,
+                hasNotificationPermission && styles.notifBtnPermissionTextGranted
+              ]}>
+                {hasNotificationPermission ? 'Ajustar no Aparelho' : 'Ativar no Celular'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.notifBtnTest}
+              onPress={handleTestNotification}
+              disabled={testingNotification}
+              activeOpacity={0.8}
+            >
+              {testingNotification ? (
+                <ActivityIndicator size="small" color="#2563EB" />
+              ) : (
+                <>
+                  <Ionicons name="paper-plane-outline" size={16} color="#2563EB" />
+                  <Text style={styles.notifBtnTestText}>Testar Agora</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* ================= GESTÃO DE LEGENDAS ================= */}
         <View style={styles.card}>
@@ -847,5 +954,81 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6D28D9',
     marginTop: 2,
+  },
+  // Notificações no Celular
+  notifBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  notifBadgeActive: {
+    backgroundColor: '#ECFDF5',
+  },
+  notifBadgePending: {
+    backgroundColor: '#FFFBEB',
+  },
+  notifBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  notifBadgeTextActive: {
+    color: '#059669',
+  },
+  notifBadgeTextPending: {
+    color: '#D97706',
+  },
+  notifDescription: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  notifActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  notifBtnPermission: {
+    flex: 1.3,
+    backgroundColor: '#2563EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    ...Shadows.sm,
+  },
+  notifBtnPermissionGranted: {
+    backgroundColor: '#CCFBF1',
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+  },
+  notifBtnPermissionText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  notifBtnPermissionTextGranted: {
+    color: '#0F766E',
+  },
+  notifBtnTest: {
+    flex: 1,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  notifBtnTestText: {
+    color: '#2563EB',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
 });

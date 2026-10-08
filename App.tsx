@@ -5,6 +5,7 @@ import { AuthProvider } from './src/contexts/AuthContext';
 import { NetworkProvider } from './src/contexts/NetworkContext';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { UpdateModal } from './src/components/UpdateModal';
+import { NotificationToast } from './src/components/NotificationToast';
 import { notificationService } from './src/services/notificationService';
 
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
         <NetworkProvider>
           <AppNavigator />
           <UpdateModal />
+          <NotificationToast />
         </NetworkProvider>
       </AuthProvider>
     </SafeAreaProvider>

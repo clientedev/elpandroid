@@ -151,6 +151,44 @@ export async function saveLocalProjeto(p: Projeto, syncStatus: 'synced' | 'pendi
   );
 }
 
+export async function deleteLocalProjetoCascade(projetoId: number): Promise<void> {
+  const db = await getDatabase();
+  
+  // 1. Fotos dos relatórios vinculados à obra
+  await db.runAsync(
+    'DELETE FROM fotos_relatorio WHERE relatorio_id IN (SELECT id FROM relatorios WHERE projeto_id = ?);',
+    [projetoId]
+  );
+
+  // 2. Relatórios da obra
+  await db.runAsync('DELETE FROM relatorios WHERE projeto_id = ?;', [projetoId]);
+
+  // 3. Participantes de visitas e visitas da obra
+  await db.runAsync(
+    'DELETE FROM visita_participantes WHERE visita_id IN (SELECT id FROM visitas WHERE projeto_id = ?);',
+    [projetoId]
+  );
+  await db.runAsync('DELETE FROM visitas WHERE projeto_id = ?;', [projetoId]);
+
+  // 4. Lembretes da obra
+  await db.runAsync('DELETE FROM lembretes WHERE projeto_id = ?;', [projetoId]);
+
+  // 5. Contatos vinculados à obra
+  await db.runAsync('DELETE FROM contatos WHERE projeto_id = ?;', [projetoId]);
+
+  // 6. Categorias personalizadas da obra
+  await db.runAsync('DELETE FROM categorias_obra WHERE projeto_id = ?;', [projetoId]);
+
+  // 7. Reembolsos vinculados à obra
+  await db.runAsync('DELETE FROM reembolsos WHERE projeto_id = ?;', [projetoId]);
+
+  // 8. Fila de sincronização desta obra
+  await db.runAsync('DELETE FROM sync_queue WHERE entity_type = "projeto" AND entity_id = ?;', [projetoId]);
+
+  // 9. Registro da Obra
+  await db.runAsync('DELETE FROM projetos WHERE id = ?;', [projetoId]);
+}
+
 // ================= VISITAS =================
 export async function getLocalVisitas(projetoId?: number): Promise<Visita[]> {
   const db = await getDatabase();
