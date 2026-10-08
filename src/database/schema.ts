@@ -226,7 +226,37 @@ CREATE TABLE IF NOT EXISTS sync_queue (
   retries INTEGER DEFAULT 0,
   error_message TEXT
 );
+
+CREATE TABLE IF NOT EXISTS checklist_obra_progresso (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  projeto_id INTEGER NOT NULL,
+  checklist_item_id INTEGER,
+  item_texto TEXT NOT NULL,
+  ordem INTEGER DEFAULT 0,
+  aprovado INTEGER DEFAULT 1,
+  aprovado_em_relatorio_id INTEGER,
+  aprovado_em_relatorio_numero TEXT,
+  data_aprovacao TEXT,
+  observacao TEXT
+);
+
+CREATE TABLE IF NOT EXISTS checklist_custom_template (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  item TEXT NOT NULL,
+  ordem INTEGER DEFAULT 0,
+  ativo INTEGER DEFAULT 1
+);
 `;
+
+export const SEED_CHECKLIST = [
+  { ordem: 1, item: 'Chapisco colante e regularização da base estrutural' },
+  { ordem: 2, item: 'Aplicação de tela metálica / fibra de reforço e ancoragem' },
+  { ordem: 3, item: 'Aplicação e tempo de cura da argamassa de emboço' },
+  { ordem: 4, item: 'Assentamento de revestimentos cerâmicos / pastilhas de fachada' },
+  { ordem: 5, item: 'Selamento de juntas de dilatação, frisos e caimentos' },
+  { ordem: 6, item: 'Verificação de peitoris, pingadeiras, muretas e impermeabilização' },
+  { ordem: 7, item: 'Limpeza e desincrustação final da fachada' },
+];
 
 export const SEED_LEGENDAS = [
   { categoria: 'Acabamentos', texto: 'Fissura superficial no revestimento de argamassa', ordem: 1 },

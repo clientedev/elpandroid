@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TouchableOpacity, 
   Image, Alert, ActivityIndicator, TextInput 
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
-  getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue, deleteLocalRelatorio 
+  getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue, deleteLocalRelatorio,
+  saveBatchChecklistProgressoObra
 } from '../../database/db';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
 import { apiClient } from '../../services/api';
@@ -31,9 +33,12 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
   const [rejectComment, setRejectComment] = useState('');
   const [showRejectBox, setShowRejectBox] = useState(false);
 
-  useEffect(() => {
-    loadReport();
-  }, [reportId]);
+  // useFocusEffect garante que se o usuário editar o relatório e voltar, os dados recarregam instantaneamente
+  useFocusEffect(
+    useCallback(() => {
+      loadReport();
+    }, [reportId])
+  );
 
   async function loadReport() {
     try {
@@ -97,6 +102,33 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
         'POST',
         { status: 'Aprovado', aprovador_id: user?.id }
       );
+      // 1. Grava no histórico cumulativo da obra todos os itens que foram aprovados nesta vistoria
+      if (relatorio.checklist_data) {
+        try {
+          const chkItems = typeof relatorio.checklist_data === 'string'
+            ? JSON.parse(relatorio.checklist_data)
+            : relatorio.checklist_data;
+          
+          if (Array.isArray(chkItems)) {
+            const aprovados = chkItems
+              .filter((item: any) => item.checked)
+              .map((item: any, idx: number) => ({
+                item_texto: item.item,
+                ordem: item.ordem || idx + 1,
+                aprovado_em_relatorio_id: relatorio.id,
+                aprovado_em_relatorio_numero: relatorio.numero || `REL-${relatorio.id}`,
+                data_aprovacao: new Date().toISOString(),
+                observacao: item.observacao || null
+              }));
+            if (aprovados.length > 0) {
+              await saveBatchChecklistProgressoObra(relatorio.projeto_id, aprovados);
+            }
+          }
+        } catch (chkErr) {
+          console.warn('Erro ao salvar progresso de checklist na aprovação:', chkErr);
+        }
+      }
+
       if (isOnline) triggerSync();
       // Salva automaticamente o PDF do relatório aprovado na pasta da obra no dispositivo
       generateReportPDF({ ...relatorio, status: 'Aprovado' }, fotos).catch(() => null);
@@ -385,32 +417,91 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           ) : null}
         </View>
 
-        {/* Checklist Section (if any) */}
-        {Array.isArray(parsedChecklist) && parsedChecklist.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardSectionTitle}>Itens Verificados no Checklist</Text>
-            {parsedChecklist.map((it, idx) => (
-              <View key={idx} style={styles.checklistViewItem}>
-                <View style={styles.checklistCheckRow}>
-                  <Ionicons 
-                    name={it.checked ? "checkbox" : "square-outline"} 
-                    size={20} 
-                    color={it.checked ? Colors.primary : Colors.textMuted} 
-                  />
-                  <Text style={[styles.checklistViewText, it.checked && styles.checklistViewTextActive]}>
-                    {it.item}
+        {/* Acompanhantes da Visita (se houver) */}
+        {(() => {
+          let acompList: string[] = [];
+          if (relatorio.acompanhantes) {
+            try {
+              acompList = typeof relatorio.acompanhantes === 'string'
+                ? JSON.parse(relatorio.acompanhantes)
+                : relatorio.acompanhantes;
+            } catch {}
+          }
+          if (!Array.isArray(acompList) || acompList.length === 0) return null;
+
+          return (
+            <View style={styles.card}>
+              <Text style={styles.cardSectionTitle}>Acompanhantes da Visita ({acompList.length})</Text>
+              <View style={{ gap: 6, marginTop: 4 }}>
+                {acompList.map((acomp, idx) => (
+                  <View key={idx} style={styles.acompDetailRow}>
+                    <Ionicons name="person-circle-outline" size={18} color="#0284C7" />
+                    <Text style={styles.acompDetailText}>{acomp}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* Checklist Section com Barra de Progresso e Badges de Aprovação */}
+        {Array.isArray(parsedChecklist) && parsedChecklist.length > 0 && (() => {
+          const totalChecks = parsedChecklist.length;
+          const completedChecks = parsedChecklist.filter(c => c.checked).length;
+          const progressPercent = totalChecks > 0 ? Math.round((completedChecks / totalChecks) * 100) : 0;
+
+          return (
+            <View style={styles.card}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text style={styles.cardSectionTitle}>Checklist Técnico de Vistoria</Text>
+                <View style={styles.checklistBadgeRow}>
+                  <Text style={styles.checklistBadgeText}>
+                    {completedChecks}/{totalChecks} ({progressPercent}%)
                   </Text>
                 </View>
-                {it.observacao ? (
-                  <View style={styles.obsDisplayBox}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={14} color="#0369A1" />
-                    <Text style={styles.obsDisplayText}>{it.observacao}</Text>
-                  </View>
-                ) : null}
               </View>
-            ))}
-          </View>
-        )}
+
+              {/* Barra de Progresso Visual */}
+              <View style={styles.checklistTrack}>
+                <View style={[styles.checklistFill, { width: `${progressPercent}%` }]} />
+              </View>
+
+              <View style={{ marginTop: 12 }}>
+                {parsedChecklist.map((it, idx) => (
+                  <View key={idx} style={styles.checklistViewItem}>
+                    <View style={styles.checklistCheckRow}>
+                      <Ionicons 
+                        name={it.checked ? (it.aprovado_anteriormente ? "shield-checkmark" : "checkbox") : "square-outline"} 
+                        size={20} 
+                        color={it.checked ? (it.aprovado_anteriormente ? "#059669" : Colors.primary) : Colors.textMuted} 
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.checklistViewText, it.checked && styles.checklistViewTextActive]}>
+                          {idx + 1}. {it.item}
+                        </Text>
+                        {it.aprovado_anteriormente ? (
+                          <View style={styles.prevApprovedBadge}>
+                            <Ionicons name="shield-checkmark" size={12} color="#059669" />
+                            <Text style={styles.prevApprovedText}>
+                              Aprovado no {it.aprovado_em_relatorio_numero || 'relatório anterior'}
+                              {it.data_aprovacao ? ` em ${new Date(it.data_aprovacao).toLocaleString('pt-BR')}` : ''}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                    {it.observacao ? (
+                      <View style={styles.obsDisplayBox}>
+                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#0369A1" />
+                        <Text style={styles.obsDisplayText}>{it.observacao}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Photos in 1 per row (List Card format) */}
         <View style={styles.card}>
@@ -957,5 +1048,65 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  acompDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 6,
+    gap: 8,
+  },
+  acompDetailText: {
+    fontSize: 13,
+    color: '#334155',
+    fontWeight: '500',
+  },
+  checklistBadgeRow: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  checklistBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#16A34A',
+  },
+  checklistDetailProgressBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#16A34A',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  checklistTrack: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  checklistFill: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 4,
+  },
+  prevApprovedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 3,
+    gap: 4,
+  },
+  prevApprovedText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#065F46',
   },
 });

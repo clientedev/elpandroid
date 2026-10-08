@@ -1,10 +1,10 @@
 import * as SQLite from 'expo-sqlite';
-import { CREATE_TABLES_SQL, SEED_LEGENDAS } from './schema';
+import { CREATE_TABLES_SQL, SEED_LEGENDAS, SEED_CHECKLIST } from './schema';
 import { 
   Projeto, Visita, Relatorio, FotoRelatorio, 
   RelatorioExpress, FotoRelatorioExpress, 
   Contato, Lembrete, Notificacao, LegendaPredefinida, 
-  SyncQueueItem, User 
+  SyncQueueItem, User, ChecklistCustomItem, ChecklistProgressoObra 
 } from '../types';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
@@ -69,6 +69,25 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
       );
     }
   }
+
+  // Seed initial checklist template if empty
+  try {
+    const chkCount = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM checklist_custom_template');
+    if (!chkCount || chkCount.count === 0) {
+      for (const it of SEED_CHECKLIST) {
+        await db.runAsync(
+          'INSERT INTO checklist_custom_template (item, ordem, ativo) VALUES (?, ?, 1)',
+          [it.item, it.ordem]
+        );
+      }
+    }
+  } catch {}
+
+  // Garante que todas as obras no SQLite tenham suas pastas físicas criadas imediatamente
+  try {
+    const { ensureAllProjectsFolders } = require('../services/appFilesService');
+    ensureAllProjectsFolders().catch(() => null);
+  } catch {}
 }
 
 // ================= USER =================
@@ -164,6 +183,12 @@ export async function saveLocalProjeto(p: Projeto, syncStatus: 'synced' | 'pendi
       syncStatus, new Date().toISOString()
     ]
   );
+
+  // Garante que a pasta física da obra seja criada imediatamente no aparelho
+  try {
+    const { ensureProjectFolders } = require('../services/appFilesService');
+    ensureProjectFolders(p.nome, p.numero || (p as any).codigo).catch(() => null);
+  } catch {}
 }
 
 export async function deleteLocalProjetoCascade(projetoId: number): Promise<void> {
@@ -196,6 +221,11 @@ export async function deleteLocalProjetoCascade(projetoId: number): Promise<void
 
   // 7. Fila de sincronização desta obra
   await db.runAsync('DELETE FROM sync_queue WHERE entity_type = "projeto" AND entity_id = ?;', [projetoId]);
+
+  // 8. Checklist de progresso da obra
+  try {
+    await db.runAsync('DELETE FROM checklist_obra_progresso WHERE projeto_id = ?;', [projetoId]);
+  } catch {}
 
   // 9. Registro da Obra
   await db.runAsync('DELETE FROM projetos WHERE id = ?;', [projetoId]);
@@ -710,6 +740,185 @@ export async function saveLocalLegenda(legenda: { id?: number; categoria: string
 export async function deleteLocalLegenda(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM legendas_predefinidas WHERE id = ?', [id]);
+}
+
+export async function updateLocalLegenda(id: number, texto: string, categoria: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    'UPDATE legendas_predefinidas SET texto = ?, categoria = ? WHERE id = ?',
+    [texto, categoria, id]
+  );
+}
+
+export async function reorderLocalLegendas(items: { id: number; ordem: number }[]): Promise<void> {
+  const db = await getDatabase();
+  for (const it of items) {
+    await db.runAsync('UPDATE legendas_predefinidas SET ordem = ? WHERE id = ?', [it.ordem, it.id]);
+  }
+}
+
+// ================= CHECKLIST CUSTOM TEMPLATE =================
+export async function getLocalChecklistTemplate(): Promise<ChecklistCustomItem[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<any>(
+    'SELECT * FROM checklist_custom_template WHERE ativo = 1 ORDER BY ordem ASC, id ASC'
+  );
+  return rows.map(r => ({
+    id: r.id,
+    item: r.item,
+    ordem: r.ordem,
+    ativo: Boolean(r.ativo)
+  }));
+}
+
+export async function addLocalChecklistItem(item: string, ordem?: number): Promise<number> {
+  const db = await getDatabase();
+  let nextOrdem = ordem;
+  if (nextOrdem === undefined) {
+    const maxRow = await db.getFirstAsync<{ max_ordem: number }>(
+      'SELECT MAX(ordem) as max_ordem FROM checklist_custom_template'
+    );
+    nextOrdem = (maxRow?.max_ordem || 0) + 1;
+  }
+  const res = await db.runAsync(
+    'INSERT INTO checklist_custom_template (item, ordem, ativo) VALUES (?, ?, 1)',
+    [item.trim(), nextOrdem]
+  );
+  return res.lastInsertRowId;
+}
+
+export async function updateLocalChecklistItem(id: number, item: string, ordem?: number): Promise<void> {
+  const db = await getDatabase();
+  if (ordem !== undefined) {
+    await db.runAsync(
+      'UPDATE checklist_custom_template SET item = ?, ordem = ? WHERE id = ?',
+      [item.trim(), ordem, id]
+    );
+  } else {
+    await db.runAsync(
+      'UPDATE checklist_custom_template SET item = ? WHERE id = ?',
+      [item.trim(), id]
+    );
+  }
+}
+
+export async function deleteLocalChecklistItem(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM checklist_custom_template WHERE id = ?', [id]);
+}
+
+export async function reorderLocalChecklistItems(items: { id: number; ordem: number }[]): Promise<void> {
+  const db = await getDatabase();
+  for (const it of items) {
+    await db.runAsync('UPDATE checklist_custom_template SET ordem = ? WHERE id = ?', [it.ordem, it.id]);
+  }
+}
+
+export async function resetLocalChecklistTemplateToDefault(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM checklist_custom_template');
+  for (const it of SEED_CHECKLIST) {
+    await db.runAsync(
+      'INSERT INTO checklist_custom_template (item, ordem, ativo) VALUES (?, ?, 1)',
+      [it.item, it.ordem]
+    );
+  }
+}
+
+// ================= CHECKLIST PROGRESSO DA OBRA =================
+export async function getChecklistProgressoObra(projetoId: number): Promise<ChecklistProgressoObra[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<any>(
+    'SELECT * FROM checklist_obra_progresso WHERE projeto_id = ? ORDER BY ordem ASC, id ASC',
+    [projetoId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    projeto_id: r.projeto_id,
+    checklist_item_id: r.checklist_item_id,
+    item_texto: r.item_texto,
+    ordem: r.ordem,
+    aprovado: Boolean(r.aprovado),
+    aprovado_em_relatorio_id: r.aprovado_em_relatorio_id,
+    aprovado_em_relatorio_numero: r.aprovado_em_relatorio_numero,
+    data_aprovacao: r.data_aprovacao,
+    observacao: r.observacao
+  }));
+}
+
+export async function saveChecklistProgressoObra(progresso: ChecklistProgressoObra): Promise<void> {
+  const db = await getDatabase();
+  const existing = await db.getFirstAsync<any>(
+    'SELECT id FROM checklist_obra_progresso WHERE projeto_id = ? AND item_texto = ? LIMIT 1',
+    [progresso.projeto_id, progresso.item_texto]
+  );
+
+  const agora = progresso.data_aprovacao || new Date().toISOString();
+
+  if (existing) {
+    await db.runAsync(
+      `UPDATE checklist_obra_progresso SET 
+        aprovado = ?, 
+        aprovado_em_relatorio_id = ?, 
+        aprovado_em_relatorio_numero = ?, 
+        data_aprovacao = ?, 
+        ordem = ?, 
+        observacao = ? 
+       WHERE id = ?`,
+      [
+        progresso.aprovado ? 1 : 0,
+        progresso.aprovado_em_relatorio_id || null,
+        progresso.aprovado_em_relatorio_numero || null,
+        agora,
+        progresso.ordem || 0,
+        progresso.observacao || null,
+        existing.id
+      ]
+    );
+  } else {
+    await db.runAsync(
+      `INSERT INTO checklist_obra_progresso (
+        projeto_id, checklist_item_id, item_texto, ordem, aprovado, 
+        aprovado_em_relatorio_id, aprovado_em_relatorio_numero, data_aprovacao, observacao
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        progresso.projeto_id,
+        progresso.checklist_item_id || null,
+        progresso.item_texto,
+        progresso.ordem || 0,
+        progresso.aprovado ? 1 : 0,
+        progresso.aprovado_em_relatorio_id || null,
+        progresso.aprovado_em_relatorio_numero || null,
+        agora,
+        progresso.observacao || null
+      ]
+    );
+  }
+}
+
+export async function saveBatchChecklistProgressoObra(
+  projetoId: number,
+  itens: Array<{
+    item_texto: string;
+    ordem?: number;
+    aprovado_em_relatorio_id?: number;
+    aprovado_em_relatorio_numero?: string;
+    data_aprovacao?: string;
+    observacao?: string;
+  }>
+): Promise<void> {
+  for (const it of itens) {
+    await saveChecklistProgressoObra({
+      projeto_id: projetoId,
+      item_texto: it.item_texto,
+      ordem: it.ordem,
+      aprovado: true,
+      aprovado_em_relatorio_id: it.aprovado_em_relatorio_id,
+      aprovado_em_relatorio_numero: it.aprovado_em_relatorio_numero,
+      data_aprovacao: it.data_aprovacao,
+      observacao: it.observacao
+    });
+  }
 }
 
 // ================= SYNC QUEUE =================

@@ -27,6 +27,10 @@ import { RemindersScreen } from '../screens/reminders/RemindersScreen';
 import { ContactsScreen } from '../screens/contacts/ContactsScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
 import { UserManagementScreen } from '../screens/admin/UserManagementScreen';
+import ChecklistCustomizerScreen from '../screens/settings/ChecklistCustomizerScreen';
+import LegendSettingsScreen from '../screens/settings/LegendSettingsScreen';
+import AppFilesScreen from '../screens/settings/AppFilesScreen';
+import NotificationsSettingsScreen from '../screens/settings/NotificationsSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -139,6 +143,10 @@ export const AppNavigator: React.FC = () => {
             <Stack.Screen name="ContactsScreen" component={ContactsScreen} />
             <Stack.Screen name="SettingsScreen" component={SettingsScreen} />
             <Stack.Screen name="UserManagementScreen" component={UserManagementScreen} />
+            <Stack.Screen name="ChecklistCustomizerScreen" component={ChecklistCustomizerScreen} />
+            <Stack.Screen name="LegendSettingsScreen" component={LegendSettingsScreen} />
+            <Stack.Screen name="AppFilesScreen" component={AppFilesScreen} />
+            <Stack.Screen name="NotificationsSettingsScreen" component={NotificationsSettingsScreen} />
           </>
         )}
       </Stack.Navigator>

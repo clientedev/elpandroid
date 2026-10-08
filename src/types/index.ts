@@ -224,6 +224,26 @@ export interface ChecklistItemTemplate {
   ordem: number;
 }
 
+export interface ChecklistCustomItem {
+  id: number;
+  item: string;
+  ordem: number;
+  ativo?: boolean;
+}
+
+export interface ChecklistProgressoObra {
+  id?: number;
+  projeto_id: number;
+  checklist_item_id?: number | null;
+  item_texto: string;
+  ordem?: number;
+  aprovado: boolean;
+  aprovado_em_relatorio_id?: number | null;
+  aprovado_em_relatorio_numero?: string | null;
+  data_aprovacao?: string | null;
+  observacao?: string | null;
+}
+
 export interface SyncQueueItem {
   id: number;
   entity_type: string;

@@ -6,6 +6,11 @@ import { getLocalProjetos } from '../database/db';
 
 export const APP_FILES_ROOT_NAME = 'ELP_Arquivos';
 
+// Caminhos físicos no dispositivo
+const ANDROID_DOCS_ROOT = 'file:///storage/emulated/0/Documents/ELP_Arquivos/';
+const ANDROID_SDCARD_ROOT = 'file:///storage/emulated/0/ELP_Arquivos/';
+const INTERNAL_ROOT = `${(FileSystem as any).documentDirectory || ''}${APP_FILES_ROOT_NAME}/`;
+
 export interface FileItem {
   name: string;
   uri: string;
@@ -37,67 +42,121 @@ export function cleanFolderName(name?: string, fallback = 'Obra_Geral'): string 
 }
 
 /**
- * Obtém ou cria o diretório raiz local do aplicativo para arquivos.
- * Sempre garantido permissão de leitura/escrita no dispositivo.
+ * Retorna as raízes disponíveis para armazenamento.
+ * Prioriza a pasta pública Documents no Android para que o usuário veja
+ * a pasta no app de Gerenciador de Arquivos do celular e no PC via USB.
  */
-export async function getAppFilesRootDir(): Promise<string> {
-  const baseDir = (FileSystem as any).documentDirectory || '';
-  const rootPath = `${baseDir}${APP_FILES_ROOT_NAME}/`;
-  try {
-    const info = await FileSystem.getInfoAsync(rootPath);
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(rootPath, { intermediates: true });
+export async function getTargetRootDirectories(): Promise<string[]> {
+  const roots: string[] = [];
+
+  if (Platform.OS === 'android') {
+    // 1. Documents público do Android
+    try {
+      const info = await FileSystem.getInfoAsync(ANDROID_DOCS_ROOT);
+      if (!info.exists) {
+        await FileSystem.makeDirectoryAsync(ANDROID_DOCS_ROOT, { intermediates: true });
+      }
+      roots.push(ANDROID_DOCS_ROOT);
+    } catch {
+      // 2. Fallback na raiz do armazenamento compartilhado
+      try {
+        const info = await FileSystem.getInfoAsync(ANDROID_SDCARD_ROOT);
+        if (!info.exists) {
+          await FileSystem.makeDirectoryAsync(ANDROID_SDCARD_ROOT, { intermediates: true });
+        }
+        roots.push(ANDROID_SDCARD_ROOT);
+      } catch {}
     }
-  } catch (e) {
-    console.warn('[appFilesService] Erro ao garantir diretório raiz:', e);
   }
-  return rootPath;
+
+  // 3. Raiz interna segura do aplicativo
+  try {
+    const info = await FileSystem.getInfoAsync(INTERNAL_ROOT);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(INTERNAL_ROOT, { intermediates: true });
+    }
+    roots.push(INTERNAL_ROOT);
+  } catch {}
+
+  return roots.length > 0 ? roots : [INTERNAL_ROOT];
 }
 
 /**
- * Regra: Criou obra -> Criou pasta!
- * Garante que a pasta da obra e suas duas subpastas existam:
- * 1. Imagens/
- * 2. Relatorios_Aprovados_PDF/
+ * Obtém o diretório raiz preferencial do aplicativo.
+ */
+export async function getAppFilesRootDir(): Promise<string> {
+  const roots = await getTargetRootDirectories();
+  return roots[0] || INTERNAL_ROOT;
+}
+
+/**
+ * Regra Obrigatória: Criou obra -> Criou pasta!
+ * Garante que para a obra indicada, existam fisicamente no celular:
+ * 1. Pasta principal da obra: ELP_Arquivos/[Nome_ou_Codigo_da_Obra]/
+ * 2. Subpasta: Imagens/
+ * 3. Subpasta: Relatorios_Aprovados_PDF/
  */
 export async function ensureProjectFolders(projectName: string, projectCode?: string): Promise<{
   projectDir: string;
   imagensDir: string;
   pdfsDir: string;
 }> {
-  const root = await getAppFilesRootDir();
+  if (!projectName || !projectName.trim()) {
+    projectName = 'Obra_Geral';
+  }
+
   const folderName = projectCode 
     ? cleanFolderName(`${projectCode}_${projectName}`)
     : cleanFolderName(projectName);
 
-  const projectDir = `${root}${folderName}/`;
-  const imagensDir = `${projectDir}Imagens/`;
-  const pdfsDir = `${projectDir}Relatorios_Aprovados_PDF/`;
+  const roots = await getTargetRootDirectories();
+  let primaryProjectDir = '';
+  let primaryImagensDir = '';
+  let primaryPdfsDir = '';
 
-  try {
-    const projInfo = await FileSystem.getInfoAsync(projectDir);
-    if (!projInfo.exists) {
-      await FileSystem.makeDirectoryAsync(projectDir, { intermediates: true });
+  for (let i = 0; i < roots.length; i++) {
+    const root = roots[i];
+    const projectDir = `${root}${folderName}/`;
+    const imagensDir = `${projectDir}Imagens/`;
+    const pdfsDir = `${projectDir}Relatorios_Aprovados_PDF/`;
+
+    if (i === 0) {
+      primaryProjectDir = projectDir;
+      primaryImagensDir = imagensDir;
+      primaryPdfsDir = pdfsDir;
     }
 
-    const imgInfo = await FileSystem.getInfoAsync(imagensDir);
-    if (!imgInfo.exists) {
-      await FileSystem.makeDirectoryAsync(imagensDir, { intermediates: true });
-    }
+    try {
+      const projInfo = await FileSystem.getInfoAsync(projectDir);
+      if (!projInfo.exists) {
+        await FileSystem.makeDirectoryAsync(projectDir, { intermediates: true });
+      }
 
-    const pdfInfo = await FileSystem.getInfoAsync(pdfsDir);
-    if (!pdfInfo.exists) {
-      await FileSystem.makeDirectoryAsync(pdfsDir, { intermediates: true });
+      const imgInfo = await FileSystem.getInfoAsync(imagensDir);
+      if (!imgInfo.exists) {
+        await FileSystem.makeDirectoryAsync(imagensDir, { intermediates: true });
+      }
+
+      const pdfInfo = await FileSystem.getInfoAsync(pdfsDir);
+      if (!pdfInfo.exists) {
+        await FileSystem.makeDirectoryAsync(pdfsDir, { intermediates: true });
+      }
+    } catch (err) {
+      console.warn(`[appFilesService] Erro ao criar pastas da obra "${folderName}" em ${root}:`, err);
     }
-  } catch (err) {
-    console.warn(`[appFilesService] Erro ao criar pastas da obra "${projectName}":`, err);
   }
 
-  return { projectDir, imagensDir, pdfsDir };
+  return { 
+    projectDir: primaryProjectDir || `${INTERNAL_ROOT}${folderName}/`, 
+    imagensDir: primaryImagensDir || `${INTERNAL_ROOT}${folderName}/Imagens/`, 
+    pdfsDir: primaryPdfsDir || `${INTERNAL_ROOT}${folderName}/Relatorios_Aprovados_PDF/` 
+  };
 }
 
 /**
- * Garante as pastas locais para todas as obras registradas no banco SQLite.
+ * Garante as pastas locais para TODAS as obras cadastradas no SQLite.
+ * Chamada na inicialização do app para garantir que todas as obras
+ * existentes já tenham suas pastas físicas criadas imediatamente.
  */
 export async function ensureAllProjectsFolders(): Promise<void> {
   try {
@@ -107,6 +166,7 @@ export async function ensureAllProjectsFolders(): Promise<void> {
         await ensureProjectFolders(p.nome, (p as any).codigo || p.numero);
       }
     }
+    console.log(`[appFilesService] ✅ Pastas físicas conferidas/criadas para ${projetos.length} obras.`);
   } catch (e) {
     console.warn('[appFilesService] Erro ao garantir pastas de todas as obras:', e);
   }
@@ -121,14 +181,30 @@ export async function saveImageToProjectFolder(
   suggestedFilename?: string
 ): Promise<string> {
   try {
-    const { imagensDir } = await ensureProjectFolders(projectName);
     const filename = suggestedFilename || `foto_${Date.now()}_${Math.floor(Math.random() * 1000)}.jpg`;
-    const destUri = `${imagensDir}${cleanFolderName(filename, 'foto.jpg')}`;
+    const safeFilename = cleanFolderName(filename, 'foto.jpg');
+    const { imagensDir } = await ensureProjectFolders(projectName);
+    const destUri = `${imagensDir}${safeFilename}`;
     
     await FileSystem.copyAsync({
       from: sourceUri,
       to: destUri,
     });
+
+    // Se houver mais de uma raiz (pública e interna), copia também na raiz interna
+    try {
+      const internalDir = `${INTERNAL_ROOT}${cleanFolderName(projectName)}/Imagens/`;
+      if (imagensDir !== internalDir) {
+        const info = await FileSystem.getInfoAsync(internalDir);
+        if (!info.exists) {
+          await FileSystem.makeDirectoryAsync(internalDir, { intermediates: true });
+        }
+        await FileSystem.copyAsync({
+          from: sourceUri,
+          to: `${internalDir}${safeFilename}`,
+        });
+      }
+    } catch {}
 
     return destUri;
   } catch (err) {
@@ -146,15 +222,30 @@ export async function saveApprovedPdfToProjectFolder(
   sourcePdfUri: string
 ): Promise<string> {
   try {
-    const { pdfsDir } = await ensureProjectFolders(projectName);
     const cleanNum = cleanFolderName(reportNumero || `REL_${Date.now()}`);
     const filename = cleanNum.toLowerCase().endsWith('.pdf') ? cleanNum : `${cleanNum}.pdf`;
+    const { pdfsDir } = await ensureProjectFolders(projectName);
     const destUri = `${pdfsDir}${filename}`;
 
     await FileSystem.copyAsync({
       from: sourcePdfUri,
       to: destUri,
     });
+
+    // Espelha no diretório interno para garantia dupla
+    try {
+      const internalDir = `${INTERNAL_ROOT}${cleanFolderName(projectName)}/Relatorios_Aprovados_PDF/`;
+      if (pdfsDir !== internalDir) {
+        const info = await FileSystem.getInfoAsync(internalDir);
+        if (!info.exists) {
+          await FileSystem.makeDirectoryAsync(internalDir, { intermediates: true });
+        }
+        await FileSystem.copyAsync({
+          from: sourcePdfUri,
+          to: `${internalDir}${filename}`,
+        });
+      }
+    } catch {}
 
     console.log(`[appFilesService] ✅ PDF aprovado salvo localmente: ${destUri}`);
     return destUri;
@@ -165,87 +256,92 @@ export async function saveApprovedPdfToProjectFolder(
 }
 
 /**
- * Lê recursivamente todas as pastas de obras salvas localmente e seus arquivos.
+ * Lê todas as pastas de obras salvas localmente e seus arquivos.
  */
 export async function getProjectsFoldersSummary(): Promise<ProjectFolderSummary[]> {
-  const root = await getAppFilesRootDir();
   await ensureAllProjectsFolders();
+  const roots = await getTargetRootDirectories();
 
-  const summaries: ProjectFolderSummary[] = [];
+  const summariesMap = new Map<string, ProjectFolderSummary>();
 
-  try {
-    const dirContent = await FileSystem.readDirectoryAsync(root);
-    
-    for (const folderName of dirContent) {
-      const projectDir = `${root}${folderName}/`;
-      const projInfo = await FileSystem.getInfoAsync(projectDir);
-      if (!projInfo.isDirectory) continue;
+  for (const root of roots) {
+    try {
+      const dirContent = await FileSystem.readDirectoryAsync(root);
+      
+      for (const folderName of dirContent) {
+        const projectDir = `${root}${folderName}/`;
+        const projInfo = await FileSystem.getInfoAsync(projectDir);
+        if (!projInfo.isDirectory) continue;
 
-      const imagensDir = `${projectDir}Imagens/`;
-      const pdfsDir = `${projectDir}Relatorios_Aprovados_PDF/`;
+        const imagensDir = `${projectDir}Imagens/`;
+        const pdfsDir = `${projectDir}Relatorios_Aprovados_PDF/`;
 
-      const imagens: FileItem[] = [];
-      const pdfs: FileItem[] = [];
-      let totalSize = 0;
+        const imagens: FileItem[] = [];
+        const pdfs: FileItem[] = [];
+        let totalSize = 0;
 
-      // Lê subpasta Imagens
-      try {
-        const imgInfo = await FileSystem.getInfoAsync(imagensDir);
-        if (imgInfo.exists && imgInfo.isDirectory) {
-          const imgFiles = await FileSystem.readDirectoryAsync(imagensDir);
-          for (const f of imgFiles) {
-            const fUri = `${imagensDir}${f}`;
-            const fInfo = await FileSystem.getInfoAsync(fUri);
-            const size = (fInfo as any).size || 0;
-            totalSize += size;
-            imagens.push({
-              name: f,
-              uri: fUri,
-              size,
-              modificationTime: (fInfo as any).modificationTime,
-            });
+        // Lê subpasta Imagens
+        try {
+          const imgInfo = await FileSystem.getInfoAsync(imagensDir);
+          if (imgInfo.exists && imgInfo.isDirectory) {
+            const imgFiles = await FileSystem.readDirectoryAsync(imagensDir);
+            for (const f of imgFiles) {
+              const fUri = `${imagensDir}${f}`;
+              const fInfo = await FileSystem.getInfoAsync(fUri);
+              const size = (fInfo as any).size || 0;
+              totalSize += size;
+              imagens.push({
+                name: f,
+                uri: fUri,
+                size,
+                modificationTime: (fInfo as any).modificationTime,
+              });
+            }
           }
-        }
-      } catch {}
+        } catch {}
 
-      // Lê subpasta Relatórios Aprovados em PDF
-      try {
-        const pdfInfo = await FileSystem.getInfoAsync(pdfsDir);
-        if (pdfInfo.exists && pdfInfo.isDirectory) {
-          const pdfFiles = await FileSystem.readDirectoryAsync(pdfsDir);
-          for (const f of pdfFiles) {
-            const fUri = `${pdfsDir}${f}`;
-            const fInfo = await FileSystem.getInfoAsync(fUri);
-            const size = (fInfo as any).size || 0;
-            totalSize += size;
-            pdfs.push({
-              name: f,
-              uri: fUri,
-              size,
-              modificationTime: (fInfo as any).modificationTime,
-            });
+        // Lê subpasta Relatórios Aprovados em PDF
+        try {
+          const pdfInfo = await FileSystem.getInfoAsync(pdfsDir);
+          if (pdfInfo.exists && pdfInfo.isDirectory) {
+            const pdfFiles = await FileSystem.readDirectoryAsync(pdfsDir);
+            for (const f of pdfFiles) {
+              const fUri = `${pdfsDir}${f}`;
+              const fInfo = await FileSystem.getInfoAsync(fUri);
+              const size = (fInfo as any).size || 0;
+              totalSize += size;
+              pdfs.push({
+                name: f,
+                uri: fUri,
+                size,
+                modificationTime: (fInfo as any).modificationTime,
+              });
+            }
           }
-        }
-      } catch {}
+        } catch {}
 
-      summaries.push({
-        projectName: folderName.replace(/_/g, ' '),
-        projectDir,
-        imagensDir,
-        pdfsDir,
-        imagens,
-        pdfs,
-        totalFiles: imagens.length + pdfs.length,
-        totalSize,
-      });
+        const normalizedName = folderName.replace(/_/g, ' ');
+        if (!summariesMap.has(normalizedName) || (imagens.length + pdfs.length) > summariesMap.get(normalizedName)!.totalFiles) {
+          summariesMap.set(normalizedName, {
+            projectName: normalizedName,
+            projectDir,
+            imagensDir,
+            pdfsDir,
+            imagens,
+            pdfs,
+            totalFiles: imagens.length + pdfs.length,
+            totalSize,
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`[appFilesService] Erro ao listar arquivos em ${root}:`, err);
     }
-  } catch (err) {
-    console.warn('[appFilesService] Erro ao listar resumo de pastas:', err);
   }
 
-  // Ordena por nome da obra
-  summaries.sort((a, b) => a.projectName.localeCompare(b.projectName));
-  return summaries;
+  const result = Array.from(summariesMap.values());
+  result.sort((a, b) => a.projectName.localeCompare(b.projectName));
+  return result;
 }
 
 /**
@@ -258,18 +354,17 @@ export async function openRootFolderExternally(): Promise<void> {
   if (Platform.OS === 'android') {
     try {
       const contentUri = await FileSystem.getContentUriAsync(root);
-      // Tentativa 1: Abrir diretamente a pasta via ContentUri
       await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
         data: contentUri,
         flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
       });
       return;
     } catch (e1) {
-      console.log('[appFilesService] Tentativa 1 (VIEW uri) falhou, tentando OPEN_DOCUMENT_TREE:', e1);
+      console.log('[appFilesService] Tentativa 1 (VIEW contentUri) falhou:', e1);
     }
 
     try {
-      // Tentativa 2: Abrir o seletor / explorador de documentos nativo do Android
+      // Abre o explorador de documentos do Android
       await IntentLauncher.startActivityAsync('android.intent.action.OPEN_DOCUMENT_TREE', {
         flags: 1,
       });
@@ -279,7 +374,6 @@ export async function openRootFolderExternally(): Promise<void> {
     }
 
     try {
-      // Tentativa 3: Visualizador padrão de armazenamento do sistema
       await IntentLauncher.startActivityAsync('android.os.storage.action.MANAGE_STORAGE');
       return;
     } catch (e3) {
@@ -289,7 +383,7 @@ export async function openRootFolderExternally(): Promise<void> {
 
   Alert.alert(
     'Raiz dos Arquivos no Dispositivo',
-    `Os arquivos do aplicativo estão armazenados no seguinte caminho local:\n\n📁 ${root}\n\nVocê pode visualizá-los e gerenciá-los usando o aplicativo Meus Arquivos / Gerenciador de Arquivos do celular.`
+    `Os arquivos do aplicativo estão armazenados localmente no seguinte caminho:\n\n📁 ${root}\n\nVocê pode visualizá-los diretamente através do aplicativo Meus Arquivos / Gerenciador de Arquivos do celular.`
   );
 }
 

@@ -11,7 +11,8 @@ import {
   getLocalProjetos, saveLocalRelatorio, saveLocalFoto, deleteLocalFoto,
   addToSyncQueue, getLocalLegendas, getLocalLembretes, saveLocalLembrete, 
   closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
-  migrateLocalFotosRelatorioId, getDatabase
+  migrateLocalFotosRelatorioId, getDatabase, getLocalChecklistTemplate,
+  getChecklistProgressoObra
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -19,15 +20,19 @@ import { useNetwork } from '../../contexts/NetworkContext';
 import { apiClient } from '../../services/api';
 import { notificationService } from '../../services/notificationService';
 
-import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete } from '../../types';
+import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete, ChecklistProgressoObra } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 import * as Location from 'expo-location';
 
-interface ChecklistItemState {
+export interface ChecklistItemState {
   id: number;
   item: string;
+  ordem?: number;
   checked: boolean;
   observacao: string;
+  aprovado_anteriormente?: boolean;
+  aprovado_em_relatorio_numero?: string;
+  data_aprovacao?: string;
 }
 
 const DEFAULT_CHECKLIST: ChecklistItemState[] = [
@@ -199,6 +204,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
         checklist_data: JSON.stringify(checklist),
+        acompanhantes: JSON.stringify(acompanhantesList),
         categoria: categoria,
         local: local,
         status: 'em_andamento', // RASCUNHO GARANTIDO
@@ -237,7 +243,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [
     currentReportId, reportUuid, reportNumber, titulo, selectedProjectId,
     preSelectedVisitId, user, dataVisita, descricao, observacoesFinais,
-    checklist, categoria, local, fotos
+    checklist, acompanhantesList, categoria, local, fotos
   ]);
 
   // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
@@ -318,6 +324,54 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     };
   }, [initialReportId, user, navigation]);
 
+  // Carrega e mescla o checklist (template configurado + histórico de aprovações da obra)
+  const loadChecklistForProject = useCallback(async (projId: number, existingChecklistJson?: string) => {
+    try {
+      const template = await getLocalChecklistTemplate();
+      const progressoObra = await getChecklistProgressoObra(projId);
+
+      let savedChecks: ChecklistItemState[] = [];
+      if (existingChecklistJson) {
+        try {
+          savedChecks = JSON.parse(existingChecklistJson);
+        } catch {}
+      }
+
+      const baseItems = template.length > 0 
+        ? template.map((t, idx) => ({ id: t.id, item: t.item, ordem: t.ordem || idx + 1 }))
+        : DEFAULT_CHECKLIST.map((d, idx) => ({ id: d.id, item: d.item, ordem: idx + 1 }));
+
+      const merged: ChecklistItemState[] = baseItems.map((base, idx) => {
+        // Verifica se já foi aprovado em algum relatório anterior desta obra
+        const prevAppr = progressoObra.find(p => 
+          p.item_texto.trim().toLowerCase() === base.item.trim().toLowerCase()
+        );
+
+        // Verifica se tem estado já salvo no rascunho atual
+        const savedItem = savedChecks.find(s => 
+          s.item?.trim().toLowerCase() === base.item.trim().toLowerCase() || s.id === base.id
+        );
+
+        const isChecked = Boolean(savedItem ? savedItem.checked : (prevAppr && prevAppr.aprovado));
+
+        return {
+          id: base.id,
+          item: base.item,
+          ordem: idx + 1,
+          checked: isChecked,
+          observacao: savedItem?.observacao || prevAppr?.observacao || '',
+          aprovado_anteriormente: Boolean(prevAppr && prevAppr.aprovado),
+          aprovado_em_relatorio_numero: prevAppr?.aprovado_em_relatorio_numero || undefined,
+          data_aprovacao: prevAppr?.data_aprovacao || undefined,
+        };
+      });
+
+      setChecklist(merged);
+    } catch (e) {
+      console.warn('Erro ao carregar checklist para a obra:', e);
+    }
+  }, []);
+
   // Carregar rascunho existente
   useEffect(() => {
     if (initialReportId) {
@@ -333,11 +387,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           setObservacoesFinais(r.observacoes_finais || '');
           setCategoria(r.categoria || 'Geral');
           setLocal(r.local || 'Fachada Principal');
-          if (r.checklist_data) {
+          if (r.acompanhantes) {
             try {
-              setChecklist(JSON.parse(r.checklist_data));
+              const aList = JSON.parse(r.acompanhantes);
+              if (Array.isArray(aList)) setAcompanhantesList(aList);
             } catch {}
           }
+          await loadChecklistForProject(r.projeto_id, r.checklist_data);
           const savedFotos = await getLocalFotos(r.id, r.uuid);
           if (savedFotos && savedFotos.length > 0) {
             setFotos(savedFotos);
@@ -345,24 +401,25 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         }
       });
     }
-  }, [initialReportId]);
+  }, [initialReportId, loadChecklistForProject]);
 
+  // Ao selecionar/trocar de obra (quando novo relatório), inicializa checklist com histórico daquela obra
   useEffect(() => {
-    if (selectedProjectId) {
+    if (selectedProjectId && !initialReportId) {
+      loadChecklistForProject(selectedProjectId);
+      getLocalLembretes(selectedProjectId, true).then(l => setLembretes(l));
+    } else if (selectedProjectId) {
       getLocalLembretes(selectedProjectId, true).then(l => setLembretes(l));
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, initialReportId, loadChecklistForProject]);
 
   // Mecanismo de AutoSave a cada 2 segundos após parar de digitar (debounce de 2000ms conforme Regra do Manual)
-  // IMPORTANTE: NÃO incluir `projetos` nas dependências para evitar re-trigger ao carregar a lista!
-  // Use `projetosRef.current` para acessar a lista de projetos sem causar re-render.
   useEffect(() => {
     if (!selectedProjectId) return;
 
     const timer = setTimeout(async () => {
       try {
         setIsAutoSaving(true);
-        // Usa ref para não disparar o efeito ao carregar projetos
         const proj = projetosRef.current.find(p => p.id === selectedProjectId);
         const draft: Relatorio = {
           id: currentReportId,
@@ -380,6 +437,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           descricao: descricao.trim(),
           observacoes_finais: observacoesFinais.trim(),
           checklist_data: JSON.stringify(checklist),
+          acompanhantes: JSON.stringify(acompanhantesList),
           categoria: categoria,
           local: local,
           status: 'em_andamento',
@@ -419,16 +477,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           try {
             const isServerId = currentReportId > 0 && currentReportId < 2000000000;
             if (isServerId) {
-              // PUT: atualizar relatório existente no servidor
               await apiClient.axios.put(`/api/relatorios/${currentReportId}`, {
                 ...draft,
                 autor_id: user?.id,
                 fotos: preparedFotos,
               }, { timeout: 12000 });
-              // Marca como synced no local
               await saveLocalRelatorio({ ...draft, sync_status: 'synced' }, 'synced');
             } else {
-              // POST: criar novo relatório no servidor com o UUID
               const res = await apiClient.axios.post('/api/relatorios', {
                 ...draft,
                 uuid: reportUuid,
@@ -470,9 +525,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }, 2000);
 
     return () => clearTimeout(timer);
-  // ATENÇÃO: `projetos` PROPOSITALMENTE removido das dependências - usar projetosRef.current!
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, fotos, categoria, local, reportNumber, currentReportId, isOnline]);
+  }, [selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist, acompanhantesList, fotos, categoria, local, reportNumber, currentReportId, isOnline]);
 
   async function handleAddPhotoCamera() {
     const photo = await takePhoto(selectedProj?.nome);
@@ -640,6 +693,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
         checklist_data: JSON.stringify(checklist),
+        acompanhantes: JSON.stringify(acompanhantesList),
         categoria: categoria,
         local: local,
         status: status,
@@ -898,59 +952,104 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           )}
         </View>
 
-        {/* 5º Sanfona Colapsável 2: Checklist da Obra (Grafite escuro #334155, 48px de área de toque) */}
-        <View style={styles.accordionCard}>
-          <TouchableOpacity 
-            style={styles.checklistAccordionHeader}
-            onPress={() => setShowChecklist(!showChecklist)}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="checkbox" size={18} color="#FFFFFF" />
-              <Text style={styles.checklistAccordionTitle}>
-                5. Checklist de Verificação ({checklist.filter(c => c.checked).length}/{checklist.length})
-              </Text>
-            </View>
-            <Ionicons name={showChecklist ? "chevron-up" : "chevron-down"} size={18} color="#FFFFFF" />
-          </TouchableOpacity>
+        {/* 5º Sanfona Colapsável 2: Checklist da Obra com Barra de Progresso Numeral */}
+        {(() => {
+          const totalChecks = checklist.length;
+          const completedChecks = checklist.filter(c => c.checked).length;
+          const progressPercent = totalChecks > 0 ? Math.round((completedChecks / totalChecks) * 100) : 0;
 
-          {showChecklist && (
-            <View style={styles.accordionBody}>
-              <Text style={styles.subHintText}>
-                Toque para alternar o status de inspeção (área de toque confortável de 48px):
-              </Text>
-
-              {checklist.map((item, idx) => (
-                <View key={item.id} style={styles.checkItemContainer}>
-                  <TouchableOpacity 
-                    style={[styles.checkItemRow, item.checked && styles.checkItemRowActive]}
-                    onPress={() => toggleChecklistItem(idx)}
-                  >
-                    <Ionicons 
-                      name={item.checked ? "checkbox" : "square-outline"} 
-                      size={24} 
-                      color={item.checked ? "#16A34A" : Colors.textMuted} 
-                    />
-                    <Text style={[styles.checkItemText, item.checked && styles.checkItemTextActive]}>
-                      {item.item}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {item.checked && (
-                    <View style={styles.obsBox}>
-                      <TextInput
-                        style={styles.obsInput}
-                        placeholder="Adicionar nota específica deste item..."
-                        value={item.observacao}
-                        onChangeText={txt => updateChecklistObservacao(idx, txt)}
-                        multiline
-                      />
+          return (
+            <View style={styles.accordionCard}>
+              <TouchableOpacity 
+                style={styles.checklistAccordionHeader}
+                onPress={() => setShowChecklist(!showChecklist)}
+              >
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="checkbox" size={18} color="#FFFFFF" />
+                      <Text style={styles.checklistAccordionTitle}>
+                        5. Checklist de Verificação ({completedChecks}/{totalChecks})
+                      </Text>
                     </View>
-                  )}
+                    <Text style={styles.checklistAccordionPercentText}>{progressPercent}%</Text>
+                  </View>
+                  {/* Barra de Progresso no Cabeçalho */}
+                  <View style={styles.checklistProgressBarTrackMini}>
+                    <View style={[styles.checklistProgressBarFillMini, { width: `${progressPercent}%` }]} />
+                  </View>
                 </View>
-              ))}
+                <Ionicons name={showChecklist ? "chevron-up" : "chevron-down"} size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+
+              {showChecklist && (
+                <View style={styles.accordionBody}>
+                  {/* Card de Progresso Visual Detalhado */}
+                  <View style={styles.checklistProgressCardDetail}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={styles.checklistProgressDetailLabel}>Progresso das Etapas Concluídas</Text>
+                      <Text style={styles.checklistProgressDetailValue}>
+                        {completedChecks} de {totalChecks} ({progressPercent}%)
+                      </Text>
+                    </View>
+                    <View style={styles.checklistProgressBarTrackLarge}>
+                      <View style={[styles.checklistProgressBarFillLarge, { width: `${progressPercent}%` }]} />
+                    </View>
+                  </View>
+
+                  <Text style={styles.subHintText}>
+                    Etapas técnicas em ordem numeral. Toque para marcar ou inspecionar:
+                  </Text>
+
+                  {checklist.map((item, idx) => (
+                    <View key={item.id} style={styles.checkItemContainer}>
+                      <TouchableOpacity 
+                        style={[
+                          styles.checkItemRow, 
+                          item.checked && styles.checkItemRowActive,
+                          item.aprovado_anteriormente && styles.checkItemRowPreviouslyApproved
+                        ]}
+                        onPress={() => toggleChecklistItem(idx)}
+                      >
+                        <Ionicons 
+                          name={item.checked ? (item.aprovado_anteriormente ? "shield-checkmark" : "checkbox") : "square-outline"} 
+                          size={24} 
+                          color={item.checked ? (item.aprovado_anteriormente ? "#059669" : "#16A34A") : Colors.textMuted} 
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.checkItemText, item.checked && styles.checkItemTextActive]}>
+                            {idx + 1}. {item.item}
+                          </Text>
+                          {item.aprovado_anteriormente ? (
+                            <View style={styles.prevApprovalBadge}>
+                              <Ionicons name="shield-checkmark" size={13} color="#059669" />
+                              <Text style={styles.prevApprovalText}>
+                                Aprovado no {item.aprovado_em_relatorio_numero || 'relatório anterior'}
+                                {item.data_aprovacao ? ` em ${new Date(item.data_aprovacao).toLocaleString('pt-BR')}` : ''}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </TouchableOpacity>
+
+                      {item.checked && (
+                        <View style={styles.obsBox}>
+                          <TextInput
+                            style={styles.obsInput}
+                            placeholder="Adicionar nota específica deste item..."
+                            value={item.observacao}
+                            onChangeText={txt => updateChecklistObservacao(idx, txt)}
+                            multiline
+                          />
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          );
+        })()}
 
         {/* 6º Card de Acompanhantes da Visita */}
         <View style={styles.card}>
@@ -1384,6 +1483,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+  checklistAccordionPercentText: {
+    color: '#86EFAC',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  checklistProgressBarTrackMini: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 2,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  checklistProgressBarFillMini: {
+    height: '100%',
+    backgroundColor: '#22C55E',
+    borderRadius: 2,
+  },
+  checklistProgressCardDetail: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  checklistProgressDetailLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  checklistProgressDetailValue: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#16A34A',
+  },
+  checklistProgressBarTrackLarge: {
+    height: 8,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  checklistProgressBarFillLarge: {
+    height: '100%',
+    backgroundColor: '#16A34A',
+    borderRadius: 4,
+  },
   accordionBody: {
     padding: 14,
     backgroundColor: '#FFFFFF',
@@ -1428,6 +1573,11 @@ const styles = StyleSheet.create({
   checkItemRowActive: {
     backgroundColor: '#F0FDF4',
   },
+  checkItemRowPreviouslyApproved: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    borderWidth: 1,
+  },
   checkItemText: {
     fontSize: 13,
     color: '#334155',
@@ -1436,6 +1586,22 @@ const styles = StyleSheet.create({
   checkItemTextActive: {
     fontWeight: '600',
     color: '#166534',
+  },
+  prevApprovalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#D1FAE5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 3,
+    gap: 4,
+  },
+  prevApprovalText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#065F46',
   },
   obsBox: {
     marginTop: 4,
