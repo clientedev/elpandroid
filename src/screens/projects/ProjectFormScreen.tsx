@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator 
 } from 'react-native';
@@ -7,6 +7,7 @@ import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { saveLocalProjeto, addToSyncQueue, getNextProjectNumber } from '../../database/db';
 import { ensureProjectFolders } from '../../services/appFilesService';
+import { apiClient } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Projeto } from '../../types';
@@ -26,6 +27,12 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   const { user } = useAuth();
   const { isOnline, triggerSync } = useNetwork();
   const existingProject: Projeto | undefined = route?.params?.project;
+  const [projectId] = useState<number>(existingProject?.id || Date.now());
+
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState('');
+  const isSavingRef = useRef(false);
+  const hasSavedRef = useRef(false);
 
   // 1º Campo: Construtora (em estrito atendimento à regra do manual)
   const [construtora, setConstrutora] = useState(existingProject?.construtora || '');
@@ -33,6 +40,13 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   // 2º Campo: Nome da Obra e Número de Identificação (Regra OBRA-0001 em diante)
   const [nome, setNome] = useState(existingProject?.nome || '');
   const [numero, setNumero] = useState(existingProject?.numero || 'OBRA-0001');
+
+  // CEP e Autocomplete de Endereço
+  const [cep, setCep] = useState('');
+  const [loadingCep, setLoadingCep] = useState(false);
+  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const streetSearchTimeout = useRef<any>(null);
 
   useEffect(() => {
     if (!existingProject) {
@@ -87,6 +101,203 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
   const [loading, setLoading] = useState(false);
 
+  // ================= AUTOSAVE EM TEMPO REAL =================
+  const saveDraftImmediately = useCallback(async () => {
+    if (!nome.trim() && !construtora.trim()) return;
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    try {
+      setIsAutoSaving(true);
+      const numInicialParsed = parseInt(numeracaoInicial, 10);
+      const projData: Projeto = {
+        id: projectId,
+        numero: numero.trim() || 'OBRA-0001',
+        nome: nome.trim() || 'Obra em Andamento',
+        construtora: construtora.trim() || 'ELP Engenharia',
+        tipo_obra: tipoObra,
+        endereco: endereco.trim(),
+        latitude: latitude,
+        longitude: longitude,
+        nome_funcionario: funcionario.trim(),
+        responsavel_id: existingProject?.responsavel_id || user?.id || 1,
+        email_principal: emailPrincipal.trim(),
+        numeracao_inicial: isNaN(numInicialParsed) ? 1 : numInicialParsed,
+        status: status,
+        elementos_construtivos_base: elementosBase.trim(),
+        especificacao_chapisco_colante: chapiscoColante.trim(),
+        especificacao_chapisco_alvenaria: chapiscoAlvenaria.trim(),
+        especificacao_argamassa_emboco: argamassaEmboco.trim(),
+        forma_aplicacao_argamassa: formaAplicacao.trim(),
+        acabamentos_revestimento: acabamentosRevestimento.trim(),
+        acabamento_peitoris: peitoris.trim(),
+        acabamento_muretas: muretas.trim(),
+        definicao_frisos_cor: frisosCor.trim(),
+        definicao_face_inferior_abas: faceInferiorAbas.trim(),
+        observacoes_projeto_fachada: observacoesFachada.trim(),
+        outras_observacoes: outrasObs.trim(),
+        sync_status: 'pending',
+      };
+
+      // 1. Salva no SQLite local
+      await saveLocalProjeto(projData, 'pending');
+
+      // 2. Garante pastas da obra
+      await ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
+
+      // 3. Registra na fila de sincronização
+      await addToSyncQueue(
+        'projeto',
+        projectId,
+        existingProject ? 'update' : 'create',
+        existingProject ? `/api/projetos/${projectId}` : '/api/projetos',
+        existingProject ? 'PUT' : 'POST',
+        projData
+      );
+
+      // 4. Salva online se conectado
+      if (isOnline) {
+        if (existingProject) {
+          apiClient.axios.put(`/api/projetos/${projectId}`, projData).catch(() => null);
+        } else {
+          apiClient.axios.post('/api/projetos', projData).catch(() => null);
+        }
+      }
+
+      const d = new Date();
+      setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    } catch (err) {
+      console.warn('[ProjectForm] AutoSave erro:', err);
+    } finally {
+      setIsAutoSaving(false);
+      isSavingRef.current = false;
+    }
+  }, [
+    projectId, numero, nome, construtora, tipoObra, endereco, latitude, longitude,
+    funcionario, emailPrincipal, numeracaoInicial, status, elementosBase,
+    chapiscoColante, chapiscoAlvenaria, argamassaEmboco, formaAplicacao,
+    acabamentosRevestimento, peitoris, muretas, frisosCor, faceInferiorAbas,
+    observacoesFachada, outrasObs, existingProject, user, isOnline
+  ]);
+
+  // Debounced AutoSave a cada alteração em qualquer campo da obra (1500ms)
+  useEffect(() => {
+    if (!nome.trim() && !construtora.trim()) return;
+    const timer = setTimeout(() => {
+      saveDraftImmediately();
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [
+    nome, construtora, tipoObra, funcionario, emailPrincipal, numeracaoInicial,
+    endereco, latitude, longitude, status, elementosBase, chapiscoColante,
+    chapiscoAlvenaria, argamassaEmboco, formaAplicacao, acabamentosRevestimento,
+    peitoris, muretas, frisosCor, faceInferiorAbas, observacoesFachada, outrasObs,
+    saveDraftImmediately
+  ]);
+
+  // Forçar salvamento e atualização sempre que voltar de janela (seja deslizando o dedo ou botão voltar)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (hasSavedRef.current) return;
+      e.preventDefault();
+      saveDraftImmediately().finally(() => {
+        hasSavedRef.current = true;
+        if (isOnline) triggerSync();
+        navigation.dispatch(e.data.action);
+      });
+    });
+    return unsubscribe;
+  }, [navigation, saveDraftImmediately, isOnline, triggerSync]);
+
+  // ================= CEP & AUTOCOMPLETE DE ENDEREÇO =================
+  function handleCepChange(text: string) {
+    let raw = text.replace(/\D/g, '');
+    if (raw.length > 8) raw = raw.slice(0, 8);
+    let formatted = raw;
+    if (raw.length > 5) {
+      formatted = `${raw.slice(0, 5)}-${raw.slice(5)}`;
+    }
+    setCep(formatted);
+    if (raw.length === 8) {
+      handleBuscarCep(raw);
+    }
+  }
+
+  async function handleBuscarCep(cepParam?: string) {
+    const rawCep = (cepParam || cep).replace(/\D/g, '');
+    if (rawCep.length !== 8) {
+      Alert.alert('CEP Inválido', 'Por favor, informe um CEP válido com 8 dígitos.');
+      return;
+    }
+    setLoadingCep(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${rawCep}/json/`).then(r => r.json());
+      if (res.erro) {
+        Alert.alert('CEP Não Encontrado', 'Não foi possível localizar o endereço para o CEP informado.');
+        return;
+      }
+      const parts = [
+        res.logradouro,
+        res.bairro,
+        res.localidade ? `${res.localidade} - ${res.uf}` : res.uf,
+        `CEP ${res.cep || rawCep}`
+      ].filter(Boolean);
+      const fullAddr = parts.join(', ');
+      setEndereco(fullAddr);
+
+      // Tenta geocodificar coordenadas
+      try {
+        const query = `${res.logradouro || ''}, ${res.localidade || ''}, ${res.uf || ''}, Brasil`;
+        const geocode = await Location.geocodeAsync(query);
+        if (geocode && geocode.length > 0) {
+          setLatitude(geocode[0].latitude);
+          setLongitude(geocode[0].longitude);
+        }
+      } catch (geoErr) {
+        console.warn('Geocodificação CEP aviso:', geoErr);
+      }
+    } catch (err: any) {
+      Alert.alert('Erro ao Buscar CEP', 'Falha na conexão com o serviço de busca de CEP.');
+    } finally {
+      setLoadingCep(false);
+    }
+  }
+
+  function handleSearchStreet(query: string) {
+    setEndereco(query);
+    if (streetSearchTimeout.current) clearTimeout(streetSearchTimeout.current);
+    if (!query || query.trim().length < 3) {
+      setStreetSuggestions([]);
+      return;
+    }
+    streetSearchTimeout.current = setTimeout(async () => {
+      setLoadingSuggestions(true);
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=br&limit=5&addressdetails=1`;
+        const res = await fetch(url, {
+          headers: { 'User-Agent': 'ObraFlowAndroid/1.0' }
+        }).then(r => r.json());
+        if (Array.isArray(res)) {
+          setStreetSuggestions(res);
+        } else {
+          setStreetSuggestions([]);
+        }
+      } catch {
+        setStreetSuggestions([]);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    }, 400);
+  }
+
+  function handleSelectSuggestion(item: any) {
+    setEndereco(item.display_name);
+    if (item.lat && item.lon) {
+      setLatitude(parseFloat(item.lat));
+      setLongitude(parseFloat(item.lon));
+    }
+    setStreetSuggestions([]);
+  }
+
   // Captura de GPS de hardware de alta precisão do dispositivo móvel + Geocodificação Reversa para endereço
   async function handleCapturarGps() {
     setLoadingGps(true);
@@ -100,7 +311,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         return;
       }
 
-      // Obtém coordenadas reais com precisão máxima do hardware do celular (não por rede)
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Highest,
       });
@@ -110,7 +320,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       setLatitude(newLat);
       setLongitude(newLon);
 
-      // Realiza geocodificação reversa para obter o endereço legível (rua, número, bairro, cidade, UF, CEP)
       let resolvedAddress = '';
       try {
         const reverseGeocode = await Location.reverseGeocodeAsync({
@@ -178,7 +387,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   }
 
   async function handleSave() {
-    // Validação dos campos obrigatórios
     if (!construtora.trim()) {
       Alert.alert('Campo Obrigatório', 'Por favor, informe o Nome da Construtora (1º campo da tela).');
       return;
@@ -193,12 +401,12 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     }
 
     setLoading(true);
+    hasSavedRef.current = true;
     try {
-      const projId = existingProject?.id || Date.now();
       const numInicialParsed = parseInt(numeracaoInicial, 10) || 1;
 
       const projData: Projeto = {
-        id: projId,
+        id: projectId,
         numero: numero.trim(),
         nome: nome.trim(),
         construtora: construtora.trim(),
@@ -226,23 +434,18 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         sync_status: 'pending',
       };
 
-      // 1. Salva no SQLite local
       await saveLocalProjeto(projData, 'pending');
-
-      // 2. Regra: Criou obra -> Criou pasta (com subpastas Imagens e Relatorios_Aprovados_PDF)
       await ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
 
-      // 2. Fila de sincronização Railway
       await addToSyncQueue(
         'projeto',
-        projId,
+        projectId,
         existingProject ? 'update' : 'create',
-        existingProject ? `/api/projetos/${projId}` : '/api/projetos',
+        existingProject ? `/api/projetos/${projectId}` : '/api/projetos',
         existingProject ? 'PUT' : 'POST',
         projData
       );
 
-      // 3. Dispara sincronização se online
       if (isOnline) {
         triggerSync();
       }
@@ -265,9 +468,29 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         title={existingProject ? "Editar Obra" : "Nova Obra"} 
         subtitle="Cadastro Técnico da Edificação"
         showBack 
-        onBack={() => navigation.goBack()} 
+        onBack={async () => {
+          await saveDraftImmediately();
+          if (isOnline) triggerSync();
+          navigation.goBack();
+        }} 
       />
       <OfflineBanner />
+
+      {/* Indicador de AutoSave em Tempo Real no Topo */}
+      <View style={styles.autoSaveBar}>
+        <Ionicons 
+          name={isAutoSaving ? "sync-outline" : "checkmark-circle"} 
+          size={14} 
+          color={isAutoSaving ? "#0284C7" : "#16A34A"} 
+        />
+        <Text style={[styles.autoSaveText, isAutoSaving && { color: '#0284C7' }]}>
+          {isAutoSaving 
+            ? 'Salvando alterações da obra...' 
+            : lastSavedTime 
+              ? `Todas as alterações salvas às ${lastSavedTime}` 
+              : 'Salvamento automático ativo em todos os campos'}
+        </Text>
+      </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
@@ -383,14 +606,49 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
           {/* 7. Endereço Completo e Geolocalização */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>7. Endereço Completo e Localização GPS (Dispositivo)</Text>
+            <Text style={styles.label}>7. Endereço Completo e Localização</Text>
+
+            {/* Busca por CEP */}
+            <Text style={[styles.label, { fontSize: 12, color: '#64748B', marginTop: 4 }]}>
+              Preenchimento Automático por CEP:
+            </Text>
+            <View style={styles.cepRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                placeholder="Digite o CEP (Ex: 01001-000)"
+                placeholderTextColor="#94A3B8"
+                keyboardType="numeric"
+                maxLength={9}
+                value={cep}
+                onChangeText={handleCepChange}
+              />
+              <TouchableOpacity
+                style={styles.cepBtn}
+                onPress={() => handleBuscarCep()}
+                disabled={loadingCep}
+              >
+                {loadingCep ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="search" size={16} color="#FFFFFF" />
+                    <Text style={styles.cepBtnText}>Buscar CEP</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Nome da Rua / Endereço com Autocomplete */}
+            <Text style={[styles.label, { fontSize: 12, color: '#64748B', marginTop: 4 }]}>
+              Logradouro / Rua (sugestões em lista ao digitar) ou GPS:
+            </Text>
             <View style={styles.addressRow}>
               <TextInput 
                 style={[styles.input, { flex: 1 }]} 
-                placeholder="Rua, número, bairro, cidade, CEP (ou toque no GPS)" 
+                placeholder="Digite a rua (busca automática) ou endereço completo" 
                 placeholderTextColor="#94A3B8"
                 value={endereco} 
-                onChangeText={setEndereco} 
+                onChangeText={handleSearchStreet} 
               />
               <TouchableOpacity 
                 style={styles.gpsBtn} 
@@ -407,6 +665,31 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
                 )}
               </TouchableOpacity>
             </View>
+
+            {/* Sugestões do Dropdown da Rua */}
+            {loadingSuggestions && (
+              <View style={styles.suggestionLoading}>
+                <ActivityIndicator size="small" color="#0284C7" />
+              </View>
+            )}
+            {streetSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {streetSuggestions.map((item, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.suggestionItem}
+                      onPress={() => handleSelectSuggestion(item)}
+                    >
+                      <Ionicons name="location-outline" size={16} color="#0284C7" />
+                      <Text style={styles.suggestionText} numberOfLines={2}>
+                        {item.display_name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             {latitude && longitude ? (
               <View style={styles.coordinatesTag}>
@@ -696,6 +979,73 @@ const styles = StyleSheet.create({
   dropdownItemTextActive: {
     fontWeight: 'bold',
     color: Colors.primary,
+  },
+  autoSaveBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DCFCE7',
+  },
+  autoSaveText: {
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: '500',
+  },
+  cepRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cepBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 8,
+  },
+  cepBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  suggestionsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    borderRadius: 8,
+    marginTop: 4,
+    maxHeight: 180,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 999,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: 8,
+  },
+  suggestionText: {
+    fontSize: 12,
+    color: '#1E293B',
+    flex: 1,
+  },
+  suggestionLoading: {
+    padding: 10,
+    alignItems: 'center',
   },
   addressRow: {
     flexDirection: 'row',

@@ -1,18 +1,28 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
-import { getLocalVisitaById, saveLocalVisita, addToSyncQueue } from '../../database/db';
+import { getLocalVisitaById, saveLocalVisita, addToSyncQueue, deleteLocalVisita } from '../../database/db';
 import { useNetwork } from '../../contexts/NetworkContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { apiClient } from '../../services/api';
 import { Visita } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
 export const VisitDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { visitId } = route.params;
   const { isOnline, triggerSync } = useNetwork();
+  const { user } = useAuth();
   const [visita, setVisita] = useState<Visita | null>(null);
+
+  const isMasterOrAdmin = Boolean(
+    user?.is_master || 
+    (user as any)?.role === 'admin' || 
+    (user as any)?.role === 'master' ||
+    user?.username?.toLowerCase() === 'admin'
+  );
 
   useEffect(() => {
     loadVisit();
@@ -51,6 +61,42 @@ export const VisitDetailScreen: React.FC<{ route: any; navigation: any }> = ({ r
     } catch (err: any) {
       Alert.alert('Erro', err.message);
     }
+  }
+
+  async function handleDeleteVisit() {
+    if (!visita || !isMasterOrAdmin) {
+      Alert.alert('Acesso Negado', 'Apenas usuários Master ou Administradores têm permissão para excluir visitas.');
+      return;
+    }
+
+    Alert.alert(
+      'Excluir Visita',
+      `Tem certeza que deseja excluir a visita ${visita.numero || ''}? Esta ação removerá o agendamento permanentemente.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteLocalVisita(visita.id);
+              if (isOnline) {
+                await apiClient.axios.delete(`/api/visits/${visita.id}`, {
+                  data: { user_id: user?.id, is_master: true }
+                }).catch(() => null);
+              } else {
+                await addToSyncQueue('visita', visita.id, 'delete', `/api/visits/${visita.id}`, 'DELETE', { user_id: user?.id, is_master: true });
+              }
+              if (isOnline) triggerSync();
+              Alert.alert('Sucesso', 'Visita excluída com sucesso.');
+              navigation.goBack();
+            } catch (delErr: any) {
+              Alert.alert('Erro', delErr?.message || 'Falha ao excluir visita.');
+            }
+          }
+        }
+      ]
+    );
   }
 
   if (!visita) {
@@ -137,6 +183,16 @@ export const VisitDetailScreen: React.FC<{ route: any; navigation: any }> = ({ r
           >
             <Ionicons name="checkmark-done-circle-outline" size={20} color="#FFFFFF" />
             <Text style={styles.btnText}>Concluir e Marcar Como Realizada</Text>
+          </TouchableOpacity>
+        )}
+
+        {isMasterOrAdmin && (
+          <TouchableOpacity 
+            style={[styles.btn, { backgroundColor: '#EF4444', marginTop: 10 }]}
+            onPress={handleDeleteVisit}
+          >
+            <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.btnText}>Excluir Visita (Master)</Text>
           </TouchableOpacity>
         )}
 

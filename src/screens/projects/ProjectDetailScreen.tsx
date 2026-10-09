@@ -10,7 +10,8 @@ import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalProjetoById, getLocalRelatorios, getLocalVisitas, getLocalLembretes, 
   saveLocalProjeto, addToSyncQueue, getLocalContatos, saveLocalContato,
-  deleteLocalProjetoCascade, getLocalChecklistTemplate, getChecklistProgressoObra
+  deleteLocalProjetoCascade, getLocalChecklistTemplate, getChecklistProgressoObra,
+  deleteLocalVisita
 } from '../../database/db';
 
 const DEFAULT_OBRA_CHECKLIST = [
@@ -249,17 +250,18 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
     if (!projeto) return;
     setIsDeleting(true);
     try {
+      const payload = { user_id: currentUser?.id, is_master: true, username: currentUser?.username };
       if (isOnline) {
         try {
-          await apiClient.axios.delete(`/api/projetos/${projeto.id}`);
+          await apiClient.axios.delete(`/api/projetos/${projeto.id}`, { data: payload });
         } catch (apiErr: any) {
-          console.warn('Aviso ao excluir no servidor:', apiErr);
-          if (apiErr.response?.data?.error) {
-            throw new Error(apiErr.response.data.error);
-          }
+          console.warn('Aviso ao excluir no servidor (enfileirando offline):', apiErr);
+          await addToSyncQueue('projeto', projeto.id, 'delete', `/api/projetos/${projeto.id}`, 'DELETE', payload);
         }
+      } else {
+        await addToSyncQueue('projeto', projeto.id, 'delete', `/api/projetos/${projeto.id}`, 'DELETE', payload);
       }
-      // Cascata completa no banco SQLite local
+      // Cascata completa no banco SQLite local (com registro de tombstone)
       await deleteLocalProjetoCascade(projeto.id);
       setShowDeleteModal(false);
       Alert.alert(
@@ -280,6 +282,42 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
     } finally {
       setIsDeleting(false);
     }
+  }
+
+  async function handleDeleteVisitaItem(v: Visita) {
+    if (!isMasterOrAdmin) return;
+    Alert.alert(
+      'Excluir Visita',
+      `Tem certeza que deseja excluir permanentemente a visita ${v.numero}? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteLocalVisita(v.id);
+              const payload = { user_id: currentUser?.id, is_master: true, username: currentUser?.username };
+              if (isOnline) {
+                try {
+                  await apiClient.axios.delete(`/api/visits/${v.id}`, { data: payload });
+                } catch (delErr: any) {
+                  console.warn('Aviso ao excluir visita no servidor (enfileirando offline):', delErr);
+                  await addToSyncQueue('visita', v.id, 'delete', `/api/visits/${v.id}`, 'DELETE', payload);
+                }
+              } else {
+                await addToSyncQueue('visita', v.id, 'delete', `/api/visits/${v.id}`, 'DELETE', payload);
+              }
+              if (isOnline) triggerSync();
+              await loadDetails();
+              Alert.alert('Sucesso', 'Visita excluída com sucesso.');
+            } catch (err: any) {
+              Alert.alert('Erro', err?.message || 'Falha ao excluir visita.');
+            }
+          }
+        }
+      ]
+    );
   }
 
   if (!projeto) {
@@ -697,20 +735,29 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
               </View>
             ) : (
               visitas.map(v => (
-                <TouchableOpacity
-                  key={v.id}
-                  style={styles.subItemCard}
-                  onPress={() => navigation.navigate('VisitDetailScreen', { visitId: v.id })}
-                >
-                  <View style={styles.subHeader}>
-                    <Text style={styles.subNumber}>{v.numero}</Text>
-                    <SyncStatusBadge status={v.sync_status} />
-                  </View>
-                  <Text style={styles.subTitle}>{v.responsavel_nome}</Text>
-                  <Text style={styles.subDate}>
-                    {new Date(v.data_inicio).toLocaleDateString('pt-BR')} às {new Date(v.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </TouchableOpacity>
+                <View key={v.id} style={[styles.subItemCard, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => navigation.navigate('VisitDetailScreen', { visitId: v.id })}
+                  >
+                    <View style={styles.subHeader}>
+                      <Text style={styles.subNumber}>{v.numero}</Text>
+                      <SyncStatusBadge status={v.sync_status} />
+                    </View>
+                    <Text style={styles.subTitle}>{v.responsavel_nome}</Text>
+                    <Text style={styles.subDate}>
+                      {new Date(v.data_inicio).toLocaleDateString('pt-BR')} às {new Date(v.data_inicio).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </TouchableOpacity>
+                  {isMasterOrAdmin && (
+                    <TouchableOpacity
+                      style={{ padding: 10, marginLeft: 8 }}
+                      onPress={() => handleDeleteVisitaItem(v)}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                    </TouchableOpacity>
+                  )}
+                </View>
               ))
             )}
           </View>

@@ -246,6 +246,13 @@ CREATE TABLE IF NOT EXISTS checklist_custom_template (
   ordem INTEGER DEFAULT 0,
   ativo INTEGER DEFAULT 1
 );
+
+CREATE TABLE IF NOT EXISTS deleted_entities (
+  entity_type TEXT NOT NULL,
+  entity_id INTEGER NOT NULL,
+  deleted_at TEXT NOT NULL,
+  PRIMARY KEY (entity_type, entity_id)
+);
 `;
 
 export const SEED_CHECKLIST = [

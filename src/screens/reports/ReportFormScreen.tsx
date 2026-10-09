@@ -13,7 +13,7 @@ import {
   closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
   migrateLocalFotosRelatorioId, getDatabase, getLocalChecklistTemplate,
   getChecklistProgressoObra, saveBatchChecklistProgressoObra, getLocalRelatorios,
-  updateLocalProjetoInfoTecnica
+  updateLocalProjetoInfoTecnica, getNextReportNumberForProject
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -154,6 +154,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const isProcessingPhotoRef = useRef(false);
   const initializedDraftRef = React.useRef(false);
+  const hasSavedAndExitingRef = useRef(false);
 
   // Localização do dispositivo via GPS de hardware para ordenação inteligente por proximidade
   useEffect(() => {
@@ -376,37 +377,26 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }
   }, [selectedProjectId, initialReportId, projetos, saveDraftImmediately]);
 
-  // Intercepta botão voltar do hardware do Android
+  // Intercepta qualquer saída da navegação (incluindo deslizar o dedo na tela, botão físico do Android ou botão voltar)
+  // Forçando salvamento e sincronização antes de trocar de janela
   useEffect(() => {
-    const onHardwareBack = () => {
+    const unsub = navigation.addListener('beforeRemove', (e: any) => {
+      if (hasSavedAndExitingRef.current) return;
+      e.preventDefault();
       saveDraftImmediately().finally(() => {
+        hasSavedAndExitingRef.current = true;
         const targetId = currentReportId || initialReportId;
         if (targetId && isOnline) {
           apiClient.axios
             .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
             .catch(() => null);
         }
-        navigation.goBack();
+        if (isOnline) triggerSync();
+        navigation.dispatch(e.data.action);
       });
-      return true;
-    };
-    const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
-    return () => sub.remove();
-  }, [saveDraftImmediately, navigation, currentReportId, initialReportId, isOnline, user]);
-
-  // Intercepta qualquer saída da navegação (incluindo gestos e pop)
-  useEffect(() => {
-    const unsub = navigation.addListener('beforeRemove', () => {
-      saveDraftImmediately().catch(() => null);
-      const targetId = currentReportId || initialReportId;
-      if (targetId && isOnline) {
-        apiClient.axios
-          .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
-          .catch(() => null);
-      }
     });
     return unsub;
-  }, [navigation, saveDraftImmediately, initialReportId, currentReportId, isOnline, user]);
+  }, [navigation, saveDraftImmediately, initialReportId, currentReportId, isOnline, user, triggerSync]);
 
   // Bloqueio Colaborativo: Impede entrar no relatório se outro usuário estiver preenchendo
   useEffect(() => {
@@ -953,12 +943,18 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     try {
       const reportId = currentReportId;
 
+      let finalReportNumber = reportNumber;
+      if (status === 'Aguardando Aprovação' && (!finalReportNumber || !finalReportNumber.startsWith('REL-') || finalReportNumber.includes('Pendente') || finalReportNumber.includes('Rascunho'))) {
+        finalReportNumber = await getNextReportNumberForProject(selectedProjectId);
+        setReportNumber(finalReportNumber);
+      }
+
       const relData: Relatorio = {
         id: reportId,
         uuid: reportUuid,
         uuid_local: reportUuid,
         data_criacao_local: new Date().toISOString(),
-        numero: reportNumber,
+        numero: finalReportNumber,
         titulo: titulo.trim(),
         projeto_id: selectedProjectId,
         projeto_nome: selectedProj?.nome || 'Obra',
@@ -1083,6 +1079,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         [{ 
           text: 'OK', 
           onPress: () => {
+            hasSavedAndExitingRef.current = true;
             const targetId = currentReportId || initialReportId;
             if (targetId && isOnline) {
               apiClient.axios

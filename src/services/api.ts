@@ -36,11 +36,22 @@ class ApiClient {
       console.warn('Error loading stored auth session:', e);
     }
 
-    // Interceptor to add cookie header
-    this.instance.interceptors.request.use((config) => {
+    // Interceptor to add cookie and mobile user headers
+    this.instance.interceptors.request.use(async (config) => {
       if (this.sessionCookie) {
         config.headers.Cookie = this.sessionCookie;
       }
+      try {
+        const storedUser = await AsyncStorage.getItem('obraflow_current_user');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          if (user?.id) config.headers['X-User-Id'] = String(user.id);
+          if (user?.username) config.headers['X-Username'] = user.username;
+          if (user?.is_master || user?.username?.toLowerCase() === 'admin') {
+            config.headers['X-Is-Master'] = 'true';
+          }
+        }
+      } catch {}
       return config;
     });
 

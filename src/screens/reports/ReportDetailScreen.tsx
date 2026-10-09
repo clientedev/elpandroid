@@ -11,7 +11,7 @@ import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
   getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue, deleteLocalRelatorio,
-  saveBatchChecklistProgressoObra
+  saveBatchChecklistProgressoObra, getNextReportNumberForProject, getDatabase
 } from '../../database/db';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
 import { apiClient } from '../../services/api';
@@ -179,6 +179,11 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
   async function handleSubmitApproval() {
     if (!relatorio) return;
     try {
+      let finalNum = relatorio.numero;
+      if (!finalNum || !finalNum.startsWith('REL-') || finalNum.includes('Rascunho') || finalNum.includes('Pendente')) {
+        finalNum = await getNextReportNumberForProject(relatorio.projeto_id);
+      }
+
       await updateLocalRelatorioStatus(
         relatorio.id,
         'Aguardando Aprovação',
@@ -187,17 +192,23 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
         undefined,
         'pending'
       );
+
+      if (finalNum !== relatorio.numero) {
+        const db = await getDatabase();
+        await db.runAsync('UPDATE relatorios SET numero = ? WHERE id = ?', [finalNum, relatorio.id]);
+      }
+
       await addToSyncQueue(
         'relatorio',
         relatorio.id,
         'submit_approval',
         `/api/relatorios/${relatorio.id}/status`,
         'POST',
-        { status: 'Aguardando Aprovação' }
+        { status: 'Aguardando Aprovação', numero: finalNum }
       );
       if (isOnline) triggerSync();
       await loadReport();
-      Alert.alert('Sucesso', 'Relatório submetido para aprovação!');
+      Alert.alert('Sucesso', `Relatório submetido para aprovação com o número ${finalNum}!`);
     } catch (err: any) {
       Alert.alert('Erro', err.message);
     }

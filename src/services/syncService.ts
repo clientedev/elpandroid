@@ -10,7 +10,8 @@ import {
   getLocalFotos, saveLocalFoto, 
   getLocalFotosExpress, saveLocalFotoExpress,
   updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase,
-  getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade
+  getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade,
+  getDeletedEntityIds, clearDeletedEntityLocally
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato } from '../types';
 import { notificationService } from './notificationService';
@@ -222,13 +223,16 @@ class SyncService {
           } else if (item.method === 'PUT') {
             response = await apiClient.axios.put(item.endpoint, payload);
           } else if (item.method === 'DELETE') {
-            response = await apiClient.axios.delete(item.endpoint);
+            response = await apiClient.axios.delete(item.endpoint, { data: payload });
           } else {
             response = await apiClient.axios.get(item.endpoint);
           }
 
           // Mark completed
           await updateSyncQueueItem(item.id, 'completed');
+          if (item.method === 'DELETE') {
+            await clearDeletedEntityLocally(item.entity_type, item.entity_id);
+          }
           processedCount++;
           syncedEntitiesInBatch.add(entityKey);
           if (uuidKey) syncedEntitiesInBatch.add(uuidKey);
@@ -318,6 +322,20 @@ class SyncService {
     try {
       const db = await getDatabase();
 
+      // Carrega IDs excluídos localmente (tombstones) e itens pendentes de exclusão na fila
+      const deletedProjects = await getDeletedEntityIds('projeto');
+      const deletedVisits = await getDeletedEntityIds('visita');
+      const deletedReports = await getDeletedEntityIds('relatorio');
+
+      const queueDeletes = await db.getAllAsync<{ entity_type: string; entity_id: number }>(
+        "SELECT entity_type, entity_id FROM sync_queue WHERE action = 'delete' OR method = 'DELETE'"
+      ).catch(() => []);
+      for (const q of queueDeletes) {
+        if (q.entity_type === 'projeto') deletedProjects.add(q.entity_id);
+        if (q.entity_type === 'visita') deletedVisits.add(q.entity_id);
+        if (q.entity_type === 'relatorio') deletedReports.add(q.entity_id);
+      }
+
       // 1. Pull Projetos com Reconciliação de Exclusão
       const projectsRes = await apiClient.axios.get('/api/projetos', { timeout: 8000 }).catch(() => null);
       if (projectsRes && Array.isArray(projectsRes.data)) {
@@ -333,8 +351,20 @@ class SyncService {
           }
         }
 
-        // Salvar/atualizar obras ativas do servidor
+        // Limpa tombstones confirmados pelo servidor (já não constam na nuvem)
+        for (const delId of deletedProjects) {
+          if (!serverProjectIds.has(delId)) {
+            await clearDeletedEntityLocally('projeto', delId);
+          }
+        }
+
+        // Salvar/atualizar obras ativas do servidor (ignorando as que foram deletadas)
         for (const p of serverProjects) {
+          if (deletedProjects.has(p.id)) {
+            console.log(`[SyncService] Obra ${p.id} marcada como excluída localmente. Ignorando download e disparando remoção no servidor.`);
+            apiClient.axios.delete(`/api/projetos/${p.id}`, { data: { is_master: true } }).catch(() => null);
+            continue;
+          }
           await saveLocalProjeto(p, 'synced');
           await ensureProjectFolders(p.nome, p.numero || p.codigo).catch(() => null);
         }
@@ -355,7 +385,18 @@ class SyncService {
           }
         }
 
+        for (const delId of deletedVisits) {
+          if (!serverVisitIds.has(delId)) {
+            await clearDeletedEntityLocally('visita', delId);
+          }
+        }
+
         for (const v of serverVisits) {
+          if (deletedVisits.has(v.id)) {
+            console.log(`[SyncService] Visita ${v.id} marcada como excluída localmente. Ignorando download e disparando remoção no servidor.`);
+            apiClient.axios.delete(`/api/visits/${v.id}`, { data: { is_master: true } }).catch(() => null);
+            continue;
+          }
           await saveLocalVisita(v, 'synced');
         }
       }
@@ -375,7 +416,18 @@ class SyncService {
           }
         }
 
+        for (const delId of deletedReports) {
+          if (!serverReportIds.has(delId)) {
+            await clearDeletedEntityLocally('relatorio', delId);
+          }
+        }
+
         for (const r of serverReports) {
+          if (deletedReports.has(r.id)) {
+            console.log(`[SyncService] Relatório ${r.id} marcado como excluído localmente. Ignorando download e disparando remoção no servidor.`);
+            apiClient.axios.delete(`/api/relatorios/${r.id}`, { data: { is_master: true } }).catch(() => null);
+            continue;
+          }
           await saveLocalRelatorio(r, 'synced');
           if (Array.isArray(r.fotos)) {
             for (const f of r.fotos) {

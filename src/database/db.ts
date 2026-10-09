@@ -123,6 +123,11 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
   try {
     await db.execAsync('ALTER TABLE relatorios ADD COLUMN em_edicao_em TEXT;');
   } catch {}
+
+  // Ensure deleted_entities table exists for tombstone reconciliation
+  try {
+    await db.execAsync('CREATE TABLE IF NOT EXISTS deleted_entities (entity_type TEXT NOT NULL, entity_id INTEGER NOT NULL, deleted_at TEXT NOT NULL, PRIMARY KEY (entity_type, entity_id));');
+  } catch {}
   
   // Seed/Sync legendas predefinidas garantindo todas as 12 categorias tecnicas solicitadas
   for (const leg of SEED_LEGENDAS) {
@@ -269,9 +274,63 @@ export async function saveLocalProjeto(p: Projeto, syncStatus: 'synced' | 'pendi
   } catch {}
 }
 
+// ================= TOMBSTONES / EXCLUSÕES =================
+export async function markEntityDeletedLocally(entityType: string, entityId: number): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      'INSERT OR REPLACE INTO deleted_entities (entity_type, entity_id, deleted_at) VALUES (?, ?, ?)',
+      [entityType, entityId, new Date().toISOString()]
+    );
+  } catch (err) {
+    console.warn(`[DB] Erro ao marcar entidade ${entityType}:${entityId} como deletada:`, err);
+  }
+}
+
+export async function isEntityDeletedLocally(entityType: string, entityId: number): Promise<boolean> {
+  try {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ entity_id: number }>(
+      'SELECT entity_id FROM deleted_entities WHERE entity_type = ? AND entity_id = ?',
+      [entityType, entityId]
+    );
+    return Boolean(row);
+  } catch {
+    return false;
+  }
+}
+
+export async function getDeletedEntityIds(entityType: string): Promise<Set<number>> {
+  try {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<{ entity_id: number }>(
+      'SELECT entity_id FROM deleted_entities WHERE entity_type = ?',
+      [entityType]
+    );
+    return new Set(rows.map(r => r.entity_id));
+  } catch {
+    return new Set();
+  }
+}
+
+export async function clearDeletedEntityLocally(entityType: string, entityId: number): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      'DELETE FROM deleted_entities WHERE entity_type = ? AND entity_id = ?',
+      [entityType, entityId]
+    );
+  } catch (err) {
+    console.warn(`[DB] Erro ao limpar tombstone ${entityType}:${entityId}:`, err);
+  }
+}
+
 export async function deleteLocalProjetoCascade(projetoId: number): Promise<void> {
   const db = await getDatabase();
   
+  // Marca tombstone para evitar ressuscitação pelo pullFromServer
+  await markEntityDeletedLocally('projeto', projetoId);
+
   // 1. Fotos dos relatórios vinculados à obra
   await db.runAsync(
     'DELETE FROM fotos_relatorio WHERE relatorio_id IN (SELECT id FROM relatorios WHERE projeto_id = ?);',
@@ -349,6 +408,14 @@ export async function saveLocalVisita(v: Visita, syncStatus: 'synced' | 'pending
       v.longitude || null, v.is_pessoal ? 1 : 0, syncStatus
     ]
   );
+}
+
+export async function deleteLocalVisita(id: number): Promise<void> {
+  const db = await getDatabase();
+  await markEntityDeletedLocally('visita', id);
+  await db.runAsync('DELETE FROM visita_participantes WHERE visita_id = ?;', [id]);
+  await db.runAsync('DELETE FROM visitas WHERE id = ?;', [id]);
+  await db.runAsync('DELETE FROM sync_queue WHERE entity_type = "visita" AND entity_id = ? AND action != "delete";', [id]);
 }
 
 // ================= RELATORIOS =================
@@ -487,8 +554,30 @@ export async function updateLocalRelatorioStatus(
 
 export async function deleteLocalRelatorio(id: number): Promise<void> {
   const db = await getDatabase();
+  await markEntityDeletedLocally('relatorio', id);
   await db.runAsync('DELETE FROM fotos_relatorio WHERE relatorio_id = ?', [id]);
   await db.runAsync('DELETE FROM relatorios WHERE id = ?', [id]);
+  await db.runAsync('DELETE FROM sync_queue WHERE entity_type = "relatorio" AND entity_id = ? AND action != "delete";', [id]);
+}
+
+export async function getNextReportNumberForProject(projectId: number): Promise<string> {
+  const db = await getDatabase();
+  const proj = await db.getFirstAsync<{ numeracao_inicial?: number }>('SELECT numeracao_inicial FROM projetos WHERE id = ?', [projectId]);
+  const startNum = proj?.numeracao_inicial && proj.numeracao_inicial > 0 ? proj.numeracao_inicial : 1;
+  const rows = await db.getAllAsync<{ numero: string }>('SELECT numero FROM relatorios WHERE projeto_id = ?', [projectId]);
+  let maxSeq = startNum - 1;
+  for (const row of rows) {
+    if (!row.numero) continue;
+    const match = row.numero.match(/REL[-_ ]*(\d+)/i);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      if (!isNaN(val) && val > maxSeq) {
+        maxSeq = val;
+      }
+    }
+  }
+  const nextSeq = maxSeq + 1;
+  return `REL-${String(nextSeq).padStart(4, '0')}`;
 }
 
 // ================= FOTOS =================
@@ -508,49 +597,40 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
     );
   }
 
-  // DEDUPLICAÇÃO RIGOROSA MULTIDIMENSIONAL: mescla fotos duplicadas por ordem, nome, uri ou base64
-  const seenByOrdem = new Map<number, FotoRelatorio>();
-  const seenByName = new Map<string, FotoRelatorio>();
+  // Deduplicação segura e não-destrutiva: mescla apenas fotos comprovadamente idênticas
+  const seenById = new Map<number, FotoRelatorio>();
   const seenByUri = new Map<string, FotoRelatorio>();
   const seenByB64 = new Map<string, FotoRelatorio>();
-
   const result: FotoRelatorio[] = [];
 
   for (const f of rows) {
-    const rawName = (f.filename 
-      || (f.uri_local ? f.uri_local.split('/').pop()?.split('?')[0] : null)
-      || (f.url ? f.url.split('/').pop()?.split('?')[0] : null) || '').toLowerCase();
-    const uriKey = (f.uri_local || '').trim();
-    const b64Key = (f.base64 && f.base64.length > 50) ? f.base64.substring(0, 80) : '';
-    const ordem = (typeof f.ordem === 'number' && !isNaN(f.ordem)) ? f.ordem : null;
+    const uriKey = (f.uri_local && f.uri_local.startsWith('file://')) ? f.uri_local.trim() : '';
+    const b64Key = (f.base64 && f.base64.length > 100) ? f.base64.substring(0, 80) : '';
 
     let existing: FotoRelatorio | undefined;
-    if (rawName && rawName.length > 3 && seenByName.has(rawName)) {
-      existing = seenByName.get(rawName);
-    } else if (uriKey && uriKey.length > 5 && seenByUri.has(uriKey)) {
+    if (f.id && seenById.has(f.id)) {
+      existing = seenById.get(f.id);
+    } else if (uriKey && seenByUri.has(uriKey)) {
       existing = seenByUri.get(uriKey);
     } else if (b64Key && seenByB64.has(b64Key)) {
       existing = seenByB64.get(b64Key);
-    } else if (ordem !== null && seenByOrdem.has(ordem)) {
-      existing = seenByOrdem.get(ordem);
     }
 
     if (existing) {
-      // Mescla priorizando a foto que tiver uri_local nativo file:// ou base64 para carregar imediatamente
+      // Mescla priorizando a foto que tiver uri_local nativo file:// ou base64
       if (f.uri_local && f.uri_local.startsWith('file://')) {
         existing.uri_local = f.uri_local;
       }
       if (!existing.base64 && f.base64) existing.base64 = f.base64;
       if (!existing.legenda && f.legenda) existing.legenda = f.legenda;
       if (!existing.anotacoes_dados && f.anotacoes_dados) existing.anotacoes_dados = f.anotacoes_dados;
-      if (f.id && f.id < 2000000000) existing.id = f.id; // prioriza ID oficial do servidor
+      if (f.id && f.id < 2000000000) existing.id = f.id;
       if (f.url) existing.url = f.url;
     } else {
       result.push(f);
-      if (rawName && rawName.length > 3) seenByName.set(rawName, f);
-      if (uriKey && uriKey.length > 5) seenByUri.set(uriKey, f);
+      if (f.id) seenById.set(f.id, f);
+      if (uriKey) seenByUri.set(uriKey, f);
       if (b64Key) seenByB64.set(b64Key, f);
-      if (ordem !== null) seenByOrdem.set(ordem, f);
     }
   }
 
