@@ -12454,18 +12454,24 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.24'
-    current_vc = 24
+    current_v = '1.0.27'
+    current_vc = 27
     try:
-        app_json_path = os.path.join(os.getcwd(), 'app.json')
-        if os.path.exists(app_json_path):
-            with open(app_json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                expo_data = data.get('expo', {})
-                if 'version' in expo_data:
-                    current_v = str(expo_data['version'])
-                if 'android' in expo_data and 'versionCode' in expo_data['android']:
-                    current_vc = int(expo_data['android']['versionCode'])
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            os.path.join(base_dir, 'app.json'),
+            os.path.join(os.getcwd(), 'app.json'),
+        ]
+        for app_json_path in candidates:
+            if os.path.exists(app_json_path):
+                with open(app_json_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    expo_data = data.get('expo', {})
+                    if 'version' in expo_data:
+                        current_v = str(expo_data['version'])
+                    if 'android' in expo_data and 'versionCode' in expo_data['android']:
+                        current_vc = int(expo_data['android']['versionCode'])
+                break
     except Exception as e:
         print(f"[app-version] Erro ao ler versao de app.json: {e}")
 
@@ -12475,7 +12481,7 @@ def get_app_version_info():
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': f'Atualização v{current_v}: Correção de salvamento SQLite (prepareAsync), prévia no editor de fotos, contabilização de arquivos/PDFs, checklist e seleção de obras em lista.',
+        'notes': f'Atualização v{current_v}: Exclusão de visitas por Master, salvamento automático contínuo em obras e relatórios, busca CEP e autocomplete de logradouro, numeração sequencial automática REL na aprovação.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -12484,16 +12490,21 @@ def get_app_version_info():
 def download_official_apk():
     """Permite download direto do executavel ELP.apk"""
     from flask import send_file
-    apk_file = os.path.join(os.getcwd(), 'ELP.apk')
-    if not os.path.exists(apk_file):
-        apk_file = os.path.join(os.getcwd(), 'static', 'ELP.apk')
-    if os.path.exists(apk_file):
-        return send_file(
-            apk_file,
-            as_attachment=True,
-            download_name='ELP.apk',
-            mimetype='application/vnd.android.package-archive'
-        )
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base_dir, 'ELP.apk'),
+        os.path.join(base_dir, 'static', 'ELP.apk'),
+        os.path.join(os.getcwd(), 'ELP.apk'),
+        os.path.join(os.getcwd(), 'static', 'ELP.apk'),
+    ]
+    for apk_file in candidates:
+        if os.path.exists(apk_file):
+            return send_file(
+                apk_file,
+                as_attachment=True,
+                download_name='ELP.apk',
+                mimetype='application/vnd.android.package-archive'
+            )
     return jsonify({'error': 'Arquivo ELP.apk nao encontrado no servidor'}), 404
 
 @app.route('/api/login', methods=['POST'])
