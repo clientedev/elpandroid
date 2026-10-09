@@ -117,55 +117,79 @@ class UpdateService {
         }
       }
 
+      let serverData: any = null;
+
       // 2. Check Backend Deploy & App Version
       try {
-        const res = await apiClient.axios.get('/api/app-version', { timeout: 6000 });
-        if (res.data) {
-          const serverVersion = String(res.data.version || '1.0.3');
-          const currentVersion = this.getCurrentVersion();
-          const serverDeployId = String(res.data.deployId || res.data.buildTime || serverVersion);
-          
-          const lastSeenDeployId = await AsyncStorage.getItem(LAST_DEPLOY_KEY);
-          const dismissedDeployId = await AsyncStorage.getItem(DISMISSED_DEPLOY_KEY);
-          
-          // First install on device: initialize last seen deploy ID so we don't nag immediately
-          if (!lastSeenDeployId) {
-            await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
-          }
-
-          const serverVersionCode = Number(res.data.versionCode || 0);
-          const currentVersionCode = Number(Constants.expoConfig?.android?.versionCode ?? 11);
-
-          // Atualização de APK só deve ser disparada se houver versão semântica estritamente MAIOR
-          // ou versionCode maior, evitando falso-positivos por simples reinício do servidor Railway.
-          const hasHigherVersion = isVersionGreater(serverVersion, currentVersion) || (serverVersionCode > currentVersionCode);
-
-          if (serverDeployId) {
-            await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
-          }
-
-          // Dispara notificação se houver nova versão real disponível
-          if (hasHigherVersion) {
-            const info: UpdateInfo = {
-              available: true,
-              isOta: false,
-              version: serverVersion,
-              deployId: serverDeployId,
-              notes: res.data.notes || 'Atualização recente sincronizada na nuvem.',
-              downloadUrl: res.data.downloadUrl || 'https://elpandroid-production.up.railway.app/download/ELP.apk',
-            };
-            this.notifyUpdateAvailable(info);
-            return info;
-          }
+        const res = await apiClient.axios.get('/api/app-version', { timeout: 10000 });
+        if (res.data && res.data.version) {
+          serverData = res.data;
         }
       } catch (backendErr) {
-        console.warn('[UpdateService] Backend check notice:', backendErr);
+        console.warn('[UpdateService] Backend check notice (tentando fallback GitHub):', backendErr);
+      }
+
+      // Fallback: consulta direta via GitHub CDN caso Railway esteja instável ou bloqueado por DNS da rede
+      if (!serverData) {
+        try {
+          const ghRes = await fetch('https://raw.githubusercontent.com/clientedev/elpandroid/main/app.json', {
+            headers: { 'Cache-Control': 'no-cache' }
+          }).then(r => r.json());
+          if (ghRes?.expo?.version) {
+            serverData = {
+              version: ghRes.expo.version,
+              versionCode: ghRes.expo.android?.versionCode,
+              appName: 'ELP',
+              notes: 'Atualização recente sincronizada no repositório.',
+              downloadUrl: 'https://github.com/clientedev/elpandroid/raw/main/ELP.apk',
+            };
+          }
+        } catch (ghErr) {
+          console.warn('[UpdateService] GitHub fallback check notice:', ghErr);
+        }
+      }
+
+      if (serverData) {
+        const serverVersion = String(serverData.version || '1.0.3');
+        const currentVersion = this.getCurrentVersion();
+        const serverDeployId = String(serverData.deployId || serverData.buildTime || serverVersion);
+        const serverVersionCode = Number(serverData.versionCode || 0);
+        const currentVersionCode = Number(Constants.expoConfig?.android?.versionCode ?? 11);
+
+        const hasHigherVersion = isVersionGreater(serverVersion, currentVersion) || (serverVersionCode > currentVersionCode);
+
+        if (serverDeployId) {
+          await AsyncStorage.setItem(LAST_DEPLOY_KEY, serverDeployId);
+        }
+
+        // Dispara notificação se houver nova versão real disponível
+        if (hasHigherVersion) {
+          const info: UpdateInfo = {
+            available: true,
+            isOta: false,
+            version: serverVersion,
+            deployId: serverDeployId,
+            notes: serverData.notes || 'Atualização recente sincronizada na nuvem.',
+            downloadUrl: serverData.downloadUrl || 'https://elpandroid-production.up.railway.app/download/ELP.apk',
+          };
+          this.notifyUpdateAvailable(info);
+          return info;
+        }
+
+        if (manual) {
+          Alert.alert(
+            'ELP Atualizado',
+            `O aplicativo já está na versão mais recente (${currentVersion}) e sincronizado com a nuvem.`
+          );
+        }
+
+        return { available: false, isOta: false };
       }
 
       if (manual) {
         Alert.alert(
-          'ELP Atualizado',
-          `O aplicativo já está na versão mais recente (${this.getCurrentVersion()}) e sincronizado com a nuvem.`
+          'Falha na Verificação',
+          'Não foi possível conectar ao servidor de atualizações. Verifique se a rede Wi-Fi está bloqueando a conexão e tente pelos dados móveis (4G/5G).'
         );
       }
 

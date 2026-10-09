@@ -78,22 +78,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   async function handleCheckUpdate() {
     setCheckingUpdates(true);
     try {
-      const updateInfo = await updateService.checkForUpdate(true);
-      if (updateInfo.available) {
-        Alert.alert(
-          'Atualização Disponível',
-          `Nova versão ${updateInfo.version || ''} encontrada. Deseja atualizar agora?`,
-          [
-            { text: 'Mais tarde', style: 'cancel' },
-            {
-              text: 'Atualizar',
-              onPress: () => updateService.applyUpdate(updateInfo),
-            },
-          ]
-        );
-      } else {
-        Alert.alert('App Atualizado', 'Você está utilizando a versão mais recente do ObraFlow.');
-      }
+      await updateService.checkForUpdate(true);
     } catch (e) {
       Alert.alert('Aviso', 'Não foi possível verificar atualizações no momento.');
     } finally {
