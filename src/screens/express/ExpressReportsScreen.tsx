@@ -70,20 +70,62 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     loadReports();
   }, [loadReports]);
 
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string | null>(null);
+
+  // Autosave contínuo para Relatório Express
+  useEffect(() => {
+    if (!modalVisible) return;
+    const timer = setTimeout(() => {
+      if (obraNome.trim() || obraConstrutora.trim() || observacoes.trim()) {
+        import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+          AsyncStorage.setItem('@elp_express_report_draft', JSON.stringify({
+            titulo,
+            dataVisita,
+            obraConstrutora,
+            obraNome,
+            obraEndereco,
+            acompanhantes,
+            informacoesTecnicas,
+            checklistData,
+            observacoes
+          })).then(() => {
+            setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+          }).catch(() => null);
+        });
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [modalVisible, titulo, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, informacoesTecnicas, checklistData, observacoes]);
+
   function handleOpenNew() {
+    import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+      AsyncStorage.getItem('@elp_express_report_draft').then(draftStr => {
+        if (draftStr) {
+          try {
+            const d = JSON.parse(draftStr);
+            if (d.obraNome) setObraNome(d.obraNome);
+            if (d.obraConstrutora) setObraConstrutora(d.obraConstrutora);
+            if (d.obraEndereco) setObraEndereco(d.obraEndereco);
+            if (d.observacoes) setObservacoes(d.observacoes);
+            if (d.acompanhantes) setAcompanhantes(d.acompanhantes);
+            if (d.informacoesTecnicas) {
+              setInformacoesTecnicas(d.informacoesTecnicas);
+              setShowTechInfo(true);
+            }
+            if (d.checklistData) {
+              setChecklistData(d.checklistData);
+              setShowChecklist(true);
+            }
+            setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+          } catch(e) {}
+        }
+      });
+    });
+
     setTitulo('Relatório Express de Visita');
     setNumero(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
     setDataVisita(new Date().toISOString().split('T')[0]);
-    setObraConstrutora('');
-    setObraNome('');
-    setObraEndereco('');
-    setAcompanhantes('');
-    setInformacoesTecnicas('');
-    setChecklistData('');
-    setObservacoes('');
     setPhotoUri(null);
-    setShowTechInfo(false);
-    setShowChecklist(false);
     setModalVisible(true);
   }
 

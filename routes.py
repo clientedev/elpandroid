@@ -2841,8 +2841,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.28"
-    version_code = 28
+    app_version = "1.0.29"
+    version_code = 29
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         app_json_path = os.path.join(base_dir, 'app.json')
@@ -12961,8 +12961,8 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.28'
-    current_vc = 28
+    current_v = '1.0.29'
+    current_vc = 29
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [
@@ -12988,7 +12988,7 @@ def get_app_version_info():
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': f'Atualização v{current_v}: Cards de navegação exclusiva por status na aba de relatórios, envio automático de notificações aos aprovadores e mestres ao submeter relatórios.',
+        'notes': 'Atualização v1.0.29: Lógica de visitas editável pelo painel web, autosave contínuo em todos os módulos do APK e sincronização em tempo real com Railway.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 

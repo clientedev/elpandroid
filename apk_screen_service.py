@@ -144,26 +144,63 @@ DEFAULT_CONFIGS = {
         ]
     },
     'visits': {
-        'title': 'Aba de Visitas',
-        'description': 'Agenda e histórico de vistorias técnicas.',
+        'title': 'Aba de Visitas & Agenda',
+        'description': 'Lógica de automação de vistorias, regras de negócio e layout da agenda no APK.',
+        'auto_baixa_relatorio_mesmo_dia': True,
+        'notificar_responsavel_agendamento': True,
+        'notificar_participantes_agendamento': True,
+        'notificar_reagendamento': True,
+        'lembrete_horas_antecedencia': 24,
+        'permitir_visitas_sem_obra': True,
+        'permitir_compromisso_pessoal': True,
+        'exigir_geolocalizacao_gps': False,
+        'visualizacao_padrao_agenda': 'minhas',
         'sections': [
             {
                 'id': 'visits_header',
                 'type': 'header',
-                'title': 'Agenda de Vistorias',
+                'title': 'Agenda de Visitas',
                 'subtitle': 'Cronograma de visitas técnicas em campo',
                 'visible': True,
                 'allowed_roles': 'all',
                 'order': 1
             },
             {
-                'id': 'visits_search',
-                'type': 'search',
-                'title': 'Busca de Visitas',
-                'custom_text': 'Buscar visitas por obra ou data...',
+                'id': 'visits_scope_selector',
+                'type': 'scope_selector',
+                'title': 'Seletor Individual: Minhas Visitas / Toda a Equipe',
+                'subtitle': 'Alternador de escopo entre compromissos pessoais e da equipe',
                 'visible': True,
                 'allowed_roles': 'all',
                 'order': 2
+            },
+            {
+                'id': 'visits_search',
+                'type': 'search',
+                'title': 'Barra de Pesquisa',
+                'custom_text': 'Buscar por obra, endereço, responsável...',
+                'visible': True,
+                'allowed_roles': 'all',
+                'order': 3
+            },
+            {
+                'id': 'visits_filters',
+                'type': 'filter_chips',
+                'title': 'Filtros Rápidos de Status',
+                'subtitle': 'Abas para Todas, Agendada, Realizada e Cancelada',
+                'visible': True,
+                'allowed_roles': 'all',
+                'order': 4
+            },
+            {
+                'id': 'visits_calendar_shortcut',
+                'type': 'custom_quick_action',
+                'title': 'Atalho: Ver Grade no Google Calendar',
+                'subtitle': 'Abrir agenda completa na web com visão mensal/semanal',
+                'action': 'CalendarWeb',
+                'visible': True,
+                'allowed_roles': 'all',
+                'order': 5
             }
         ]
     },

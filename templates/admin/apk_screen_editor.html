@@ -261,7 +261,7 @@
             <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="badge bg-danger fw-bold px-2 py-1"><i class="fas fa-crown me-1"></i>EXCLUSIVO MASTER</span>
                 <span class="badge bg-primary">SERVER-DRIVEN UI</span>
-                <span class="badge bg-success" id="versionBadge">VERSÃO v1.0.28 (BUILD 28)</span>
+                <span class="badge bg-success" id="versionBadge">VERSÃO v{{ app_version }} (BUILD {{ app_version_code }})</span>
             </div>
             <h2 class="h3 fw-bold text-dark mb-0">
                 <i class="fas fa-magic text-primary me-2"></i>Construtor de Telas, Regras & Publicador do APK
@@ -446,7 +446,7 @@
                 <div class="bg-light p-3 rounded-3 border mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <span class="text-muted small">Versão Atual em Produção:</span>
-                        <span class="badge bg-secondary fs-6" id="modalCurrentVersion">1.0.28 (Build 28)</span>
+                        <span class="badge bg-secondary fs-6" id="modalCurrentVersion">{{ app_version }} (Build {{ app_version_code }})</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="fw-bold text-dark small">Nova Versão a ser Lançada:</span>
@@ -602,6 +602,74 @@ function renderizarEditor() {
     }
 
     const config = currentConfigs[activeScreenKey] || { sections: [] };
+
+    // Se for a aba de Visitas, renderizar painel de regras e lógica de negócio
+    if (activeScreenKey === 'visits') {
+        const vCfg = currentConfigs['visits'] || {};
+        const rulesCard = document.createElement('div');
+        rulesCard.className = 'card border-0 shadow-sm p-3 mb-4 rounded-3 bg-light border-start border-4 border-primary';
+        rulesCard.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold text-dark mb-0"><i class="fas fa-sliders-h text-primary me-2"></i>Regras & Lógica da Agenda de Visitas</h5>
+                <span class="badge bg-success">Sincronizado com APK</span>
+            </div>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="swAutoBaixa" ${vCfg.auto_baixa_relatorio_mesmo_dia !== false ? 'checked' : ''} onchange="atualizarVisitaProp('auto_baixa_relatorio_mesmo_dia', this.checked)">
+                        <label class="form-check-label small fw-bold" for="swAutoBaixa">Auto-Baixa para "Realizada" ao emitir relatório no mesmo dia</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="swNotifResp" ${vCfg.notificar_responsavel_agendamento !== false ? 'checked' : ''} onchange="atualizarVisitaProp('notificar_responsavel_agendamento', this.checked)">
+                        <label class="form-check-label small fw-bold" for="swNotifResp">Notificar Responsável ao agendar visita</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="swNotifPart" ${vCfg.notificar_participantes_agendamento !== false ? 'checked' : ''} onchange="atualizarVisitaProp('notificar_participantes_agendamento', this.checked)">
+                        <label class="form-check-label small fw-bold" for="swNotifPart">Notificar Equipe / Participantes convocados</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="swNotifReag" ${vCfg.notificar_reagendamento !== false ? 'checked' : ''} onchange="atualizarVisitaProp('notificar_reagendamento', this.checked)">
+                        <label class="form-check-label small fw-bold" for="swNotifReag">Notificar equipe se a visita for reagendada no Google Calendar</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="swPermSemObra" ${vCfg.permitir_visitas_sem_obra !== false ? 'checked' : ''} onchange="atualizarVisitaProp('permitir_visitas_sem_obra', this.checked)">
+                        <label class="form-check-label small fw-bold" for="swPermSemObra">Permitir visitas sem obra cadastrada ("Outros")</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="swPermPessoal" ${vCfg.permitir_compromisso_pessoal !== false ? 'checked' : ''} onchange="atualizarVisitaProp('permitir_compromisso_pessoal', this.checked)">
+                        <label class="form-check-label small fw-bold" for="swPermPessoal">Permitir compromissos pessoais confidenciais</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted mb-1">Visualização Padrão da Agenda no APK:</label>
+                    <select class="form-select form-select-sm" onchange="atualizarVisitaProp('visualizacao_padrao_agenda', this.value)">
+                        <option value="minhas" ${vCfg.visualizacao_padrao_agenda !== 'equipe' ? 'selected' : ''}>Minhas Visitas (Individualizado)</option>
+                        <option value="equipe" ${vCfg.visualizacao_padrao_agenda === 'equipe' ? 'selected' : ''}>Toda a Equipe</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-muted mb-1">Lembrete de Visita (Horas de Antecedência):</label>
+                    <select class="form-select form-select-sm" onchange="atualizarVisitaProp('lembrete_horas_antecedencia', parseInt(this.value, 10))">
+                        <option value="24" ${vCfg.lembrete_horas_antecedencia === 24 ? 'selected' : ''}>24 Horas Antes (1 Dia)</option>
+                        <option value="2" ${vCfg.lembrete_horas_antecedencia === 2 ? 'selected' : ''}>2 Horas Antes</option>
+                        <option value="1" ${vCfg.lembrete_horas_antecedencia === 1 ? 'selected' : ''}>1 Hora Antes</option>
+                    </select>
+                </div>
+            </div>
+        `;
+        container.appendChild(rulesCard);
+    }
+
     config.sections.sort((a, b) => (a.order || 0) - (b.order || 0));
 
     config.sections.forEach((sec, idx) => {
@@ -785,6 +853,14 @@ function atualizarPdfCampo(campo, valor) {
         currentConfigs['pdf_config'] = {};
     }
     currentConfigs['pdf_config'][campo] = valor;
+    renderizarPreview();
+}
+
+function atualizarVisitaProp(prop, valor) {
+    if (!currentConfigs['visits']) {
+        currentConfigs['visits'] = {};
+    }
+    currentConfigs['visits'][prop] = valor;
     renderizarPreview();
 }
 
@@ -1271,22 +1347,65 @@ function renderizarPreviewCelular() {
 
     // VISITAS
     else if (activeScreenKey === 'visits') {
+        const vCfg = currentConfigs['visits'] || {};
         const wrap = document.createElement('div');
+        const modoMinhas = vCfg.visualizacao_padrao_agenda !== 'equipe';
+
         wrap.innerHTML = `
-            <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #94A3B8;">
-                <i class="fas fa-search"></i>
-                <span>Buscar visitas por obra ou data...</span>
+            <!-- Seletor de Escopo Individual vs Equipe -->
+            <div style="display: flex; background: #F1F5F9; border-radius: 8px; padding: 2px; margin-bottom: 10px; gap: 4px;">
+                <div style="flex: 1; text-align: center; font-size: 10px; font-weight: bold; padding: 5px 0; border-radius: 6px; ${modoMinhas ? 'background: #2563EB; color: white;' : 'color: #64748B;'}">
+                    <i class="fas fa-user me-1"></i> Minhas Visitas
+                </div>
+                <div style="flex: 1; text-align: center; font-size: 10px; font-weight: bold; padding: 5px 0; border-radius: 6px; ${!modoMinhas ? 'background: #2563EB; color: white;' : 'color: #64748B;'}">
+                    <i class="fas fa-users me-1"></i> Toda a Equipe
+                </div>
             </div>
 
-            <div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border: 1px solid #E2E8F0; margin-bottom: 8px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; font-size: 13px; color: #1E293B;">Residencial Jardins</span>
-                    <span style="background: #DCFCE7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Confirmada</span>
+            <!-- Busca -->
+            <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #94A3B8;">
+                <i class="fas fa-search"></i>
+                <span>Buscar por obra, endereço, responsável...</span>
+            </div>
+
+            <!-- Filtros de Status -->
+            <div style="display: flex; gap: 6px; overflow-x: auto; margin-bottom: 10px; padding-bottom: 2px;">
+                <span style="background: #2563EB; color: white; font-size: 9px; font-weight: bold; padding: 3px 8px; border-radius: 12px;">Todas (14)</span>
+                <span style="background: #E2E8F0; color: #475569; font-size: 9px; font-weight: bold; padding: 3px 8px; border-radius: 12px;">Agendada</span>
+                <span style="background: #E2E8F0; color: #475569; font-size: 9px; font-weight: bold; padding: 3px 8px; border-radius: 12px;">Realizada</span>
+            </div>
+
+            <!-- Card 1 -->
+            <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; border-left: 4px solid #2563EB; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <span style="background: #EFF6FF; color: #1E40AF; font-size: 8px; font-weight: bold; padding: 1px 5px; border-radius: 4px;">VIS-0104</span>
+                        <span style="background: #2563EB; color: white; font-size: 8px; font-weight: bold; padding: 1px 5px; border-radius: 4px;">Gabriel Eduardo</span>
+                    </div>
+                    <span style="background: #DCFCE7; color: #166534; font-size: 8px; font-weight: bold; padding: 1px 5px; border-radius: 4px;">Confirmada</span>
                 </div>
-                <div style="font-size: 10px; color: #2563EB; font-weight: bold; margin-top: 2px;">
-                    <i class="fas fa-clock"></i> 14/10/2026 às 09:00
+                <div style="font-weight: bold; font-size: 12px; color: #1E293B;">Residencial Jardins - Torre A</div>
+                <div style="font-size: 10px; color: #2563EB; font-weight: bold; margin-top: 3px;">
+                    <i class="far fa-clock"></i> 14/10/2026 às 09:00
                 </div>
-                <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Engenheiro: Gabriel Eduardo</div>
+                <div style="font-size: 9px; color: #64748B; margin-top: 2px;">
+                    <i class="fas fa-map-marker-alt text-danger"></i> Av. Paulista, 1000 - São Paulo/SP
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; border-left: 4px solid #10B981; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <span style="background: #EFF6FF; color: #1E40AF; font-size: 8px; font-weight: bold; padding: 1px 5px; border-radius: 4px;">VIS-0105</span>
+                        <span style="background: #10B981; color: white; font-size: 8px; font-weight: bold; padding: 1px 5px; border-radius: 4px;">Mateus Engenharia</span>
+                    </div>
+                    <span style="background: #FEF3C7; color: #B45309; font-size: 8px; font-weight: bold; padding: 1px 5px; border-radius: 4px;">Agendada</span>
+                </div>
+                <div style="font-weight: bold; font-size: 12px; color: #1E293B;">Retrofit Edifício Central</div>
+                <div style="font-size: 10px; color: #2563EB; font-weight: bold; margin-top: 3px;">
+                    <i class="far fa-clock"></i> 15/10/2026 às 14:30
+                </div>
             </div>
         `;
         container.appendChild(wrap);

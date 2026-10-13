@@ -95,6 +95,22 @@ class ApiClient {
   get axios(): AxiosInstance {
     return this.instance;
   }
+
+  get<T = any>(url: string, config?: any): Promise<any> {
+    return this.instance.get<T>(url, config);
+  }
+
+  post<T = any>(url: string, data?: any, config?: any): Promise<any> {
+    return this.instance.post<T>(url, data, config);
+  }
+
+  put<T = any>(url: string, data?: any, config?: any): Promise<any> {
+    return this.instance.put<T>(url, data, config);
+  }
+
+  delete<T = any>(url: string, config?: any): Promise<any> {
+    return this.instance.delete<T>(url, config);
+  }
 }
 
 export const apiClient = new ApiClient();

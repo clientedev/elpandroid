@@ -75,6 +75,7 @@ export interface Visita {
   latitude?: number;
   longitude?: number;
   is_pessoal?: boolean;
+  criado_por?: number;
   sync_status?: 'synced' | 'pending' | 'error';
   participantes?: number[];
 }

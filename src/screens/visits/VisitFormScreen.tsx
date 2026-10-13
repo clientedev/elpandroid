@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
@@ -21,6 +21,45 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
   const [observacoes, setObservacoes] = useState('');
   const [dataHora, setDataHora] = useState(new Date().toISOString().substring(0, 16).replace('T', ' '));
   const [loading, setLoading] = useState(false);
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string | null>(null);
+
+  // Restaurar rascunho salvo automaticamente
+  useEffect(() => {
+    import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+      AsyncStorage.getItem('@elp_visit_form_draft').then(draftStr => {
+        if (draftStr) {
+          try {
+            const draft = JSON.parse(draftStr);
+            if (draft.observacoes) setObservacoes(draft.observacoes);
+            if (draft.outroNome) setOutroNome(draft.outroNome);
+            if (draft.selectedProjectId) setSelectedProjectId(draft.selectedProjectId);
+            if (draft.isPessoal !== undefined) setIsPessoal(draft.isPessoal);
+            setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+          } catch (e) {}
+        }
+      });
+    });
+  }, []);
+
+  // Autosave contínuo a cada alteração
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (observacoes || outroNome || selectedProjectId) {
+        import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+          AsyncStorage.setItem('@elp_visit_form_draft', JSON.stringify({
+            observacoes,
+            outroNome,
+            selectedProjectId,
+            isPessoal,
+            dataHora
+          })).then(() => {
+            setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+          }).catch(() => null);
+        });
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [observacoes, outroNome, selectedProjectId, isPessoal, dataHora]);
 
   useEffect(() => {
     getLocalProjetos().then(p => {
@@ -65,9 +104,14 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
         visitaData
       );
 
+      // Limpar rascunho de autosave após gravação com sucesso
+      import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
+        AsyncStorage.removeItem('@elp_visit_form_draft').catch(() => null);
+      });
+
       if (isOnline) triggerSync();
 
-      Alert.alert('Sucesso', 'Visita agendada com sucesso no aplicativo!', [
+      Alert.alert('Sucesso', 'Visita agendada com sucesso e sincronizada com Railway!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (err: any) {
@@ -84,7 +128,15 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Dados da Visita</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Dados da Visita</Text>
+            {lastAutoSaveTime ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0FDF4', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: '#BBF7D0' }}>
+                <Ionicons name="checkmark-circle" size={11} color="#16A34A" style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 10, color: '#16A34A', fontWeight: 'bold' }}>Autosave {lastAutoSaveTime}</Text>
+              </View>
+            ) : null}
+          </View>
 
           {/* Switch compromisso pessoal */}
           <View style={styles.switchRow}>

@@ -501,7 +501,7 @@
             <div class="row align-items-center min-vh-75 py-4">
                 <div class="col-lg-7">
                     <div class="hero-badge">
-                        <i class="fab fa-android"></i> APLICATIVO NATIVO ANDROID • VERSÃO {{ apk_info.version if apk_info else '1.0.27' }}
+                        <i class="fab fa-android"></i> APLICATIVO NATIVO ANDROID • VERSÃO {{ app_version }}
                     </div>
                     
                     <h1 class="hero-title">
@@ -675,7 +675,7 @@
                         <div class="mb-4">
                             <div class="spec-item">
                                 <i class="fab fa-android"></i>
-                                <span><strong>Versão Atual:</strong> v{{ apk_info.version if apk_info else '1.0.27' }} (Build {{ apk_info.version_code if apk_info else '27' }})</span>
+                                <span><strong>Versão Atual:</strong> v{{ app_version }} (Build {{ app_version_code }})</span>
                             </div>
                             <div class="spec-item">
                                 <i class="fas fa-hdd"></i>
