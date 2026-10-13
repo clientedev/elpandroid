@@ -683,9 +683,13 @@ def current_user_is_aprovador_da_obra(projeto_id):
 # Context processor para disponibilizar função nos templates
 @app.context_processor
 def inject_approval_functions():
+    from publish_service import get_current_version_info
+    ver_info = get_current_version_info()
     return {
         'current_user_is_aprovador': current_user_is_aprovador,
-        'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra
+        'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra,
+        'app_version': ver_info.get('version', '1.0.28'),
+        'app_version_code': ver_info.get('version_code', 28)
     }
 
 @app.route('/api/checklist-padrao')
@@ -6912,6 +6916,38 @@ def visit_new():
                 current_app.logger.warning(f"⚠️ Erro ao adicionar templates de checklist: {template_error}")
 
             db.session.commit()
+
+            # Disparar notificações individualizadas para o responsável e participantes
+            try:
+                from notification_service import notification_service
+                data_formatada = visita.data_inicio.strftime('%d/%m/%Y às %H:%M')
+                nome_obra = visita.projeto_nome
+                
+                # Notificar responsável
+                if visita.responsavel_id:
+                    notification_service.criar_notificacao(
+                        user_id=visita.responsavel_id,
+                        tipo='visita_agendada',
+                        titulo=f"📅 Nova Visita Agendada: {nome_obra}",
+                        mensagem=f"Você foi definido como responsável pela visita {visita.numero} ({nome_obra}) agendada para {data_formatada}.",
+                        link_destino=f"/visits/{visita.id}",
+                        enviar_push=True
+                    )
+                
+                # Notificar demais participantes
+                for part_id in participantes_adicionados:
+                    if part_id != visita.responsavel_id and part_id != current_user.id:
+                        notification_service.criar_notificacao(
+                            user_id=part_id,
+                            tipo='visita_convite',
+                            titulo=f"👥 Convocado para Visita: {nome_obra}",
+                            mensagem=f"Você foi incluído na equipe da visita {visita.numero} ({nome_obra}) marcada para {data_formatada}.",
+                            link_destino=f"/visits/{visita.id}",
+                            enviar_push=True
+                        )
+            except Exception as notif_err:
+                current_app.logger.warning(f"⚠️ Erro ao enviar notificações da nova visita: {notif_err}")
+
             flash('Visita agendada com sucesso!', 'success')
             return redirect(url_for('visits_list'))
 
@@ -7140,6 +7176,30 @@ def visit_edit(visit_id):
 
                 db.session.commit()
                 current_app.logger.info(f"✅ Visita {visit_id} alterada com sucesso")
+
+                # Disparar notificações de alteração/reagendamento da visita
+                try:
+                    from notification_service import notification_service
+                    data_formatada = visit.data_inicio.strftime('%d/%m/%Y às %H:%M')
+                    nome_obra = visit.projeto_nome
+                    
+                    destinatarios = set(participantes_adicionados)
+                    if visit.responsavel_id:
+                        destinatarios.add(visit.responsavel_id)
+                    
+                    for dest_id in destinatarios:
+                        if dest_id != current_user.id:
+                            notification_service.criar_notificacao(
+                                user_id=dest_id,
+                                tipo='visita_alterada',
+                                titulo=f"🕒 Visita Remarcada: {nome_obra}",
+                                mensagem=f"A visita {visit.numero} ({nome_obra}) foi atualizada/remarcada para {data_formatada}.",
+                                link_destino=f"/visits/{visit.id}",
+                                enviar_push=True
+                            )
+                except Exception as notif_err:
+                    current_app.logger.warning(f"⚠️ Erro ao enviar notificações de alteração da visita: {notif_err}")
+
                 flash('Visita alterada com sucesso!', 'success')
                 return redirect(url_for('visit_view', visit_id=visit_id))
 
@@ -8968,8 +9028,7 @@ def visit_communication(visit_id):
 # Calendar API routes
 @app.route('/api/visits/calendar')
 def api_visits_calendar():
-    """API endpoint for calendar data - Item 29: Incluir participantes com cores"""
-    # Check authentication for API - return JSON 401 instead of HTML redirect
+    """API endpoint for calendar data - Suporte a Google Calendar e individualização por usuário"""
     if not current_user.is_authenticated:
         return jsonify({
             'success': False,
@@ -8977,24 +9036,62 @@ def api_visits_calendar():
         }), 401
 
     try:
-        # Enhanced logging for diagnostics
         current_app.logger.info("📅 Carregando dados do calendário...")
 
-        # Buscar todas as visitas com joins corretos - corrigido join problemático
-        visits = db.session.query(Visita).outerjoin(
+        # Parâmetros de filtro para individualização
+        user_param = request.args.get('user_id')
+        user_ids_param = request.args.get('user_ids')
+        status_param = request.args.get('status')
+        start_param = request.args.get('start')
+        end_param = request.args.get('end')
+
+        query = db.session.query(Visita).outerjoin(
             Projeto, Visita.projeto_id == Projeto.id
         ).join(
             User, Visita.responsavel_id == User.id
-        ).all()
+        )
 
-        current_app.logger.info(f"📅 {len(visits)} visitas encontradas")
+        # Filtro de Individualização por Usuário:
+        # Se for usuário comum (não master), filtra OBRIGATORIAMENTE para o usuário logado
+        # Se for Master e passou user_id/user_ids, filtra pelos selecionados
+        selected_user_ids = []
+        if not current_user.is_master or user_param == 'me':
+            selected_user_ids = [current_user.id]
+        elif user_param and user_param != 'all':
+            try:
+                selected_user_ids = [int(user_param)]
+            except ValueError:
+                pass
+        elif user_ids_param:
+            try:
+                selected_user_ids = [int(uid.strip()) for uid in user_ids_param.split(',') if uid.strip().isdigit()]
+            except Exception:
+                pass
+
+        if selected_user_ids:
+            # Buscar IDs de visitas onde o usuário é participante
+            subquery_parts = db.session.query(VisitaParticipante.visita_id).filter(
+                VisitaParticipante.user_id.in_(selected_user_ids)
+            ).subquery()
+
+            query = query.filter(
+                db.or_(
+                    Visita.responsavel_id.in_(selected_user_ids),
+                    Visita.criado_por.in_(selected_user_ids),
+                    Visita.id.in_(subquery_parts)
+                )
+            )
+
+        if status_param and status_param != 'all':
+            query = query.filter(Visita.status == status_param)
+
+        visits = query.order_by(Visita.data_inicio.asc()).all()
+        current_app.logger.info(f"📅 {len(visits)} visitas encontradas para o calendário")
 
         visits_data = []
         for visit in visits:
-            # Buscar participantes da visita com suas cores - Item 29
             participantes = []
             try:
-                # Buscar participantes usando query separada para evitar problemas de relacionamento
                 participantes_query = db.session.query(VisitaParticipante).filter_by(
                     visita_id=visit.id
                 ).join(User, VisitaParticipante.user_id == User.id).all()
@@ -9011,7 +9108,6 @@ def api_visits_calendar():
                 current_app.logger.warning(f"⚠️ Erro ao carregar participantes da visita {visit.id}: {part_error}")
                 participantes = []
 
-            # Buscar dados do responsável separadamente para evitar problemas
             responsavel_nome = ''
             responsavel_cor = '#0EA5E9'
             try:
@@ -9020,7 +9116,6 @@ def api_visits_calendar():
                     responsavel_nome = responsavel.nome_completo
                     responsavel_cor = responsavel.cor_agenda or '#0EA5E9'
 
-                    # Incluir responsável na lista se não estiver nos participantes
                     responsavel_incluido = any(p['id'] == visit.responsavel_id for p in participantes)
                     if not responsavel_incluido:
                         participantes.insert(0, {
@@ -9033,7 +9128,6 @@ def api_visits_calendar():
             except Exception as resp_error:
                 current_app.logger.warning(f"⚠️ Erro ao carregar responsável da visita {visit.id}: {resp_error}")
 
-            # Buscar dados do projeto separadamente para evitar problemas
             projeto_nome = "Sem projeto"
             projeto_numero = None
             try:
@@ -9049,82 +9143,307 @@ def api_visits_calendar():
             except Exception as proj_error:
                 current_app.logger.warning(f"⚠️ Erro ao carregar projeto da visita {visit.id}: {proj_error}")
 
-            # Item 31: Verificar se é compromisso pessoal
             title = visit.numero or f"Visita {visit.id}"
             if visit.is_pessoal:
                 if visit.criado_por != current_user.id:
-                    title = "Confidencial"  # Mostrar como confidencial para outros usuários
-                    participantes = []  # Não mostrar participantes para compromissos confidenciais
+                    title = "Confidencial"
+                    participantes = []
                 else:
                     title = f"{visit.numero or f'Visita {visit.id}'} (Pessoal)"
 
-            # PARTE 3: Criar UM ÚNICO evento por visita (corrige duplicação)
             total_participantes = len(participantes)
             has_multiple_participants = total_participantes > 1
             
-            # Criar título melhorado com código da visita
-            display_title = visit.numero or f"VIS-{visit.id:04d}"
+            display_title = f"{visit.numero or f'VIS-{visit.id:04d}'} • {projeto_nome}"
             if has_multiple_participants:
                 display_title = f"{display_title} ({total_participantes})"
             
+            can_edit = (current_user.is_master or visit.responsavel_id == current_user.id or visit.criado_por == current_user.id) and (visit.status != 'Realizada')
+
             visits_data.append({
                 'id': f"visit-{visit.id}",
                 'visit_id': visit.id,
                 'numero': visit.numero or f"VIS-{visit.id:04d}",
                 'title': display_title,
+                'start': visit.data_inicio.isoformat() if visit.data_inicio else None,
+                'end': visit.data_fim.isoformat() if visit.data_fim else None,
                 'data_inicio': visit.data_inicio.isoformat() if visit.data_inicio else None,
                 'data_fim': visit.data_fim.isoformat() if visit.data_fim else None,
                 'data_realizada': visit.data_realizada.isoformat() if visit.data_realizada else None,
                 'status': visit.status or 'Agendada',
+                'backgroundColor': responsavel_cor,
+                'borderColor': responsavel_cor,
+                'textColor': '#FFFFFF',
+                'projeto_id': visit.projeto_id,
                 'projeto_nome': projeto_nome,
                 'projeto_numero': projeto_numero,
+                'responsavel_id': visit.responsavel_id,
                 'responsavel_nome': responsavel_nome,
                 'responsavel_cor': responsavel_cor,
                 'observacoes': visit.observacoes or '',
                 'atividades_realizadas': visit.atividades_realizadas or '',
+                'endereco_gps': visit.endereco_gps or '',
                 'participantes': participantes,
                 'is_pessoal': visit.is_pessoal or False,
                 'criado_por': visit.criado_por,
+                'can_edit': can_edit,
                 'has_multiple_participants': has_multiple_participants,
                 'total_participants': total_participantes
             })
 
-        current_app.logger.info(f"✅ Calendário carregado com {len(visits_data)} eventos")
-
-        # Buscar todos os funcionários ativos (não clientes) para a legenda
+        # Buscar todos os usuários ativos (equipe) para a sidebar estilo Google Calendar
         funcionarios = db.session.query(User).filter(
             User.is_cliente == False,
-            User.is_active == True
-        ).all()
+            User.ativo == True
+        ).order_by(User.nome_completo.asc()).all()
         
         employees_data = []
         for func in funcionarios:
             employees_data.append({
+                'id': func.id,
                 'nome': func.nome_completo,
+                'email': func.email,
+                'is_current': (func.id == current_user.id),
                 'cor_agenda': func.cor_agenda or '#0EA5E9'
             })
 
-        # Ensure proper JSON response structure for FullCalendar compatibility
-        # We return an object with visits and employees arrays
-        response_data = {
+        # Buscar obras ativas para o modal de criação rápida
+        projetos = db.session.query(Projeto).filter_by(ativo=True).order_by(Projeto.nome.asc()).all()
+        projects_data = [{'id': p.id, 'nome': f"{p.numero} - {p.nome}"} for p in projetos]
+
+        return jsonify({
             'success': True,
             'visits': visits_data,
-            'employees': employees_data
-        }
-
-        return jsonify(response_data)
+            'employees': employees_data,
+            'projects': projects_data,
+            'current_user': {
+                'id': current_user.id,
+                'nome': current_user.nome_completo,
+                'is_master': current_user.is_master,
+                'cor_agenda': current_user.cor_agenda or '#0EA5E9'
+            }
+        })
 
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
         current_app.logger.exception(f"❌ Erro no calendário API: {str(e)}")
-        current_app.logger.error(f"❌ Full traceback: {error_trace}")
-
-        # Always return JSON for API endpoints, never HTML
         return jsonify({
             'success': False,
             'error': 'Erro ao carregar calendário'
         }), 500
+
+@app.route('/api/visits/<int:visit_id>/reschedule', methods=['POST'])
+@login_required
+def api_visits_reschedule(visit_id):
+    """Endpoint para reagendamento rápido por drag & drop no Google Calendar com notificação"""
+    try:
+        visit = Visita.query.get_or_404(visit_id)
+        if not (current_user.is_master or visit.responsavel_id == current_user.id or visit.criado_por == current_user.id):
+            return jsonify({'success': False, 'error': 'Permissão negada para reagendar esta visita'}), 403
+
+        if visit.status == 'Realizada':
+            return jsonify({'success': False, 'error': 'Não é possível reagendar visita já realizada'}), 400
+
+        data = request.get_json() or {}
+        new_start_str = data.get('start')
+        new_end_str = data.get('end')
+
+        if not new_start_str:
+            return jsonify({'success': False, 'error': 'Data de início é obrigatória'}), 400
+
+        # Normalizar strings ISO
+        new_start = datetime.fromisoformat(new_start_str.replace('Z', '+00:00')).replace(tzinfo=None)
+        if new_end_str:
+            new_end = datetime.fromisoformat(new_end_str.replace('Z', '+00:00')).replace(tzinfo=None)
+        else:
+            new_end = new_start + timedelta(hours=1)
+
+        visit.data_inicio = new_start
+        visit.data_fim = new_end
+        db.session.commit()
+
+        # Disparar notificações imediatas para todos os envolvidos
+        try:
+            from notification_service import notification_service
+            data_str = visit.data_inicio.strftime('%d/%m/%Y às %H:%M')
+            nome_obra = visit.projeto_nome
+
+            participantes = VisitaParticipante.query.filter_by(visita_id=visit.id).all()
+            destinatarios = {p.user_id for p in participantes if p.user_id}
+            if visit.responsavel_id:
+                destinatarios.add(visit.responsavel_id)
+
+            for uid in destinatarios:
+                if uid != current_user.id:
+                    notification_service.criar_notificacao(
+                        user_id=uid,
+                        tipo='visita_alterada',
+                        titulo=f"🕒 Visita Remarcada: {nome_obra}",
+                        mensagem=f"A visita {visit.numero} ({nome_obra}) foi reagendada para {data_str}.",
+                        link_destino=f"/visits/{visit.id}",
+                        enviar_push=True
+                    )
+        except Exception as notif_err:
+            current_app.logger.warning(f"Erro ao disparar notificações de reagendamento: {notif_err}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Visita reagendada com sucesso e participantes notificados!',
+            'visit_id': visit.id,
+            'new_start': visit.data_inicio.isoformat(),
+            'new_end': visit.data_fim.isoformat()
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception(f"Erro ao reagendar visita {visit_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/visits/quick-create', methods=['POST'])
+@login_required
+def api_visits_quick_create():
+    """Endpoint para criação rápida de evento/visita estilo Google Calendar"""
+    try:
+        data = request.get_json() or {}
+        projeto_id = data.get('projeto_id')
+        projeto_outros = data.get('projeto_outros')
+        start_str = data.get('start')
+        end_str = data.get('end')
+        responsavel_id = data.get('responsavel_id') or current_user.id
+        observacoes = data.get('observacoes', '')
+        participantes_ids = data.get('participantes', [])
+
+        if not start_str:
+            return jsonify({'success': False, 'error': 'Data e hora de início são obrigatórias'}), 400
+
+        dt_inicio = datetime.fromisoformat(start_str.replace('Z', '+00:00')).replace(tzinfo=None)
+        if end_str:
+            dt_fim = datetime.fromisoformat(end_str.replace('Z', '+00:00')).replace(tzinfo=None)
+        else:
+            dt_fim = dt_inicio + timedelta(hours=1)
+
+        final_proj_id = None
+        if projeto_id and str(projeto_id) != '-1':
+            final_proj_id = int(projeto_id)
+
+        visita = Visita(
+            numero=generate_visit_number(),
+            projeto_id=final_proj_id,
+            projeto_outros=projeto_outros if not final_proj_id else None,
+            responsavel_id=int(responsavel_id),
+            data_inicio=dt_inicio,
+            data_fim=dt_fim,
+            observacoes=observacoes,
+            is_pessoal=bool(data.get('is_pessoal', False)),
+            criado_por=current_user.id
+        )
+        db.session.add(visita)
+        db.session.flush()
+
+        # Adicionar responsável
+        db.session.add(VisitaParticipante(
+            visita_id=visita.id,
+            user_id=int(responsavel_id),
+            confirmado=True
+        ))
+
+        # Adicionar participantes adicionais
+        adicionados = {int(responsavel_id)}
+        for p_id in participantes_ids:
+            try:
+                p_int = int(p_id)
+                if p_int not in adicionados:
+                    db.session.add(VisitaParticipante(
+                        visita_id=visita.id,
+                        user_id=p_int,
+                        confirmado=False
+                    ))
+                    adicionados.add(p_int)
+            except Exception:
+                pass
+
+        db.session.commit()
+
+        # Notificações
+        try:
+            from notification_service import notification_service
+            data_str = visita.data_inicio.strftime('%d/%m/%Y às %H:%M')
+            nome_obra = visita.projeto_nome
+
+            if visita.responsavel_id != current_user.id:
+                notification_service.criar_notificacao(
+                    user_id=visita.responsavel_id,
+                    tipo='visita_agendada',
+                    titulo=f"📅 Nova Visita Agendada: {nome_obra}",
+                    mensagem=f"Você foi definido como responsável pela visita {visita.numero} ({nome_obra}) em {data_str}.",
+                    link_destino=f"/visits/{visita.id}",
+                    enviar_push=True
+                )
+
+            for p_id in adicionados:
+                if p_id != visita.responsavel_id and p_id != current_user.id:
+                    notification_service.criar_notificacao(
+                        user_id=p_id,
+                        tipo='visita_convite',
+                        titulo=f"👥 Convocado para Visita: {nome_obra}",
+                        mensagem=f"Você foi adicionado à equipe da visita {visita.numero} ({nome_obra}) em {data_str}.",
+                        link_destino=f"/visits/{visita.id}",
+                        enviar_push=True
+                    )
+        except Exception as notif_err:
+            current_app.logger.warning(f"Erro ao disparar notificações de criação rápida: {notif_err}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Visita criada com sucesso e equipe notificada!',
+            'visit_id': visita.id,
+            'numero': visita.numero
+        })
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception(f"Erro ao criar visita rápida: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/visits/<int:visit_id>/quick-delete', methods=['POST'])
+@login_required
+def api_visits_quick_delete(visit_id):
+    """Cancela ou exclui a visita direto pelo calendário Google Calendar"""
+    try:
+        visit = Visita.query.get_or_404(visit_id)
+        if not (current_user.is_master or visit.responsavel_id == current_user.id or visit.criado_por == current_user.id):
+            return jsonify({'success': False, 'error': 'Permissão negada'}), 403
+
+        if visit.status == 'Realizada':
+            return jsonify({'success': False, 'error': 'Não é possível cancelar visita já realizada'}), 400
+
+        visit.status = 'Cancelada'
+        db.session.commit()
+
+        # Notificar cancelamento
+        try:
+            from notification_service import notification_service
+            participantes = VisitaParticipante.query.filter_by(visita_id=visit.id).all()
+            destinatarios = {p.user_id for p in participantes if p.user_id}
+            if visit.responsavel_id:
+                destinatarios.add(visit.responsavel_id)
+
+            for uid in destinatarios:
+                if uid != current_user.id:
+                    notification_service.criar_notificacao(
+                        user_id=uid,
+                        tipo='visita_cancelada',
+                        titulo=f"❌ Visita Cancelada: {visit.projeto_nome}",
+                        mensagem=f"A visita {visit.numero} ({visit.projeto_nome}) agendada para {visit.data_inicio.strftime('%d/%m/%Y')} foi cancelada.",
+                        link_destino=f"/visits/{visit.id}",
+                        enviar_push=True
+                    )
+        except Exception as notif_err:
+            current_app.logger.warning(f"Erro ao notificar cancelamento: {notif_err}")
+
+        return jsonify({'success': True, 'message': 'Visita cancelada com sucesso!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/visits', methods=['GET', 'POST'])
 @csrf.exempt

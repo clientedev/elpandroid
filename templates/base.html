@@ -245,8 +245,13 @@
 
     <!-- Rodapé -->
     <footer class="footer-elp">
-        <div class="container text-center">
-            <p class="mb-0">&copy; 2026 ELP Consultoria e Engenharia. Todos os direitos reservados. Foco 100% no Aplicativo Mobile Android.</p>
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 text-center text-md-start">
+            <p class="mb-0">&copy; 2026 ELP Consultoria e Engenharia. Todos os direitos reservados.</p>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                    <i class="fab fa-android me-1"></i>Web & APK: v{{ app_version }} (Build {{ app_version_code }})
+                </span>
+            </div>
         </div>
     </footer>
 

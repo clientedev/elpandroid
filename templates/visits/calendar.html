@@ -1,269 +1,782 @@
 {% extends "base.html" %}
 
-{% block title %}Calendário de Visitas - Sistema ELP{% endblock %}
+{% block title %}Agenda de Vistorias & Visitas - Padrão Google Calendar{% endblock %}
 
 {% block extra_head %}
-<!-- FullCalendar CSS -->
+<!-- Google Fonts: Inter & Roboto -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- FullCalendar 6 CSS -->
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css' rel='stylesheet' />
+
 <style>
-    .fc-event {
-        border-radius: 3px;
-        border: none;
-    }
-    .fc-event-agendada {
-        /* background-color removido para permitir cor dinâmica do responsável */
-        color: white;
-    }
-    .fc-event-realizada {
-        background-color: #28a745;
-        color: white;
-    }
-    .fc-event-cancelada {
-        background-color: #dc3545;
-        color: white;
-    }
-    .calendar-controls {
-        margin-bottom: 20px;
-    }
-    .export-buttons {
-        margin-top: 15px;
-    }
-    .visit-tooltip {
-        max-width: 300px;
-        z-index: 9999;
-    }
-    .calendar-legend {
-        display: flex;
-        gap: 20px;
-        flex-wrap: wrap;
-        align-items: center;
-        margin-bottom: 15px;
-    }
-    .legend-item {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .legend-color {
-        width: 16px;
-        height: 16px;
-        border-radius: 3px;
-    }
-    .fc-toolbar {
-        margin-bottom: 20px !important;
-        flex-wrap: wrap !important;
-        gap: 10px !important;
-    }
-    
-    /* Responsividade para mobile */
-    @media (max-width: 768px) {
-        .fc-toolbar {
-            flex-direction: column !important;
-            align-items: stretch !important;
-        }
-        .fc-toolbar-chunk {
-            display: flex !important;
-            justify-content: center !important;
-            margin-bottom: 10px !important;
-        }
-        .fc-button-group {
-            display: flex !important;
-            width: 100% !important;
-        }
-        .fc-button {
-            min-height: 44px !important;
-            font-size: 14px !important;
-            flex: 1 !important;
-        }
-        .fc-toolbar-title {
-            font-size: 1.2rem !important;
-            text-align: center !important;
-            margin: 10px 0 !important;
-        }
-        .fc-dayGridMonth-view .fc-daygrid-day-number {
-            font-size: 14px !important;
-            padding: 4px !important;
-        }
-        /* Melhorar exibição de eventos no mobile */
-        .fc-event {
-            font-size: 11px !important;
-            padding: 3px 5px !important;
-            margin: 1px 0 !important;
-            border-radius: 4px !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            white-space: nowrap !important;
-            display: block !important;
-            line-height: 1.3 !important;
-        }
-        .fc-event-title {
-            font-weight: 600 !important;
-        }
-        .fc-col-header-cell {
-            padding: 8px 4px !important;
-            font-size: 12px !important;
-        }
-        /* Células do calendário com mais espaço */
-        .fc-daygrid-day {
-            min-height: 70px !important;
-        }
-        .fc-daygrid-day-events {
-            margin-bottom: 2px !important;
-        }
-    }
-    
-    /* Melhorias para telas pequenas */
-    @media (max-width: 576px) {
-        .fc-toolbar-title {
-            font-size: 1rem !important;
-        }
-        .fc-button {
-            font-size: 11px !important;
-            padding: 6px 10px !important;
-        }
-        .fc-dayGridMonth-view .fc-daygrid-day-number {
-            font-size: 11px !important;
-        }
-        .calendar-legend {
-            justify-content: center !important;
-        }
-        .legend-item {
-            font-size: 11px !important;
-        }
-        /* Evento no mobile extra pequeno */
-        .fc-event {
-            font-size: 10px !important;
-            padding: 2px 4px !important;
-            min-height: 18px !important;
-        }
-        .fc-daygrid-day {
-            min-height: 60px !important;
-        }
-    }
+/* ========================================================
+   GOOGLE CALENDAR EXACT REPLICA STYLING
+======================================================== */
+:root {
+    --gcal-bg: #FFFFFF;
+    --gcal-border: #DADCE0;
+    --gcal-hover: #F1F3F4;
+    --gcal-text-primary: #3C4043;
+    --gcal-text-secondary: #70757A;
+    --gcal-blue: #1A73E8;
+    --gcal-blue-hover: #174EA6;
+    --gcal-blue-light: #E8F0FE;
+}
+
+body {
+    background-color: #F8F9FA;
+    font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Layout Container */
+.gcal-wrapper {
+    background: #FFFFFF;
+    border: 1px solid var(--gcal-border);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(60, 64, 67, 0.08);
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 170px);
+    min-height: 720px;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Top Google Header */
+.gcal-header {
+    height: 64px;
+    border-bottom: 1px solid var(--gcal-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: #FFFFFF;
+    flex-shrink: 0;
+    gap: 12px;
+}
+
+.gcal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.gcal-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--gcal-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.gcal-icon-btn:hover {
+    background-color: var(--gcal-hover);
+    color: var(--gcal-text-primary);
+}
+
+.gcal-logo-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.gcal-calendar-icon {
+    width: 38px;
+    height: 38px;
+    background: #FFFFFF;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    border: 1px solid var(--gcal-border);
+}
+.gcal-calendar-icon-top {
+    background: #1A73E8;
+    color: #FFFFFF;
+    font-size: 8px;
+    font-weight: 700;
+    text-align: center;
+    padding: 1px 0;
+    text-transform: uppercase;
+}
+.gcal-calendar-icon-day {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1E293B;
+}
+
+.gcal-title-brand {
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--gcal-text-primary);
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+}
+
+.gcal-btn-today {
+    height: 36px;
+    padding: 0 16px;
+    border: 1px solid var(--gcal-border);
+    border-radius: 4px;
+    background: #FFFFFF;
+    color: var(--gcal-text-primary);
+    font-weight: 500;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.gcal-btn-today:hover {
+    background-color: var(--gcal-hover);
+}
+
+.gcal-nav-arrows {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.gcal-current-date-title {
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--gcal-text-primary);
+    min-width: 200px;
+    margin-left: 8px;
+}
+
+/* Header Right */
+.gcal-header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gcal-search-box {
+    position: relative;
+    width: 240px;
+}
+.gcal-search-input {
+    width: 100%;
+    height: 38px;
+    border-radius: 8px;
+    border: 1px solid var(--gcal-border);
+    background: #F1F3F4;
+    padding: 0 12px 0 34px;
+    font-size: 13px;
+    color: var(--gcal-text-primary);
+    transition: background-color 0.2s, box-shadow 0.2s;
+}
+.gcal-search-input:focus {
+    background: #FFFFFF;
+    outline: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    border-color: #1A73E8;
+}
+.gcal-search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gcal-text-secondary);
+    font-size: 13px;
+}
+
+.gcal-view-selector {
+    height: 36px;
+    border: 1px solid var(--gcal-border);
+    border-radius: 4px;
+    background: #FFFFFF;
+    color: var(--gcal-text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 0 12px;
+    cursor: pointer;
+}
+
+/* Floating Iconic Create Button */
+.gcal-btn-create {
+    height: 48px;
+    padding: 0 24px 0 16px;
+    background: #FFFFFF;
+    border: 1px solid #DADCE0;
+    border-radius: 24px;
+    box-shadow: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #3C4043;
+    cursor: pointer;
+    transition: box-shadow 0.2s, background-color 0.2s;
+    user-select: none;
+    margin-bottom: 20px;
+}
+.gcal-btn-create:hover {
+    box-shadow: 0 2px 6px 2px rgba(60,64,67,0.15), 0 6px 12px 4px rgba(60,64,67,0.15);
+    background-color: #FAFAFA;
+}
+.gcal-create-plus-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* Main Body Layout */
+.gcal-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Left Sidebar */
+.gcal-sidebar {
+    width: 260px;
+    border-right: 1px solid var(--gcal-border);
+    background: #FFFFFF;
+    overflow-y: auto;
+    padding: 16px 14px;
+    flex-shrink: 0;
+    transition: width 0.25s ease, margin-left 0.25s ease;
+}
+.gcal-sidebar.collapsed {
+    margin-left: -260px;
+}
+
+.gcal-sidebar-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #475569;
+    margin: 18px 0 8px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* User Filter List */
+.gcal-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--gcal-text-primary);
+    transition: background-color 0.15s;
+    user-select: none;
+}
+.gcal-filter-item:hover {
+    background-color: var(--gcal-hover);
+}
+.gcal-filter-checkbox {
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    border-radius: 3px;
+    accent-color: var(--gcal-blue);
+}
+.gcal-user-color-pill {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* Mini Calendar Widget */
+.gcal-mini-calendar {
+    background: #FFFFFF;
+    border-radius: 8px;
+    border: 1px solid var(--gcal-border);
+    padding: 10px;
+    margin-bottom: 16px;
+}
+.gcal-mini-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gcal-text-primary);
+    margin-bottom: 8px;
+}
+.gcal-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    text-align: center;
+}
+.gcal-mini-day-name {
+    font-size: 10px;
+    color: var(--gcal-text-secondary);
+    font-weight: 600;
+    padding: 2px 0;
+}
+.gcal-mini-day-cell {
+    font-size: 11px;
+    color: var(--gcal-text-primary);
+    padding: 4px 0;
+    border-radius: 50%;
+    cursor: pointer;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.gcal-mini-day-cell:hover {
+    background: var(--gcal-hover);
+}
+.gcal-mini-day-cell.today {
+    background: var(--gcal-blue);
+    color: #FFFFFF;
+    font-weight: 700;
+}
+.gcal-mini-day-cell.other-month {
+    color: #BDC1C6;
+}
+
+/* Main Calendar Board */
+.gcal-main-calendar {
+    flex: 1;
+    background: #FFFFFF;
+    padding: 8px 12px;
+    overflow-y: auto;
+    position: relative;
+}
+
+/* FullCalendar Overrides to match Google Calendar 100% */
+.fc {
+    font-family: inherit;
+    height: 100% !important;
+}
+.fc-toolbar {
+    display: none !important; /* Já temos o cabeçalho idêntico do Google */
+}
+.fc-theme-standard th {
+    border: none !important;
+    padding: 8px 0 !important;
+    color: var(--gcal-text-secondary);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.fc-theme-standard td {
+    border-color: var(--gcal-border) !important;
+}
+.fc-day-today {
+    background-color: transparent !important;
+}
+.fc-day-today .fc-daygrid-day-number {
+    background-color: var(--gcal-blue);
+    color: #FFFFFF !important;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px 6px;
+    font-weight: 700;
+}
+.fc-daygrid-day-number {
+    font-size: 12px;
+    color: var(--gcal-text-primary);
+    padding: 4px 8px;
+    font-weight: 500;
+    text-decoration: none !important;
+}
+.fc-daygrid-event {
+    border-radius: 4px !important;
+    padding: 2px 6px !important;
+    font-size: 12px !important;
+    margin: 1px 2px !important;
+    border: none !important;
+    font-weight: 500;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.fc-daygrid-event:hover {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+    transform: translateY(-1px);
+}
+.fc-event-time {
+    font-weight: 700;
+    margin-right: 4px;
+}
+
+/* Google Calendar Details Popover / Modal */
+.gcal-popover-card {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 24px 38px 3px rgba(60,64,67,0.14), 0 9px 46px 8px rgba(60,64,67,0.12), 0 11px 15px -7px rgba(60,64,67,0.2);
+    overflow: hidden;
+}
+.gcal-popover-top-bar {
+    height: 8px;
+    background: var(--gcal-blue);
+}
+.gcal-popover-header {
+    padding: 14px 20px 8px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.gcal-popover-title {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--gcal-text-primary);
+    line-height: 1.3;
+}
+.gcal-popover-body {
+    padding: 10px 20px 20px 20px;
+    font-size: 13px;
+    color: var(--gcal-text-primary);
+}
+.gcal-detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+.gcal-detail-icon {
+    color: var(--gcal-text-secondary);
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    margin-top: 2px;
+}
+.gcal-avatar-initials {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-            <h1 class="mb-0"><i class="fas fa-calendar-alt me-2 text-primary"></i>Calendário de Visitas</h1>
-            <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-md-auto">
-                <a href="{{ url_for('visit_new') }}" class="btn btn-primary" style="min-height: 44px;">
-                    <i class="fas fa-plus me-2"></i>Nova Visita
-                </a>
-                <a href="{{ url_for('visits_list') }}" class="btn btn-outline-secondary" style="min-height: 44px;">
-                    <i class="fas fa-list me-2"></i>Lista
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <!-- Legenda de Status -->
-                <div class="calendar-legend mb-3">
-                    <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Status das Visitas</h6>
-                    <div class="d-flex gap-3 flex-wrap">
-                        <div class="legend-item">
-                            <div class="legend-color" style="background-color: #007bff;"></div>
-                            <span>Agendada</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background-color: #28a745;"></div>
-                            <span>Realizada</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color" style="background-color: #dc3545;"></div>
-                            <span>Cancelada</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Legenda de Cores dos Funcionários -->
-                <div class="calendar-legend mb-3" id="employeeColorsLegend" style="display: none;">
-                    <h6 class="mb-2"><i class="fas fa-users me-2"></i>Cores dos Funcionários</h6>
-                    <div class="d-flex gap-2 flex-wrap" id="employeeColorsContainer">
-                        <!-- Cores dos funcionários carregadas dinamicamente -->
-                    </div>
-                </div>
-
-                <!-- Calendário -->
-                <div id='calendar'></div>
-
-                <!-- Botões de Export -->
-                <div class="export-buttons">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6><i class="fas fa-download me-2"></i>Exportar Calendário</h6>
-                            <div class="btn-group" role="group">
-                                <button type="button" class="btn btn-outline-success" onclick="exportToGoogleCalendar()">
-                                    <i class="fab fa-google me-2"></i>Google Calendar
-                                </button>
-                                <button type="button" class="btn btn-outline-primary" onclick="exportToOutlook()">
-                                    <i class="fab fa-microsoft me-2"></i>Outlook
-                                </button>
-                                <button type="button" class="btn btn-outline-info" onclick="exportToICS()">
-                                    <i class="fas fa-calendar-download me-2"></i>Arquivo ICS
-                                </button>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <h6><i class="fas fa-filter me-2"></i>Filtros</h6>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="filterAgendada" checked>
-                                <label class="form-check-label" for="filterAgendada">Agendadas</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="filterRealizada" checked>
-                                <label class="form-check-label" for="filterRealizada">Realizadas</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="filterCancelada" checked>
-                                <label class="form-check-label" for="filterCancelada">Canceladas</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal para detalhes da visita - Design melhorado -->
-<div class="modal fade" id="visitModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            <div class="modal-header border-0 pb-0" id="visitModalHeader" style="background: linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%); border-radius: 0.5rem 0.5rem 0 0;">
-                <div class="w-100 text-white py-2">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h4 class="modal-title mb-1" id="visitModalTitle">
-                                <i class="fas fa-calendar-check me-2"></i>Detalhes da Visita
-                            </h4>
-                            <p class="mb-0 opacity-75" id="visitModalSubtitle"></p>
-                        </div>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-body pt-4" id="visitModalBody">
-                <div class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Carregando...</span>
-                    </div>
-                    <p class="text-muted mt-2">Carregando detalhes...</p>
-                </div>
-            </div>
-            <div class="modal-footer border-0 bg-light" style="border-radius: 0 0 0.5rem 0.5rem;">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-1"></i>Fechar
+<div class="container-fluid p-0">
+    <div class="gcal-wrapper">
+        <!-- BARRA SUPERIOR IDÊNTICA AO GOOGLE CALENDAR -->
+        <header class="gcal-header">
+            <div class="gcal-header-left">
+                <button class="gcal-icon-btn" id="btnToggleSidebar" title="Menu principal">
+                    <i class="fas fa-bars fs-5"></i>
                 </button>
-                <div id="visitModalActions" class="d-flex gap-2">
+                <div class="gcal-logo-box" onclick="calendarGoToday()">
+                    <div class="gcal-calendar-icon">
+                        <div class="gcal-calendar-icon-top">ELP</div>
+                        <div class="gcal-calendar-icon-day" id="logoCurrentDayNumber">14</div>
+                    </div>
+                    <span class="gcal-title-brand">Agenda</span>
                 </div>
+
+                <button class="gcal-btn-today" onclick="calendarGoToday()">Hoje</button>
+
+                <div class="gcal-nav-arrows">
+                    <button class="gcal-icon-btn" onclick="calendarPrev()" title="Período anterior">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="gcal-icon-btn" onclick="calendarNext()" title="Próximo período">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <div class="gcal-current-date-title" id="gcalCurrentDateLabel">
+                    Carregando...
+                </div>
+            </div>
+
+            <div class="gcal-header-right">
+                <!-- Busca de Visitas -->
+                <div class="gcal-search-box">
+                    <i class="fas fa-search gcal-search-icon"></i>
+                    <input type="text" class="gcal-search-input" id="gcalSearchInput" placeholder="Pesquisar visitas, obras..." oninput="filtrarEventos()">
+                </div>
+
+                <!-- Seletor de Modo Google Calendar -->
+                <select class="gcal-view-selector" id="gcalViewSelector" onchange="mudarVisualizacao(this.value)">
+                    <option value="dayGridMonth">Mês</option>
+                    <option value="timeGridWeek">Semana</option>
+                    <option value="timeGridDay">Dia</option>
+                    <option value="listWeek">Programação</option>
+                </select>
+
+                <!-- Exportações Rápidas -->
+                <div class="dropdown">
+                    <button class="gcal-icon-btn" data-bs-toggle="dropdown" title="Exportar e Opções">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                        <li>
+                            <a class="dropdown-item" href="javascript:void(0)" onclick="exportToGoogleCalendar()">
+                                <i class="fab fa-google text-success me-2"></i>Exportar p/ Google Calendar
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="javascript:void(0)" onclick="exportToOutlook()">
+                                <i class="fab fa-microsoft text-primary me-2"></i>Exportar p/ Outlook
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="javascript:void(0)" onclick="exportToICS()">
+                                <i class="fas fa-calendar-download text-info me-2"></i>Baixar Arquivo .ICS
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('visits_list') }}">
+                                <i class="fas fa-list me-2"></i>Ver Lista Clássica de Visitas
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <!-- CORPO PRINCIPAL COM SIDEBAR RETRÁTIL E GRADE -->
+        <div class="gcal-body">
+            <!-- SIDEBAR ESQUERDA GOOGLE CALENDAR -->
+            <aside class="gcal-sidebar" id="gcalSidebar">
+                <!-- Botão Criar Icônico Google -->
+                <button class="gcal-btn-create" onclick="abrirModalCriacaoRapida()">
+                    <div class="gcal-create-plus-icon">
+                        <svg width="28" height="28" viewBox="0 0 36 36">
+                            <path fill="#4285F4" d="M16 16v14h4V20z"/>
+                            <path fill="#34A853" d="M30 16H20l-4 4h14z"/>
+                            <path fill="#FBBC05" d="M6 16h10l4-4H6z"/>
+                            <path fill="#EA4335" d="M20 16V2h-4v14z"/>
+                            <path fill="none" d="M0 0h36v36H0z"/>
+                        </svg>
+                    </div>
+                    <span>Criar</span>
+                </button>
+
+                <!-- Mini Calendário do Mês Navegável -->
+                <div class="gcal-mini-calendar">
+                    <div class="gcal-mini-header">
+                        <span id="miniCalendarMonthYear">Outubro 2026</span>
+                        <div>
+                            <button class="btn btn-sm btn-link text-muted p-0 me-2" onclick="miniPrev()"><i class="fas fa-chevron-left"></i></button>
+                            <button class="btn btn-sm btn-link text-muted p-0" onclick="miniNext()"><i class="fas fa-chevron-right"></i></button>
+                        </div>
+                    </div>
+                    <div class="gcal-mini-grid" id="miniCalendarGrid">
+                        <!-- Gerado dinamicamente via JS -->
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 1: INDIVIDUALIZAÇÃO - MINHAS AGENDAS -->
+                <div class="gcal-sidebar-section-title">
+                    <span>Minha Agenda</span>
+                </div>
+                <div class="gcal-filter-item" onclick="toggleMinhaAgenda()">
+                    <input class="gcal-filter-checkbox" type="checkbox" id="chkMinhaAgenda" checked onchange="filtrarEventos()">
+                    <div class="gcal-user-color-pill" id="myUserColorPill" style="background: #1A73E8;"></div>
+                    <span class="fw-bold text-dark text-truncate" id="myUserNameLabel">Carregando...</span>
+                </div>
+
+                <!-- SEÇÃO 2: EQUIPE / ENGENHEIROS (MULTIUSUÁRIO) -->
+                {% if current_user.is_master %}
+                <div class="gcal-sidebar-section-title mt-4">
+                    <span>Equipe & Engenheiros</span>
+                    <button class="btn btn-link btn-sm text-primary p-0 text-decoration-none" style="font-size: 11px;" onclick="toggleTodosEngenheiros()">
+                        <span id="labelToggleTodos">Alternar</span>
+                    </button>
+                </div>
+                <div id="teamEngineersFilterContainer">
+                    <div class="text-muted small py-2">Carregando equipe...</div>
+                </div>
+                {% endif %}
+
+                <!-- SEÇÃO 3: STATUS DAS VISTORIAS -->
+                <div class="gcal-sidebar-section-title mt-4">
+                    <span>Status da Visita</span>
+                </div>
+                <div class="gcal-filter-item">
+                    <input class="gcal-filter-checkbox" type="checkbox" id="chkStatusAgendada" checked onchange="filtrarEventos()">
+                    <div class="gcal-user-color-pill" style="background: #1A73E8;"></div>
+                    <span>Agendada</span>
+                </div>
+                <div class="gcal-filter-item">
+                    <input class="gcal-filter-checkbox" type="checkbox" id="chkStatusRealizada" checked onchange="filtrarEventos()">
+                    <div class="gcal-user-color-pill" style="background: #10B981;"></div>
+                    <span>Realizada</span>
+                </div>
+                <div class="gcal-filter-item">
+                    <input class="gcal-filter-checkbox" type="checkbox" id="chkStatusCancelada" checked onchange="filtrarEventos()">
+                    <div class="gcal-user-color-pill" style="background: #EF4444;"></div>
+                    <span>Cancelada</span>
+                </div>
+            </aside>
+
+            <!-- ÁREA DO CALENDÁRIO FULLCALENDAR GOOGLE STYLE -->
+            <main class="gcal-main-calendar">
+                <div id="googleCalendarTarget"></div>
+            </main>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================
+     MODAL DE CRIAÇÃO RÁPIDA ESTILO GOOGLE CALENDAR
+======================================================== -->
+<div class="modal fade" id="modalCriarVisitaRapida" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content gcal-popover-card">
+            <div class="gcal-popover-top-bar" style="background: #1A73E8;"></div>
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="fas fa-calendar-plus text-primary me-2"></i>Nova Visita / Vistoria Técnica
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Obra / Empreendimento:</label>
+                    <select class="form-select" id="quickVisitaObra">
+                        <option value="-1">Outros / Sem Obra Cadastrada</option>
+                    </select>
+                </div>
+                <div class="mb-3" id="quickVisitaOutrosBox">
+                    <label class="form-label small fw-bold text-muted">Identificação / Nome:</label>
+                    <input type="text" class="form-control" id="quickVisitaOutrosTexto" placeholder="Ex: Inspeção de Fachada Torre Sul">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-bold text-muted">Início:</label>
+                        <input type="datetime-local" class="form-control" id="quickVisitaInicio">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold text-muted">Término:</label>
+                        <input type="datetime-local" class="form-control" id="quickVisitaFim">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Engenheiro Responsável:</label>
+                    <select class="form-select" id="quickVisitaResponsavel">
+                        <!-- Carregado via JS -->
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted">Observações / Objetivo:</label>
+                    <textarea class="form-control" id="quickVisitaObservacoes" rows="2" placeholder="Descreva os pontos a inspecionar..."></textarea>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="quickVisitaPessoal">
+                    <label class="form-check-label small" for="quickVisitaPessoal">Marcar como compromisso pessoal (visível apenas para você)</label>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light p-3">
+                <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Descartar</button>
+                <button type="button" class="btn btn-primary fw-bold px-4" id="btnSalvarVisitaRapida" onclick="salvarVisitaRapida()">
+                    <i class="fas fa-check me-1"></i>Salvar e Notificar Equipe
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================
+     MODAL DE DETALHES ESTILO GOOGLE CALENDAR POPOVER
+======================================================== -->
+<div class="modal fade" id="modalDetalhesGoogle" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content gcal-popover-card">
+            <div class="gcal-popover-top-bar" id="popoverTopColorBar"></div>
+            <div class="gcal-popover-header">
+                <div>
+                    <div class="gcal-popover-title" id="popoverTitle">Visita Técnica</div>
+                    <div class="small text-muted" id="popoverSubtitle">Residencial Jardins</div>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <button class="gcal-icon-btn" id="popoverBtnEdit" title="Editar" onclick="editarVisitaSelecionada()">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button class="gcal-icon-btn text-danger" id="popoverBtnDelete" title="Cancelar Visita" onclick="cancelarVisitaSelecionada()">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                    <button type="button" class="btn-close ms-2" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+
+            <div class="gcal-popover-body">
+                <div class="gcal-detail-row">
+                    <i class="far fa-clock gcal-detail-icon"></i>
+                    <div>
+                        <div class="fw-bold" id="popoverDateTime">Terça-feira, 14 de Outubro • 09:00 - 10:00</div>
+                        <span class="badge" id="popoverStatusBadge">Agendada</span>
+                    </div>
+                </div>
+
+                <div class="gcal-detail-row">
+                    <i class="fas fa-user-tie gcal-detail-icon"></i>
+                    <div>
+                        <div class="small text-muted">Responsável Técnico</div>
+                        <div class="fw-bold" id="popoverResponsavelNome">Eng. Gabriel Eduardo</div>
+                    </div>
+                </div>
+
+                <div class="gcal-detail-row" id="popoverParticipantesRow">
+                    <i class="fas fa-users gcal-detail-icon"></i>
+                    <div class="w-100">
+                        <div class="small text-muted mb-1">Equipe / Participantes</div>
+                        <div class="d-flex flex-wrap gap-1" id="popoverParticipantesList">
+                            <!-- Iniciais coloridas -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gcal-detail-row" id="popoverLocalizacaoRow">
+                    <i class="fas fa-map-marker-alt gcal-detail-icon text-danger"></i>
+                    <div>
+                        <div class="small text-muted">Localização</div>
+                        <div id="popoverEndereco">Av. Paulista, 1000 - São Paulo/SP</div>
+                        <a href="#" target="_blank" class="small text-primary fw-bold text-decoration-none mt-1 d-inline-block" id="popoverMapsLink">
+                            <i class="fas fa-external-link-alt me-1"></i>Abrir no Google Maps
+                        </a>
+                    </div>
+                </div>
+
+                <div class="gcal-detail-row" id="popoverObsRow">
+                    <i class="fas fa-align-left gcal-detail-icon"></i>
+                    <div>
+                        <div class="small text-muted">Observações & Diretrizes</div>
+                        <div class="small text-dark" id="popoverObservacoes">Nenhuma observação.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer border-0 bg-light p-3 d-flex justify-content-between">
+                <a href="#" id="popoverBtnVerCompleto" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-external-link-alt me-1"></i>Ver Completo
+                </a>
+                <a href="#" id="popoverBtnIniciarLaudo" class="btn btn-success btn-sm fw-bold">
+                    <i class="fas fa-play me-1"></i>Iniciar Vistoria no APK
+                </a>
             </div>
         </div>
     </div>
@@ -275,865 +788,523 @@
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js'></script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const calendarEl = document.getElementById('calendar');
-    let calendar;
-    let allEvents = [];
+let fullCalendarInstance = null;
+let allCalendarEvents = [];
+let serverEmployees = [];
+let serverProjects = [];
+let currentUserData = {};
+let selectedVisitData = null;
+let miniCurrentMonth = new Date().getMonth();
+let miniCurrentYear = new Date().getFullYear();
 
-    // Inicializar calendário
-    calendar = new FullCalendar.Calendar(calendarEl, {
+document.addEventListener('DOMContentLoaded', function() {
+    // Atualizar número no logo estilo Google Calendar
+    const today = new Date();
+    document.getElementById('logoCurrentDayNumber').innerText = today.getDate();
+
+    // Toggle da Sidebar retrátil
+    document.getElementById('btnToggleSidebar').addEventListener('click', () => {
+        const sidebar = document.getElementById('gcalSidebar');
+        sidebar.classList.toggle('collapsed');
+        setTimeout(() => {
+            if (fullCalendarInstance) fullCalendarInstance.updateSize();
+        }, 260);
+    });
+
+    // Inicializar FullCalendar
+    const calendarEl = document.getElementById('googleCalendarTarget');
+    fullCalendarInstance = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
-        eventDisplay: 'block', // Força exibição em bloco com cor de fundo
         locale: 'pt-br',
-        headerToolbar: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        editable: true,
+        selectable: true,
+        selectMirror: true,
+        dayMaxEvents: true,
+        headerToolbar: false, // Usamos nosso cabeçalho do Google
+        slotMinTime: '06:00:00',
+        slotMaxTime: '21:00:00',
+        eventDisplay: 'block',
+        
+        // Clique no dia ou horário -> Criar nova visita (Google Calendar style)
+        select: function(info) {
+            abrirModalCriacaoRapida(info.startStr, info.endStr);
         },
-        slotMinTime: '07:00:00',
-        slotMaxTime: '18:00:00',
-        height: 'auto',
-        // Item 28: Implementar clique em eventos para mostrar modal de detalhes
+
+        // Clique no evento -> Abrir popover de detalhes (Google Calendar style)
         eventClick: function(info) {
             info.jsEvent.preventDefault();
-            showVisitDetails(info.event.extendedProps.visitId);
+            abrirDetalhesGoogle(info.event.extendedProps);
         },
-        // Item 28: Implementar clique em datas para novo agendamento
-        dateClick: function(info) {
-            // No modo mês: abrir nova visita com data preenchida
-            // No modo semana/dia: abrir com data e horário preenchidos
-            const dateStr = info.dateStr;
-            const timeStr = info.date.toTimeString().substring(0, 5); // HH:MM
-            
-            // Construir URL com data e horário
-            let url = "/visits/new?data=" + dateStr;
-            if (info.view.type !== 'dayGridMonth') {
-                // Em modo semana/dia, incluir horário
-                url += "&hora=" + timeStr;
-            }
-            
-            window.location.href = url;
+
+        // Drag & Drop (Arrastar e Soltar) -> Reagendamento automático e notificações
+        eventDrop: function(info) {
+            reagendarVisita(info.event, info.revert);
         },
-        eventDidMount: function(info) {
-            // Adicionar tooltip
-            info.el.setAttribute('title', info.event.extendedProps.tooltip);
-            info.el.setAttribute('data-bs-toggle', 'tooltip');
+
+        // Redimensionar duração
+        eventResize: function(info) {
+            reagendarVisita(info.event, info.revert);
         },
-        eventClassNames: function(info) {
-            return 'fc-event-' + info.event.extendedProps.status.toLowerCase();
+
+        // Atualizar título do mês e ano no topo
+        datesSet: function(info) {
+            atualizarTituloTopo(info.view.title);
         }
     });
 
-    // Carregar eventos e cores dos funcionários
-    loadVisits();
-    loadEmployeeColors();
+    fullCalendarInstance.render();
+    renderizarMiniCalendario();
 
-    // Configurar filtros
-    document.querySelectorAll('input[id^="filter"]').forEach(checkbox => {
-        checkbox.addEventListener('change', applyFilters);
-    });
-
-    // Criar tooltip detalhado com cores dos participantes
-    function createDetailedTooltip(visit, participantesNomes) {
-        let tooltip = `${visit.title || visit.numero}\n`;
-        tooltip += `Projeto: ${visit.projeto_nome}\n`;
-        tooltip += `Responsável: ${visit.responsavel_nome}\n`;
-        tooltip += `Status: ${visit.status}`;
-        
-        if (visit.participantes && visit.participantes.length > 0 && !visit.is_pessoal) {
-            tooltip += `\n\nParticipantes (${visit.participantes.length}):`;
-            visit.participantes.forEach(p => {
-                const roleIndicator = p.is_responsavel ? ' (Responsável)' : '';
-                tooltip += `\n• ${p.nome}${roleIndicator}`;
-            });
-        }
-        
-        if (visit.observacoes) {
-            tooltip += `\n\nObservações: ${visit.observacoes}`;
-        }
-        
-        return tooltip;
-    }
-    
-    // Carregar e exibir cores dos funcionários na legenda
-    function loadEmployeeColors() {
-        fetch('/api/visits/calendar')
-            .then(response => {
-                if (!response.ok) {
-                    console.error('Employee colors error', response.status);
-                    return;
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data) return;
-                
-                const employeeColors = new Map();
-                
-                // Se a API retornou a lista de funcionários ativos, usar ela (prioridade)
-                if (data.employees && Array.isArray(data.employees)) {
-                    data.employees.forEach(emp => {
-                        if (emp.nome && emp.cor_agenda) {
-                            employeeColors.set(emp.nome, emp.cor_agenda);
-                        }
-                    });
-                } else {
-                    // Fallback: Extrair cores únicas dos funcionários apenas das visitas carregadas
-                    const visits = Array.isArray(data) ? data : (data.visits || []);
-                    visits.forEach(visit => {
-                        // Adicionar responsável
-                        if (visit.responsavel_nome && visit.responsavel_cor) {
-                            employeeColors.set(visit.responsavel_nome, visit.responsavel_cor);
-                        }
-                        
-                        // Adicionar participantes
-                        if (visit.participantes && visit.participantes.length > 0) {
-                            visit.participantes.forEach(participante => {
-                                if (participante.nome && participante.cor_agenda) {
-                                    employeeColors.set(participante.nome, participante.cor_agenda);
-                                }
-                            });
-                        }
-                    });
-                }
-                
-                // Exibir legenda se houver funcionários com cores
-                if (employeeColors.size > 0) {
-                    const container = document.getElementById('employeeColorsContainer');
-                    const legend = document.getElementById('employeeColorsLegend');
-                    
-                    container.innerHTML = '';
-                    
-                    // Converter para array e ordenar por nome
-                    const sortedEmployees = Array.from(employeeColors.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-                    
-                    sortedEmployees.forEach(([name, color]) => {
-                        const legendItem = document.createElement('div');
-                        legendItem.className = 'legend-item';
-                        legendItem.innerHTML = `
-                            <div class="legend-color" style="background-color: ${color}; border: 1px solid #dee2e6;"></div>
-                            <small class="text-muted">${name}</small>
-                        `;
-                        container.appendChild(legendItem);
-                    });
-                    
-                    legend.style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao carregar cores dos funcionários:', error);
-            });
-    }
-
-    function loadVisits() {
-        fetch('/api/visits/calendar')
-            .then(response => {
-                // Check response.ok before response.json() - defensive programming
-                if (!response.ok) {
-                    console.error('Calendar error', response.status);
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Ensure that code only executes .map() on arrays - defensive check
-                if (!data) {
-                    console.warn('Calendar API returned null/undefined data');
-                    allEvents = [];
-                    applyFilters();
-                    return;
-                }
-                
-                const visits = Array.isArray(data) ? data : (data.visits || []);
-                
-                if (!Array.isArray(visits)) {
-                    console.warn('Calendar API did not return array data:', data);
-                    allEvents = [];
-                    applyFilters();
-                    return;
-                }
-                
-                allEvents = visits.map(visit => {
-                    // Título simplificado: código da visita + número de participantes
-                    let displayTitle = visit.numero || visit.title || `VIS-${visit.id}`;
-                    let participantesNomes = visit.participantes ? visit.participantes.map(p => p.nome).join(', ') : '';
-                    
-                    // Indicador de participantes apenas se houver múltiplos
-                    if (visit.participantes && visit.participantes.length > 1 && !visit.is_pessoal) {
-                        displayTitle = `${displayTitle} (${visit.participantes.length})`;
-                    }
-                    
-                    // Cor do evento baseada no status e responsável
-                    let eventColor = '#0EA5E9'; // Default Blue
-                    const status = visit.status ? visit.status.toLowerCase() : '';
-                    let isOverdue = false;
-                    let displayStatus = visit.status;
-                    
-                    if (status !== 'realizada' && status !== 'cancelada' && status !== 'cancelado') {
-                        const start = new Date(visit.data_inicio);
-                        // Fuso horário de Brasília (UTC-3)
-                        const agoraUTC = new Date();
-                        const agoraBR = new Date(agoraUTC.getTime() - (agoraUTC.getTimezoneOffset() * 60000) - (3 * 60 * 60 * 1000));
-                        
-                        if (start < agoraBR) {
-                            isOverdue = true;
-                            displayStatus = 'Atrasada';
-                        }
-                    }
-                    
-                    if (status === 'realizada') {
-                        eventColor = '#28a745'; // Green for Realizada
-                    } else if (status === 'cancelada' || status === 'cancelado') {
-                        eventColor = '#dc3545'; // Red for Cancelada
-                    } else if (isOverdue) {
-                        eventColor = '#dc3545'; // Red for Atrasada
-                    } else {
-                        // Para agendadas/pendentes, usar cor do responsável
-                        eventColor = visit.responsavel_cor || '#0EA5E9';
-                        if (visit.participantes && visit.participantes.length > 0) {
-                            const responsavel = visit.participantes.find(p => p.is_responsavel);
-                            if (responsavel) {
-                                eventColor = responsavel.cor_agenda || eventColor;
-                            } else {
-                                // Se não houver marcado como responsável, pega o primeiro
-                                eventColor = visit.participantes[0].cor_agenda || eventColor;
-                            }
-                        }
-                    }
-
-                    return {
-                        id: visit.id,
-                        title: displayTitle,
-                        start: visit.data_inicio,
-                        end: visit.data_fim || visit.data_realizada,
-                        backgroundColor: eventColor,
-                        borderColor: eventColor,
-                        extendedProps: {
-                            visitId: visit.visit_id || visit.id,
-                            status: visit.status,
-                            projeto: visit.projeto_nome,
-                            responsavel: visit.responsavel_nome,
-                            observacoes: visit.observacoes,
-                            participantes: visit.participantes,
-                            is_pessoal: visit.is_pessoal,
-                            tooltip: createDetailedTooltip(visit, participantesNomes)
-                        }
-                    };
-                });
-                
-                applyFilters();
-            })
-            .catch(error => {
-                console.error('Erro ao carregar visitas:', error);
-                // Set empty array to prevent undefined.map() errors
-                allEvents = [];
-                applyFilters();
-                
-                // Show user-friendly error message instead of technical alert
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'alert alert-danger';
-                const errorMsg = error.message.includes('500') 
-                    ? '⚠️ Erro no servidor. Por favor, tente novamente em alguns instantes.'
-                    : '⚠️ Erro ao carregar lista de visitas. Verifique sua conexão e tente novamente.';
-                errorDiv.innerHTML = errorMsg;
-                const container = document.querySelector('.container-fluid');
-                if (container) container.prepend(errorDiv);
-                
-                // Initialize empty events to prevent further errors
-                allEvents = [];
-                applyFilters();
-            });
-    }
-
-    function applyFilters() {
-        const showAgendada = document.getElementById('filterAgendada').checked;
-        const showRealizada = document.getElementById('filterRealizada').checked;
-        const showCancelada = document.getElementById('filterCancelada').checked;
-
-        const filteredEvents = allEvents.filter(event => {
-            const status = event.extendedProps.status.toLowerCase();
-            return (showAgendada && status === 'agendada') ||
-                   (showRealizada && status === 'realizada') ||
-                   (showCancelada && status === 'cancelada');
-        });
-
-        calendar.removeAllEvents();
-        calendar.addEventSource(filteredEvents);
-    }
-
-    function showVisitDetails(visitId) {
-        const modal = new bootstrap.Modal(document.getElementById('visitModal'));
-        modal.show();
-        
-        const modalHeader = document.getElementById('visitModalHeader');
-        const modalTitle = document.getElementById('visitModalTitle');
-        const modalSubtitle = document.getElementById('visitModalSubtitle');
-        const modalBody = document.getElementById('visitModalBody');
-        const modalActions = document.getElementById('visitModalActions');
-        
-        modalBody.innerHTML = `
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Carregando...</span>
-                </div>
-                <p class="text-muted mt-2">Carregando detalhes...</p>
-            </div>
-        `;
-        
-        fetch(`/api/visits/${visitId}/details`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const visit = data.visit;
-                    
-                    const statusColors = {
-                        'Agendada': { bg: 'linear-gradient(135deg, #0EA5E9 0%, #0284C7 100%)', badge: 'primary' },
-                        'Realizada': { bg: 'linear-gradient(135deg, #10B981 0%, #059669 100%)', badge: 'success' },
-                        'Cancelado': { bg: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', badge: 'danger' },
-                        'Cancelada': { bg: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', badge: 'danger' },
-                        'Atrasada':  { bg: 'linear-gradient(135deg, #DC3545 0%, #C82333 100%)', badge: 'danger' }
-                    };
-                    
-                    let displayStatus = visit.status;
-                    if (visit.status !== 'Realizada' && visit.status !== 'Cancelada' && visit.data_inicio) {
-                        const start = new Date(visit.data_inicio);
-                        // Fuso horário de Brasília (UTC-3) para cálculo de atraso real
-                        const agoraUTC = new Date();
-                        const agoraBR = new Date(agoraUTC.getTime() - (agoraUTC.getTimezoneOffset() * 60000) - (3 * 60 * 60 * 1000));
-
-                        if (start < agoraBR) {
-                            displayStatus = 'Atrasada';
-                        }
-                    }
-                    const statusStyle = statusColors[displayStatus] || statusColors['Agendada'];
-                    
-                    modalHeader.style.background = statusStyle.bg;
-                    modalTitle.innerHTML = `<i class="fas fa-calendar-check me-2"></i>Visita ${visit.numero}`;
-                    modalSubtitle.innerHTML = visit.is_pessoal ? 
-                        '<i class="fas fa-user me-1"></i>Compromisso Pessoal' : 
-                        `<i class="fas fa-building me-1"></i>${visit.projeto_nome}${visit.projeto_numero ? ' (' + visit.projeto_numero + ')' : ''}`;
-                    
-                    const dataInicio = visit.data_inicio ? new Date(visit.data_inicio) : null;
-                    const dataFim = visit.data_fim ? new Date(visit.data_fim) : null;
-                    const dataRealizada = visit.data_realizada ? new Date(visit.data_realizada) : null;
-                    
-                    let participantesHtml = '';
-                    if (visit.participantes && visit.participantes.length > 0) {
-                        participantesHtml = `
-                            <div class="mb-3">
-                                <h6 class="text-muted mb-2"><i class="fas fa-users me-2"></i>Participantes</h6>
-                                <div class="d-flex flex-wrap gap-2">
-                                    ${visit.participantes.map(p => `
-                                        <span class="badge" style="background-color: ${p.cor_agenda}; font-size: 0.85rem; padding: 8px 12px;">
-                                            ${p.is_responsavel ? '<i class="fas fa-star me-1"></i>' : ''}
-                                            ${p.nome}
-                                            ${p.confirmado ? '<i class="fas fa-check-circle ms-1"></i>' : ''}
-                                        </span>
-                                    `).join('')}
-                                </div>
-                            </div>
-                        `;
-                    }
-                    
-                    modalBody.innerHTML = `
-                        <div class="row g-4">
-                            <div class="col-12">
-                                <div class="d-flex align-items-center mb-3">
-                                    <span class="badge bg-${statusStyle.badge} me-2" style="font-size: 0.9rem; padding: 8px 16px;">
-                                        <i class="fas fa-${displayStatus === 'Realizada' ? 'check-circle' : displayStatus === 'Atrasada' ? 'exclamation-circle' : displayStatus === 'Agendada' ? 'clock' : 'times-circle'} me-1"></i>
-                                        ${displayStatus}
-                                    </span>
-                                    ${visit.is_pessoal ? '<span class="badge bg-secondary"><i class="fas fa-user me-1"></i>Pessoal</span>' : ''}
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="card border-0 bg-light h-100">
-                                    <div class="card-body">
-                                        <h6 class="text-primary mb-3"><i class="fas fa-calendar-alt me-2"></i>Datas</h6>
-                                        
-                                        <div class="mb-2">
-                                            <small class="text-muted d-block">Início</small>
-                                            <strong>${dataInicio ? dataInicio.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' }) : 'N/A'}</strong>
-                                        </div>
-                                        
-                                        ${dataFim ? `
-                                        <div class="mb-2">
-                                            <small class="text-muted d-block">Término</small>
-                                            <strong>${dataFim.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' })}</strong>
-                                        </div>
-                                        ` : ''}
-                                        
-                                        ${dataRealizada ? `
-                                        <div class="mb-2">
-                                            <small class="text-muted d-block"><i class="fas fa-check-circle text-success me-1"></i>Realizada em</small>
-                                            <strong class="text-success">${dataRealizada.toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' })}</strong>
-                                        </div>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="card border-0 bg-light h-100">
-                                    <div class="card-body">
-                                        <h6 class="text-primary mb-3"><i class="fas fa-user-tie me-2"></i>Responsável</h6>
-                                        <div class="d-flex align-items-center">
-                                            <div class="rounded-circle d-flex align-items-center justify-content-center me-3" 
-                                                 style="width: 40px; height: 40px; background-color: ${visit.responsavel_cor || '#0EA5E9'}; color: white;">
-                                                <i class="fas fa-user"></i>
-                                            </div>
-                                            <div>
-                                                <strong>${visit.responsavel_nome}</strong>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            ${participantesHtml ? `<div class="col-12">${participantesHtml}</div>` : ''}
-                            
-                            ${visit.observacoes ? `
-                            <div class="col-12">
-                                <div class="card border-0 bg-light">
-                                    <div class="card-body">
-                                        <h6 class="text-primary mb-2"><i class="fas fa-clipboard-list me-2"></i>Observações</h6>
-                                        <p class="mb-0">${visit.observacoes}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            ` : ''}
-                            
-                            ${visit.atividades_realizadas ? `
-                            <div class="col-12">
-                                <div class="card border-0 bg-success bg-opacity-10">
-                                    <div class="card-body">
-                                        <h6 class="text-success mb-2"><i class="fas fa-tasks me-2"></i>Atividades Realizadas</h6>
-                                        <p class="mb-0">${visit.atividades_realizadas}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            ` : ''}
-                            
-                            ${(visit.endereco_gps || visit.projeto_endereco) ? `
-                            <div class="col-12">
-                                <div class="card border-0 bg-light">
-                                    <div class="card-body">
-                                        <h6 class="text-primary mb-2"><i class="fas fa-map-marker-alt me-2"></i>Localização</h6>
-                                        <p class="mb-0">${visit.endereco_gps || visit.projeto_endereco}</p>
-                                        ${visit.latitude && visit.longitude ? `
-                                        <a href="https://www.google.com/maps?q=${visit.latitude},${visit.longitude}" 
-                                           target="_blank" class="btn btn-sm btn-outline-primary mt-2">
-                                            <i class="fas fa-external-link-alt me-1"></i>Abrir no Mapa
-                                        </a>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                            ` : ''}
-                        </div>
-                    `;
-
-                    let actions = '';
-                    if (displayStatus === 'Agendada' || displayStatus === 'Atrasada') {
-                        if(visit.projeto_id) {
-                            actions += `<a href="/projects/${visit.projeto_id}" class="btn btn-success"><i class="fas fa-check me-1"></i>Realizar</a>`;
-                        }
-                        actions += `<a href="/visits/${visit.id}/edit" class="btn btn-warning"><i class="fas fa-edit me-1"></i>Editar</a>`;
-                    }
-                    actions += `<a href="/visits/${visit.id}" class="btn btn-primary"><i class="fas fa-eye me-1"></i>Ver Detalhes</a>`;
-                    
-                    modalActions.innerHTML = actions;
-                } else {
-                    modalBody.innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            Erro ao carregar detalhes da visita.
-                        </div>
-                    `;
-                    modalActions.innerHTML = '';
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao carregar detalhes:', error);
-                modalBody.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        Erro ao carregar detalhes da visita. Tente novamente.
-                    </div>
-                `;
-                modalActions.innerHTML = '';
-            });
-    }
-
-    // Inicializar tooltips
-    calendar.render();
-    
-    // Inicializar tooltips do Bootstrap após renderizar o calendário
-    setTimeout(() => {
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    }, 100);
+    // Carregar dados da API
+    carregarDadosCalendario();
 });
 
-// Funções de exportação
-let currentIncludeAll = false;
-
-function exportToGoogleCalendar(includeAll = false) {
-    currentIncludeAll = includeAll;
-    fetch(`/api/visits/export/google?include_all=${includeAll}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const totalVisitas = data.export_urls ? data.export_urls.length : 0;
-                const jaExportadas = data.ja_exportadas || 0;
-                const totalGeral = data.total_visits || 0;
-                
-                if (totalVisitas === 0 && !includeAll && jaExportadas > 0) {
-                    if (confirm(`Todas as ${jaExportadas} visitas já foram exportadas anteriormente.\n\nDeseja ver todas as visitas para re-exportar?`)) {
-                        exportToGoogleCalendar(true);
-                    }
-                    return;
-                }
-                
-                if (totalVisitas === 0) {
-                    alert('Nenhuma visita encontrada para exportação.');
-                    return;
-                }
-                
-                const infoMessage = includeAll 
-                    ? `<strong>${totalVisitas} visitas</strong> disponíveis (incluindo já exportadas).`
-                    : `<strong>${totalVisitas} visitas novas</strong> para exportar. ${jaExportadas > 0 ? `(${jaExportadas} já exportadas)` : ''}`;
-                
-                const toggleBtn = includeAll
-                    ? `<button type="button" class="btn btn-sm btn-outline-primary" onclick="exportToGoogleCalendar(false)">
-                        <i class="fas fa-filter me-1"></i>Mostrar Apenas Novas
-                       </button>`
-                    : (jaExportadas > 0 ? `<button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportToGoogleCalendar(true)">
-                        <i class="fas fa-eye me-1"></i>Mostrar Todas (${totalGeral})
-                       </button>` : '');
-                
-                const modalHtml = `
-                    <div class="modal fade" id="googleExportModal" tabindex="-1">
-                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                            <div class="modal-content">
-                                <div class="modal-header bg-success text-white">
-                                    <h5 class="modal-title"><i class="fab fa-google me-2"></i>Exportar para Google Calendar</h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <div class="alert alert-info mb-0 flex-grow-1 me-2">
-                                            <i class="fas fa-info-circle me-2"></i>${infoMessage}
-                                        </div>
-                                        ${toggleBtn}
-                                    </div>
-                                    
-                                    <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="selectAllVisits" onchange="toggleSelectAllVisits(this)">
-                                            <label class="form-check-label fw-bold" for="selectAllVisits">
-                                                Selecionar Todas
-                                            </label>
-                                        </div>
-                                        <span class="badge bg-primary" id="selectedCount">0 selecionadas</span>
-                                    </div>
-                                    
-                                    <div class="list-group" id="visitExportList">
-                                        ${data.export_urls.map((visit, index) => `
-                                            <label class="list-group-item list-group-item-action d-flex align-items-center ${visit.ja_exportada ? 'list-group-item-light' : ''}" style="cursor: pointer;">
-                                                <input class="form-check-input me-3 visit-checkbox" type="checkbox" 
-                                                       data-url="${visit.url}" data-title="${visit.title}" data-id="${visit.visit_id}"
-                                                       onchange="updateSelectedCount()">
-                                                <div class="flex-grow-1">
-                                                    <i class="fas fa-calendar-check ${visit.ja_exportada ? 'text-secondary' : 'text-success'} me-2"></i>
-                                                    <span>${visit.title}</span>
-                                                    ${visit.ja_exportada ? '<span class="badge bg-secondary ms-2">Já exportada</span>' : ''}
-                                                </div>
-                                            </label>
-                                        `).join('')}
-                                    </div>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
-                                        <i class="fas fa-times me-1"></i>Cancelar
-                                    </button>
-                                    <button type="button" class="btn btn-success" onclick="exportSelectedVisits()" id="btnExportSelected" disabled>
-                                        <i class="fab fa-google me-1"></i>Exportar Selecionadas
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
-                const existingModal = document.getElementById('googleExportModal');
-                if (existingModal) {
-                    // Garantir que modal anterior é destruído corretamente
-                    const existingInstance = bootstrap.Modal.getInstance(existingModal);
-                    if (existingInstance) {
-                        existingInstance.dispose();
-                    }
-                    existingModal.remove();
-                }
-                
-                // Remover qualquer backdrop dangling
-                const backdrops = document.querySelectorAll('.modal-backdrop');
-                backdrops.forEach(bd => bd.remove());
-                
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                const newModal = document.getElementById('googleExportModal');
-                const modal = new bootstrap.Modal(newModal);
-                
-                // Remover backdrop ao fechar
-                newModal.addEventListener('hidden.bs.modal', function() {
-                    const backdrop = document.querySelector('.modal-backdrop');
-                    if (backdrop) {
-                        backdrop.remove();
-                    }
-                });
-                
-                modal.show();
-            } else {
-                alert(data.error || 'Erro ao gerar link do Google Calendar.');
-            }
-        })
-        .catch(error => {
-            console.error('Erro na exportação:', error);
-            alert('Erro ao exportar para Google Calendar.');
-        });
+// Atualizar título da barra superior
+function atualizarTituloTopo(titulo) {
+    const el = document.getElementById('gcalCurrentDateLabel');
+    if (el) el.innerText = titulo;
 }
 
-function toggleSelectAllVisits(checkbox) {
-    const allCheckboxes = document.querySelectorAll('.visit-checkbox');
-    allCheckboxes.forEach(cb => cb.checked = checkbox.checked);
-    updateSelectedCount();
+// Navegação do calendário
+function calendarGoToday() {
+    fullCalendarInstance.today();
+    renderizarMiniCalendario();
+}
+function calendarPrev() {
+    fullCalendarInstance.prev();
+    renderizarMiniCalendario();
+}
+function calendarNext() {
+    fullCalendarInstance.next();
+    renderizarMiniCalendario();
+}
+function mudarVisualizacao(viewName) {
+    fullCalendarInstance.changeView(viewName);
 }
 
-function updateSelectedCount() {
-    const checkboxes = document.querySelectorAll('.visit-checkbox');
-    const checkedCount = document.querySelectorAll('.visit-checkbox:checked').length;
-    const countBadge = document.getElementById('selectedCount');
-    const exportBtn = document.getElementById('btnExportSelected');
-    const selectAllCheckbox = document.getElementById('selectAllVisits');
-    
-    if (countBadge) {
-        countBadge.textContent = `${checkedCount} selecionada${checkedCount !== 1 ? 's' : ''}`;
-    }
-    
-    if (exportBtn) {
-        exportBtn.disabled = checkedCount === 0;
-        exportBtn.innerHTML = checkedCount > 0 
-            ? `<i class="fab fa-google me-1"></i>Exportar ${checkedCount} Visita${checkedCount !== 1 ? 's' : ''}`
-            : `<i class="fab fa-google me-1"></i>Exportar Selecionadas`;
-    }
-    
-    if (selectAllCheckbox) {
-        selectAllCheckbox.checked = checkedCount === checkboxes.length && checkboxes.length > 0;
-        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
-    }
-}
-
-let pendingExportUrls = [];
-let currentExportIndex = 0;
-
-function exportSelectedVisits() {
-    const selectedVisits = document.querySelectorAll('.visit-checkbox:checked');
-    
-    if (selectedVisits.length === 0) {
-        alert('Selecione pelo menos uma visita para exportar.');
-        return;
-    }
-    
-    pendingExportUrls = [];
-    currentExportIndex = 0;
-    const visitIds = [];
-    
-    selectedVisits.forEach((checkbox) => {
-        const url = checkbox.dataset.url;
-        const title = checkbox.dataset.title;
-        const visitId = checkbox.dataset.id;
-        pendingExportUrls.push({ url, title, visitId });
-        visitIds.push(parseInt(visitId));
-    });
-    
-    fetch('/api/visits/export/google/mark', {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token() }}'
-        },
-        body: JSON.stringify({ visit_ids: visitIds })
-    }).catch(err => console.log('Erro ao marcar visitas:', err));
-    
-    const existingModal = document.getElementById('googleExportModal');
-    if (existingModal) {
-        const modal = bootstrap.Modal.getInstance(existingModal);
-        if (modal) {
-            modal.hide();
-            // Aguardar fechamento da modal
-            setTimeout(() => {
-                showExportProgressModal();
-                openNextVisit();
-            }, 300);
-        } else {
-            showExportProgressModal();
-            openNextVisit();
+// Carregar visitas e equipe do backend
+async function carregarDadosCalendario() {
+    try {
+        const res = await fetch('/api/visits/calendar');
+        const data = await res.json();
+        if (!data.success) {
+            console.error('Falha ao carregar visitas:', data.error);
+            return;
         }
-    } else {
-        showExportProgressModal();
-        openNextVisit();
+
+        allCalendarEvents = data.visits || [];
+        serverEmployees = data.employees || [];
+        serverProjects = data.projects || [];
+        currentUserData = data.current_user || {};
+
+        // Atualizar dados do usuário atual na sidebar
+        document.getElementById('myUserNameLabel').innerText = currentUserData.nome || 'Meu Usuário';
+        document.getElementById('myUserColorPill').style.backgroundColor = currentUserData.cor_agenda || '#1A73E8';
+
+        // Preencher lista de projetos no modal
+        const obraSelect = document.getElementById('quickVisitaObra');
+        obraSelect.innerHTML = '<option value="-1">Outros / Sem Obra Cadastrada</option>';
+        serverProjects.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.innerText = p.nome;
+            obraSelect.appendChild(opt);
+        });
+
+        // Preencher lista de responsáveis no modal
+        const respSelect = document.getElementById('quickVisitaResponsavel');
+        respSelect.innerHTML = '';
+        serverEmployees.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.innerText = e.nome;
+            if (e.id === currentUserData.id) opt.selected = true;
+            respSelect.appendChild(opt);
+        });
+
+        // Renderizar lista de engenheiros na sidebar
+        renderizarSidebarEquipe();
+
+        // Aplicar filtros e renderizar no FullCalendar
+        filtrarEventos();
+
+    } catch (e) {
+        console.error('Erro na requisição da agenda:', e);
     }
 }
 
-function showExportProgressModal() {
-    const existingProgress = document.getElementById('exportProgressModal');
-    if (existingProgress) existingProgress.remove();
+// Renderizar filtros de equipe na sidebar
+function renderizarSidebarEquipe() {
+    const container = document.getElementById('teamEngineersFilterContainer');
+    if (!container) return;
+
+    container.innerHTML = '';
+    serverEmployees.forEach(emp => {
+        // Ignorar o usuário atual aqui pois já está na seção "Minha Agenda"
+        if (emp.id === currentUserData.id) return;
+
+        const item = document.createElement('div');
+        item.className = 'gcal-filter-item';
+        item.innerHTML = `
+            <input class="gcal-filter-checkbox" type="checkbox" id="chkEng_${emp.id}" checked onchange="filtrarEventos()">
+            <div class="gcal-user-color-pill" style="background: ${emp.cor_agenda || '#0EA5E9'};"></div>
+            <span class="text-truncate">${emp.nome}</span>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// Alternar todos os engenheiros na sidebar
+function toggleTodosEngenheiros() {
+    const checkboxes = document.querySelectorAll('#teamEngineersFilterContainer .gcal-filter-checkbox');
+    const algumDesmarcado = Array.from(checkboxes).some(c => !c.checked);
+    checkboxes.forEach(c => c.checked = algumDesmarcado);
+    filtrarEventos();
+}
+
+// Alternar minha agenda
+function toggleMinhaAgenda() {
+    const chk = document.getElementById('chkMinhaAgenda');
+    chk.checked = !chk.checked;
+    filtrarEventos();
+}
+
+// Filtro em tempo real de eventos no FullCalendar
+function filtrarEventos() {
+    const minhaAgendaAtiva = document.getElementById('chkMinhaAgenda').checked;
+    const chkAgendada = document.getElementById('chkStatusAgendada').checked;
+    const chkRealizada = document.getElementById('chkStatusRealizada').checked;
+    const chkCancelada = document.getElementById('chkStatusCancelada').checked;
+    const termoBusca = (document.getElementById('gcalSearchInput').value || '').trim().toLowerCase();
+
+    // IDs de engenheiros selecionados
+    const selectedEngIds = new Set();
+    if (minhaAgendaAtiva && currentUserData.id) {
+        selectedEngIds.add(currentUserData.id);
+    }
+    document.querySelectorAll('#teamEngineersFilterContainer .gcal-filter-checkbox').forEach(chk => {
+        if (chk.checked) {
+            const uid = parseInt(chk.id.replace('chkEng_', ''), 10);
+            if (uid) selectedEngIds.add(uid);
+        }
+    });
+
+    const eventosFiltrados = allCalendarEvents.filter(ev => {
+        // Filtro por status
+        const st = (ev.status || '').toLowerCase();
+        if (st === 'agendada' && !chkAgendada) return false;
+        if (st === 'realizada' && !chkRealizada) return false;
+        if ((st === 'cancelada' || st === 'cancelado') && !chkCancelada) return false;
+
+        // Filtro por usuário / equipe
+        let pertenceAoFiltro = false;
+        if (selectedEngIds.has(ev.responsavel_id)) pertenceAoFiltro = true;
+        if (ev.participantes && ev.participantes.some(p => selectedEngIds.has(p.id))) pertenceAoFiltro = true;
+        if (ev.criado_por && selectedEngIds.has(ev.criado_por)) pertenceAoFiltro = true;
+
+        if (!pertenceAoFiltro) return false;
+
+        // Filtro de busca textual
+        if (termoBusca) {
+            const strAlvo = `${ev.title} ${ev.numero} ${ev.projeto_nome} ${ev.responsavel_nome} ${ev.observacoes}`.toLowerCase();
+            if (!strAlvo.includes(termoBusca)) return false;
+        }
+
+        return true;
+    });
+
+    fullCalendarInstance.removeAllEvents();
+    fullCalendarInstance.addEventSource(eventosFiltrados);
+}
+
+// Drag & Drop e Reschedule com API e Notificações
+async function reagendarVisita(calendarEvent, revertFunc) {
+    const visitId = calendarEvent.extendedProps.visit_id;
+    const newStart = calendarEvent.start ? calendarEvent.start.toISOString() : null;
+    const newEnd = calendarEvent.end ? calendarEvent.end.toISOString() : null;
+
+    try {
+        const res = await fetch(`/api/visits/${visitId}/reschedule`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                start: newStart,
+                end: newEnd
+            })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            // Atualizar no array local
+            const localEv = allCalendarEvents.find(e => e.visit_id === visitId);
+            if (localEv) {
+                localEv.start = newStart;
+                localEv.end = newEnd;
+            }
+        } else {
+            alert('Não foi possível reagendar: ' + (data.error || 'Erro'));
+            revertFunc();
+        }
+    } catch (e) {
+        alert('Erro de conexão ao reagendar: ' + e.message);
+        revertFunc();
+    }
+}
+
+// Abrir modal de criação rápida
+function abrirModalCriacaoRapida(startStr, endStr) {
+    const modal = new bootstrap.Modal(document.getElementById('modalCriarVisitaRapida'));
     
-    const totalVisits = pendingExportUrls.length;
-    
-    const modalHtml = `
-        <div class="modal fade" id="exportProgressModal" tabindex="-1" data-bs-backdrop="static">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="fab fa-google me-2"></i>Exportando para Google Calendar</h5>
-                    </div>
-                    <div class="modal-body text-center py-4">
-                        <div class="mb-3">
-                            <div class="progress" style="height: 25px;">
-                                <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" 
-                                     id="exportProgressBar" role="progressbar" style="width: 0%">
-                                    <span id="exportProgressText">0 / ${totalVisits}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="mb-3" id="exportCurrentVisit">Preparando exportação...</p>
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            <strong>Importante:</strong> Clique em "Abrir Próxima" para cada visita.<br>
-                            Salve cada evento no Google Calendar antes de continuar.
-                        </div>
-                        <div class="d-grid gap-2">
-                            <button type="button" class="btn btn-success btn-lg" id="btnOpenNext" onclick="openNextVisit()">
-                                <i class="fab fa-google me-2"></i>Abrir Visita 1 de ${totalVisits}
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="skipRemainingExports()">
-                                <i class="fas fa-times me-1"></i>Cancelar Restantes
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modal = new bootstrap.Modal(document.getElementById('exportProgressModal'));
+    // Configurar datas padrão
+    const agora = new Date();
+    const agoraMaisUmaHora = new Date(agora.getTime() + 60 * 60 * 1000);
+
+    const formatToLocalInput = (d) => {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    if (startStr) {
+        document.getElementById('quickVisitaInicio').value = startStr.substring(0, 16);
+        document.getElementById('quickVisitaFim').value = endStr ? endStr.substring(0, 16) : startStr.substring(0, 16);
+    } else {
+        document.getElementById('quickVisitaInicio').value = formatToLocalInput(agora);
+        document.getElementById('quickVisitaFim').value = formatToLocalInput(agoraMaisUmaHora);
+    }
+
     modal.show();
 }
 
-function openNextVisit() {
-    if (currentExportIndex >= pendingExportUrls.length) {
-        finishExport();
+// Salvar Visita Rápida
+async function salvarVisitaRapida() {
+    const btn = document.getElementById('btnSalvarVisitaRapida');
+    const obraId = document.getElementById('quickVisitaObra').value;
+    const outrosTexto = document.getElementById('quickVisitaOutrosTexto').value.trim();
+    const start = document.getElementById('quickVisitaInicio').value;
+    const end = document.getElementById('quickVisitaFim').value;
+    const respId = document.getElementById('quickVisitaResponsavel').value;
+    const obs = document.getElementById('quickVisitaObservacoes').value.trim();
+    const isPessoal = document.getElementById('quickVisitaPessoal').checked;
+
+    if (!start) {
+        alert('Por favor, informe a data de início da visita.');
         return;
     }
-    
-    const visit = pendingExportUrls[currentExportIndex];
-    const totalVisits = pendingExportUrls.length;
-    
-    const progressBar = document.getElementById('exportProgressBar');
-    const progressText = document.getElementById('exportProgressText');
-    const currentVisitText = document.getElementById('exportCurrentVisit');
-    const btnOpenNext = document.getElementById('btnOpenNext');
-    
-    const popup = window.open(visit.url, '_blank');
-    
-    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-        currentVisitText.innerHTML = `
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle me-2"></i>
-                <strong>Pop-up bloqueado!</strong><br>
-                <a href="${visit.url}" target="_blank" class="btn btn-success btn-sm mt-2">
-                    <i class="fab fa-google me-1"></i>Clique aqui para abrir: ${visit.title}
-                </a>
-            </div>
-        `;
-    } else {
-        currentVisitText.innerHTML = `<i class="fas fa-check-circle text-success me-2"></i>Aberto: <strong>${visit.title}</strong>`;
-    }
-    
-    currentExportIndex++;
-    
-    const progress = Math.round((currentExportIndex / totalVisits) * 100);
-    progressBar.style.width = `${progress}%`;
-    progressText.textContent = `${currentExportIndex} / ${totalVisits}`;
-    
-    if (currentExportIndex >= totalVisits) {
-        btnOpenNext.innerHTML = '<i class="fas fa-check-circle me-2"></i>Concluir';
-        btnOpenNext.classList.remove('btn-success');
-        btnOpenNext.classList.add('btn-primary');
-        btnOpenNext.onclick = finishExport;
-    } else {
-        btnOpenNext.innerHTML = `<i class="fab fa-google me-2"></i>Abrir Visita ${currentExportIndex + 1} de ${totalVisits}`;
-    }
-}
 
-function skipRemainingExports() {
-    if (confirm('Deseja cancelar a exportação das visitas restantes?')) {
-        finishExport();
-    }
-}
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Salvando...';
 
-function finishExport() {
-    const modalEl = document.getElementById('exportProgressModal');
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) {
-        modal.hide();
-        setTimeout(() => {
-            if (modalEl) modalEl.remove();
-            // Remover backdrop dangling e resetar body
-            const backdrops = document.querySelectorAll('.modal-backdrop');
-            backdrops.forEach(bd => bd.remove());
-            document.body.classList.remove('modal-open');
-        }, 300);
-    }
-    
-    const exported = currentExportIndex;
-    const total = pendingExportUrls.length;
-    
-    if (exported > 0) {
-        alert(`${exported} de ${total} visita(s) exportada(s) para o Google Calendar!`);
-    }
-    
-    pendingExportUrls = [];
-    currentExportIndex = 0;
-}
-
-function exportToOutlook() {
-    window.open('/api/visits/export/ics', '_blank');
-}
-
-function exportToICS() {
-    window.location.href = '/api/visits/export/ics';
-}
-
-function exportSingleVisit(visitId) {
-    fetch(`/api/visits/${visitId}/export/google`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.open(data.url, '_blank');
-            } else {
-                alert('Erro ao gerar link do Google Calendar.');
-            }
-        })
-        .catch(error => {
-            console.error('Erro na exportação:', error);
-            alert('Erro ao exportar visita.');
+    try {
+        const res = await fetch('/api/visits/quick-create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({
+                projeto_id: obraId,
+                projeto_outros: outrosTexto,
+                start: start,
+                end: end,
+                responsavel_id: respId,
+                observacoes: obs,
+                is_pessoal: isPessoal
+            })
         });
+
+        const data = await res.json();
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalCriarVisitaRapida')).hide();
+            await carregarDadosCalendario();
+        } else {
+            alert('Erro ao agendar visita: ' + (data.error || 'Erro desconhecido'));
+        }
+    } catch (e) {
+        alert('Erro de conexão ao salvar visita: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>Salvar e Notificar Equipe';
+    }
+}
+
+// Abrir Detalhes Google Popover
+function abrirDetalhesGoogle(props) {
+    selectedVisitData = props;
+    const modal = new bootstrap.Modal(document.getElementById('modalDetalhesGoogle'));
+
+    document.getElementById('popoverTopColorBar').style.background = props.responsavel_cor || '#1A73E8';
+    document.getElementById('popoverTitle').innerText = `${props.numero} • ${props.projeto_nome}`;
+    document.getElementById('popoverSubtitle').innerText = props.is_pessoal ? 'Compromisso Pessoal' : (props.projeto_nome || 'Visita Técnica');
+
+    // Horários
+    const dInicio = props.data_inicio ? new Date(props.data_inicio) : null;
+    const dFim = props.data_fim ? new Date(props.data_fim) : null;
+    let dataStr = 'N/A';
+    if (dInicio) {
+        dataStr = dInicio.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) + ' • ' +
+                  dInicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' às ' +
+                  (dFim ? dFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+    }
+    document.getElementById('popoverDateTime').innerText = dataStr;
+
+    // Status
+    const stBadge = document.getElementById('popoverStatusBadge');
+    stBadge.innerText = props.status || 'Agendada';
+    if (props.status === 'Realizada') {
+        stBadge.className = 'badge bg-success';
+    } else if (props.status === 'Cancelada') {
+        stBadge.className = 'badge bg-danger';
+    } else {
+        stBadge.className = 'badge bg-primary';
+    }
+
+    // Responsável
+    document.getElementById('popoverResponsavelNome').innerText = props.responsavel_nome || 'Equipe';
+
+    // Participantes
+    const partList = document.getElementById('popoverParticipantesList');
+    partList.innerHTML = '';
+    if (props.participantes && props.participantes.length > 0) {
+        props.participantes.forEach(p => {
+            const initials = p.nome ? p.nome.split(' ').map(n=>n[0]).slice(0,2).join('') : '?';
+            const pill = document.createElement('span');
+            pill.className = 'badge d-inline-flex align-items-center gap-1';
+            pill.style.backgroundColor = p.cor_agenda || '#0EA5E9';
+            pill.style.color = '#FFFFFF';
+            pill.innerText = `${p.nome} ${p.is_responsavel ? '★' : ''}`;
+            partList.appendChild(pill);
+        });
+        document.getElementById('popoverParticipantesRow').style.display = 'flex';
+    } else {
+        document.getElementById('popoverParticipantesRow').style.display = 'none';
+    }
+
+    // Localização
+    if (props.endereco_gps) {
+        document.getElementById('popoverEndereco').innerText = props.endereco_gps;
+        document.getElementById('popoverMapsLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(props.endereco_gps)}`;
+        document.getElementById('popoverLocalizacaoRow').style.display = 'flex';
+    } else {
+        document.getElementById('popoverLocalizacaoRow').style.display = 'none';
+    }
+
+    // Observações
+    document.getElementById('popoverObservacoes').innerText = props.observacoes || 'Nenhuma observação técnica registrada.';
+
+    // Botões
+    document.getElementById('popoverBtnVerCompleto').href = `/visits/${props.visit_id}`;
+    document.getElementById('popoverBtnIniciarLaudo').href = props.projeto_id ? `/reports/new?project_id=${props.projeto_id}` : `/reports/new`;
+
+    // Permissão de edição
+    if (props.can_edit) {
+        document.getElementById('popoverBtnEdit').style.display = 'inline-flex';
+        document.getElementById('popoverBtnDelete').style.display = 'inline-flex';
+    } else {
+        document.getElementById('popoverBtnEdit').style.display = 'none';
+        document.getElementById('popoverBtnDelete').style.display = 'none';
+    }
+
+    modal.show();
+}
+
+// Editar visita
+function editarVisitaSelecionada() {
+    if (selectedVisitData && selectedVisitData.visit_id) {
+        window.location.href = `/visits/${selectedVisitData.visit_id}/edit`;
+    }
+}
+
+// Cancelar visita
+async function cancelarVisitaSelecionada() {
+    if (!selectedVisitData || !selectedVisitData.visit_id) return;
+    if (confirm(`Tem certeza que deseja cancelar a visita ${selectedVisitData.numero}?`)) {
+        try {
+            const res = await fetch(`/api/visits/${selectedVisitData.visit_id}/quick-delete`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await res.json();
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('modalDetalhesGoogle')).hide();
+                await carregarDadosCalendario();
+            } else {
+                alert('Erro: ' + data.error);
+            }
+        } catch (e) {
+            alert('Erro de conexão: ' + e.message);
+        }
+    }
+}
+
+// Mini Calendário Navegável
+function renderizarMiniCalendario() {
+    const grid = document.getElementById('miniCalendarGrid');
+    const label = document.getElementById('miniCalendarMonthYear');
+    if (!grid || !label) return;
+
+    const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    label.innerText = `${monthNames[miniCurrentMonth]} ${miniCurrentYear}`;
+
+    grid.innerHTML = '';
+    ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].forEach(d => {
+        const h = document.createElement('div');
+        h.className = 'gcal-mini-day-name';
+        h.innerText = d;
+        grid.appendChild(h);
+    });
+
+    const firstDay = new Date(miniCurrentYear, miniCurrentMonth, 1).getDay();
+    const daysInMonth = new Date(miniCurrentYear, miniCurrentMonth + 1, 0).getDate();
+    const today = new Date();
+
+    for (let i = 0; i < firstDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'gcal-mini-day-cell other-month';
+        grid.appendChild(empty);
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+        const cell = document.createElement('div');
+        cell.className = 'gcal-mini-day-cell';
+        cell.innerText = d;
+        if (today.getFullYear() === miniCurrentYear && today.getMonth() === miniCurrentMonth && today.getDate() === d) {
+            cell.classList.add('today');
+        }
+        cell.onclick = () => {
+            const targetDate = new Date(miniCurrentYear, miniCurrentMonth, d);
+            fullCalendarInstance.gotoDate(targetDate);
+        };
+        grid.appendChild(cell);
+    }
+}
+function miniPrev() {
+    miniCurrentMonth--;
+    if (miniCurrentMonth < 0) { miniCurrentMonth = 11; miniCurrentYear--; }
+    renderizarMiniCalendario();
+}
+function miniNext() {
+    miniCurrentMonth++;
+    if (miniCurrentMonth > 11) { miniCurrentMonth = 0; miniCurrentYear++; }
+    renderizarMiniCalendario();
+}
+
+// Funções de exportação
+function exportToGoogleCalendar() {
+    if (allCalendarEvents.length === 0) return alert('Nenhuma visita disponível para exportação.');
+    const first = allCalendarEvents[0];
+    const s = first.start ? new Date(first.start).toISOString().replace(/-|:|\.\d\d\d/g, "") : "";
+    const e = first.end ? new Date(first.end).toISOString().replace(/-|:|\.\d\d\d/g, "") : s;
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(first.title)}&dates=${s}/${e}&details=${encodeURIComponent(first.observacoes || '')}&location=${encodeURIComponent(first.endereco_gps || '')}`;
+    window.open(url, '_blank');
+}
+function exportToOutlook() {
+    window.location.href = '/visits/export/outlook';
+}
+function exportToICS() {
+    window.location.href = '/visits/export/ics';
 }
 </script>
 {% endblock %}

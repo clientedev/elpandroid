@@ -9,6 +9,7 @@ import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { getLocalVisitas, getLocalRelatorios, saveLocalVisita, addToSyncQueue } from '../../database/db';
 import { Visita, Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { useAuth } from '../../contexts/AuthContext';
 
 // Team fixed colors per specification (Item 8.1):
 // Leopoldo: Azul (#1E88E5), Mateus: Verde (#43A047), Isadora: Amarelo (#FDD835), Luciana: Laranja (#FB8C00)
@@ -29,14 +30,29 @@ function getTeamTheme(name?: string) {
 }
 
 export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { user } = useAuth();
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [filteredVisitas, setFilteredVisitas] = useState<Visita[]>([]);
   const [selectedFilter, setSelectedFilter] = useState('Todas');
+  const [scopeFilter, setScopeFilter] = useState<'minhas' | 'equipe'>('minhas');
   const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  const applyFilters = useCallback((data: Visita[], filter: string, search: string) => {
+  const applyFilters = useCallback((data: Visita[], filter: string, search: string, scope: 'minhas' | 'equipe' = scopeFilter) => {
     let list = data;
+
+    // Filtro individual por usuário logado
+    if (scope === 'minhas' && user) {
+      const myName = (user.nome_completo || user.username || '').trim().toLowerCase();
+      list = list.filter(v => {
+        const matchId = v.responsavel_id && user.id && v.responsavel_id === user.id;
+        const respName = (v.responsavel_nome || '').toLowerCase();
+        const matchName = myName && respName.includes(myName);
+        const matchPessoal = v.is_pessoal && v.criado_por === user.id;
+        return matchId || matchName || matchPessoal;
+      });
+    }
+
     if (filter !== 'Todas') {
       list = list.filter(v => v.status === filter);
     }
@@ -51,7 +67,7 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       );
     }
     setFilteredVisitas(list);
-  }, []);
+  }, [scopeFilter, user]);
 
   const loadVisitasAndAutoCheck = useCallback(async () => {
     try {
@@ -94,12 +110,17 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
   const handleFilter = (filter: string) => {
     setSelectedFilter(filter);
-    applyFilters(visitas, filter, searchQuery);
+    applyFilters(visitas, filter, searchQuery, scopeFilter);
+  };
+
+  const handleScope = (scope: 'minhas' | 'equipe') => {
+    setScopeFilter(scope);
+    applyFilters(visitas, selectedFilter, searchQuery, scope);
   };
 
   const handleSearch = (text: string) => {
     setSearchQuery(text);
-    applyFilters(visitas, selectedFilter, text);
+    applyFilters(visitas, selectedFilter, text, scopeFilter);
   };
 
   const onRefresh = async () => {
@@ -112,7 +133,7 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
     <View style={styles.container}>
       <Header 
         title="Agenda de Visitas" 
-        subtitle={`${filteredVisitas.length} visitas na equipe`}
+        subtitle={`${filteredVisitas.length} ${scopeFilter === 'minhas' ? 'visitas para você' : 'visitas na equipe'}`}
         rightAction={
           <TouchableOpacity 
             style={styles.addBtn}
@@ -123,6 +144,30 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
         }
       />
       <OfflineBanner />
+
+      {/* Scope Selector: Individual vs Equipe */}
+      <View style={styles.scopeRow}>
+        <TouchableOpacity 
+          style={[styles.scopeBtn, scopeFilter === 'minhas' && styles.scopeBtnActive]}
+          onPress={() => handleScope('minhas')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="person" size={13} color={scopeFilter === 'minhas' ? '#FFFFFF' : Colors.primary} />
+          <Text style={[styles.scopeBtnText, scopeFilter === 'minhas' && styles.scopeBtnTextActive]}>
+            Minhas Visitas
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.scopeBtn, scopeFilter === 'equipe' && styles.scopeBtnActive]}
+          onPress={() => handleScope('equipe')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="people" size={14} color={scopeFilter === 'equipe' ? '#FFFFFF' : Colors.textMuted} />
+          <Text style={[styles.scopeBtnText, scopeFilter === 'equipe' && styles.scopeBtnTextActive]}>
+            Toda a Equipe
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Substring Search Bar (Item 8.2) */}
       <View style={styles.searchBox}>
@@ -273,6 +318,41 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  scopeRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 10,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    padding: 3,
+    gap: 4,
+  },
+  scopeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  scopeBtnActive: {
+    backgroundColor: Colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  scopeBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  scopeBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   searchBox: {
     flexDirection: 'row',

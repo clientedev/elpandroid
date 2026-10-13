@@ -97,6 +97,22 @@ def update_version_files(new_version: str, new_version_code: int, notes: str = N
         with open(routes_path, 'w', encoding='utf-8') as f:
             f.write(content)
 
+    # 5. version.json (fonte centralizada para Web e APK)
+    version_json_path = os.path.join(BASE_DIR, 'version.json')
+    try:
+        from datetime import datetime
+        version_data = {
+            "version": new_version,
+            "versionCode": new_version_code,
+            "updatedAt": datetime.now().isoformat(),
+            "notes": notes or f"Atualização oficial v{new_version} (Build {new_version_code})"
+        }
+        with open(version_json_path, 'w', encoding='utf-8') as f:
+            json.dump(version_data, f, indent=2, ensure_ascii=False)
+            f.write('\n')
+    except Exception as v_err:
+        logger.error(f"Erro ao salvar version.json: {v_err}")
+
     return True
 
 def compile_and_copy_apk():

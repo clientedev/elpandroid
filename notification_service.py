@@ -38,27 +38,29 @@ class NotificationService:
         
         return f"{self.base_url}{path}"
     
-    def criar_notificacao(self, user_id, tipo, titulo, mensagem, link_destino=None, enviar_push=True):
+    def criar_notificacao(self, user_id, tipo, titulo, mensagem, link_destino=None, link=None, enviar_push=True, **kwargs):
         """
         Cria uma notificação genérica no sistema
         
         Args:
             user_id: ID do usuário destinatário
-            tipo: Tipo da notificação (obra_criada, relatorio_pendente, relatorio_reprovado)
+            tipo: Tipo da notificação (obra_criada, relatorio_pendente, relatorio_reprovado, visita_agendada, etc.)
             titulo: Título da notificação
             mensagem: Mensagem da notificação
-            link_destino: URL de destino ao clicar na notificação
+            link_destino: URL de destino ao clicar na notificação (ou link)
             enviar_push: Se deve enviar push notification
         """
         try:
             from models import Notificacao, User
+            
+            destino = link_destino or link
             
             notificacao = Notificacao(
                 user_id=user_id,
                 tipo=tipo,
                 titulo=titulo,
                 mensagem=mensagem,
-                link_destino=link_destino,
+                link_destino=destino,
                 status='nova'
             )
             
