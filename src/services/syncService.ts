@@ -361,8 +361,6 @@ class SyncService {
         // Salvar/atualizar obras ativas do servidor (ignorando as que foram deletadas)
         for (const p of serverProjects) {
           if (deletedProjects.has(p.id)) {
-            console.log(`[SyncService] Obra ${p.id} marcada como excluída localmente. Ignorando download e disparando remoção no servidor.`);
-            apiClient.axios.delete(`/api/projetos/${p.id}`, { data: { is_master: true } }).catch(() => null);
             continue;
           }
           await saveLocalProjeto(p, 'synced');
@@ -393,8 +391,6 @@ class SyncService {
 
         for (const v of serverVisits) {
           if (deletedVisits.has(v.id)) {
-            console.log(`[SyncService] Visita ${v.id} marcada como excluída localmente. Ignorando download e disparando remoção no servidor.`);
-            apiClient.axios.delete(`/api/visits/${v.id}`, { data: { is_master: true } }).catch(() => null);
             continue;
           }
           await saveLocalVisita(v, 'synced');
@@ -424,8 +420,6 @@ class SyncService {
 
         for (const r of serverReports) {
           if (deletedReports.has(r.id)) {
-            console.log(`[SyncService] Relatório ${r.id} marcado como excluído localmente. Ignorando download e disparando remoção no servidor.`);
-            apiClient.axios.delete(`/api/relatorios/${r.id}`, { data: { is_master: true } }).catch(() => null);
             continue;
           }
           await saveLocalRelatorio(r, 'synced');

@@ -310,7 +310,7 @@
 </head>
 
 <body>
-    <!-- Navigation - Desktop Optimized -->
+    <!-- Navigation - Desktop & Mobile Optimized -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark py-3 px-4 shadow-sm" id="navbarELP"
         style="background-color: var(--elp-dark);">
         <div class="container-fluid">
@@ -318,150 +318,109 @@
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
                 <img src="{{ url_for('static', filename='logo_elp_navbar.png') }}" alt="ELP Logo" width="90"
                     height="auto" class="me-2">
-                <span class="logo-text fw-bold text-white d-none d-lg-inline">ELP</span>
+                <span class="logo-text fw-bold text-white d-none d-lg-inline">ELP ENGENHARIA</span>
             </a>
 
-            {% if current_user.is_authenticated %}
-            <!-- Ícone de notificações e botão hambúrguer (mobile) -->
-            <div class="d-flex align-items-center gap-2 ms-auto order-lg-2">
-                <!-- Ícone de Notificações - visível sempre -->
-                <a class="nav-link position-relative d-lg-none" href="#" id="notificationBellMobile"
-                    style="cursor: pointer;">
-                    <i class="fas fa-bell fs-5 text-white"></i>
-                    <span id="notificationBadgeMobile"
-                        class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                        style="display: none; font-size: 0.65rem;">
-                        0
-                    </span>
-                </a>
-                <!-- Botão hambúrguer -->
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
-                    aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-            </div>
+            <!-- Botão hambúrguer -->
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-            <!-- ITENS DA NAVBAR -->
-            <div class="collapse navbar-collapse order-lg-1" id="navbarContent">
+            <div class="collapse navbar-collapse" id="navbarContent">
+                {% if current_user.is_authenticated %}
+                <!-- LINKS PRINCIPAIS (USUÁRIO LOGADO) -->
                 <ul class="navbar-nav mx-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('index') }}">
-                            <i class="fas fa-home"></i> Dashboard
+                            <i class="fas fa-home me-1"></i> Painel APK
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('projects_list') }}">
-                            <i class="fas fa-hard-hat"></i> Obras
+                        <a class="nav-link text-success fw-bold" href="{{ url_for('download_official_apk') }}">
+                            <i class="fab fa-android me-1"></i> Baixar APK
                         </a>
                     </li>
-
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="visitasDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-calendar-check"></i> Visitas
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="visitasDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('visit_new') }}">Nova Visita</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('visits_list') }}">Listar Visitas</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('visits_calendar') }}">Calendário</a></li>
-                        </ul>
-                    </li>
-
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="relatoriosDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-file-alt"></i> Relatórios
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="relatoriosDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('reports') }}">Listar Relatórios</a></li>
-                        </ul>
-                    </li>
-
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="expressDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-bolt"></i> Relatório Express
-                        </a>
-                        <ul class="dropdown-menu" aria-labelledby="expressDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('new_express_report') }}">Criar novo relatório express</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('express_reports_list') }}">Listar relatórios express</a></li>
-                        </ul>
-                    </li>
-
 
                     {% if current_user.is_master %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-cog"></i> Administração
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('users_list') }}">
+                            <i class="fas fa-users me-1"></i> Usuários
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="adminDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('users_list') }}">Usuários</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_emails') }}">E-mails de Clientes</a>
-                            </li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_legendas') }}">Legendas</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_aprovadores_padrao') }}">Aprovadores
-                                    Padrão</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_checklist_padrao') }}">Checklist
-                                    Padrão</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="{{ url_for('admin_drive_test') }}">Salvar Backup</a></li>
-                        </ul>
                     </li>
                     {% endif %}
 
-                    {% if current_user.is_developer %}
+                    <!-- AJUSTES QUE INFLUENCIAM O APK -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="devDropdown" role="button"
+                        <a class="nav-link dropdown-toggle" href="#" id="ajustesApkDropdown" role="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-code"></i> Desenvolvedor
+                            <i class="fas fa-sliders-h me-1"></i> Ajustes do APK
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="devDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('admin_legendas') }}">Gerenciar Legendas</a>
-                            </li>
-                            <li><a class="dropdown-item" href="{{ url_for('developer_checklist_padrao') }}">Checklist
-                                    Padrão</a></li>
+                        <ul class="dropdown-menu shadow border-0" aria-labelledby="ajustesApkDropdown">
+                            <li><a class="dropdown-item fw-bold" href="{{ url_for('ajustes_apk_page') }}">
+                                <i class="fas fa-cogs text-primary me-2"></i>Todos os Ajustes do APK
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_legendas') }}">
+                                <i class="fas fa-tags text-info me-2"></i>Legendas Técnicas
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_checklist_padrao') }}">
+                                <i class="fas fa-tasks text-warning me-2"></i>Checklist Padrão
+                            </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_aprovadores_padrao') }}">
+                                <i class="fas fa-user-check text-success me-2"></i>Aprovadores Padrão
+                            </a></li>
                         </ul>
                     </li>
-                    {% endif %}
+
+                    <li class="nav-item">
+                        <a class="nav-link text-muted" href="{{ url_for('landing_page') }}" target="_blank">
+                            <i class="fas fa-globe me-1"></i> Site Institucional
+                        </a>
+                    </li>
                 </ul>
 
-                <!-- PERFIL E NOTIFICAÇÕES -->
-                <ul class="navbar-nav ms-auto">
+                <!-- PERFIL E LOGOUT -->
+                <ul class="navbar-nav ms-auto align-items-lg-center">
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user-circle"></i> {{ current_user.nome_completo }}
+                            <i class="fas fa-user-circle fs-5 me-1"></i> {{ current_user.nome_completo or current_user.username }}
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                            <li><span class="dropdown-item-text">{{ current_user.cargo or 'Usuário' }}</span></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="{{ url_for('install_guide') }}">Instalar App no
-                                    Celular</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">Sair</a></li>
+                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="userDropdown">
+                            <li><span class="dropdown-item-text text-muted small fw-bold">{{ current_user.cargo or 'Vistoriador' }}</span></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-success fw-bold" href="{{ url_for('download_official_apk') }}">
+                                <i class="fab fa-android me-2"></i>Baixar ELP.apk
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Sair
+                            </a></li>
                         </ul>
                     </li>
-                    <li class="nav-item d-none d-lg-block">
-                        <a class="nav-link position-relative" href="#" id="notificationBell" style="cursor: pointer;">
-                            <i class="fas fa-bell"></i>
-                            <span id="notificationBadge"
-                                class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-                                style="display: none; font-size: 0.65rem;">
-                                0
-                            </span>
+                </ul>
+
+                {% else %}
+                <!-- LINKS PÚBLICOS (NÃO LOGADO) -->
+                <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('landing_page') }}">Sobre o Sistema</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-success fw-bold" href="{{ url_for('download_official_apk') }}">
+                            <i class="fab fa-android me-1"></i> Baixar APK
+                        </a>
+                    </li>
+                    <li class="nav-item ms-lg-2">
+                        <a class="btn btn-outline-info btn-sm px-3" href="{{ url_for('login') }}">
+                            <i class="fas fa-lock me-1"></i> Acessar Sistema
                         </a>
                     </li>
                 </ul>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </nav>
 

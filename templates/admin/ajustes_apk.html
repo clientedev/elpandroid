@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Ajustes do Aplicativo (APK) - ELP Consultoria{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 px-md-3 py-3">
+    <!-- Header -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 pb-3 border-bottom gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary px-2 py-1">CONFIGURAÇÕES TÉCNICAS</span>
+                <span class="badge bg-success">SINCRONIZAÇÃO NATIVA</span>
+            </div>
+            <h2 class="h3 fw-bold text-dark mb-0">
+                <i class="fas fa-sliders-h text-primary me-2"></i>Ajustes que influenciam diretamente no APK
+            </h2>
+            <p class="text-muted small mb-0 mt-1">
+                Central de parametrização do sistema. Apenas os módulos que alimentam o aplicativo móvel dos vistoriadores estão disponíveis aqui.
+            </p>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar ao Painel
+            </a>
+            <a href="{{ url_for('download_official_apk') }}" class="btn btn-success fw-bold">
+                <i class="fas fa-download me-1"></i> Baixar APK
+            </a>
+        </div>
+    </div>
+
+    <!-- Banner Informativo -->
+    <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-3 p-3 mb-4 rounded-3">
+        <i class="fas fa-info-circle fs-3 text-info"></i>
+        <div class="small">
+            <strong>Como estes ajustes impactam o aplicativo?</strong><br>
+            Toda legenda técnica, item de checklist ou aprovador configurado nestas telas é consumido via API pelo aplicativo Android em tempo real ou na próxima sincronização dos aparelhos em campo.
+        </div>
+    </div>
+
+    <!-- Grid de Ajustes do APK -->
+    <div class="row g-4">
+        <!-- 1. Legendas Pré-definidas -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100 rounded-3">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="fas fa-tags text-info me-2"></i>1. Legendas Técnicas & Patologias
+                    </h5>
+                    <span class="badge bg-info-subtle text-info border border-info-subtle">Câmera do APK</span>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <p class="text-muted small mb-3">
+                        Gerencie a biblioteca de termos técnicos, anomalias e descrições pré-definidas (como fissuras, desplacamentos, armadura exposta, etc.) que aparecem na câmera e no editor de fotos do aplicativo.
+                    </p>
+
+                    <div class="bg-light p-3 rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted">Legendas Cadastradas:</span>
+                            <span class="fw-bold text-dark">{{ total_legendas if total_legendas is defined else 'Ativas' }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted">Endpoint Consumido pelo APK:</span>
+                            <code>/api/legendas</code>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto d-flex flex-wrap gap-2 pt-2">
+                        <a href="{{ url_for('admin_legendas') }}" class="btn btn-primary fw-bold">
+                            <i class="fas fa-list me-1"></i> Gerenciar Legendas
+                        </a>
+                        <a href="{{ url_for('admin_legenda_nova') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-plus me-1"></i> Nova Legenda
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Checklist Padrão -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100 rounded-3">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="fas fa-tasks text-warning me-2"></i>2. Checklist Técnico Padrão
+                    </h5>
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Vistorias no APK</span>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <p class="text-muted small mb-3">
+                        Configure a lista de etapas de inspeção e itens técnicos padronizados de fachadas e canteiro que os engenheiros preenchem no aplicativo durante as vistorias.
+                    </p>
+
+                    <div class="bg-light p-3 rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted">Itens Configurados:</span>
+                            <span class="fw-bold text-dark">{{ total_checklist if total_checklist is defined else 'Definidos' }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted">Endpoint Consumido pelo APK:</span>
+                            <code>/api/checklist-padrao</code>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto d-flex flex-wrap gap-2 pt-2">
+                        <a href="{{ url_for('admin_checklist_padrao') }}" class="btn btn-primary fw-bold">
+                            <i class="fas fa-edit me-1"></i> Configurar Checklist Padrão
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Aprovadores Padrão -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100 rounded-3">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="fas fa-user-check text-success me-2"></i>3. Aprovadores Padrão
+                    </h5>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">Fluxo de Aprovação</span>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <p class="text-muted small mb-3">
+                        Define qual engenheiro responsável ou coordenador técnico recebe os relatórios emitidos pela equipe de campo no aplicativo para validação e emissão final do laudo.
+                    </p>
+
+                    <div class="bg-light p-3 rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted">Aprovador Global Atual:</span>
+                            <span class="fw-bold text-dark">{{ aprovador_global_nome if aprovador_global_nome else 'Configurado' }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted">Impacto no APK:</span>
+                            <span class="text-success small fw-bold">Roteamento automático ao finalizar relatório</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto d-flex flex-wrap gap-2 pt-2">
+                        <a href="{{ url_for('admin_aprovadores_padrao') }}" class="btn btn-primary fw-bold">
+                            <i class="fas fa-user-shield me-1"></i> Configurar Aprovadores
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Versão e Arquivo do APK -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm h-100 rounded-3">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="fab fa-android text-success me-2"></i>4. Versão & Distribuição do APK
+                    </h5>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Binário</span>
+                </div>
+                <div class="card-body p-4 d-flex flex-column">
+                    <p class="text-muted small mb-3">
+                        Monitoramento do instalador <code>ELP.apk</code> disponível no servidor para atualização remota e download direto pelos vistoriadores.
+                    </p>
+
+                    <div class="bg-light p-3 rounded-3 mb-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted">Versão Distribuída:</span>
+                            <span class="fw-bold text-dark">v{{ apk_info.version if apk_info else '1.0.27' }} (Build {{ apk_info.version_code if apk_info else '27' }})</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted">Tamanho do Binário:</span>
+                            <span>{{ apk_info.size if apk_info else '37.1 MB' }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted">Verificação de Atualização:</span>
+                            <code>/api/app-version</code>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto d-flex flex-wrap gap-2 pt-2">
+                        <a href="{{ url_for('download_official_apk') }}" class="btn btn-success fw-bold">
+                            <i class="fas fa-download me-1"></i> Baixar Arquivo APK
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

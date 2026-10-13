@@ -1,35 +1,52 @@
 {% extends "base.html" %}
 
-{% block title %}Login - Sistema de Acompanhamento de Visitas em Obras{% endblock %}
+{% block title %}Login - Acesso de Usuários Cadastrados | ELP Consultoria{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow">
-            <div class="card-body">
-                <div class="text-center mb-4">
-                    <i class="fas fa-hard-hat fa-3x text-primary mb-3"></i>
-                    <h3>Sistema de Obras</h3>
-                    <p class="text-muted">Acompanhamento de Visitas em Obras</p>
+<div class="row justify-content-center py-4">
+    <div class="col-md-7 col-lg-5 col-xl-4">
+        <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+            <div class="card-header bg-dark text-white text-center py-4 border-0" style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+                <img src="{{ url_for('static', filename='logo_elp_navbar.png') }}" alt="ELP Logo" class="mb-2" style="max-height: 48px;">
+                <h4 class="fw-bold mb-1 text-white">Acesso ao Sistema</h4>
+                <p class="small text-muted mb-0">Uso exclusivo para usuários previamente cadastrados</p>
+            </div>
+
+            <div class="card-body p-4 p-md-4">
+                <!-- Informação para novos usuários -->
+                <div class="alert alert-light border small text-muted mb-4 py-2 px-3 rounded-3 d-flex align-items-center gap-2">
+                    <i class="fas fa-shield-alt text-primary fs-5"></i>
+                    <div>
+                        O cadastro de novos usuários é gerenciado pelo administrador técnico da ELP.
+                    </div>
                 </div>
-                
+
                 <form method="POST">
                     {{ form.hidden_tag() }}
                     
                     <div class="mb-3">
-                        {{ form.username.label(class="form-label") }}
-                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                        <label class="form-label fw-semibold text-secondary small">Nome de Usuário</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-user"></i></span>
+                            {{ form.username(class="form-control border-start-0 ps-0" + (" is-invalid" if form.username.errors else ""), placeholder="Digite seu usuário", autofocus=true) }}
+                        </div>
                         {% for error in form.username.errors %}
-                            <div class="invalid-feedback">{{ error }}</div>
+                            <div class="invalid-feedback d-block">{{ error }}</div>
                         {% endfor %}
                     </div>
                     
                     <div class="mb-3">
-                        {{ form.password.label(class="form-label") }}
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label fw-semibold text-secondary small mb-0">Senha</label>
+                            <a href="{{ url_for('forgot_password') }}" class="text-decoration-none small text-primary">
+                                Esqueceu?
+                            </a>
+                        </div>
                         <div class="input-group">
-                            {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else ""), id="password") }}
-                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
-                                <i class="fas fa-eye" id="eyeIcon"></i>
+                            <span class="input-group-text bg-light border-end-0 text-muted"><i class="fas fa-lock"></i></span>
+                            {{ form.password(class="form-control border-start-0 border-end-0 ps-0" + (" is-invalid" if form.password.errors else ""), id="password", placeholder="Digite sua senha") }}
+                            <button class="btn btn-outline-secondary border-start-0" type="button" id="togglePassword">
+                                <i class="fas fa-eye text-muted" id="eyeIcon"></i>
                             </button>
                         </div>
                         {% for error in form.password.errors %}
@@ -37,45 +54,44 @@
                         {% endfor %}
                     </div>
                     
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            const toggleBtn = document.getElementById('togglePassword');
-                            const passwordInput = document.getElementById('password');
-                            const eyeIcon = document.getElementById('eyeIcon');
-                            
-                            if (toggleBtn && passwordInput) {
-                                toggleBtn.addEventListener('click', function() {
-                                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-                                    passwordInput.setAttribute('type', type);
-                                    
-                                    if (type === 'text') {
-                                        eyeIcon.classList.remove('fa-eye');
-                                        eyeIcon.classList.add('fa-eye-slash');
-                                    } else {
-                                        eyeIcon.classList.remove('fa-eye-slash');
-                                        eyeIcon.classList.add('fa-eye');
-                                    }
-                                });
-                            }
-                        });
-                    </script>
-                    
-                    <div class="mb-3 text-end">
-                        <a href="{{ url_for('forgot_password') }}" class="text-decoration-none small">
-                            Esqueceu a senha?
-                        </a>
-                    </div>
-                    
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-sign-in-alt me-2"></i>Entrar
+                    <div class="d-grid mt-4 mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold rounded-3 shadow-sm" style="background: linear-gradient(135deg, #20c1e8 0%, #0284c7 100%); border: none;">
+                            <i class="fas fa-sign-in-alt me-2"></i>Entrar no Sistema
                         </button>
                     </div>
                 </form>
-                
 
+                <hr class="my-3 border-secondary-subtle">
+
+                <!-- Botão de Download APK Direto -->
+                <div class="text-center">
+                    <p class="small text-muted mb-2">Engenheiro ou vistoriador de campo?</p>
+                    <a href="{{ url_for('download_official_apk') }}" class="btn btn-sm btn-outline-success w-100 fw-bold py-2 rounded-3 mb-2">
+                        <i class="fab fa-android me-1"></i> Baixar Aplicativo ELP.apk
+                    </a>
+                    <a href="{{ url_for('landing_page') }}" class="text-decoration-none small text-muted d-block mt-2">
+                        <i class="fas fa-arrow-left me-1"></i> Voltar à apresentação do sistema
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const eyeIcon = document.getElementById('eyeIcon');
+    
+    if (toggleBtn && passwordInput) {
+        toggleBtn.addEventListener('click', function() {
+            const isPassword = passwordInput.getAttribute('type') === 'password';
+            passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+            eyeIcon.classList.toggle('fa-eye', !isPassword);
+            eyeIcon.classList.toggle('fa-eye-slash', isPassword);
+        });
+    }
+});
+</script>
 {% endblock %}

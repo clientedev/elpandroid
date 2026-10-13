@@ -13,6 +13,7 @@ class ApiClient {
   private instance: AxiosInstance;
   private readonly currentBaseUrl: string = DEFAULT_API_URL;
   private sessionCookie: string | null = null;
+  private currentMobileUser: any = null;
 
   constructor() {
     this.instance = axios.create({
@@ -24,34 +25,18 @@ class ApiClient {
       },
     });
 
-    this.init();
-  }
-
-  async init() {
-    try {
-      // Clean up legacy custom URLs to guarantee fixed production URL
-      await AsyncStorage.removeItem(API_URL_KEY);
-      this.sessionCookie = await SecureStore.getItemAsync(AUTH_COOKIE_KEY);
-    } catch (e) {
-      console.warn('Error loading stored auth session:', e);
-    }
-
-    // Interceptor to add cookie and mobile user headers
-    this.instance.interceptors.request.use(async (config) => {
+    // Interceptor to add cookie and mobile user headers (synchronous for maximum reliability)
+    this.instance.interceptors.request.use((config) => {
       if (this.sessionCookie) {
         config.headers.Cookie = this.sessionCookie;
       }
-      try {
-        const storedUser = await AsyncStorage.getItem('obraflow_current_user');
-        if (storedUser) {
-          const user = JSON.parse(storedUser);
-          if (user?.id) config.headers['X-User-Id'] = String(user.id);
-          if (user?.username) config.headers['X-Username'] = user.username;
-          if (user?.is_master || user?.username?.toLowerCase() === 'admin') {
-            config.headers['X-Is-Master'] = 'true';
-          }
+      if (this.currentMobileUser) {
+        if (this.currentMobileUser.id) config.headers['X-User-Id'] = String(this.currentMobileUser.id);
+        if (this.currentMobileUser.username) config.headers['X-Username'] = this.currentMobileUser.username;
+        if (this.currentMobileUser.is_master || this.currentMobileUser.username?.toLowerCase() === 'admin') {
+          config.headers['X-Is-Master'] = 'true';
         }
-      } catch {}
+      }
       return config;
     });
 
@@ -70,6 +55,26 @@ class ApiClient {
         return Promise.reject(error);
       }
     );
+
+    this.init();
+  }
+
+  async init() {
+    try {
+      // Clean up legacy custom URLs to guarantee fixed production URL
+      await AsyncStorage.removeItem(API_URL_KEY);
+      this.sessionCookie = await SecureStore.getItemAsync(AUTH_COOKIE_KEY);
+      const rawUser = await AsyncStorage.getItem('obraflow_current_user');
+      if (rawUser) {
+        this.currentMobileUser = JSON.parse(rawUser);
+      }
+    } catch (e) {
+      console.warn('Error loading stored auth session:', e);
+    }
+  }
+
+  public setMobileUser(user: any) {
+    this.currentMobileUser = user;
   }
 
   async setBaseUrl(_url: string): Promise<void> {

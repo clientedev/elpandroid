@@ -2825,75 +2825,142 @@ def api_get_photo(foto_id):
 
 # ==================== END NEW UNIFIED IMAGE UPLOAD API ====================
 
+# ==========================================================================================
+# APK & PORTAL HELPERS
+# ==========================================================================================
+def get_apk_info():
+    """Retorna informações atualizadas sobre o arquivo APK e versão"""
+    import json
+    app_version = "1.0.27"
+    version_code = 27
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        app_json_path = os.path.join(base_dir, 'app.json')
+        if os.path.exists(app_json_path):
+            with open(app_json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                expo_data = data.get('expo', {})
+                app_version = str(expo_data.get('version', app_version))
+                if 'android' in expo_data and 'versionCode' in expo_data['android']:
+                    version_code = int(expo_data['android']['versionCode'])
+    except Exception as e:
+        pass
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(base_dir, 'ELP.apk'),
+        os.path.join(base_dir, 'static', 'ELP.apk'),
+        os.path.join(os.getcwd(), 'ELP.apk'),
+        os.path.join(os.getcwd(), 'static', 'ELP.apk'),
+    ]
+    apk_size_mb = "37.1 MB"
+    apk_mtime = ""
+    apk_exists = False
+    for path in candidates:
+        if os.path.exists(path):
+            apk_exists = True
+            st = os.stat(path)
+            apk_size_mb = f"{st.st_size / (1024 * 1024):.1f} MB"
+            apk_mtime = datetime.fromtimestamp(st.st_mtime).strftime('%d/%m/%Y às %H:%M')
+            break
+
+    return {
+        'version': app_version,
+        'version_code': version_code,
+        'size': apk_size_mb,
+        'mtime': apk_mtime,
+        'exists': apk_exists
+    }
+
 # Main routes
 @app.route('/')
 def index():
-    # Se não estiver logado, redirecionar para login
+    apk_info = get_apk_info()
+    
+    # Se não estiver logado, exibe o site institucional de apresentação do sistema
     if not current_user.is_authenticated:
-        return redirect(url_for('login'))
+        return render_template('landing.html', apk_info=apk_info)
 
+    # Para usuário logado: Painel focado 100% no APK, Usuários e Ajustes do APK
     try:
-        # BUSCAR DADOS REAIS DO POSTGRESQL COM FALLBACK
-        projetos_ativos = Projeto.query.filter_by(status='Ativo').count()
-        visitas_agendadas = Visita.query.filter_by(status='Agendada').count()
-        relatorios_pendentes = Relatorio.query.filter(
-            Relatorio.status.in_(['Rascunho', 'Aguardando Aprovação'])
-        ).count()
-
-        # Usuários ativos
-        try:
-            usuarios_ativos = User.query.filter_by(ativo=True).count()
-        except:
-            usuarios_ativos = 0
-
+        users = User.query.order_by(User.created_at.desc()).all()
+        usuarios_ativos = sum(1 for u in users if u.ativo)
+        
+        # Ajustes que influenciam diretamente no APK
+        total_legendas = LegendaPredefinida.query.filter_by(ativo=True).count()
+        total_checklist = ChecklistPadrao.query.count()
+        aprovador_global = AprovadorPadrao.query.filter_by(is_global=True, ativo=True).first()
+        aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Não definido"
+        
         stats = {
-            'projetos_ativos': projetos_ativos,
-            'visitas_agendadas': visitas_agendadas,
-            'relatorios_pendentes': relatorios_pendentes,
-            'usuarios_ativos': usuarios_ativos
+            'usuarios_ativos': usuarios_ativos,
+            'total_legendas': total_legendas,
+            'total_checklist': total_checklist,
+            'aprovador_global_nome': aprovador_global_nome
         }
-
-        # Log para monitoramento
-        print(f"REAL STATS FROM DB: P={projetos_ativos}, V={visitas_agendadas}, R={relatorios_pendentes}, U={usuarios_ativos}")
-
-        # Get recent reports com fallback
-        # Relatórios recentes
-        query = Relatorio.query
-        
-        # Filtro de Visibilidade GLOBAL (Aplicado a TODOS, inclusive masters)
-        # Regra: "Aguardando Aprovação" só aparece para o Aprovador designado (aprovador_id).
-        # Ninguém mais vê (nem autor, nem outros admins).
-        # Outros status (Aprovado, Preenchimento, etc) aparecem para todos.
-        
-        query = query.filter(
-            db.or_(
-                # 1. Não é "Aguardando Aprovação" -> Visível para todos
-                ~Relatorio.status.ilike('%Aguardando Aprovação%'),
-                
-                # 2. É "Aguardando Aprovação" -> Só visível se eu for o aprovador
-                db.and_(
-                    Relatorio.status.ilike('%Aguardando Aprovação%'),
-                    Relatorio.aprovador_id == current_user.id
-                )
-            )
-        )
-            
-        relatorios_recentes = query.order_by(Relatorio.created_at.desc()).limit(5).all()
-
     except Exception as e:
-        # Em caso de erro, retornar lista vazia para não quebrar a página
-        print(f"Erro ao carregar dashboard: {e}") 
+        print(f"Erro ao carregar dados do painel APK: {e}")
+        users = []
         stats = {
-            'projetos_ativos': 0,
-            'visitas_agendadas': 0,
-            'relatorios_pendentes': 0,
-            'usuarios_ativos': 0
+            'usuarios_ativos': 0,
+            'total_legendas': 0,
+            'total_checklist': 0,
+            'aprovador_global_nome': 'N/D'
         }
-        relatorios_recentes = []
 
-    return render_template('dashboard_simple.html',
-                         stats=stats,
-                         relatorios_recentes=relatorios_recentes)
+    return render_template('dashboard_apk.html',
+                           apk_info=apk_info,
+                           users=users,
+                           stats=stats)
+
+@app.route('/sobre')
+@app.route('/apresentacao')
+def landing_page():
+    """Página institucional que apresenta o sistema ELP e o aplicativo Android"""
+    return render_template('landing.html', apk_info=get_apk_info())
+
+@app.route('/admin/ajustes-apk')
+@login_required
+def ajustes_apk_page():
+    """Página dedicada aos ajustes que influenciam diretamente no APK"""
+    apk_info = get_apk_info()
+    try:
+        total_legendas = LegendaPredefinida.query.filter_by(ativo=True).count()
+        total_checklist = ChecklistPadrao.query.count()
+        aprovador_global = AprovadorPadrao.query.filter_by(is_global=True, ativo=True).first()
+        aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Não definido"
+    except Exception as e:
+        print(f"Erro ao carregar métricas de ajustes do APK: {e}")
+        total_legendas = 0
+        total_checklist = 0
+        aprovador_global_nome = "Não definido"
+
+    return render_template('admin/ajustes_apk.html',
+                           apk_info=apk_info,
+                           total_legendas=total_legendas,
+                           total_checklist=total_checklist,
+                           aprovador_global_nome=aprovador_global_nome)
+
+@app.route('/apk-qr.png')
+def apk_qr_code():
+    """Retorna QR code dinâmico para download direto do APK oficial"""
+    try:
+        import qrcode
+        import io
+        download_url = url_for('download_official_apk', _external=True)
+        if request.headers.get('X-Forwarded-Proto') == 'https' and download_url.startswith('http://'):
+            download_url = download_url.replace('http://', 'https://', 1)
+        
+        img = qrcode.make(download_url)
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        return send_file(buf, mimetype='image/png')
+    except Exception as e:
+        static_qr = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'img', 'apk_qr.png')
+        if os.path.exists(static_qr):
+            return send_file(static_qr, mimetype='image/png')
+        return jsonify({'error': str(e)}), 500
 
 # User management routes
 @app.route('/users')
@@ -12545,26 +12612,6 @@ def api_mobile_login():
 # ==============================================================================
 # MOBILE OFFLINE-FIRST SYNCHRONIZATION API (ELP ANDROID)
 # ==============================================================================
-
-def _resolve_mobile_user(data):
-    """Auxiliar para identificar o usuario da operacao mobile (autenticado ou via payload)"""
-    if current_user and current_user.is_authenticated:
-        return current_user
-    if data:
-        uid = data.get('autor_id') or data.get('responsavel_id') or data.get('usuario_id') or data.get('user_id')
-        if uid:
-            try:
-                u = User.query.get(int(uid))
-                if u:
-                    return u
-            except Exception:
-                pass
-        un = data.get('username') or data.get('autor_nome') or data.get('responsavel_nome')
-        if un:
-            u = User.query.filter_by(username=un).first()
-            if u:
-                return u
-    return User.query.filter_by(is_master=True).first() or User.query.filter_by(ativo=True).first()
 
 def _parse_iso_date(val, as_date=False, default=None):
     if not val:

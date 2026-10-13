@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}Painel do Aplicativo ELP - Gestão & APK{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0 px-md-3 py-2">
+    <!-- Header de Boas-Vindas -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 pb-3 border-bottom gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-info text-dark fw-bold px-2 py-1">PAINEL OPERACIONAL</span>
+                <span class="badge bg-secondary">FOCO 100% NO APK</span>
+            </div>
+            <h2 class="h3 fw-bold text-dark mb-0">
+                <i class="fab fa-android text-success me-2"></i>Gestão do Aplicativo ELP & Acessos
+            </h2>
+            <p class="text-muted small mb-0 mt-1">
+                Ambiente administrativo para distribuição do instalador, controle de usuários e ajustes que alimentam o aplicativo móvel.
+            </p>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_for('download_official_apk') }}" class="btn btn-success fw-bold">
+                <i class="fas fa-download me-1"></i> Baixar ELP.apk
+            </a>
+            <a href="{{ url_for('landing_page') }}" class="btn btn-outline-secondary" target="_blank" title="Visualizar a página de apresentação pública do sistema">
+                <i class="fas fa-external-link-alt me-1"></i> Ver Apresentação
+            </a>
+        </div>
+    </div>
+
+    <!-- Banner Explicativo: Foco Exclusivo no APK -->
+    <div class="alert alert-primary border-0 shadow-sm d-flex align-items-center gap-3 p-3 mb-4 rounded-3" style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);">
+        <div class="fs-2 text-primary">
+            <i class="fas fa-mobile-alt"></i>
+        </div>
+        <div class="flex-grow-1">
+            <h6 class="fw-bold mb-1 text-primary-emphasis">
+                O foco deste projeto é 100% no Aplicativo Android (APK)
+            </h6>
+            <p class="mb-0 small text-secondary">
+                O cadastro de obras, agendamento de visitas em campo, vistorias técnicas, checklists e captura de fotos são realizados <strong>exclusivamente no aplicativo móvel dos vistoriadores</strong>. Este portal web destina-se ao download do instalador, gestão de usuários e ajustes técnicos de sistema.
+            </p>
+        </div>
+    </div>
+
+    <!-- SEÇÃO 1: BAIXAR O APK (DISTRIBUIÇÃO) -->
+    <div class="row g-4 mb-4" id="secao-apk">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100 rounded-3">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="fab fa-android text-success me-2"></i>Aplicativo Móvel Oficial (APK)
+                    </h5>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">
+                        Build Oficial Pronto
+                    </span>
+                </div>
+                <div class="card-body p-4">
+                    <div class="row align-items-center g-4">
+                        <div class="col-md-7">
+                            <h4 class="fw-bold text-dark mb-2">ELP Android • v{{ apk_info.version if apk_info else '1.0.27' }}</h4>
+                            <p class="text-muted small mb-3">
+                                Executável oficial para smartphones e tablets Android. Permite vistorias 100% offline, fotos com anotações e geração instantânea de laudos em PDF.
+                            </p>
+
+                            <div class="d-flex flex-column gap-2 mb-4">
+                                <div class="d-flex align-items-center text-muted small">
+                                    <i class="fas fa-file-archive text-primary me-2" style="width: 18px;"></i>
+                                    <span><strong>Arquivo:</strong> <code>ELP.apk</code> ({{ apk_info.size if apk_info else '37.1 MB' }})</span>
+                                </div>
+                                <div class="d-flex align-items-center text-muted small">
+                                    <i class="fas fa-code-branch text-primary me-2" style="width: 18px;"></i>
+                                    <span><strong>Version Code:</strong> {{ apk_info.version_code if apk_info else '27' }}</span>
+                                </div>
+                                {% if apk_info and apk_info.mtime %}
+                                <div class="d-flex align-items-center text-muted small">
+                                    <i class="fas fa-calendar-alt text-primary me-2" style="width: 18px;"></i>
+                                    <span><strong>Data do Build:</strong> {{ apk_info.mtime }}</span>
+                                </div>
+                                {% endif %}
+                                <div class="d-flex align-items-center text-muted small">
+                                    <i class="fas fa-shield-alt text-success me-2" style="width: 18px;"></i>
+                                    <span><strong>Compatibilidade:</strong> Android 8.0 Oreo ou superior</span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex flex-wrap gap-2">
+                                <a href="{{ url_for('download_official_apk') }}" class="btn btn-success btn-lg px-4 fw-bold shadow-sm">
+                                    <i class="fas fa-download me-2"></i> Baixar Arquivo APK
+                                </a>
+                                <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#guiaInstalacao">
+                                    <i class="fas fa-question-circle me-1"></i> Como Instalar?
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-5 text-center">
+                            <div class="p-3 bg-light rounded-3 border d-inline-block">
+                                <img src="{{ url_for('static', filename='img/apk_qr.png') }}" alt="QR Code para baixar APK" class="img-fluid rounded mb-2" style="max-width: 170px;" onerror="this.src='/apk-qr.png'">
+                                <div class="fw-bold text-dark small">Escaneie com a Câmera</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">Download direto no celular</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Instruções de Instalação (Collapse) -->
+                    <div class="collapse mt-4 pt-3 border-top" id="guiaInstalacao">
+                        <h6 class="fw-bold text-dark mb-2">Instruções para a equipe de campo:</h6>
+                        <ol class="small text-muted mb-0 ps-3">
+                            <li class="mb-1">Baixe o arquivo <code>ELP.apk</code> tocando no botão verde ou escaneando o QR Code com o celular.</li>
+                            <li class="mb-1">Ao finalizar o download, toque na notificação do arquivo baixado.</li>
+                            <li class="mb-1">Se o Android solicitar, permita a opção <em>"Instalar aplicativos de fontes desconhecidas"</em> para o navegador.</li>
+                            <li class="mb-0">Conclua a instalação, abra o ícone <strong>ELP</strong> e acesse com seu usuário e senha previamente cadastrados.</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card de Atalhos Rápidos -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm h-100 rounded-3">
+                <div class="card-header bg-white py-3 border-bottom">
+                    <h5 class="card-title mb-0 fw-bold text-dark">
+                        <i class="fas fa-cogs text-primary me-2"></i>Resumo do Sistema
+                    </h5>
+                </div>
+                <div class="card-body p-3">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="small text-muted"><i class="fas fa-users me-2 text-primary"></i>Usuários Ativos</span>
+                            <span class="badge bg-primary rounded-pill">{{ stats.usuarios_ativos if stats else (users|length if users else 0) }}</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="small text-muted"><i class="fas fa-tags me-2 text-info"></i>Legendas do APK</span>
+                            <span class="badge bg-info text-dark rounded-pill">{{ stats.total_legendas if stats and stats.total_legendas is defined else 'Ativas' }}</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="small text-muted"><i class="fas fa-tasks me-2 text-warning"></i>Itens do Checklist</span>
+                            <span class="badge bg-warning text-dark rounded-pill">{{ stats.total_checklist if stats and stats.total_checklist is defined else 'Configurados' }}</span>
+                        </div>
+                        <div class="list-group-item px-0 py-2 d-flex justify-content-between align-items-center">
+                            <span class="small text-muted"><i class="fas fa-user-check me-2 text-success"></i>Aprovador Global</span>
+                            <span class="badge bg-success rounded-pill">{{ stats.aprovador_global_nome if stats and stats.aprovador_global_nome else 'Definido' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top">
+                        <h6 class="small fw-bold text-dark mb-2">Acesso Rápido aos Ajustes:</h6>
+                        <div class="d-grid gap-2">
+                            <a href="{{ url_for('admin_legendas') }}" class="btn btn-sm btn-outline-primary text-start">
+                                <i class="fas fa-tags me-1"></i> Legendas e Patologias do APK
+                            </a>
+                            <a href="{{ url_for('admin_checklist_padrao') }}" class="btn btn-sm btn-outline-primary text-start">
+                                <i class="fas fa-tasks me-1"></i> Checklist Padrão das Vistorias
+                            </a>
+                            <a href="{{ url_for('admin_aprovadores_padrao') }}" class="btn btn-sm btn-outline-primary text-start">
+                                <i class="fas fa-user-check me-1"></i> Aprovadores Técnicos
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEÇÃO 2: GESTÃO DE USUÁRIOS -->
+    <div class="card border-0 shadow-sm mb-4 rounded-3" id="secao-usuarios">
+        <div class="card-header bg-white py-3 border-bottom d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
+            <div>
+                <h5 class="card-title mb-0 fw-bold text-dark">
+                    <i class="fas fa-users text-primary me-2"></i>Gestão de Usuários
+                </h5>
+                <small class="text-muted">Apenas usuários cadastrados conseguem logar no aplicativo APK e no sistema.</small>
+            </div>
+            {% if current_user.is_master %}
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm fw-bold">
+                    <i class="fas fa-user-plus me-1"></i> Novo Usuário
+                </a>
+                <a href="{{ url_for('users_list') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-list me-1"></i> Ver Todos
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body p-0">
+            {% if users %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Nome Completo</th>
+                            <th>Usuário</th>
+                            <th>Email</th>
+                            <th>Cargo</th>
+                            <th>Perfil</th>
+                            <th>Status</th>
+                            {% if current_user.is_master %}
+                            <th class="text-end pe-4">Ações</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users[:8] %}
+                        <tr>
+                            <td class="ps-4">
+                                <div class="fw-bold text-dark">{{ user.nome_completo }}</div>
+                                <small class="text-muted">ID #{{ user.id }}</small>
+                            </td>
+                            <td><code>{{ user.username }}</code></td>
+                            <td>{{ user.email or '-' }}</td>
+                            <td>{{ user.cargo or 'Engenheiro' }}</td>
+                            <td>
+                                {% if user.is_master %}
+                                    <span class="badge bg-danger">Master</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Vistoriador</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user.ativo %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Ativo</span>
+                                {% else %}
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Inativo</span>
+                                {% endif %}
+                            </td>
+                            {% if current_user.is_master %}
+                            <td class="text-end pe-4">
+                                <a href="{{ url_for('user_edit', user_id=user.id) }}" class="btn btn-sm btn-outline-primary" title="Editar usuário">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if users|length > 8 and current_user.is_master %}
+            <div class="p-3 text-center border-top bg-light">
+                <a href="{{ url_for('users_list') }}" class="btn btn-sm btn-outline-primary">
+                    Ver todos os {{ users|length }} usuários cadastrados <i class="fas fa-arrow-right ms-1"></i>
+                </a>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <i class="fas fa-users fa-3x mb-3 text-secondary"></i>
+                <p class="mb-2">Nenhum usuário encontrado.</p>
+                {% if current_user.is_master %}
+                <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Cadastrar Primeiro Usuário</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- SEÇÃO 3: AJUSTES QUE INFLUENCIAM DIRETAMENTE NO APK -->
+    <div class="card border-0 shadow-sm mb-4 rounded-3" id="secao-ajustes">
+        <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="card-title mb-0 fw-bold text-dark">
+                    <i class="fas fa-sliders-h text-primary me-2"></i>Ajustes que influenciam diretamente no APK
+                </h5>
+                <small class="text-muted">Configurações que sincronizam e alimentam o aplicativo dos vistoriadores em tempo real.</small>
+            </div>
+            <a href="{{ url_for('ajustes_apk_page') }}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-external-link-alt me-1"></i> Página de Ajustes
+            </a>
+        </div>
+        <div class="card-body p-4">
+            <div class="row g-4">
+                <!-- Ajuste 1: Legendas Técnicas -->
+                <div class="col-md-4">
+                    <div class="card h-100 border p-3 rounded-3 shadow-sm hover-lift">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="rounded-3 p-3 bg-info-subtle text-info fs-4">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">Legendas Pré-definidas</h6>
+                                <small class="text-muted">Câmera e Editor do APK</small>
+                            </div>
+                        </div>
+                        <p class="small text-muted flex-grow-1">
+                            Biblioteca de termos técnicos, patologias e anotações fotográficas que aparecem para o engenheiro ao tirar e editar fotos de vistoria no celular.
+                        </p>
+                        <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                            <span class="badge bg-light text-dark border">Alimenta <code>/api/legendas</code></span>
+                            <a href="{{ url_for('admin_legendas') }}" class="btn btn-sm btn-primary">
+                                Configurar <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ajuste 2: Checklist Padrão -->
+                <div class="col-md-4">
+                    <div class="card h-100 border p-3 rounded-3 shadow-sm hover-lift">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="rounded-3 p-3 bg-warning-subtle text-warning fs-4">
+                                <i class="fas fa-tasks"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">Checklist Técnico Padrão</h6>
+                                <small class="text-muted">Vistorias no APK</small>
+                            </div>
+                        </div>
+                        <p class="small text-muted flex-grow-1">
+                            Define as etapas técnicas e itens de checagem de fachadas/obras carregados automaticamente quando o vistoriador inicia uma visita no aplicativo.
+                        </p>
+                        <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                            <span class="badge bg-light text-dark border">Alimenta <code>/api/checklist</code></span>
+                            <a href="{{ url_for('admin_checklist_padrao') }}" class="btn btn-sm btn-primary">
+                                Configurar <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ajuste 3: Aprovadores Padrão -->
+                <div class="col-md-4">
+                    <div class="card h-100 border p-3 rounded-3 shadow-sm hover-lift">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div class="rounded-3 p-3 bg-success-subtle text-success fs-4">
+                                <i class="fas fa-user-check"></i>
+                            </div>
+                            <div>
+                                <h6 class="fw-bold mb-0 text-dark">Aprovadores Padrão</h6>
+                                <small class="text-muted">Fluxo de Aprovação do APK</small>
+                            </div>
+                        </div>
+                        <p class="small text-muted flex-grow-1">
+                            Define a hierarquia do Engenheiro Aprovador responsável pela revisão e liberação dos laudos técnicos submetidos pela equipe de campo no aplicativo.
+                        </p>
+                        <div class="mt-2 pt-2 border-top d-flex justify-content-between align-items-center">
+                            <span class="badge bg-light text-dark border">Roteamento de Laudos</span>
+                            <a href="{{ url_for('admin_aprovadores_padrao') }}" class="btn btn-sm btn-primary">
+                                Configurar <i class="fas fa-arrow-right ms-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08) !important;
+}
+</style>
+{% endblock %}

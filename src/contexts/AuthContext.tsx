@@ -29,6 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (cached) {
         const parsed = JSON.parse(cached);
         setUser(parsed);
+        apiClient.setMobileUser(parsed);
       }
     } catch (e) {
       console.warn('Error loading cached user:', e);
@@ -81,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           setUser(userData);
+          apiClient.setMobileUser(userData);
           await AsyncStorage.setItem('obraflow_current_user', JSON.stringify(userData));
           await saveLocalUser(userData);
           return { success: true };
@@ -93,6 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed: User = JSON.parse(cached);
         if (parsed.username.toLowerCase() === username.trim().toLowerCase()) {
           setUser(parsed);
+          apiClient.setMobileUser(parsed);
           return { success: true, message: 'Autenticado em modo offline.' };
         }
       }
@@ -109,6 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           ativo: true
         };
         setUser(newUser);
+        apiClient.setMobileUser(newUser);
         await AsyncStorage.setItem('obraflow_current_user', JSON.stringify(newUser));
         await saveLocalUser(newUser);
         return { success: true, message: 'Conta configurada localmente.' };
@@ -122,12 +126,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   async function logout() {
     setUser(null);
+    apiClient.setMobileUser(null);
     await AsyncStorage.removeItem('obraflow_current_user');
     await apiClient.clearSession();
   }
 
   async function updateUser(updated: User) {
     setUser(updated);
+    apiClient.setMobileUser(updated);
     await AsyncStorage.setItem('obraflow_current_user', JSON.stringify(updated));
     await saveLocalUser(updated);
   }
