@@ -18,6 +18,24 @@
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-152x152.png') }}">
 
+    <!-- Script de Desativação de Service Workers Antigos e Limpeza de Cache PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
+        }
+        if ('caches' in window) {
+            caches.keys().then(function(names) {
+                for (let name of names) {
+                    caches.delete(name);
+                }
+            });
+        }
+    </script>
+
     <style>
         :root {
             --elp-cyan: #20c1e8;
@@ -458,11 +476,11 @@
 
                 <div class="d-flex align-items-center gap-2">
                     {% if current_user.is_authenticated %}
-                        <a href="{{ url_for('index') }}" class="btn btn-elp-primary">
-                            <i class="fas fa-th-large me-1"></i> Ir para o Painel
+                        <a href="{{ url_for('painel_apk') }}" class="btn btn-elp-primary">
+                            <i class="fas fa-th-large me-1"></i> Painel do APK
                         </a>
                         <a href="{{ url_for('logout') }}" class="btn btn-elp-outline">
-                            <i class="fas fa-sign-out-alt"></i>
+                            <i class="fas fa-sign-out-alt"></i> Sair
                         </a>
                     {% else %}
                         <a href="{{ url_for('login') }}" class="btn btn-elp-outline">
@@ -498,8 +516,8 @@
                         <a href="{{ url_for('download_official_apk') }}" class="btn btn-elp-primary btn-lg">
                             <i class="fab fa-android fs-5"></i> Baixar APK Oficial ({{ apk_info.size if apk_info else '37 MB' }})
                         </a>
-                        <a href="{{ url_for('login') }}" class="btn btn-elp-outline btn-lg">
-                            <i class="fas fa-sign-in-alt"></i> Acessar Portal
+                        <a href="{{ url_for('painel_apk' if current_user.is_authenticated else 'login') }}" class="btn btn-elp-outline btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> {% if current_user.is_authenticated %}Acessar Painel{% else %}Acessar Sistema{% endif %}
                         </a>
                     </div>
 

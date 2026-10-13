@@ -2222,7 +2222,7 @@ def api_upload_photo_simple():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('index'))
+        return redirect(url_for('painel_apk'))
 
     form = LoginForm()
     if form.validate_on_submit():
@@ -2279,8 +2279,8 @@ def login():
                 return redirect(url_for('first_login'))
 
             next_page = request.args.get('next')
-            if not next_page or urlparse(next_page).netloc != '':
-                next_page = url_for('index')
+            if not next_page or urlparse(next_page).netloc != '' or next_page == '/':
+                next_page = url_for('painel_apk')
             return redirect(next_page)
         flash('Usuário ou senha inválidos.', 'error')
 
@@ -2875,13 +2875,23 @@ def get_apk_info():
 # Main routes
 @app.route('/')
 def index():
-    apk_info = get_apk_info()
-    
-    # Se não estiver logado, exibe o site institucional de apresentação do sistema
-    if not current_user.is_authenticated:
-        return render_template('landing.html', apk_info=apk_info)
+    """Site oficial da ELP - Apresentação institucional sobre o sistema e foco no APK"""
+    return render_template('landing.html', apk_info=get_apk_info())
 
-    # Para usuário logado: Painel focado 100% no APK, Usuários e Ajustes do APK
+@app.route('/sobre')
+@app.route('/apresentacao')
+@app.route('/landing')
+def landing_page():
+    """Página institucional que apresenta o sistema ELP e o aplicativo Android"""
+    return render_template('landing.html', apk_info=get_apk_info())
+
+@app.route('/painel')
+@app.route('/portal')
+@app.route('/dashboard')
+@login_required
+def painel_apk():
+    """Área administrativa restrita com download do APK, gestão de usuários e ajustes do APK"""
+    apk_info = get_apk_info()
     try:
         users = User.query.order_by(User.created_at.desc()).all()
         usuarios_ativos = sum(1 for u in users if u.ativo)
@@ -2912,12 +2922,6 @@ def index():
                            apk_info=apk_info,
                            users=users,
                            stats=stats)
-
-@app.route('/sobre')
-@app.route('/apresentacao')
-def landing_page():
-    """Página institucional que apresenta o sistema ELP e o aplicativo Android"""
-    return render_template('landing.html', apk_info=get_apk_info())
 
 @app.route('/admin/ajustes-apk')
 @login_required
