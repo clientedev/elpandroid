@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Editor Visual de Telas do APK - Master{% endblock %}
+{% block title %}Editor Visual de Telas & Publicador do APK - Master{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -48,7 +48,6 @@
     flex-direction: column;
     position: relative;
 }
-/* Side buttons */
 .phone-frame::before {
     content: '';
     position: absolute;
@@ -82,7 +81,6 @@
     scrollbar-width: thin;
 }
 
-/* Camera Notch / Hole Punch */
 .phone-camera-hole {
     position: absolute;
     top: 7px;
@@ -95,7 +93,6 @@
     z-index: 100;
 }
 
-/* Status Bar */
 .phone-status-bar {
     height: 28px;
     background: #ffffff;
@@ -112,7 +109,6 @@
     z-index: 10;
 }
 
-/* Header Component (Fiel ao Header.tsx) */
 .real-apk-header {
     background: #ffffff;
     padding: 12px 14px 10px 14px;
@@ -149,7 +145,6 @@
     color: #2563EB;
 }
 
-/* Phone Scrollable Body */
 .phone-content {
     flex: 1;
     padding: 12px;
@@ -159,7 +154,6 @@
     overflow-y: auto;
 }
 
-/* Bottom Navigation Bar (Fiel ao React Navigation) */
 .real-apk-bottom-bar {
     height: 54px;
     background: #ffffff;
@@ -208,6 +202,54 @@
     min-width: 14px;
     text-align: center;
 }
+
+/* ========================================================
+   PDF SIMULATOR SHEET (A4 PREVIEW)
+======================================================== */
+.pdf-sheet-frame {
+    width: 360px;
+    height: 720px;
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    margin: 0 auto;
+    overflow-y: auto;
+    padding: 20px 16px;
+    font-size: 10px;
+    color: #1e293b;
+    font-family: Arial, sans-serif;
+}
+.pdf-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #2563eb;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+}
+.pdf-table-header {
+    background: #2563eb;
+    color: #ffffff;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px 4px 0 0;
+    font-size: 10px;
+}
+.pdf-table-body {
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 0 0 4px 4px;
+    margin-bottom: 10px;
+}
+.rules-badge-pill {
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
 </style>
 {% endblock %}
 
@@ -219,27 +261,30 @@
             <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="badge bg-danger fw-bold px-2 py-1"><i class="fas fa-crown me-1"></i>EXCLUSIVO MASTER</span>
                 <span class="badge bg-primary">SERVER-DRIVEN UI</span>
-                <span class="badge bg-success">SIMULADOR 100% FIEL AO APK</span>
+                <span class="badge bg-success" id="versionBadge">VERSÃO v1.0.28 (BUILD 28)</span>
             </div>
             <h2 class="h3 fw-bold text-dark mb-0">
-                <i class="fas fa-magic text-primary me-2"></i>Construtor & Editor de Telas do APK
+                <i class="fas fa-magic text-primary me-2"></i>Construtor de Telas, Regras & Publicador do APK
             </h2>
             <p class="text-muted small mb-0 mt-1">
-                Orquestre a ordem dos itens, personalize textos, adicione novos blocos e gerencie as regras de exibição com pré-visualização em alta fidelidade.
+                Visualize e altere todas as regras de cada página do APK, customize a formatação oficial dos laudos PDF e lance novas versões oficiais (1.0.29 .. 30 .. 31) em 1 clique.
             </p>
         </div>
 
-        <div class="d-flex gap-2">
-            <a href="{{ url_for('ajustes_apk_page') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i> Voltar aos Ajustes
-            </a>
-            <button class="btn btn-primary fw-bold px-4" onclick="salvarConfiguracao()">
-                <i class="fas fa-save me-1"></i> Salvar Alterações no APK
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-success fw-bold px-3 shadow-sm" onclick="abrirModalPublicar()">
+                <i class="fas fa-rocket me-1"></i> Publicar Nova Atualização
             </button>
+            <button class="btn btn-primary fw-bold" onclick="salvarConfiguracao()">
+                <i class="fas fa-save me-1"></i> Salvar Alterações
+            </button>
+            <a href="{{ url_for('ajustes_apk_page') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i> Voltar
+            </a>
         </div>
     </div>
 
-    <!-- Seletor de Telas do APK -->
+    <!-- Seletor de Telas do APK + Aba de PDFs -->
     <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="screenTabs">
         <li class="nav-item">
             <button class="nav-link active fw-bold" onclick="selecionarTela('dashboard')">
@@ -261,22 +306,27 @@
                 <i class="fas fa-calendar-alt me-2"></i>4. Aba de Visitas
             </button>
         </li>
+        <li class="nav-item">
+            <button class="nav-link fw-bold text-danger" onclick="selecionarTela('pdf_config')">
+                <i class="fas fa-file-pdf me-2"></i>5. Formatação dos Laudos (PDF)
+            </button>
+        </li>
     </ul>
 
-    <!-- Grid: Editor na Esquerda + Celular Realista na Direita -->
+    <!-- Grid: Editor na Esquerda + Simulador Fiel na Direita -->
     <div class="row g-4">
-        <!-- Coluna Esquerda: Editor de Blocos -->
+        <!-- Coluna Esquerda: Editor de Regras e Blocos -->
         <div class="col-lg-7 col-xl-7">
             <div class="editor-card p-4 shadow-sm mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
                         <h4 class="fw-bold text-dark mb-1" id="telaTitulo">Painel Principal (Dashboard)</h4>
                         <p class="text-muted small mb-0" id="telaDescricao">
-                            Ordem das seções, textos e regras de exibição no aplicativo móvel.
+                            Todas as regras de exibição, perfil autorizado, contadores e ações desta tela.
                         </p>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-success fw-bold" onclick="abrirModalAdicionarBloco()">
+                        <button class="btn btn-sm btn-outline-success fw-bold" id="btnAdicionarBloco" onclick="abrirModalAdicionarBloco()">
                             <i class="fas fa-plus me-1"></i> Adicionar Bloco
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="resetarTelaAtual()">
@@ -285,27 +335,36 @@
                     </div>
                 </div>
 
-                <!-- Lista de Blocos Editáveis -->
+                <!-- Painel Explicativo de Regras Ativas -->
+                <div class="alert alert-info border-0 shadow-sm py-2 px-3 mb-3 rounded-3 d-flex align-items-center gap-2 small" id="alertRegrasInfo">
+                    <i class="fas fa-info-circle text-info fs-5"></i>
+                    <div>
+                        <strong>Regras de Negócio e Acesso:</strong> Você pode orquestrar quem vê cada bloco, mudar a ordem de exibição, modificar textos e definir o destino do toque.
+                    </div>
+                </div>
+
+                <!-- Container Principal do Formulário (Blocos do APK ou PDF Form) -->
                 <div id="listaBlocosContainer" class="mt-3">
                     <!-- Renderizado dinamicamente via JS -->
                 </div>
             </div>
         </div>
 
-        <!-- Coluna Direita: Mockup Android Fiel ao Real -->
+        <!-- Coluna Direita: Mockup Android Fiel ou Folha A4 do PDF -->
         <div class="col-lg-5 col-xl-5">
             <div class="phone-mockup-wrapper">
                 <div class="text-center mb-2">
-                    <span class="badge bg-dark text-white border px-3 py-1">
+                    <span class="badge bg-dark text-white border px-3 py-1" id="simulatorBadge">
                         <i class="fab fa-android text-success me-1"></i> Pré-visualização 100% Real do APK
                     </span>
                 </div>
 
-                <div class="phone-frame">
+                <!-- CELULAR ANDROID REALISTA (Abas 1 a 4) -->
+                <div class="phone-frame" id="phoneMockupFrame">
                     <div class="phone-camera-hole"></div>
 
                     <div class="phone-screen">
-                        <!-- Real Android Status Bar -->
+                        <!-- Android Status Bar -->
                         <div class="phone-status-bar">
                             <span id="phoneClock">12:45</span>
                             <div class="d-flex gap-2 align-items-center">
@@ -316,7 +375,7 @@
                             </div>
                         </div>
 
-                        <!-- Real Header Component -->
+                        <!-- Header Component (Header.tsx) -->
                         <div class="real-apk-header">
                             <div>
                                 <div class="real-apk-header-title" id="previewHeaderTitle">Dashboard ELP</div>
@@ -332,12 +391,12 @@
                             </div>
                         </div>
 
-                        <!-- Real APK Scrollable Body -->
+                        <!-- Scrollable Body -->
                         <div class="phone-content" id="phonePreviewContainer">
                             <!-- Renderizado fielmente via JS -->
                         </div>
 
-                        <!-- Real Bottom Navigation Bar -->
+                        <!-- Bottom Navigation Bar -->
                         <div class="real-apk-bottom-bar">
                             <div class="real-tab-btn active" id="tabNav_dashboard" onclick="selecionarTela('dashboard')">
                                 <i class="fas fa-home"></i>
@@ -359,6 +418,57 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- SIMULADOR DE FOLHA A4 DO LAUDO PDF (Aba 5) -->
+                <div class="pdf-sheet-frame d-none" id="pdfSheetFrame">
+                    <!-- Renderizado dinamicamente via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Publicar Nova Atualização do APK -->
+<div class="modal fade" id="modalPublicarAtualizacao" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-rocket me-2"></i>Publicar Nova Atualização do APK
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">
+                    Este assistente incrementará automaticamente a versão em todos os arquivos de configuração do aplicativo, compilará o novo instalador nativo oficial e fará o deploy em produção.
+                </p>
+
+                <div class="bg-light p-3 rounded-3 border mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small">Versão Atual em Produção:</span>
+                        <span class="badge bg-secondary fs-6" id="modalCurrentVersion">1.0.28 (Build 28)</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold text-dark small">Nova Versão a ser Lançada:</span>
+                        <span class="badge bg-success fs-6" id="modalNextVersion">1.0.29 (Build 29)</span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Notas da Versão (Changelog exibido no app):</label>
+                    <textarea class="form-control" id="modalVersionNotes" rows="3" placeholder="Ex: Ajustes nas regras de exibição das telas, novas cores nos laudos PDF e melhorias de performance."></textarea>
+                </div>
+
+                <div class="alert alert-warning border-0 p-2 small mb-0 rounded-2">
+                    <i class="fas fa-exclamation-triangle me-1"></i>
+                    A compilação do APK nativo pode levar cerca de 1 a 2 minutos. Aguarde o aviso de conclusão.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success fw-bold" id="btnConfirmarPublicacao" onclick="executarPublicacaoAtualizacao()">
+                    <i class="fas fa-check-circle me-1"></i> Confirmar & Publicar Agora
+                </button>
             </div>
         </div>
     </div>
@@ -383,21 +493,24 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Título / Cabeçalho:</label>
-                    <input type="text" class="form-control" id="novoBlocoTitulo" placeholder="Ex: Atenção ao Protocolo de Vistoria">
+                    <input type="text" class="form-control" id="novoBlocoTitulo" placeholder="Ex: Protocolo de Segurança em Fachadas">
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Texto / Mensagem:</label>
-                    <textarea class="form-control" id="novoBlocoTexto" rows="3" placeholder="Mensagem exibida no aplicativo para os vistoriadores..."></textarea>
+                    <textarea class="form-control" id="novoBlocoTexto" rows="3" placeholder="Mensagem exibida no aplicativo para os engenheiros..."></textarea>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Ação ao Clicar (Orquestração de Lógica):</label>
+                    <label class="form-label fw-bold">Ação ao Clicar (Orquestração de Navegação):</label>
                     <select class="form-select" id="novoBlocoAcao">
                         <option value="PendentesTab:Aguardando Aprovação">Abrir Relatórios Pra Aprovação</option>
                         <option value="PendentesTab:Aprovado">Abrir Relatórios Aprovados</option>
                         <option value="PendentesTab:em_andamento">Abrir Rascunhos em Preenchimento</option>
+                        <option value="PendentesTab:Todos">Abrir Todos os Relatórios</option>
                         <option value="ObrasTab">Abrir Aba de Obras</option>
                         <option value="VisitasTab">Abrir Aba de Visitas</option>
                         <option value="ReportCreate">Abrir Criador de Novo Relatório</option>
+                        <option value="ProjectForm">Cadastrar Nova Obra</option>
+                        <option value="VisitForm">Agendar Nova Visita</option>
                     </select>
                 </div>
                 <div class="mb-3">
@@ -428,7 +541,8 @@ const SCREEN_HEADERS = {
     dashboard: { title: 'Dashboard ELP', subtitle: 'Acompanhamento de Obras & Vistorias' },
     reports: { title: 'Relatórios', subtitle: 'Gerenciamento de laudos técnicos' },
     projects: { title: 'Obras', subtitle: 'Empreendimentos cadastrados' },
-    visits: { title: 'Visitas', subtitle: 'Agenda de vistorias técnicas' }
+    visits: { title: 'Visitas', subtitle: 'Agenda de vistorias técnicas' },
+    pdf_config: { title: 'Formatação dos Laudos', subtitle: 'Padrão visual dos arquivos PDF' }
 };
 
 function selecionarTela(screenKey) {
@@ -441,12 +555,30 @@ function selecionarTela(screenKey) {
     );
     if (matchingTab) matchingTab.classList.add('active');
 
-    // Atualizar abas inferiores do mockup
-    document.querySelectorAll('.real-tab-btn').forEach(b => b.classList.remove('active'));
-    const bottomTab = document.getElementById(`tabNav_${screenKey}`);
-    if (bottomTab) bottomTab.classList.add('active');
+    // Alternar entre Celular e Folha A4 do PDF
+    const phoneFrame = document.getElementById('phoneMockupFrame');
+    const pdfFrame = document.getElementById('pdfSheetFrame');
+    const simBadge = document.getElementById('simulatorBadge');
+    const btnAdd = document.getElementById('btnAdicionarBloco');
 
-    // Atualizar títulos
+    if (screenKey === 'pdf_config') {
+        phoneFrame.classList.add('d-none');
+        pdfFrame.classList.remove('d-none');
+        simBadge.innerHTML = '<i class="fas fa-file-pdf text-danger me-1"></i> Visualização Real do Laudo PDF (A4)';
+        btnAdd.style.display = 'none';
+    } else {
+        phoneFrame.classList.remove('d-none');
+        pdfFrame.classList.add('d-none');
+        simBadge.innerHTML = '<i class="fab fa-android text-success me-1"></i> Pré-visualização 100% Real do APK';
+        btnAdd.style.display = 'inline-block';
+
+        // Atualizar aba inferior
+        document.querySelectorAll('.real-tab-btn').forEach(b => b.classList.remove('active'));
+        const bottomTab = document.getElementById(`tabNav_${screenKey}`);
+        if (bottomTab) bottomTab.classList.add('active');
+    }
+
+    // Títulos da tela
     const config = currentConfigs[screenKey] || {};
     document.getElementById('telaTitulo').innerText = config.title || screenKey;
     document.getElementById('telaDescricao').innerText = config.description || 'Configurações de layout e lógica.';
@@ -456,14 +588,20 @@ function selecionarTela(screenKey) {
     document.getElementById('previewHeaderSubtitle').innerText = hMeta.subtitle;
 
     renderizarEditor();
-    renderizarPreviewCelular();
+    renderizarPreview();
 }
 
 function renderizarEditor() {
     const container = document.getElementById('listaBlocosContainer');
     container.innerHTML = '';
-    const config = currentConfigs[activeScreenKey] || { sections: [] };
 
+    // Se for a aba de PDFs, renderizar formulário completo de formatação de laudos
+    if (activeScreenKey === 'pdf_config') {
+        renderizarEditorPdf(container);
+        return;
+    }
+
+    const config = currentConfigs[activeScreenKey] || { sections: [] };
     config.sections.sort((a, b) => (a.order || 0) - (b.order || 0));
 
     config.sections.forEach((sec, idx) => {
@@ -475,7 +613,7 @@ function renderizarEditor() {
         card.innerHTML = `
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-secondary">#${sec.order || (idx + 1)}</span>
+                    <span class="badge bg-secondary">Posição #${sec.order || (idx + 1)}</span>
                     <strong class="text-dark fs-6">${sec.title}</strong>
                     <span class="badge bg-primary-subtle text-primary border border-primary-subtle">${sec.type}</span>
                 </div>
@@ -506,7 +644,7 @@ function renderizarEditor() {
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label small text-muted mb-1">Regra de Exibição (Perfil Autorizado):</label>
+                    <label class="form-label small text-muted mb-1">Regra de Acesso (Perfil Autorizado):</label>
                     <select class="form-select form-select-sm" onchange="atualizarCampo(${idx}, 'allowed_roles', this.value)">
                         <option value="all" ${sec.allowed_roles === 'all' ? 'selected' : ''}>Todos os Usuários</option>
                         <option value="approver_only" ${sec.allowed_roles === 'approver_only' ? 'selected' : ''}>Somente Aprovadores & Masters</option>
@@ -515,7 +653,22 @@ function renderizarEditor() {
                     </select>
                 </div>
 
-                <div class="col-md-6 d-flex align-items-center justify-content-between pt-3">
+                <div class="col-md-6">
+                    <label class="form-label small text-muted mb-1">Regra de Ação ao Tocar (Navegação):</label>
+                    <select class="form-select form-select-sm" onchange="atualizarCampo(${idx}, 'action', this.value)">
+                        <option value="PendentesTab:Aguardando Aprovação" ${sec.action === 'PendentesTab:Aguardando Aprovação' ? 'selected' : ''}>Abrir Relatórios Pra Aprovação</option>
+                        <option value="PendentesTab:Aprovado" ${sec.action === 'PendentesTab:Aprovado' ? 'selected' : ''}>Abrir Relatórios Aprovados</option>
+                        <option value="PendentesTab:em_andamento" ${sec.action === 'PendentesTab:em_andamento' ? 'selected' : ''}>Abrir Rascunhos em Preenchimento</option>
+                        <option value="PendentesTab:Todos" ${sec.action === 'PendentesTab:Todos' ? 'selected' : ''}>Abrir Todos os Relatórios</option>
+                        <option value="ObrasTab" ${sec.action === 'ObrasTab' ? 'selected' : ''}>Abrir Aba de Obras</option>
+                        <option value="VisitasTab" ${sec.action === 'VisitasTab' ? 'selected' : ''}>Abrir Aba de Visitas</option>
+                        <option value="ReportCreate" ${sec.action === 'ReportCreate' ? 'selected' : ''}>Abrir Criador de Relatório</option>
+                        <option value="ProjectForm" ${sec.action === 'ProjectForm' ? 'selected' : ''}>Cadastrar Nova Obra</option>
+                        <option value="VisitForm" ${sec.action === 'VisitForm' ? 'selected' : ''}>Agendar Nova Visita</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6 d-flex align-items-center justify-content-between pt-2">
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="switch_${idx}" ${sec.visible ? 'checked' : ''} onchange="atualizarCampo(${idx}, 'visible', this.checked)">
                         <label class="form-check-label small fw-bold" for="switch_${idx}">
@@ -529,6 +682,112 @@ function renderizarEditor() {
     });
 }
 
+function renderizarEditorPdf(container) {
+    const pdfCfg = currentConfigs['pdf_config'] || {};
+    container.innerHTML = `
+        <div class="card border-0 shadow-sm p-3 mb-4 rounded-3 bg-light">
+            <h5 class="fw-bold text-dark mb-3"><i class="fas fa-building text-primary me-2"></i>1. Dados Institucionais do Cabeçalho & Rodapé</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold">Razão Social / Nome da Empresa:</label>
+                    <input type="text" class="form-control form-control-sm" value="${pdfCfg.empresa_nome || 'ELP Consultoria'}" onchange="atualizarPdfCampo('empresa_nome', this.value)">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold">Endereço Completo & CEP:</label>
+                    <input type="text" class="form-control form-control-sm" value="${pdfCfg.empresa_endereco || 'Rua Jaboticabal, 530 apto. 31 - São Paulo - SP - CEP: 03188-000'}" onchange="atualizarPdfCampo('empresa_endereco', this.value)">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Telefones:</label>
+                    <input type="text" class="form-control form-control-sm" value="${pdfCfg.empresa_telefones || '(11) 98111-5800 / 99201-9258'}" onchange="atualizarPdfCampo('empresa_telefones', this.value)">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">E-mail Institucional:</label>
+                    <input type="text" class="form-control form-control-sm" value="${pdfCfg.empresa_email || 'elp@elpconsultoria.com.br'}" onchange="atualizarPdfCampo('empresa_email', this.value)">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-bold">Site Oficial:</label>
+                    <input type="text" class="form-control form-control-sm" value="${pdfCfg.empresa_site || 'www.elpconsultoria.com.br'}" onchange="atualizarPdfCampo('empresa_site', this.value)">
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm p-3 mb-4 rounded-3 bg-light">
+            <h5 class="fw-bold text-dark mb-3"><i class="fas fa-palette text-primary me-2"></i>2. Identidade Visual & Cores do PDF</h5>
+            <div class="row g-3 align-items-center">
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold">Cor Primária de Destaque das Tabelas:</label>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="color" class="form-control form-control-color" value="${pdfCfg.cor_destaque || '#2563EB'}" onchange="atualizarPdfCampo('cor_destaque', this.value)">
+                        <code>${pdfCfg.cor_destaque || '#2563EB'}</code>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="switchLogoCabecalho" ${pdfCfg.exibir_logo_cabecalho !== false ? 'checked' : ''} onchange="atualizarPdfCampo('exibir_logo_cabecalho', this.checked)">
+                        <label class="form-check-label small fw-bold" for="switchLogoCabecalho">Exibir Logotipo no Cabeçalho</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="switchLogoRodape" ${pdfCfg.exibir_logo_rodape !== false ? 'checked' : ''} onchange="atualizarPdfCampo('exibir_logo_rodape', this.checked)">
+                        <label class="form-check-label small fw-bold" for="switchLogoRodape">Exibir Logotipo e Dados no Rodapé</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm p-3 mb-4 rounded-3 bg-light">
+            <h5 class="fw-bold text-dark mb-3"><i class="fas fa-camera text-primary me-2"></i>3. Diagramação & Registro Fotográfico</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold">Fotos na 1ª Página (abaixo de itens observados):</label>
+                    <select class="form-select form-select-sm" onchange="atualizarPdfCampo('fotos_primeira_pagina', parseInt(this.value, 10))">
+                        <option value="2" ${pdfCfg.fotos_primeira_pagina === 2 ? 'selected' : ''}>2 Fotos Lado a Lado (Padrão Oficial)</option>
+                        <option value="0" ${pdfCfg.fotos_primeira_pagina === 0 ? 'selected' : ''}>Nenhuma Foto na 1ª Página</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold">Fotos nas Páginas Seguintes:</label>
+                    <select class="form-select form-select-sm" onchange="atualizarPdfCampo('fotos_por_pagina', parseInt(this.value, 10))">
+                        <option value="4" ${pdfCfg.fotos_por_pagina === 4 ? 'selected' : ''}>4 Fotos por Página (Grid 2x2)</option>
+                        <option value="2" ${pdfCfg.fotos_por_pagina === 2 ? 'selected' : ''}>2 Fotos por Página (Grandes)</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="switchLegendasFotos" ${pdfCfg.exibir_legendas_fotos !== false ? 'checked' : ''} onchange="atualizarPdfCampo('exibir_legendas_fotos', this.checked)">
+                        <label class="form-check-label small fw-bold" for="switchLegendasFotos">Exibir Legendas Técnicas e Patologias</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="switchCarimboData" ${pdfCfg.exibir_carimbo_data !== false ? 'checked' : ''} onchange="atualizarPdfCampo('exibir_carimbo_data', this.checked)">
+                        <label class="form-check-label small fw-bold" for="switchCarimboData">Exibir Data e Hora de Captura nas Fotos</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm p-3 mb-3 rounded-3 bg-light">
+            <h5 class="fw-bold text-dark mb-3"><i class="fas fa-file-signature text-primary me-2"></i>4. Seções e Conclusão Técnica</h5>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Texto / Parecer Técnico Padrão de Conclusão:</label>
+                <textarea class="form-control form-control-sm" rows="3" onchange="atualizarPdfCampo('texto_conclusao_padrao', this.value)">${pdfCfg.texto_conclusao_padrao || 'Laudo técnico de vistoria emitido em conformidade com as diretrizes e normas técnicas aplicáveis.'}</textarea>
+            </div>
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="switchAssinaturas" ${pdfCfg.exibir_assinaturas !== false ? 'checked' : ''} onchange="atualizarPdfCampo('exibir_assinaturas', this.checked)">
+                <label class="form-check-label small fw-bold" for="switchAssinaturas">Exibir Tabela de Assinaturas (Preenchido por, Liberado por, Responsável)</label>
+            </div>
+        </div>
+    `;
+}
+
+function atualizarPdfCampo(campo, valor) {
+    if (!currentConfigs['pdf_config']) {
+        currentConfigs['pdf_config'] = {};
+    }
+    currentConfigs['pdf_config'][campo] = valor;
+    renderizarPreview();
+}
+
 function moverBloco(index, direcao) {
     const config = currentConfigs[activeScreenKey];
     const novoIndex = index + direcao;
@@ -540,14 +799,14 @@ function moverBloco(index, direcao) {
 
     config.sections.forEach((sec, i) => { sec.order = i + 1; });
     renderizarEditor();
-    renderizarPreviewCelular();
+    renderizarPreview();
 }
 
 function atualizarCampo(index, campo, valor) {
     const config = currentConfigs[activeScreenKey];
     config.sections[index][campo] = valor;
     renderizarEditor();
-    renderizarPreviewCelular();
+    renderizarPreview();
 }
 
 function removerBloco(index) {
@@ -556,7 +815,7 @@ function removerBloco(index) {
         config.sections.splice(index, 1);
         config.sections.forEach((sec, i) => { sec.order = i + 1; });
         renderizarEditor();
-        renderizarPreviewCelular();
+        renderizarPreview();
     }
 }
 
@@ -590,18 +849,119 @@ function confirmarAdicionarBloco() {
     document.getElementById('novoBlocoTexto').value = '';
 
     renderizarEditor();
-    renderizarPreviewCelular();
+    renderizarPreview();
 }
 
-/* ========================================================
-   RENDERIZADOR DO SIMULADOR 100% FIEL AO REAL
-======================================================== */
+function renderizarPreview() {
+    if (activeScreenKey === 'pdf_config') {
+        renderizarPreviewPdf();
+    } else {
+        renderizarPreviewCelular();
+    }
+}
+
+function renderizarPreviewPdf() {
+    const pdfFrame = document.getElementById('pdfSheetFrame');
+    const pdfCfg = currentConfigs['pdf_config'] || {};
+    const cor = pdfCfg.cor_destaque || '#2563EB';
+
+    pdfFrame.innerHTML = `
+        <div class="pdf-sheet-header" style="border-bottom-color: ${cor};">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                ${pdfCfg.exibir_logo_cabecalho !== false ? `
+                    <img src="/static/logo_elp_navbar.png" alt="Logo" style="height: 32px;" onerror="this.src='/static/img/logo.png'">
+                ` : ''}
+                <div>
+                    <div style="font-weight: bold; font-size: 13px; color: ${cor};">${pdfCfg.empresa_nome || 'ELP Consultoria'}</div>
+                    <div style="font-size: 9px; color: #64748B;">Laudo Técnico de Inspeção Predial</div>
+                </div>
+            </div>
+            <div style="text-align: right; font-size: 9px; color: #64748B;">
+                <div>Data: 13/10/2026</div>
+                <div>Relatório Nº: <strong>REL-0004</strong></div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <div class="pdf-table-header" style="background: ${cor};">DADOS GERAIS DA OBRA</div>
+            <div class="pdf-table-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 9px;">
+                    <div><strong>Obra:</strong> Residencial Jardins - Torre A</div>
+                    <div><strong>Construtora:</strong> Construtora Alfa S/A</div>
+                    <div><strong>Endereço:</strong> Av. Paulista, 1000 - SP</div>
+                    <div><strong>Responsável Técnico:</strong> Eng. Gabriel Eduardo</div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <div class="pdf-table-header" style="background: ${cor};">ITENS OBSERVADOS & DIAGNÓSTICO</div>
+            <div class="pdf-table-body" style="font-size: 9px; line-height: 1.4;">
+                Vistoria técnica realizada nas fachadas norte e leste. Constatou-se fissuras térmicas no 4º pavimento e necessidade de calafetação nas juntas de dilatação conforme normas técnicas vigentes.
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <div class="pdf-table-header" style="background: ${cor};">REGISTRO FOTOGRÁFICO</div>
+            <div style="border: 1px solid #e2e8f0; border-top: none; padding: 8px; background: #f8fafc; border-radius: 0 0 4px 4px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px;">
+                        <div style="height: 90px; background: #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 9px;">
+                            <i class="fas fa-camera me-1"></i> Foto 01
+                        </div>
+                        <div style="font-size: 8px; font-weight: bold; margin-top: 4px; color: #1e293b;">
+                            Fachada Norte - Fissura vertical
+                        </div>
+                        <div style="font-size: 7px; color: #64748b;">13/10/2026 11:30 • 4º Pavimento</div>
+                    </div>
+                    <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px;">
+                        <div style="height: 90px; background: #e2e8f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 9px;">
+                            <i class="fas fa-camera me-1"></i> Foto 02
+                        </div>
+                        <div style="font-size: 8px; font-weight: bold; margin-top: 4px; color: #1e293b;">
+                            Junta de Dilatação - Desgaste
+                        </div>
+                        <div style="font-size: 7px; color: #64748b;">13/10/2026 11:35 • Cobertura</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <div class="pdf-table-header" style="background: ${cor};">PARECER TÉCNICO & CONCLUSÃO</div>
+            <div class="pdf-table-body" style="font-size: 9px; line-height: 1.4;">
+                ${pdfCfg.texto_conclusao_padrao || 'Laudo técnico de vistoria emitido em conformidade com as diretrizes e normas técnicas aplicáveis.'}
+            </div>
+        </div>
+
+        ${pdfCfg.exibir_assinaturas !== false ? `
+        <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; background: #f8fafc; margin-bottom: 12px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; font-size: 8px;">
+                <div style="border-top: 1px solid #94a3b8; padding-top: 4px; margin-top: 14px;">
+                    <strong>Eng. Gabriel Eduardo</strong><br>Vistoriador de Campo
+                </div>
+                <div style="border-top: 1px solid #94a3b8; padding-top: 4px; margin-top: 14px;">
+                    <strong>Eng. Aprovador Técnico</strong><br>CREA/SP • Responsável Técnico
+                </div>
+            </div>
+        </div>
+        ` : ''}
+
+        <div style="border-top: 1px solid #cbd5e1; padding-top: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 8px; color: #64748b;">
+            <div>
+                <strong>${pdfCfg.empresa_nome || 'ELP Consultoria'}</strong> • ${pdfCfg.empresa_telefones || '(11) 98111-5800'}
+            </div>
+            <div>Página 1 de 2</div>
+        </div>
+    `;
+}
+
 function renderizarPreviewCelular() {
     const container = document.getElementById('phonePreviewContainer');
     container.innerHTML = '';
     const config = currentConfigs[activeScreenKey] || { sections: [] };
 
-    // 1. DASHBOARD
+    // DASHBOARD
     if (activeScreenKey === 'dashboard') {
         config.sections.forEach(sec => {
             if (!sec.visible) return;
@@ -748,7 +1108,6 @@ function renderizarPreviewCelular() {
                         </div>
                     </div>
 
-                    <!-- Item 1 -->
                     <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; margin-bottom: 7px; display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
@@ -764,7 +1123,6 @@ function renderizarPreviewCelular() {
                         </div>
                     </div>
 
-                    <!-- Item 2 -->
                     <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
                         <div>
                             <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
@@ -804,7 +1162,6 @@ function renderizarPreviewCelular() {
                 container.appendChild(el);
             } 
             else {
-                // Bloco Customizado criado pelo Master
                 const el = document.createElement('div');
                 el.style.cssText = 'background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 12px; display: flex; align-items: center; justify-content: space-between;';
                 el.innerHTML = `
@@ -822,11 +1179,10 @@ function renderizarPreviewCelular() {
         });
     }
 
-    // 2. ABA DE RELATÓRIOS (100% Fiel a ReportsListScreen.tsx)
+    // RELATÓRIOS
     else if (activeScreenKey === 'reports') {
         const wrap = document.createElement('div');
         wrap.innerHTML = `
-            <!-- 4 Cards de Métricas e Páginas Exclusivas -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
                 <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 10px; text-align: left;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -862,7 +1218,6 @@ function renderizarPreviewCelular() {
                 </div>
             </div>
 
-            <!-- Banner de Seção Exclusiva -->
             <div style="background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: bold; color: #B45309;">
                     <i class="fas fa-hourglass-half"></i>
@@ -873,13 +1228,11 @@ function renderizarPreviewCelular() {
                 </div>
             </div>
 
-            <!-- Campo de Busca -->
             <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #94A3B8;">
                 <i class="fas fa-search"></i>
                 <span>Buscar por obra, título ou número...</span>
             </div>
 
-            <!-- Lista de Relatórios -->
             <div style="background: #FFFFFF; border-radius: 10px; padding: 10px; border: 1px solid #E2E8F0; margin-bottom: 8px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                     <span style="font-weight: bold; font-size: 12px; color: #1E293B;">REL-0004</span>
@@ -892,7 +1245,7 @@ function renderizarPreviewCelular() {
         container.appendChild(wrap);
     }
 
-    // 3. ABA DE OBRAS
+    // OBRAS
     else if (activeScreenKey === 'projects') {
         const wrap = document.createElement('div');
         wrap.innerHTML = `
@@ -912,23 +1265,11 @@ function renderizarPreviewCelular() {
                     <span><i class="fas fa-file-alt text-success"></i> 8 Relatórios</span>
                 </div>
             </div>
-
-            <div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border: 1px solid #E2E8F0;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: bold; font-size: 13px; color: #1E293B;">Edifício Horizon</span>
-                    <span style="background: #DCFCE7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Ativa</span>
-                </div>
-                <div style="font-size: 10px; color: #64748B; margin-top: 3px;">Rua Oscar Freire, 800 - São Paulo/SP</div>
-                <div style="display: flex; gap: 10px; font-size: 10px; color: #475569; margin-top: 8px; border-top: 1px solid #F1F5F9; pt-1;">
-                    <span><i class="fas fa-calendar-alt text-primary"></i> 6 Visitas</span>
-                    <span><i class="fas fa-file-alt text-success"></i> 5 Relatórios</span>
-                </div>
-            </div>
         `;
         container.appendChild(wrap);
     }
 
-    // 4. ABA DE VISITAS
+    // VISITAS
     else if (activeScreenKey === 'visits') {
         const wrap = document.createElement('div');
         wrap.innerHTML = `
@@ -954,20 +1295,30 @@ function renderizarPreviewCelular() {
 
 async function salvarConfiguracao() {
     try {
-        const res = await fetch('/admin/apk/editor-telas/salvar', {
+        let endpoint = '/admin/apk/editor-telas/salvar';
+        let bodyData = {
+            screen_key: activeScreenKey,
+            config: currentConfigs[activeScreenKey]
+        };
+
+        if (activeScreenKey === 'pdf_config') {
+            endpoint = '/admin/apk/salvar-pdf-config';
+            bodyData = {
+                pdf_config: currentConfigs['pdf_config']
+            };
+        }
+
+        const res = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
             },
-            body: JSON.stringify({
-                screen_key: activeScreenKey,
-                config: currentConfigs[activeScreenKey]
-            })
+            body: JSON.stringify(bodyData)
         });
         const data = await res.json();
         if (data.success) {
-            alert('✅ Configurações salvas com sucesso! O aplicativo sincronizará os novos blocos e textos.');
+            alert('✅ Configurações salvas com sucesso! O aplicativo e os laudos em PDF aplicarão as novas regras imediatamente.');
         } else {
             alert('❌ Erro ao salvar: ' + (data.error || 'Erro desconhecido'));
         }
@@ -987,12 +1338,66 @@ async function resetarTelaAtual() {
             if (data.success) {
                 currentConfigs[activeScreenKey] = data.config;
                 renderizarEditor();
-                renderizarPreviewCelular();
-                alert('✅ Tela restaurada para o padrão de fábrica!');
+                renderizarPreview();
+                alert('✅ Restaurado para o padrão de fábrica!');
             }
         } catch (e) {
             alert('❌ Erro ao restaurar: ' + e.message);
         }
+    }
+}
+
+/* ========================================================
+   MODAL DE PUBLICAÇÃO DE NOVA ATUALIZAÇÃO (1.0.29..30..31)
+======================================================== */
+async function abrirModalPublicar() {
+    try {
+        const res = await fetch('/admin/apk/info-versao');
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('modalCurrentVersion').innerText = `v${data.current_version} (Build ${data.current_version_code})`;
+            document.getElementById('modalNextVersion').innerText = `v${data.next_version} (Build ${data.next_version_code})`;
+            document.getElementById('modalVersionNotes').value = `Atualização oficial v${data.next_version}: Novas regras de navegação, ajustes de telas do APK e formatação de laudos em PDF.`;
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalPublicarAtualizacao'));
+            modal.show();
+        } else {
+            alert('Erro ao consultar versão atual: ' + data.error);
+        }
+    } catch (e) {
+        alert('Erro ao conectar com o servidor: ' + e.message);
+    }
+}
+
+async function executarPublicacaoAtualizacao() {
+    const btn = document.getElementById('btnConfirmarPublicacao');
+    const notes = document.getElementById('modalVersionNotes').value.trim();
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Compilando APK & Publicando...';
+
+    try {
+        const res = await fetch('/admin/apk/publicar-atualizacao', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ notes })
+        });
+        const data = await res.json();
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalPublicarAtualizacao')).hide();
+            document.getElementById('versionBadge').innerText = `VERSÃO v${data.new_version} (BUILD ${data.new_version_code})`;
+            alert(`🎉 SUCESSO!\n\nA versão oficial v${data.new_version} (Build ${data.new_version_code}) foi compilada nativamente, atualizada em todos os arquivos e publicada em produção no Railway com push automático!`);
+        } else {
+            alert('❌ Falha na publicação: ' + (data.error || 'Erro desconhecido'));
+        }
+    } catch (e) {
+        alert('❌ Erro na requisição de publicação: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Confirmar & Publicar Agora';
     }
 }
 
@@ -1008,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateClock, 30000);
 
     renderizarEditor();
-    renderizarPreviewCelular();
+    renderizarPreview();
 });
 </script>
 {% endblock %}

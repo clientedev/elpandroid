@@ -3005,6 +3005,63 @@ def api_apk_screen_configs():
         'timestamp': datetime.now().isoformat()
     }), 200
 
+@app.route('/admin/apk/info-versao', methods=['GET'])
+@login_required
+def admin_apk_info_versao():
+    """Retorna detalhes da versão atual e a próxima versão calculada para publicação"""
+    if not current_user.is_master:
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    
+    import publish_service
+    info = publish_service.get_current_version_info()
+    next_v, next_vc = publish_service.increment_version(info['version'], info['version_code'])
+    return jsonify({
+        'success': True,
+        'current_version': info['version'],
+        'current_version_code': info['version_code'],
+        'next_version': next_v,
+        'next_version_code': next_vc
+    }), 200
+
+@app.route('/admin/apk/publicar-atualizacao', methods=['POST'])
+@login_required
+def admin_apk_publicar_atualizacao():
+    """Lança uma nova versão oficial do APK incrementando todos os arquivos e publicando em produção"""
+    if not current_user.is_master:
+        return jsonify({'success': False, 'error': 'Acesso negado. Apenas o Master pode publicar versões do APK.'}), 403
+    
+    import publish_service
+    data = request.get_json() or {}
+    notes = data.get('notes')
+    
+    result = publish_service.execute_publish_pipeline(custom_notes=notes)
+    status_code = 200 if result.get('success') else 500
+    return jsonify(result), status_code
+
+@app.route('/admin/apk/salvar-pdf-config', methods=['POST'])
+@login_required
+def admin_apk_salvar_pdf_config():
+    """Salva a formatação personalizada dos laudos técnicos e relatórios PDF"""
+    if not current_user.is_master:
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    
+    import apk_screen_service
+    data = request.get_json() or {}
+    config_data = data.get('pdf_config') or data
+    
+    success = apk_screen_service.save_screen_config('pdf_config', config_data, user_id=current_user.id)
+    return jsonify({'success': success})
+
+@app.route('/api/apk/pdf-config', methods=['GET'])
+def api_apk_pdf_config():
+    """Endpoint que retorna as configurações de formatação do PDF"""
+    import apk_screen_service
+    pdf_cfg = apk_screen_service.get_screen_config('pdf_config')
+    return jsonify({
+        'success': True,
+        'pdf_config': pdf_cfg
+    }), 200
+
 @app.route('/apk-qr.png')
 def apk_qr_code():
     """Retorna QR code dinâmico para download direto do APK oficial"""

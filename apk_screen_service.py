@@ -166,6 +166,27 @@ DEFAULT_CONFIGS = {
                 'order': 2
             }
         ]
+    },
+    'pdf_config': {
+        'title': 'Formatação dos Laudos (PDF)',
+        'description': 'Identidade visual, regras de diagramação fotográfica e dados institucionais dos laudos técnicos gerados.',
+        'empresa_nome': 'ELP Consultoria',
+        'empresa_endereco': 'Rua Jaboticabal, 530 apto. 31 - São Paulo - SP - CEP: 03188-000',
+        'empresa_telefones': '(11) 98111-5800 / 99201-9258',
+        'empresa_email': 'elp@elpconsultoria.com.br',
+        'empresa_site': 'www.elpconsultoria.com.br',
+        'cor_destaque': '#2563EB',
+        'fotos_primeira_pagina': 2,
+        'fotos_por_pagina': 4,
+        'exibir_logo_cabecalho': True,
+        'exibir_logo_rodape': True,
+        'exibir_legendas_fotos': True,
+        'exibir_carimbo_data': True,
+        'exibir_dados_gerais': True,
+        'exibir_itens_observados': True,
+        'exibir_assinaturas': True,
+        'texto_conclusao_padrao': 'Laudo técnico de vistoria emitido em conformidade com as diretrizes e normas técnicas aplicáveis.',
+        'sections': []
     }
 }
 

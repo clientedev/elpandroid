@@ -276,6 +276,20 @@ class WeasyPrintReportGenerator:
                     'not_found': not foto_base64
                 })
         
+        # Injetar configurações customizadas do Master (pdf_config)
+        try:
+            import apk_screen_service
+            pdf_cfg = apk_screen_service.get_screen_config('pdf_config')
+            data['empresa_custom'] = pdf_cfg.get('empresa_nome')
+            data['endereco_custom'] = pdf_cfg.get('empresa_endereco')
+            data['telefones_custom'] = pdf_cfg.get('empresa_telefones')
+            data['email_custom'] = pdf_cfg.get('empresa_email')
+            data['site_custom'] = pdf_cfg.get('empresa_site')
+            data['cor_destaque'] = pdf_cfg.get('cor_destaque')
+            data['pdf_config'] = pdf_cfg
+        except Exception as e:
+            pass
+
         return data
     
     def _create_html_template(self):
@@ -444,13 +458,15 @@ class WeasyPrintReportGenerator:
     <!-- Rodapé ELP -->
     <div class="footer-section">
         <div class="footer-left">
-            <img src="data:{{ data.get('logo_mime', 'image/png') }};base64,{{ data.logo_base64 }}" alt="ELP Consultoria" class="footer-logo">
+            {% if data.pdf_config.get('exibir_logo_rodape', True) %}
+            <img src="data:{{ data.get('logo_mime', 'image/png') }};base64,{{ data.logo_base64 }}" alt="Logo" class="footer-logo">
+            {% endif %}
             <div class="company-info">
-                <div class="company-name">ELP Consultoria</div>
-                <div>Rua Jaboticabal, 530 apto. 31 - São Paulo - SP - CEP: 03188-000</div>
-                <div><a href="mailto:leopoldo@elpconsultoria.eng.br">leopoldo@elpconsultoria.eng.br</a></div>
-                <div><a href="https://www.elpconsultoria.com" target="_blank">www.elpconsultoria.com</a></div>
-                <div>Telefone: (11) 99138-4517</div>
+                <div class="company-name">{{ data.empresa_custom or 'ELP Consultoria' }}</div>
+                <div>{{ data.endereco_custom or 'Rua Jaboticabal, 530 apto. 31 - São Paulo - SP - CEP: 03188-000' }}</div>
+                <div><a href="mailto:{{ data.email_custom or 'leopoldo@elpconsultoria.eng.br' }}">{{ data.email_custom or 'leopoldo@elpconsultoria.eng.br' }}</a></div>
+                <div><a href="https://{{ data.site_custom or 'www.elpconsultoria.com' }}" target="_blank">{{ data.site_custom or 'www.elpconsultoria.com' }}</a></div>
+                <div>Telefone: {{ data.telefones_custom or '(11) 99138-4517' }}</div>
             </div>
         </div>
         <div class="footer-right">
