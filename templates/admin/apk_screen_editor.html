@@ -10,129 +10,222 @@
     transition: all 0.2s ease;
     background: #ffffff;
 }
-.editor-card:hover {
-    border-color: #cbd5e1;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
 .section-item-card {
     border: 1px solid #e2e8f0;
-    border-left: 4px solid #3b82f6;
-    border-radius: 8px;
+    border-left: 5px solid #2563eb;
+    border-radius: 10px;
     background: #ffffff;
-    padding: 14px;
-    margin-bottom: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .section-item-card.is-hidden {
-    opacity: 0.6;
+    opacity: 0.55;
     border-left-color: #94a3b8;
     background: #f8fafc;
 }
 .section-item-card:hover {
-    box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
-.section-drag-handle {
-    cursor: grab;
-    color: #94a3b8;
-}
-.section-drag-handle:active {
-    cursor: grabbing;
-}
-/* Android Smartphone Mockup */
+
+/* ========================================================
+   ANDROID REALISTIC PHONE MOCKUP (100% FIEL AO REAL)
+======================================================== */
 .phone-mockup-wrapper {
     position: sticky;
     top: 20px;
 }
 .phone-frame {
-    width: 320px;
-    height: 640px;
+    width: 360px;
+    height: 720px;
     background: #0f172a;
-    border-radius: 36px;
+    border-radius: 44px;
     padding: 12px;
-    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25), 0 0 0 2px #334155;
+    box-shadow: 0 25px 60px rgba(15, 23, 42, 0.35), 0 0 0 3px #334155, inset 0 0 0 2px #1e293b;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
+    position: relative;
 }
+/* Side buttons */
+.phone-frame::before {
+    content: '';
+    position: absolute;
+    top: 140px;
+    left: -5px;
+    width: 3px;
+    height: 48px;
+    background: #334155;
+    border-radius: 3px 0 0 3px;
+}
+.phone-frame::after {
+    content: '';
+    position: absolute;
+    top: 200px;
+    left: -5px;
+    width: 3px;
+    height: 48px;
+    background: #334155;
+    border-radius: 3px 0 0 3px;
+}
+
 .phone-screen {
-    background: #f8fafc;
-    border-radius: 26px;
+    background: #F8FAFC;
+    border-radius: 34px;
     height: 100%;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     scrollbar-width: thin;
 }
+
+/* Camera Notch / Hole Punch */
+.phone-camera-hole {
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: #000000;
+    border-radius: 50%;
+    z-index: 100;
+}
+
+/* Status Bar */
 .phone-status-bar {
-    height: 24px;
-    background: #1e293b;
-    color: #cbd5e1;
-    font-size: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 16px;
-    border-top-left-radius: 26px;
-    border-top-right-radius: 26px;
-    flex-shrink: 0;
-}
-.phone-header-app {
+    height: 28px;
     background: #ffffff;
-    padding: 10px 14px;
-    border-bottom: 1px solid #e2e8f0;
+    color: #1e293b;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 18px 0 18px;
+    border-top-left-radius: 34px;
+    border-top-right-radius: 34px;
+    flex-shrink: 0;
+    z-index: 10;
+}
+
+/* Header Component (Fiel ao Header.tsx) */
+.real-apk-header {
+    background: #ffffff;
+    padding: 12px 14px 10px 14px;
+    border-bottom: 1px solid #E2E8F0;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
 }
+.real-apk-header-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0F172A;
+    line-height: 1.2;
+}
+.real-apk-header-subtitle {
+    font-size: 11px;
+    color: #64748B;
+    margin-top: 1px;
+}
+.real-apk-header-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #F1F5F9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #334155;
+    font-size: 13px;
+}
+.real-apk-header-sync {
+    background: #EFF6FF;
+    color: #2563EB;
+}
+
+/* Phone Scrollable Body */
 .phone-content {
     flex: 1;
     padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
+    overflow-y: auto;
 }
-.phone-nav-bar {
-    height: 48px;
+
+/* Bottom Navigation Bar (Fiel ao React Navigation) */
+.real-apk-bottom-bar {
+    height: 54px;
     background: #ffffff;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #E2E8F0;
     display: flex;
     justify-content: space-around;
     align-items: center;
-    font-size: 11px;
-    color: #64748b;
-    border-bottom-left-radius: 26px;
-    border-bottom-right-radius: 26px;
+    border-bottom-left-radius: 34px;
+    border-bottom-right-radius: 34px;
     flex-shrink: 0;
+    padding: 0 4px;
 }
-.phone-nav-item.active {
-    color: #2563eb;
+.real-tab-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #64748B;
+    font-size: 9px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    position: relative;
+    padding: 4px 10px;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+.real-tab-btn i {
+    font-size: 18px;
+    margin-bottom: 2px;
+}
+.real-tab-btn.active {
+    color: #2563EB;
+    font-weight: 700;
+}
+.real-tab-badge {
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    background: #EF4444;
+    color: #ffffff;
+    font-size: 9px;
     font-weight: bold;
-}
-.badge-role {
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 10px;
+    padding: 1px 4px;
+    min-width: 14px;
+    text-align: center;
 }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid px-0 px-md-3 py-3">
-    <!-- Header -->
+    <!-- Header Principal -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 pb-3 border-bottom gap-3">
         <div>
             <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="badge bg-danger fw-bold px-2 py-1"><i class="fas fa-crown me-1"></i>EXCLUSIVO MASTER</span>
                 <span class="badge bg-primary">SERVER-DRIVEN UI</span>
-                <span class="badge bg-success">SINCRONIZAÇÃO EM TEMPO REAL NO APK</span>
+                <span class="badge bg-success">SIMULADOR 100% FIEL AO APK</span>
             </div>
             <h2 class="h3 fw-bold text-dark mb-0">
                 <i class="fas fa-magic text-primary me-2"></i>Construtor & Editor de Telas do APK
             </h2>
             <p class="text-muted small mb-0 mt-1">
-                Reordene blocos, altere textos, crie novos avisos/atalhos e orquestre as regras de exibição das telas do aplicativo diretamente pelo portal Master.
+                Orquestre a ordem dos itens, personalize textos, adicione novos blocos e gerencie as regras de exibição com pré-visualização em alta fidelidade.
             </p>
         </div>
 
@@ -140,17 +233,17 @@
             <a href="{{ url_for('ajustes_apk_page') }}" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left me-1"></i> Voltar aos Ajustes
             </a>
-            <button class="btn btn-primary fw-bold" onclick="salvarConfiguracao()">
+            <button class="btn btn-primary fw-bold px-4" onclick="salvarConfiguracao()">
                 <i class="fas fa-save me-1"></i> Salvar Alterações no APK
             </button>
         </div>
     </div>
 
-    <!-- Navegação de Telas do APK -->
+    <!-- Seletor de Telas do APK -->
     <ul class="nav nav-pills mb-4 gap-2 bg-light p-2 rounded-3 border" id="screenTabs">
         <li class="nav-item">
             <button class="nav-link active fw-bold" onclick="selecionarTela('dashboard')">
-                <i class="fas fa-th-large me-2"></i>1. Painel Principal (Dashboard)
+                <i class="fas fa-home me-2"></i>1. Painel Principal (Dashboard)
             </button>
         </li>
         <li class="nav-item">
@@ -160,30 +253,30 @@
         </li>
         <li class="nav-item">
             <button class="nav-link fw-bold" onclick="selecionarTela('projects')">
-                <i class="fas fa-city me-2"></i>3. Aba de Obras
+                <i class="fas fa-building me-2"></i>3. Aba de Obras
             </button>
         </li>
         <li class="nav-item">
             <button class="nav-link fw-bold" onclick="selecionarTela('visits')">
-                <i class="fas fa-calendar-check me-2"></i>4. Aba de Visitas
+                <i class="fas fa-calendar-alt me-2"></i>4. Aba de Visitas
             </button>
         </li>
     </ul>
 
-    <!-- Corpo com 2 Colunas: Editor + Preview Celular -->
+    <!-- Grid: Editor na Esquerda + Celular Realista na Direita -->
     <div class="row g-4">
         <!-- Coluna Esquerda: Editor de Blocos -->
-        <div class="col-lg-7 col-xl-8">
+        <div class="col-lg-7 col-xl-7">
             <div class="editor-card p-4 shadow-sm mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div>
                         <h4 class="fw-bold text-dark mb-1" id="telaTitulo">Painel Principal (Dashboard)</h4>
                         <p class="text-muted small mb-0" id="telaDescricao">
-                            Estrutura de seções, indicadores e atalhos da tela inicial do aplicativo.
+                            Ordem das seções, textos e regras de exibição no aplicativo móvel.
                         </p>
                     </div>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-success" onclick="abrirModalAdicionarBloco()">
+                        <button class="btn btn-sm btn-outline-success fw-bold" onclick="abrirModalAdicionarBloco()">
                             <i class="fas fa-plus me-1"></i> Adicionar Bloco
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="resetarTelaAtual()">
@@ -199,55 +292,68 @@
             </div>
         </div>
 
-        <!-- Coluna Direita: Simulador em Tempo Real -->
-        <div class="col-lg-5 col-xl-4">
+        <!-- Coluna Direita: Mockup Android Fiel ao Real -->
+        <div class="col-lg-5 col-xl-5">
             <div class="phone-mockup-wrapper">
                 <div class="text-center mb-2">
-                    <span class="badge bg-dark-subtle text-dark border px-3 py-1">
-                        <i class="fab fa-android text-success me-1"></i> Pré-visualização do APK em Tempo Real
+                    <span class="badge bg-dark text-white border px-3 py-1">
+                        <i class="fab fa-android text-success me-1"></i> Pré-visualização 100% Real do APK
                     </span>
                 </div>
 
                 <div class="phone-frame">
-                    <div class="phone-status-bar">
-                        <span>12:00</span>
-                        <div class="d-flex gap-1 align-items-center">
-                            <i class="fas fa-wifi"></i>
-                            <i class="fas fa-battery-full"></i>
-                        </div>
-                    </div>
+                    <div class="phone-camera-hole"></div>
 
                     <div class="phone-screen">
-                        <!-- Top Bar App -->
-                        <div class="phone-header-app">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="fw-bold text-dark" style="font-size: 14px;">ELP</span>
-                                <span class="badge bg-primary" style="font-size: 9px;">PROD</span>
+                        <!-- Real Android Status Bar -->
+                        <div class="phone-status-bar">
+                            <span id="phoneClock">12:45</span>
+                            <div class="d-flex gap-2 align-items-center">
+                                <span style="font-size: 9px; font-weight: bold;">5G</span>
+                                <i class="fas fa-wifi" style="font-size: 10px;"></i>
+                                <span style="font-size: 9px;">98%</span>
+                                <i class="fas fa-battery-full" style="font-size: 11px;"></i>
                             </div>
-                            <i class="fas fa-bell text-secondary" style="font-size: 14px;"></i>
                         </div>
 
-                        <!-- Conteúdo da Tela do Celular -->
+                        <!-- Real Header Component -->
+                        <div class="real-apk-header">
+                            <div>
+                                <div class="real-apk-header-title" id="previewHeaderTitle">Dashboard ELP</div>
+                                <div class="real-apk-header-subtitle" id="previewHeaderSubtitle">Acompanhamento de Obras & Vistorias</div>
+                            </div>
+                            <div class="d-flex gap-2 align-items-center">
+                                <div class="real-apk-header-btn">
+                                    <i class="fas fa-sliders-h"></i>
+                                </div>
+                                <div class="real-apk-header-btn real-apk-header-sync">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Real APK Scrollable Body -->
                         <div class="phone-content" id="phonePreviewContainer">
-                            <!-- Renderizado via JS -->
+                            <!-- Renderizado fielmente via JS -->
                         </div>
 
-                        <!-- Barra Inferior de Abas do APK -->
-                        <div class="phone-nav-bar">
-                            <div class="phone-nav-item active text-center" id="navItemDashboard">
-                                <i class="fas fa-home d-block"></i>
+                        <!-- Real Bottom Navigation Bar -->
+                        <div class="real-apk-bottom-bar">
+                            <div class="real-tab-btn active" id="tabNav_dashboard" onclick="selecionarTela('dashboard')">
+                                <i class="fas fa-home"></i>
                                 <span>Início</span>
                             </div>
-                            <div class="phone-nav-item text-center" id="navItemObras">
-                                <i class="fas fa-building d-block"></i>
+                            <div class="real-tab-btn" id="tabNav_projects" onclick="selecionarTela('projects')">
+                                <i class="fas fa-building"></i>
                                 <span>Obras</span>
                             </div>
-                            <div class="phone-nav-item text-center" id="navItemVisitas">
-                                <i class="fas fa-calendar d-block"></i>
+                            <div class="real-tab-btn" id="tabNav_visits" onclick="selecionarTela('visits')">
+                                <i class="fas fa-calendar-alt"></i>
                                 <span>Visitas</span>
                             </div>
-                            <div class="phone-nav-item text-center" id="navItemRelatorios">
-                                <i class="fas fa-file-alt d-block"></i>
+                            <div class="real-tab-btn" id="tabNav_reports" onclick="selecionarTela('reports')">
+                                <i class="fas fa-file-alt"></i>
+                                <span class="real-tab-badge">2</span>
                                 <span>Relatórios</span>
                             </div>
                         </div>
@@ -269,7 +375,7 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label fw-bold">Tipo de Bloco:</label>
-                    <select class="form-select" id="novoBlocoTipo" onchange="atualizarFormNovoBloco()">
+                    <select class="form-select" id="novoBlocoTipo">
                         <option value="custom_banner">📢 Banner de Comunicado / Aviso da Diretoria</option>
                         <option value="custom_quick_action">⚡ Atalho / Ação Rápida de Campo</option>
                         <option value="custom_info_card">ℹ️ Card Informativo / Diretrizes Técnicas</option>
@@ -277,16 +383,16 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Título / Cabeçalho:</label>
-                    <input type="text" class="form-control" id="novoBlocoTitulo" placeholder="Ex: Aviso Importante aos Engenheiros">
+                    <input type="text" class="form-control" id="novoBlocoTitulo" placeholder="Ex: Atenção ao Protocolo de Vistoria">
                 </div>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Texto / Mensagem:</label>
-                    <textarea class="form-control" id="novoBlocoTexto" rows="3" placeholder="Digite o conteúdo ou mensagem que aparecerá no aplicativo..."></textarea>
+                    <textarea class="form-control" id="novoBlocoTexto" rows="3" placeholder="Mensagem exibida no aplicativo para os vistoriadores..."></textarea>
                 </div>
-                <div class="mb-3" id="campoAcaoWrapper">
+                <div class="mb-3">
                     <label class="form-label fw-bold">Ação ao Clicar (Orquestração de Lógica):</label>
                     <select class="form-select" id="novoBlocoAcao">
-                        <option value="PendentesTab:Aguardando Aprovação">Abrir Relatórios Pendentes de Aprovação</option>
+                        <option value="PendentesTab:Aguardando Aprovação">Abrir Relatórios Pra Aprovação</option>
                         <option value="PendentesTab:Aprovado">Abrir Relatórios Aprovados</option>
                         <option value="PendentesTab:em_andamento">Abrir Rascunhos em Preenchimento</option>
                         <option value="ObrasTab">Abrir Aba de Obras</option>
@@ -300,7 +406,7 @@
                         <option value="all">Todos os Usuários</option>
                         <option value="approver_only">Somente Engenheiros Aprovadores & Masters</option>
                         <option value="surveyor_only">Somente Vistoriadores de Campo</option>
-                        <option value="master_only">Somente Masters</option>
+                        <option value="master_only">Somente Master</option>
                     </select>
                 </div>
             </div>
@@ -315,21 +421,39 @@
 </div>
 
 <script>
-// Dados globais de configurações recebidos do backend
 let currentConfigs = {{ configs_json|safe }};
 let activeScreenKey = 'dashboard';
+
+const SCREEN_HEADERS = {
+    dashboard: { title: 'Dashboard ELP', subtitle: 'Acompanhamento de Obras & Vistorias' },
+    reports: { title: 'Relatórios', subtitle: 'Gerenciamento de laudos técnicos' },
+    projects: { title: 'Obras', subtitle: 'Empreendimentos cadastrados' },
+    visits: { title: 'Visitas', subtitle: 'Agenda de vistorias técnicas' }
+};
 
 function selecionarTela(screenKey) {
     activeScreenKey = screenKey;
     
-    // Atualizar abas visuais
+    // Atualizar abas do topo
     document.querySelectorAll('#screenTabs .nav-link').forEach(btn => btn.classList.remove('active'));
-    event.currentTarget.classList.add('active');
+    const matchingTab = Array.from(document.querySelectorAll('#screenTabs .nav-link')).find(btn => 
+        btn.getAttribute('onclick') && btn.getAttribute('onclick').includes(screenKey)
+    );
+    if (matchingTab) matchingTab.classList.add('active');
+
+    // Atualizar abas inferiores do mockup
+    document.querySelectorAll('.real-tab-btn').forEach(b => b.classList.remove('active'));
+    const bottomTab = document.getElementById(`tabNav_${screenKey}`);
+    if (bottomTab) bottomTab.classList.add('active');
 
     // Atualizar títulos
     const config = currentConfigs[screenKey] || {};
     document.getElementById('telaTitulo').innerText = config.title || screenKey;
     document.getElementById('telaDescricao').innerText = config.description || 'Configurações de layout e lógica.';
+
+    const hMeta = SCREEN_HEADERS[screenKey] || { title: 'ELP', subtitle: 'Aplicativo Oficial' };
+    document.getElementById('previewHeaderTitle').innerText = hMeta.title;
+    document.getElementById('previewHeaderSubtitle').innerText = hMeta.subtitle;
 
     renderizarEditor();
     renderizarPreviewCelular();
@@ -340,7 +464,6 @@ function renderizarEditor() {
     container.innerHTML = '';
     const config = currentConfigs[activeScreenKey] || { sections: [] };
 
-    // Ordenar seções por campo order
     config.sections.sort((a, b) => (a.order || 0) - (b.order || 0));
 
     config.sections.forEach((sec, idx) => {
@@ -354,7 +477,7 @@ function renderizarEditor() {
                 <div class="d-flex align-items-center gap-2">
                     <span class="badge bg-secondary">#${sec.order || (idx + 1)}</span>
                     <strong class="text-dark fs-6">${sec.title}</strong>
-                    <span class="badge bg-info-subtle text-info">${sec.type}</span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">${sec.type}</span>
                 </div>
                 <div class="d-flex align-items-center gap-1">
                     <button class="btn btn-sm btn-outline-secondary py-0 px-2" title="Mover para cima" onclick="moverBloco(${idx}, -1)" ${isFirst ? 'disabled' : ''}>
@@ -371,7 +494,6 @@ function renderizarEditor() {
                 </div>
             </div>
 
-            <!-- Controles de Edição de Textos e Lógica -->
             <div class="row g-2 align-items-center mt-2 pt-2 border-top">
                 <div class="col-md-6">
                     <label class="form-label small text-muted mb-1">Título / Cabeçalho:</label>
@@ -384,7 +506,7 @@ function renderizarEditor() {
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label small text-muted mb-1">Regra de Exibição (Orquestração de Lógica):</label>
+                    <label class="form-label small text-muted mb-1">Regra de Exibição (Perfil Autorizado):</label>
                     <select class="form-select form-select-sm" onchange="atualizarCampo(${idx}, 'allowed_roles', this.value)">
                         <option value="all" ${sec.allowed_roles === 'all' ? 'selected' : ''}>Todos os Usuários</option>
                         <option value="approver_only" ${sec.allowed_roles === 'approver_only' ? 'selected' : ''}>Somente Aprovadores & Masters</option>
@@ -416,11 +538,7 @@ function moverBloco(index, direcao) {
     config.sections[index] = config.sections[novoIndex];
     config.sections[novoIndex] = temp;
 
-    // Reatribuir ordens sequenciais
-    config.sections.forEach((sec, i) => {
-        sec.order = i + 1;
-    });
-
+    config.sections.forEach((sec, i) => { sec.order = i + 1; });
     renderizarEditor();
     renderizarPreviewCelular();
 }
@@ -467,7 +585,6 @@ function confirmarAdicionarBloco() {
     };
 
     config.sections.push(novoBloco);
-
     bootstrap.Modal.getInstance(document.getElementById('modalAdicionarBloco')).hide();
     document.getElementById('novoBlocoTitulo').value = '';
     document.getElementById('novoBlocoTexto').value = '';
@@ -476,104 +593,363 @@ function confirmarAdicionarBloco() {
     renderizarPreviewCelular();
 }
 
+/* ========================================================
+   RENDERIZADOR DO SIMULADOR 100% FIEL AO REAL
+======================================================== */
 function renderizarPreviewCelular() {
     const container = document.getElementById('phonePreviewContainer');
     container.innerHTML = '';
     const config = currentConfigs[activeScreenKey] || { sections: [] };
 
-    config.sections.forEach(sec => {
-        if (!sec.visible) return;
+    // 1. DASHBOARD
+    if (activeScreenKey === 'dashboard') {
+        config.sections.forEach(sec => {
+            if (!sec.visible) return;
 
-        const blockEl = document.createElement('div');
-        blockEl.style.borderRadius = '8px';
-        blockEl.style.padding = '8px 10px';
-        blockEl.style.fontSize = '11px';
-        blockEl.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
+            if (sec.type === 'hero') {
+                const el = document.createElement('div');
+                el.style.cssText = 'background: #ffffff; border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);';
+                el.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <img src="/static/logo_elp_navbar.png" alt="ELP" style="width: 42px; height: 42px; border-radius: 8px; object-fit: contain;" onerror="this.src='/static/img/logo.png'">
+                        <div>
+                            <div style="font-size: 14px; font-weight: bold; color: #0F172A;">${sec.custom_text || 'Olá, Gabriel Eduardo!'}</div>
+                            <div style="font-size: 10px; color: #64748B; text-transform: capitalize;">terça-feira, 13 de outubro de 2026</div>
+                        </div>
+                    </div>
+                    <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; padding: 3px 8px; font-size: 10px; color: #2563EB; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                        <i class="fas fa-sparkles"></i> Editar
+                    </div>
+                `;
+                container.appendChild(el);
+            } 
+            else if (sec.type === 'badges') {
+                const el = document.createElement('div');
+                el.style.cssText = 'display: flex; gap: 6px; flex-wrap: wrap;';
+                el.innerHTML = `
+                    <div style="background: #2563EB; color: #ffffff; font-size: 11px; font-weight: bold; border-radius: 6px; padding: 4px 8px; display: flex; align-items: center; gap: 4px;">
+                        <i class="fas fa-user"></i> Gabriel Eduardo
+                    </div>
+                    <div style="background: #0891B2; color: #ffffff; font-size: 11px; font-weight: bold; border-radius: 6px; padding: 4px 8px; display: flex; align-items: center; gap: 4px;">
+                        <i class="fas fa-building"></i> ELP Consultoria
+                    </div>
+                `;
+                container.appendChild(el);
+            } 
+            else if (sec.type === 'alert' || sec.id === 'approverAlert') {
+                const el = document.createElement('div');
+                el.style.cssText = 'background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.04);';
+                el.innerHTML = `
+                    <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                        <i class="fas fa-exclamation-circle" style="color: #D97706; font-size: 20px;"></i>
+                        <div>
+                            <div style="font-size: 12px; font-weight: bold; color: #92400E;">${sec.title || 'Relatórios Pendentes de Aprovação'}</div>
+                            <div style="font-size: 10px; color: #B45309; margin-top: 1px;">${sec.custom_text || 'Existem 2 relatório(s) aguardando sua revisão e carimbo técnico.'}</div>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #D97706; font-size: 14px;"></i>
+                `;
+                container.appendChild(el);
+            } 
+            else if (sec.type === 'stats') {
+                const el = document.createElement('div');
+                el.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: bold; color: #1E293B;">
+                            <i class="fas fa-chart-line" style="color: #4E73DF;"></i>
+                            <span>${sec.title || 'Métricas Rápidas'}</span>
+                        </div>
+                        <div style="background: #F1F5F9; border-radius: 6px; padding: 2px 7px; display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; color: #475569;">
+                            <span style="width: 6px; height: 6px; border-radius: 50%; background: #10B981;"></span>
+                            Online
+                        </div>
+                    </div>
 
-        if (sec.type === 'hero') {
-            blockEl.style.background = '#ffffff';
-            blockEl.style.border = '1px solid #e2e8f0';
-            blockEl.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div style="width: 24px; height: 24px; background: #2563eb; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">ELP</div>
-                    <div>
-                        <div style="font-weight: bold; color: #1e293b;">${sec.custom_text || 'Olá, Engenheiro!'}</div>
-                        <div style="font-size: 9px; color: #64748b;">Painel de Vistorias Técnicas</div>
-                    </div>
-                </div>
-            `;
-        } else if (sec.type === 'alert' || sec.type === 'custom_banner') {
-            blockEl.style.background = '#fef3c7';
-            blockEl.style.border = '1px solid #fde68a';
-            blockEl.style.color = '#92400e';
-            blockEl.innerHTML = `
-                <div style="display: flex; gap: 6px; align-items: flex-start;">
-                    <i class="fas fa-exclamation-circle" style="color: #d97706; margin-top: 2px;"></i>
-                    <div>
-                        <div style="font-weight: bold;">${sec.title}</div>
-                        <div style="font-size: 9px;">${sec.custom_text || sec.subtitle || ''}</div>
-                    </div>
-                </div>
-            `;
-        } else if (sec.type === 'stats') {
-            blockEl.style.background = 'transparent';
-            blockEl.style.boxShadow = 'none';
-            blockEl.style.padding = '0';
-            blockEl.innerHTML = `
-                <div style="font-weight: bold; color: #334155; margin-bottom: 4px; font-size: 10px;">${sec.title}</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                    <div style="background: white; border-left: 3px solid #10b981; padding: 6px; border-radius: 6px;">
-                        <div style="color: #059669; font-size: 8px; font-weight: bold;">OBRAS ATIVAS</div>
-                        <div style="font-weight: bold; font-size: 12px; color: #065f46;">12</div>
-                    </div>
-                    <div style="background: white; border-left: 3px solid #2563eb; padding: 6px; border-radius: 6px;">
-                        <div style="color: #2563eb; font-size: 8px; font-weight: bold;">VISITAS</div>
-                        <div style="font-weight: bold; font-size: 12px; color: #1e3a8a;">5</div>
-                    </div>
-                    <div style="background: white; border-left: 3px solid #f59e0b; padding: 6px; border-radius: 6px;">
-                        <div style="color: #d97706; font-size: 8px; font-weight: bold;">EM PREENCHIMENTO</div>
-                        <div style="font-weight: bold; font-size: 12px; color: #92400e;">3</div>
-                    </div>
-                    <div style="background: white; border-left: 3px solid #06b6d4; padding: 6px; border-radius: 6px;">
-                        <div style="color: #0891b2; font-size: 8px; font-weight: bold;">APROVADOS</div>
-                        <div style="font-weight: bold; font-size: 12px; color: #155e75;">24</div>
-                    </div>
-                </div>
-            `;
-        } else if (sec.type === 'quick_actions') {
-            blockEl.style.background = '#ffffff';
-            blockEl.style.border = '1px solid #e2e8f0';
-            blockEl.innerHTML = `
-                <div style="font-weight: bold; color: #334155; margin-bottom: 4px; font-size: 10px;">${sec.title}</div>
-                <div style="display: flex; gap: 4px;">
-                    <button style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 4px; padding: 4px 2px; font-size: 9px; font-weight: bold;">+ Laudo</button>
-                    <button style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 4px; padding: 4px 2px; font-size: 9px; font-weight: bold;">+ Obra</button>
-                    <button style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 4px; padding: 4px 2px; font-size: 9px; font-weight: bold;">+ Visita</button>
-                </div>
-            `;
-        } else if (sec.type === 'filter_cards') {
-            blockEl.style.background = '#ffffff';
-            blockEl.style.border = '1px solid #e2e8f0';
-            blockEl.innerHTML = `
-                <div style="font-weight: bold; color: #334155; margin-bottom: 4px; font-size: 10px;">Páginas Exclusivas</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
-                    <div style="background: #fef3c7; padding: 4px; border-radius: 4px; font-size: 8px; font-weight: bold; color: #b45309; text-align: center;">Pra Aprovação</div>
-                    <div style="background: #ecfdf5; padding: 4px; border-radius: 4px; font-size: 8px; font-weight: bold; color: #047857; text-align: center;">Aprovados</div>
-                    <div style="background: #eff6ff; padding: 4px; border-radius: 4px; font-size: 8px; font-weight: bold; color: #1d4ed8; text-align: center;">Em Preenchimento</div>
-                    <div style="background: #f1f5f9; padding: 4px; border-radius: 4px; font-size: 8px; font-weight: bold; color: #334155; text-align: center;">Todos</div>
-                </div>
-            `;
-        } else {
-            blockEl.style.background = '#ffffff';
-            blockEl.style.border = '1px solid #e2e8f0';
-            blockEl.innerHTML = `
-                <div style="font-weight: bold; color: #1e293b;">${sec.title}</div>
-                <div style="font-size: 9px; color: #64748b;">${sec.custom_text || sec.subtitle || ''}</div>
-            `;
-        }
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 14px; border: 1px solid #E2E8F0; border-left: 4px solid #10B981; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #059669; font-size: 10px; font-weight: bold;">OBRAS ATIVAS</div>
+                                <div style="font-size: 20px; font-weight: bold; color: #065F46;">12</div>
+                            </div>
+                            <i class="fas fa-building" style="font-size: 26px; color: #A7F3D0;"></i>
+                        </div>
 
-        container.appendChild(blockEl);
-    });
+                        <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 14px; border: 1px solid #E2E8F0; border-left: 4px solid #2563EB; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #2563EB; font-size: 10px; font-weight: bold;">VISITAS AGENDADAS</div>
+                                <div style="font-size: 20px; font-weight: bold; color: #1E3A8A;">5</div>
+                            </div>
+                            <i class="fas fa-calendar-alt" style="font-size: 26px; color: #BFDBFE;"></i>
+                        </div>
+
+                        <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 14px; border: 1px solid #E2E8F0; border-left: 4px solid #F59E0B; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #D97706; font-size: 10px; font-weight: bold;">EM PREENCHIMENTO</div>
+                                <div style="font-size: 20px; font-weight: bold; color: #92400E;">3</div>
+                            </div>
+                            <i class="fas fa-file-alt" style="font-size: 26px; color: #FDE68A;"></i>
+                        </div>
+
+                        <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 14px; border: 1px solid #E2E8F0; border-left: 4px solid #06B6D4; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="color: #0891B2; font-size: 10px; font-weight: bold;">RELATÓRIOS APROVADOS</div>
+                                <div style="font-size: 20px; font-weight: bold; color: #155E75;">24</div>
+                            </div>
+                            <i class="fas fa-check-circle" style="font-size: 26px; color: #BAE6FD;"></i>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(el);
+            } 
+            else if (sec.type === 'quick_actions') {
+                const el = document.createElement('div');
+                el.innerHTML = `
+                    <div style="font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-bolt" style="color: #2563EB;"></i>
+                        <span>${sec.title || 'Ações Rápidas no Canteiro'}</span>
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 7px; margin-bottom: 8px;">
+                        <div style="background: #FFFFFF; border: 2px solid #2563EB; color: #2563EB; border-radius: 10px; padding: 10px; text-align: center; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <i class="fas fa-calendar-plus"></i> + Nova Visita
+                        </div>
+                        <div style="background: #FFFFFF; border: 2px solid #2563EB; color: #2563EB; border-radius: 10px; padding: 10px; text-align: center; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                            <i class="fas fa-building"></i> + Cadastrar Obra
+                        </div>
+                        <div style="background: #2563EB; color: #FFFFFF; border-radius: 10px; padding: 10px; text-align: center; font-weight: bold; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 6px rgba(37,99,235,0.3);">
+                            <i class="fas fa-file-alt"></i> + Novo Relatório
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        <div style="background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; color: #334155;">
+                            Histórico de Laudos
+                        </div>
+                        <div style="background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; color: #334155;">
+                            Checklist Técnico
+                        </div>
+                        <div style="background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 8px; padding: 5px 10px; font-size: 11px; font-weight: 600; color: #334155;">
+                            Usuários
+                        </div>
+                    </div>
+                `;
+                container.appendChild(el);
+            } 
+            else if (sec.type === 'recent_reports') {
+                const el = document.createElement('div');
+                el.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div style="font-size: 13px; font-weight: bold; color: #1E293B; display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-file-signature" style="color: #475569;"></i>
+                            <span>${sec.title || 'Relatórios Recentes'}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #2563EB; font-weight: 600; cursor: pointer;">
+                            ${sec.button_text || 'Ver todos'}
+                        </div>
+                    </div>
+
+                    <!-- Item 1 -->
+                    <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; margin-bottom: 7px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                <span style="font-weight: bold; font-size: 12px; color: #1E293B;">REL-0004</span>
+                                <span style="background: #DCFCE7; color: #166534; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 4px;">Sincronizado</span>
+                            </div>
+                            <div style="font-size: 11px; color: #64748B;">Residencial Jardins</div>
+                            <div style="font-size: 9px; color: #94A3B8;">13/10/2026 às 11:30</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="background: #FEF3C7; color: #B45309; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px;">Aguardando Aprovação</span>
+                            <div style="background: #2563EB; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Ver Laudo</div>
+                        </div>
+                    </div>
+
+                    <!-- Item 2 -->
+                    <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                <span style="font-weight: bold; font-size: 12px; color: #1E293B;">REL-0003</span>
+                                <span style="background: #DCFCE7; color: #166534; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 4px;">Sincronizado</span>
+                            </div>
+                            <div style="font-size: 11px; color: #64748B;">Edifício Horizon</div>
+                            <div style="font-size: 9px; color: #94A3B8;">12/10/2026 às 15:45</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <span style="background: #DCFCE7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px;">Aprovado</span>
+                            <div style="background: #2563EB; color: white; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Ver Laudo</div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(el);
+            } 
+            else if (sec.type === 'upcoming_visits') {
+                const el = document.createElement('div');
+                el.innerHTML = `
+                    <div style="font-size: 13px; font-weight: bold; color: #1E293B; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-calendar-check" style="color: #475569;"></i>
+                        <span>${sec.title || 'Próximas Visitas Agendadas'}</span>
+                    </div>
+
+                    <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: bold; color: #1E293B;">Residencial Jardins</div>
+                            <div style="font-size: 10px; color: #64748B;">14/10/2026 às 09:00</div>
+                            <span style="background: #DCFCE7; color: #166534; font-size: 9px; font-weight: bold; padding: 1px 5px; border-radius: 4px;">Confirmada</span>
+                        </div>
+                        <div style="background: #2563EB; color: white; font-size: 10px; font-weight: bold; padding: 5px 8px; border-radius: 6px; display: flex; align-items: center; gap: 4px;">
+                            <i class="fas fa-play"></i> Iniciar Relatório
+                        </div>
+                    </div>
+                `;
+                container.appendChild(el);
+            } 
+            else {
+                // Bloco Customizado criado pelo Master
+                const el = document.createElement('div');
+                el.style.cssText = 'background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 12px; display: flex; align-items: center; justify-content: space-between;';
+                el.innerHTML = `
+                    <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                        <i class="fas fa-bullhorn" style="color: #2563EB; font-size: 18px;"></i>
+                        <div>
+                            <div style="font-size: 12px; font-weight: bold; color: #1E3A8A;">${sec.title}</div>
+                            <div style="font-size: 10px; color: #3B82F6; margin-top: 1px;">${sec.custom_text || sec.subtitle || ''}</div>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right" style="color: #2563EB; font-size: 14px;"></i>
+                `;
+                container.appendChild(el);
+            }
+        });
+    }
+
+    // 2. ABA DE RELATÓRIOS (100% Fiel a ReportsListScreen.tsx)
+    else if (activeScreenKey === 'reports') {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = `
+            <!-- 4 Cards de Métricas e Páginas Exclusivas -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 10px; padding: 10px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="background: #FEF3C7; padding: 4px 6px; border-radius: 6px; color: #D97706; font-size: 11px;"><i class="fas fa-hourglass-half"></i></span>
+                        <span style="background: #D97706; color: white; font-size: 8px; font-weight: bold; padding: 1px 4px; border-radius: 4px;">Ativo</span>
+                    </div>
+                    <div style="font-size: 18px; font-weight: bold; color: #B45309; margin-top: 4px;">2</div>
+                    <div style="font-size: 10px; font-weight: bold; color: #78350F;">Pra Aprovação</div>
+                </div>
+
+                <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; padding: 10px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="background: #D1FAE5; padding: 4px 6px; border-radius: 6px; color: #059669; font-size: 11px;"><i class="fas fa-check-circle"></i></span>
+                    </div>
+                    <div style="font-size: 18px; font-weight: bold; color: #065F46; margin-top: 4px;">24</div>
+                    <div style="font-size: 10px; font-weight: bold; color: #064E3B;">Aprovados</div>
+                </div>
+
+                <div style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; padding: 10px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="background: #DBEAFE; padding: 4px 6px; border-radius: 6px; color: #2563EB; font-size: 11px;"><i class="fas fa-file-alt"></i></span>
+                    </div>
+                    <div style="font-size: 18px; font-weight: bold; color: #1E40AF; margin-top: 4px;">3</div>
+                    <div style="font-size: 10px; font-weight: bold; color: #1E3A8A;">Em Preenchimento</div>
+                </div>
+
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 10px; text-align: left;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="background: #F1F5F9; padding: 4px 6px; border-radius: 6px; color: #475569; font-size: 11px;"><i class="fas fa-layer-group"></i></span>
+                    </div>
+                    <div style="font-size: 18px; font-weight: bold; color: #334155; margin-top: 4px;">29</div>
+                    <div style="font-size: 10px; font-weight: bold; color: #1E293B;">Todos os Relatórios</div>
+                </div>
+            </div>
+
+            <!-- Banner de Seção Exclusiva -->
+            <div style="background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 8px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: bold; color: #B45309;">
+                    <i class="fas fa-hourglass-half"></i>
+                    <span>PÁGINA EXCLUSIVA: PRA APROVAÇÃO</span>
+                </div>
+                <div style="font-size: 9px; color: #64748B; font-weight: bold; background: white; padding: 2px 6px; border-radius: 4px; border: 1px solid #E2E8F0;">
+                    Ver Todos ✕
+                </div>
+            </div>
+
+            <!-- Campo de Busca -->
+            <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #94A3B8;">
+                <i class="fas fa-search"></i>
+                <span>Buscar por obra, título ou número...</span>
+            </div>
+
+            <!-- Lista de Relatórios -->
+            <div style="background: #FFFFFF; border-radius: 10px; padding: 10px; border: 1px solid #E2E8F0; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-weight: bold; font-size: 12px; color: #1E293B;">REL-0004</span>
+                    <span style="background: #FEF3C7; color: #B45309; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Aguardando Aprovação</span>
+                </div>
+                <div style="font-size: 11px; font-weight: 600; color: #334155;">Residencial Jardins - Torre A</div>
+                <div style="font-size: 9px; color: #94A3B8; margin-top: 2px;">Vistoriador: Gabriel Eduardo • 13/10/2026</div>
+            </div>
+        `;
+        container.appendChild(wrap);
+    }
+
+    // 3. ABA DE OBRAS
+    else if (activeScreenKey === 'projects') {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = `
+            <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #94A3B8;">
+                <i class="fas fa-search"></i>
+                <span>Buscar por nome, código ou endereço...</span>
+            </div>
+
+            <div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border: 1px solid #E2E8F0; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 13px; color: #1E293B;">Residencial Jardins</span>
+                    <span style="background: #DCFCE7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Ativa</span>
+                </div>
+                <div style="font-size: 10px; color: #64748B; margin-top: 3px;">Av. das Nações, 1420 - São Paulo/SP</div>
+                <div style="display: flex; gap: 10px; font-size: 10px; color: #475569; margin-top: 8px; border-top: 1px solid #F1F5F9; pt-1;">
+                    <span><i class="fas fa-calendar-alt text-primary"></i> 14 Visitas</span>
+                    <span><i class="fas fa-file-alt text-success"></i> 8 Relatórios</span>
+                </div>
+            </div>
+
+            <div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border: 1px solid #E2E8F0;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 13px; color: #1E293B;">Edifício Horizon</span>
+                    <span style="background: #DCFCE7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Ativa</span>
+                </div>
+                <div style="font-size: 10px; color: #64748B; margin-top: 3px;">Rua Oscar Freire, 800 - São Paulo/SP</div>
+                <div style="display: flex; gap: 10px; font-size: 10px; color: #475569; margin-top: 8px; border-top: 1px solid #F1F5F9; pt-1;">
+                    <span><i class="fas fa-calendar-alt text-primary"></i> 6 Visitas</span>
+                    <span><i class="fas fa-file-alt text-success"></i> 5 Relatórios</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(wrap);
+    }
+
+    // 4. ABA DE VISITAS
+    else if (activeScreenKey === 'visits') {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = `
+            <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 7px 10px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 11px; color: #94A3B8;">
+                <i class="fas fa-search"></i>
+                <span>Buscar visitas por obra ou data...</span>
+            </div>
+
+            <div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border: 1px solid #E2E8F0; margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold; font-size: 13px; color: #1E293B;">Residencial Jardins</span>
+                    <span style="background: #DCFCE7; color: #166534; font-size: 9px; font-weight: bold; padding: 2px 6px; border-radius: 4px;">Confirmada</span>
+                </div>
+                <div style="font-size: 10px; color: #2563EB; font-weight: bold; margin-top: 2px;">
+                    <i class="fas fa-clock"></i> 14/10/2026 às 09:00
+                </div>
+                <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Engenheiro: Gabriel Eduardo</div>
+            </div>
+        `;
+        container.appendChild(wrap);
+    }
 }
 
 async function salvarConfiguracao() {
@@ -591,7 +967,7 @@ async function salvarConfiguracao() {
         });
         const data = await res.json();
         if (data.success) {
-            alert('✅ Configurações da tela salvas com sucesso! O aplicativo sincronizará os novos blocos e textos.');
+            alert('✅ Configurações salvas com sucesso! O aplicativo sincronizará os novos blocos e textos.');
         } else {
             alert('❌ Erro ao salvar: ' + (data.error || 'Erro desconhecido'));
         }
@@ -620,8 +996,17 @@ async function resetarTelaAtual() {
     }
 }
 
-// Inicializar na carga da página
 document.addEventListener('DOMContentLoaded', () => {
+    // Relógio dinâmico do smartphone
+    const updateClock = () => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const clockEl = document.getElementById('phoneClock');
+        if (clockEl) clockEl.innerText = timeStr;
+    };
+    updateClock();
+    setInterval(updateClock, 30000);
+
     renderizarEditor();
     renderizarPreviewCelular();
 });
