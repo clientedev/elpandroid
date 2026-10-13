@@ -13,8 +13,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/api';
 import { syncService } from '../../services/syncService';
 import { useFocusEffect } from '@react-navigation/native';
+import { ScrollView } from 'react-native';
 
-export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ navigation, route }) => {
   const { isOnline } = useNetwork();
   const { user } = useAuth();
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
@@ -22,6 +23,15 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
   const [search, setSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Escutar parâmetros de navegação (ex: vindo do Dashboard)
+  useEffect(() => {
+    if (route?.params?.filterStatus) {
+      const target = route.params.filterStatus;
+      setSelectedStatus(target);
+      filterReports(relatorios, search, target);
+    }
+  }, [route?.params?.filterStatus]);
 
   function getReportTimestamp(r: Relatorio): number {
     // IDs gerados localmente em milissegundos (Date.now())
@@ -88,19 +98,20 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
     try {
       const data = await getLocalRelatorios();
       setRelatorios(data);
-      filterReports(data, search, selectedStatus);
+      const activeStatus = route?.params?.filterStatus || selectedStatus;
+      filterReports(data, search, activeStatus);
 
       if (isOnline) {
         syncService.syncAll().then(async () => {
           const fresh = await getLocalRelatorios();
           setRelatorios(fresh);
-          filterReports(fresh, search, selectedStatus);
+          filterReports(fresh, search, activeStatus);
         }).catch(() => null);
       }
     } catch (e) {
       console.warn('Erro ao carregar relatórios:', e);
     }
-  }, [search, selectedStatus, isOnline]);
+  }, [search, selectedStatus, isOnline, route?.params?.filterStatus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,6 +125,9 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
   };
 
   const handleStatusFilter = (status: string) => {
+    if (route?.params?.filterStatus) {
+      route.params.filterStatus = undefined;
+    }
     setSelectedStatus(status);
     filterReports(relatorios, search, status);
   };
@@ -139,11 +153,85 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
     }
   };
 
+  // Contadores dinâmicos para os cards de métricas
+  const countAprovacao = relatorios.filter(r => r.status === 'Aguardando Aprovação').length;
+  const countAprovados = relatorios.filter(r => r.status === 'Aprovado').length;
+  const countRascunhos = relatorios.filter(r => r.status === 'em_andamento' || r.status === 'preenchimento' || !r.status).length;
+  const countTotal = relatorios.length;
+
+  // Informações da visão exclusiva conforme o card selecionado
+  function getHeaderExclusiveInfo() {
+    switch (selectedStatus) {
+      case 'Aguardando Aprovação':
+        return {
+          title: 'Para Aprovação',
+          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório aguardando' : 'relatórios aguardando'} revisão técnica`,
+          exclusiveLabel: 'PÁGINA EXCLUSIVA: RELATÓRIOS PARA APROVAÇÃO',
+          bannerColor: '#B45309',
+          bannerBg: '#FEF3C7',
+          bannerBorder: '#FDE68A',
+          iconName: 'hourglass-outline' as const,
+          emptyTitle: 'Nenhum relatório pendente de aprovação',
+          emptySub: 'Parabéns! Todos os relatórios foram revisados ou ainda estão em preenchimento.'
+        };
+      case 'Aprovado':
+        return {
+          title: 'Relatórios Aprovados',
+          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'laudo técnico aprovado' : 'laudos técnicos aprovados'}`,
+          exclusiveLabel: 'PÁGINA EXCLUSIVA: LAUDOS TÉCNICOS APROVADOS',
+          bannerColor: '#065F46',
+          bannerBg: '#D1FAE5',
+          bannerBorder: '#A7F3D0',
+          iconName: 'checkmark-circle' as const,
+          emptyTitle: 'Nenhum relatório aprovado encontrado',
+          emptySub: 'Quando um relatório for aprovado por um engenheiro responsável, ele constará aqui.'
+        };
+      case 'em_andamento':
+        return {
+          title: 'Rascunhos em Aberto',
+          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório em elaboração' : 'relatórios em elaboração'}`,
+          exclusiveLabel: 'PÁGINA EXCLUSIVA: RASCUNHOS EM PREENCHIMENTO',
+          bannerColor: '#1D4ED8',
+          bannerBg: '#DBEAFE',
+          bannerBorder: '#BFDBFE',
+          iconName: 'document-text-outline' as const,
+          emptyTitle: 'Nenhum rascunho em aberto',
+          emptySub: 'Todos os relatórios iniciados foram enviados ou ainda não foram criados.'
+        };
+      case 'Rejeitado':
+        return {
+          title: 'Relatórios Rejeitados',
+          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório com correções solicitadas' : 'relatórios com correções solicitadas'}`,
+          exclusiveLabel: 'PÁGINA EXCLUSIVA: RELATÓRIOS REJEITADOS',
+          bannerColor: '#991B1B',
+          bannerBg: '#FEE2E2',
+          bannerBorder: '#FECACA',
+          iconName: 'close-circle-outline' as const,
+          emptyTitle: 'Nenhum relatório rejeitado',
+          emptySub: 'Não há relatórios com pendências ou correções solicitadas.'
+        };
+      default:
+        return {
+          title: 'Relatórios',
+          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório disponível' : 'relatórios disponíveis'}`,
+          exclusiveLabel: null,
+          bannerColor: '#475569',
+          bannerBg: '#F1F5F9',
+          bannerBorder: '#E2E8F0',
+          iconName: 'albums-outline' as const,
+          emptyTitle: 'Nenhum relatório encontrado',
+          emptySub: 'Toque no botão + acima para iniciar um novo relatório de visita.'
+        };
+    }
+  }
+
+  const exclusiveInfo = getHeaderExclusiveInfo();
+
   return (
     <View style={styles.container}>
       <Header 
-        title="Relatórios" 
-        subtitle={`${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório' : 'relatórios'}`}
+        title={exclusiveInfo.title} 
+        subtitle={exclusiveInfo.subtitle}
         rightAction={
           <TouchableOpacity 
             style={styles.addBtn}
@@ -153,6 +241,133 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
           </TouchableOpacity>
         }
       />
+
+      {/* CARDS DE NAVEGAÇÃO EXCLUSIVA DE STATUS */}
+      <View style={styles.metricsContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.metricsScrollContent}
+        >
+          {/* Card 1: Para Aprovação */}
+          <TouchableOpacity 
+            style={[
+              styles.metricCard,
+              styles.cardApproval,
+              selectedStatus === 'Aguardando Aprovação' && styles.metricCardActiveApproval
+            ]}
+            onPress={() => handleStatusFilter('Aguardando Aprovação')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.metricHeaderRow}>
+              <View style={[styles.metricIconBox, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="hourglass" size={16} color="#D97706" />
+              </View>
+              {selectedStatus === 'Aguardando Aprovação' && (
+                <View style={styles.activePillBadge}>
+                  <Text style={styles.activePillText}>Ativo</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.metricCount, { color: '#B45309' }]}>{countAprovacao}</Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>Pra Aprovação</Text>
+          </TouchableOpacity>
+
+          {/* Card 2: Aprovados */}
+          <TouchableOpacity 
+            style={[
+              styles.metricCard,
+              styles.cardApproved,
+              selectedStatus === 'Aprovado' && styles.metricCardActiveApproved
+            ]}
+            onPress={() => handleStatusFilter('Aprovado')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.metricHeaderRow}>
+              <View style={[styles.metricIconBox, { backgroundColor: '#D1FAE5' }]}>
+                <Ionicons name="checkmark-done-circle" size={16} color="#059669" />
+              </View>
+              {selectedStatus === 'Aprovado' && (
+                <View style={[styles.activePillBadge, { backgroundColor: '#059669' }]}>
+                  <Text style={styles.activePillText}>Ativo</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.metricCount, { color: '#065F46' }]}>{countAprovados}</Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>Aprovados</Text>
+          </TouchableOpacity>
+
+          {/* Card 3: Rascunhos / Em Preenchimento */}
+          <TouchableOpacity 
+            style={[
+              styles.metricCard,
+              styles.cardDraft,
+              selectedStatus === 'em_andamento' && styles.metricCardActiveDraft
+            ]}
+            onPress={() => handleStatusFilter('em_andamento')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.metricHeaderRow}>
+              <View style={[styles.metricIconBox, { backgroundColor: '#DBEAFE' }]}>
+                <Ionicons name="document-text" size={16} color="#2563EB" />
+              </View>
+              {selectedStatus === 'em_andamento' && (
+                <View style={[styles.activePillBadge, { backgroundColor: '#2563EB' }]}>
+                  <Text style={styles.activePillText}>Ativo</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.metricCount, { color: '#1E40AF' }]}>{countRascunhos}</Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>Em Preenchimento</Text>
+          </TouchableOpacity>
+
+          {/* Card 4: Todos */}
+          <TouchableOpacity 
+            style={[
+              styles.metricCard,
+              styles.cardAll,
+              selectedStatus === 'Todos' && styles.metricCardActiveAll
+            ]}
+            onPress={() => handleStatusFilter('Todos')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.metricHeaderRow}>
+              <View style={[styles.metricIconBox, { backgroundColor: '#F1F5F9' }]}>
+                <Ionicons name="albums-outline" size={16} color="#475569" />
+              </View>
+              {selectedStatus === 'Todos' && (
+                <View style={[styles.activePillBadge, { backgroundColor: '#475569' }]}>
+                  <Text style={styles.activePillText}>Ativo</Text>
+                </View>
+              )}
+            </View>
+            <Text style={[styles.metricCount, { color: '#334155' }]}>{countTotal}</Text>
+            <Text style={styles.metricLabel} numberOfLines={1}>Todos os Relatórios</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+
+      {/* BANNER DE SEÇÃO EXCLUSIVA (Quando filtrado) */}
+      {exclusiveInfo.exclusiveLabel && (
+        <View style={[
+          styles.exclusiveBannerContainer, 
+          { backgroundColor: exclusiveInfo.bannerBg, borderColor: exclusiveInfo.bannerBorder }
+        ]}>
+          <View style={styles.exclusiveBannerLeft}>
+            <Ionicons name={exclusiveInfo.iconName} size={18} color={exclusiveInfo.bannerColor} />
+            <Text style={[styles.exclusiveBannerText, { color: exclusiveInfo.bannerColor }]}>
+              {exclusiveInfo.exclusiveLabel}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.exclusiveResetBtn}
+            onPress={() => handleStatusFilter('Todos')}
+          >
+            <Text style={styles.exclusiveResetText}>Ver Todos</Text>
+            <Ionicons name="close" size={14} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -173,7 +388,7 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
         </View>
       </View>
 
-      {/* Filter Tabs */}
+      {/* Filter Tabs Chips */}
       <View style={styles.filterRow}>
         {['Todos', 'em_andamento', 'Aguardando Aprovação', 'Aprovado', 'Rejeitado'].map(st => (
           <TouchableOpacity
@@ -196,9 +411,18 @@ export const ReportsListScreen: React.FC<{ navigation: any }> = ({ navigation })
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyTitle}>Nenhum relatório encontrado</Text>
-            <Text style={styles.emptySub}>Toque no botão + acima para iniciar um novo relatório.</Text>
+            <Ionicons name={exclusiveInfo.iconName} size={52} color={exclusiveInfo.bannerColor || Colors.textMuted} />
+            <Text style={styles.emptyTitle}>{exclusiveInfo.emptyTitle}</Text>
+            <Text style={styles.emptySub}>{exclusiveInfo.emptySub}</Text>
+            {selectedStatus !== 'Todos' && (
+              <TouchableOpacity 
+                style={styles.emptyResetBtn} 
+                onPress={() => handleStatusFilter('Todos')}
+              >
+                <Ionicons name="albums-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.emptyResetBtnText}>Mostrar Todos os Relatórios</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
         renderItem={({ item }) => {
@@ -394,4 +618,152 @@ const styles = StyleSheet.create({
   emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginTop: 12 },
   emptySub: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 },
+  metricsContainer: {
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  metricsScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  metricCard: {
+    width: 145,
+    borderRadius: 14,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    ...Shadows.sm,
+  },
+  cardApproval: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  cardApproved: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  cardDraft: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  cardAll: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  metricCardActiveApproval: {
+    borderColor: '#D97706',
+    borderWidth: 2,
+    backgroundColor: '#FEF3C7',
+    ...Shadows.md,
+  },
+  metricCardActiveApproved: {
+    borderColor: '#059669',
+    borderWidth: 2,
+    backgroundColor: '#D1FAE5',
+    ...Shadows.md,
+  },
+  metricCardActiveDraft: {
+    borderColor: '#2563EB',
+    borderWidth: 2,
+    backgroundColor: '#DBEAFE',
+    ...Shadows.md,
+  },
+  metricCardActiveAll: {
+    borderColor: '#0F172A',
+    borderWidth: 2,
+    backgroundColor: '#F1F5F9',
+    ...Shadows.md,
+  },
+  metricHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  metricIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activePillBadge: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  activePillText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  metricCount: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  exclusiveBannerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  exclusiveBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    flex: 1,
+  },
+  exclusiveBannerText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+    flex: 1,
+  },
+  exclusiveResetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  exclusiveResetText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  emptyResetBtn: {
+    marginTop: 16,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    ...Shadows.sm,
+  },
+  emptyResetBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
 });

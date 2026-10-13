@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from app import db
 import os
+import json
 from cryptography.fernet import Fernet
 from sqlalchemy.dialects.postgresql import JSONB
 import pytz
@@ -912,4 +913,33 @@ class Lembrete(db.Model):
             'fechado_por': self.fechado_por.username if self.fechado_por else None,
             'criado_em': self.criado_em.isoformat() if self.criado_em else None,
             'criado_por': self.criado_por.username if self.criado_por else None
+        }
+
+
+class ApkScreenConfig(db.Model):
+    """
+    Configuração dinâmica de telas do APK (Server-Driven UI / Construtor de Telas).
+    Permite ao Master reordenar seções, adicionar itens, alterar textos e orquestrar lógica do APK.
+    """
+    __tablename__ = 'apk_screen_configs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    screen_key = db.Column(db.String(50), unique=True, nullable=False, index=True) # 'dashboard', 'reports', 'projects', 'visits'
+    title = db.Column(db.String(100), nullable=True)
+    config_json = db.Column(db.Text, nullable=False)
+    updated_at = db.Column(db.DateTime, default=brazil_now, onupdate=brazil_now)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+
+    def to_dict(self):
+        try:
+            parsed = json.loads(self.config_json)
+        except Exception:
+            parsed = {}
+        return {
+            'screen_key': self.screen_key,
+            'title': self.title,
+            'config': parsed,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

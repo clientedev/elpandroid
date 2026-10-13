@@ -227,8 +227,8 @@ class NotificationService:
                 logger.error(f"❌ Relatório {relatorio_id} não encontrado")
                 return {'success': False, 'error': 'Relatório não encontrado'}
             
-            # Buscar aprovador específico do projeto ou aprovador global
-            aprovador_id = None
+            # Buscar aprovadores: tentar específico, global, do relatório e fallback para TODOS os aprovadores/mestres
+            destinatarios_ids = set()
             
             # 1. Tentar buscar aprovador específico do projeto
             if relatorio.projeto_id:
@@ -236,31 +236,46 @@ class NotificationService:
                     projeto_id=relatorio.projeto_id,
                     ativo=True
                 ).order_by(AprovadorPadrao.prioridade).first()
-                
-                if aprovador_projeto:
-                    aprovador_id = aprovador_projeto.aprovador_id
-                    logger.info(f"✅ Aprovador específico encontrado para projeto {relatorio.projeto_id}: user {aprovador_id}")
+                if aprovador_projeto and aprovador_projeto.aprovador_id:
+                    destinatarios_ids.add(aprovador_projeto.aprovador_id)
+                    logger.info(f"✅ Aprovador específico encontrado para projeto {relatorio.projeto_id}: user {aprovador_projeto.aprovador_id}")
             
-            # 2. Se não encontrou aprovador específico, buscar aprovador global
-            if not aprovador_id:
-                aprovador_global = AprovadorPadrao.query.filter_by(
-                    is_global=True,
-                    ativo=True
-                ).order_by(AprovadorPadrao.prioridade).first()
-                
-                if aprovador_global:
-                    aprovador_id = aprovador_global.aprovador_id
-                    logger.info(f"✅ Aprovador global encontrado: user {aprovador_id}")
+            # 2. Tentar aprovador global
+            aprovador_global = AprovadorPadrao.query.filter_by(
+                is_global=True,
+                ativo=True
+            ).order_by(AprovadorPadrao.prioridade).first()
+            if aprovador_global and aprovador_global.aprovador_id:
+                destinatarios_ids.add(aprovador_global.aprovador_id)
             
-            # 3. Fallback: usar aprovador_id do relatório se existir
-            if not aprovador_id and relatorio.aprovador_id:
-                aprovador_id = relatorio.aprovador_id
-                logger.info(f"✅ Usando aprovador_id do relatório: user {aprovador_id}")
+            # 3. Aprovador designado direto no relatório
+            if relatorio.aprovador_id:
+                destinatarios_ids.add(relatorio.aprovador_id)
             
-            # Se não encontrou nenhum aprovador, retornar erro
-            if not aprovador_id:
-                logger.warning(f"⚠️ Relatório {relatorio_id} não tem aprovador designado (nem específico, nem global)")
-                return {'success': False, 'error': 'Relatório sem aprovador designado'}
+            # 4. Fallback Essencial: buscar todos os usuários aprovadores ou masters no sistema
+            from models import User
+            todos_aprovadores = User.query.filter(
+                (User.is_aprovador_express == True) | 
+                (User.is_master == True) | 
+                (User.cargo.ilike('%aprovad%')) | 
+                (User.cargo.ilike('%master%')) | 
+                (User.cargo.ilike('%admin%')) |
+                (User.username == 'admin')
+            ).filter_by(ativo=True).all()
+            
+            for ap in todos_aprovadores:
+                if ap.id != relatorio.autor_id:
+                    destinatarios_ids.add(ap.id)
+            
+            if not destinatarios_ids:
+                # Se ainda estiver vazio, notificar o primeiro usuário master ou admin
+                first_admin = User.query.filter_by(is_master=True).first() or User.query.filter_by(username='admin').first()
+                if first_admin:
+                    destinatarios_ids.add(first_admin.id)
+            
+            if not destinatarios_ids:
+                logger.warning(f"⚠️ Relatório {relatorio_id} sem nenhum aprovador ou admin disponível no sistema")
+                return {'success': False, 'error': 'Nenhum aprovador disponível'}
             
             # Buscar informações do projeto para mensagem mais completa
             projeto = Projeto.query.get(relatorio.projeto_id) if relatorio.projeto_id else None
@@ -268,15 +283,20 @@ class NotificationService:
             numero_rel = relatorio.numero or "S/N"
             titulo_rel = relatorio.titulo or "Sem título"
             
-            resultado = self.criar_notificacao(
-                user_id=aprovador_id,
-                tipo='relatorio_pendente',
-                titulo='Você tem um relatório com aprovação pendente',
-                mensagem=f'O relatório nº {numero_rel} "{titulo_rel}" da obra "{projeto_nome}" está aguardando sua aprovação.',
-                link_destino=f'/reports/{relatorio_id}/review'
-            )
+            total_notificados = 0
+            for dest_id in destinatarios_ids:
+                res = self.criar_notificacao(
+                    user_id=dest_id,
+                    tipo='relatorio_pendente',
+                    titulo='Você tem um relatório com aprovação pendente',
+                    mensagem=f'O relatório nº {numero_rel} "{titulo_rel}" da obra "{projeto_nome}" está aguardando sua aprovação.',
+                    link_destino=f'/reports/{relatorio_id}/review'
+                )
+                if res.get('success'):
+                    total_notificados += 1
             
-            return resultado
+            logger.info(f"✅ Notificação de relatório pendente {numero_rel} enviada para {total_notificados} aprovador(es)")
+            return {'success': True, 'count': total_notificados}
             
         except Exception as e:
             logger.error(f"❌ Erro ao criar notificação de relatório pendente: {e}")
@@ -700,44 +720,56 @@ class NotificationService:
                 logger.error(f"❌ Relatório Express {relatorio_express_id} não encontrado")
                 return {'success': False, 'error': 'Relatório Express não encontrado'}
             
-            aprovador_id = None
+            destinatarios_ids = set()
             
             aprovador_global = AprovadorPadrao.query.filter_by(
                 is_global=True,
                 ativo=True
             ).order_by(AprovadorPadrao.prioridade).first()
+            if aprovador_global and aprovador_global.aprovador_id:
+                destinatarios_ids.add(aprovador_global.aprovador_id)
             
-            if aprovador_global:
-                aprovador_id = aprovador_global.aprovador_id
-                logger.info(f"✅ Aprovador global encontrado: user {aprovador_id}")
+            if hasattr(relatorio, 'aprovador_id') and relatorio.aprovador_id:
+                destinatarios_ids.add(relatorio.aprovador_id)
             
-            if not aprovador_id:
-                aprovador_padrao = AprovadorPadrao.query.filter_by(
-                    projeto_id=None,
-                    ativo=True
-                ).order_by(AprovadorPadrao.prioridade).first()
-                
-                if aprovador_padrao:
-                    aprovador_id = aprovador_padrao.aprovador_id
-                    logger.info(f"✅ Aprovador padrão encontrado: user {aprovador_id}")
+            # Buscar todos os aprovadores e masters do sistema
+            from models import User
+            todos_aprovadores = User.query.filter(
+                (User.is_aprovador_express == True) | 
+                (User.is_master == True) | 
+                (User.cargo.ilike('%aprovad%')) | 
+                (User.cargo.ilike('%master%')) | 
+                (User.cargo.ilike('%admin%')) |
+                (User.username == 'admin')
+            ).filter_by(ativo=True).all()
             
-            if not aprovador_id and hasattr(relatorio, 'aprovador_id') and relatorio.aprovador_id:
-                aprovador_id = relatorio.aprovador_id
-                logger.info(f"✅ Usando aprovador_id do relatório: user {aprovador_id}")
+            for ap in todos_aprovadores:
+                if ap.id != relatorio.autor_id:
+                    destinatarios_ids.add(ap.id)
             
-            if not aprovador_id:
+            if not destinatarios_ids:
+                first_admin = User.query.filter_by(is_master=True).first() or User.query.filter_by(username='admin').first()
+                if first_admin:
+                    destinatarios_ids.add(first_admin.id)
+            
+            if not destinatarios_ids:
                 logger.warning(f"⚠️ Nenhum aprovador encontrado para Relatório Express {relatorio_express_id}")
                 return {'success': False, 'error': 'Nenhum aprovador configurado'}
             
-            resultado = self.criar_notificacao(
-                user_id=aprovador_id,
-                tipo='relatorio_express_pendente',
-                titulo='Novo Relatório Express aguardando aprovação',
-                mensagem=f'O Relatório Express "{relatorio.numero}" da obra "{relatorio.obra_nome}" está aguardando sua aprovação.',
-                link_destino=f'/relatorio-express/{relatorio_express_id}'
-            )
+            total_notificados = 0
+            for dest_id in destinatarios_ids:
+                res = self.criar_notificacao(
+                    user_id=dest_id,
+                    tipo='relatorio_express_pendente',
+                    titulo='Novo Relatório Express aguardando aprovação',
+                    mensagem=f'O Relatório Express "{relatorio.numero}" da obra "{relatorio.obra_nome}" está aguardando sua aprovação.',
+                    link_destino=f'/relatorio-express/{relatorio_express_id}'
+                )
+                if res.get('success'):
+                    total_notificados += 1
             
-            return resultado
+            logger.info(f"✅ Notificação de Express pendente {relatorio.numero} enviada para {total_notificados} aprovador(es)")
+            return {'success': True, 'count': total_notificados}
             
         except Exception as e:
             logger.error(f"❌ Erro ao criar notificação de Relatório Express pendente: {e}")

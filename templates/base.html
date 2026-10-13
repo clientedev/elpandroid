@@ -145,6 +145,13 @@
                                     <i class="fas fa-cogs text-primary me-2"></i>Todos os Ajustes do APK
                                 </a>
                             </li>
+                            {% if current_user.is_master %}
+                            <li>
+                                <a class="dropdown-item fw-bold text-primary" href="{{ url_for('admin_apk_screen_editor') }}">
+                                    <i class="fas fa-magic text-primary me-2"></i>Construtor de Telas do APK
+                                </a>
+                            </li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item" href="{{ url_for('admin_legendas') }}">

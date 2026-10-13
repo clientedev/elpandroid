@@ -15,6 +15,7 @@ import {
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato } from '../types';
 import { notificationService } from './notificationService';
+import { screenConfigService } from './screenConfigService';
 import { ensureProjectFolders } from './appFilesService';
 
 export type SyncState = 'idle' | 'syncing' | 'offline' | 'error';
@@ -524,6 +525,12 @@ class SyncService {
       await db.runAsync('DELETE FROM visitas WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
       await db.runAsync('DELETE FROM lembretes WHERE projeto_id NOT IN (SELECT id FROM projetos);');
       await db.runAsync('DELETE FROM contatos WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
+
+      // 7. Sincronizar notificações pendentes do servidor para o celular
+      await notificationService.syncServerNotifications().catch(() => null);
+
+      // 8. Sincronizar configurações dinâmicas de telas do APK (Server-Driven UI)
+      await screenConfigService.syncFromServer().catch(() => null);
     } catch (pullErr) {
       console.warn('[SyncService] Inbound pull notice:', pullErr);
     }

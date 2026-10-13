@@ -17,6 +17,7 @@ import {
 import { Projeto, Visita, Relatorio } from '../../types';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Shadows } from '../../theme/colors';
+import { screenConfigService, ScreenSectionConfig } from '../../services/screenConfigService';
 
 const WIDGETS_CONFIG_KEY = '@elp_dashboard_widgets_v2';
 
@@ -78,28 +79,60 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [widgetsConfig, setWidgetsConfig] = useState<DashboardWidgetsConfig>(DEFAULT_CONFIG);
   const [sectionsOrder, setSectionsOrder] = useState<DashboardSectionId[]>(DEFAULT_SECTIONS_ORDER);
+  const [serverSections, setServerSections] = useState<ScreenSectionConfig[]>([]);
   const [showConfigModal, setShowConfigModal] = useState(false);
+
+  const loadServerConfig = useCallback(async () => {
+    try {
+      const cfg = await screenConfigService.getScreenConfig('dashboard');
+      if (cfg && cfg.sections && cfg.sections.length > 0) {
+        setServerSections(cfg.sections);
+        const ordered = cfg.sections
+          .filter(s => s.visible && screenConfigService.isSectionAllowedForUser(s, user))
+          .map(s => s.id as any);
+        if (ordered.length > 0) {
+          setSectionsOrder(ordered);
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar configuracao de tela SDUI:', e);
+    }
+  }, [user]);
+
+  function handleCustomAction(actionStr?: string) {
+    if (!actionStr) return;
+    if (actionStr.startsWith('PendentesTab:')) {
+      const filter = actionStr.split(':')[1];
+      navigation.navigate('PendentesTab', { filterStatus: filter });
+    } else if (actionStr === 'PendentesTab') {
+      navigation.navigate('PendentesTab');
+    } else if (actionStr === 'ObrasTab') {
+      navigation.navigate('ObrasTab');
+    } else if (actionStr === 'VisitasTab') {
+      navigation.navigate('VisitasTab');
+    } else if (actionStr === 'ReportCreate' || actionStr === 'ReportFormScreen') {
+      navigation.navigate('ReportFormScreen');
+    } else if (actionStr === 'ProjectForm') {
+      navigation.navigate('ProjectForm');
+    } else if (actionStr === 'VisitForm') {
+      navigation.navigate('VisitFormScreen');
+    }
+  }
 
   // Load custom user widgets configuration and section order
   useEffect(() => {
     (async () => {
       try {
+        await loadServerConfig();
         const saved = await AsyncStorage.getItem(WIDGETS_CONFIG_KEY);
         if (saved) {
           setWidgetsConfig({ ...DEFAULT_CONFIG, ...JSON.parse(saved) });
-        }
-        const savedOrder = await AsyncStorage.getItem(SECTIONS_ORDER_KEY);
-        if (savedOrder) {
-          const parsed = JSON.parse(savedOrder);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setSectionsOrder(parsed);
-          }
         }
       } catch (err) {
         console.warn('Erro ao carregar configuracoes do dashboard:', err);
       }
     })();
-  }, []);
+  }, [loadServerConfig]);
 
   async function updateWidgetConfig<K extends keyof DashboardWidgetsConfig>(key: K, value: boolean) {
     const updated = { ...widgetsConfig, [key]: value };
@@ -167,15 +200,18 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   useFocusEffect(
     useCallback(() => {
+      loadServerConfig();
       loadData();
-    }, [loadData])
+    }, [loadServerConfig, loadData])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
     if (isOnline) {
+      await screenConfigService.syncFromServer().catch(() => null);
       await triggerSync();
     }
+    await loadServerConfig();
     await loadData();
     setRefreshing(false);
   };
@@ -195,6 +231,8 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     switch (sectionId) {
       case 'hero':
         if (!widgetsConfig.showHero) return null;
+        const heroCfg = serverSections.find(s => s.id === 'hero');
+        if (heroCfg && !heroCfg.visible) return null;
         return (
           <View key="hero" style={styles.heroCard}>
             <View style={styles.heroLeft}>
@@ -205,7 +243,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               />
               <View style={styles.heroTextContainer}>
                 <Text style={styles.heroGreeting}>
-                  Olá, {(user as any)?.nome_completo || user?.username || 'Engenheiro'}!
+                  {heroCfg?.custom_text || `Olá, ${(user as any)?.nome_completo || user?.username || 'Engenheiro'}!`}
                 </Text>
                 <Text style={styles.heroDateText}>
                   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -244,19 +282,23 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
       case 'approverAlert':
         if (!isApprover || relatoriosPendentes === 0) return null;
+        const alertCfg = serverSections.find(s => s.id === 'approverAlert');
+        if (alertCfg && !alertCfg.visible) return null;
         return (
           <TouchableOpacity 
             key="approverAlert"
             style={styles.approverAlertBanner}
-            onPress={() => navigation.navigate('PendentesTab')}
+            onPress={() => navigation.navigate('PendentesTab', { filterStatus: 'Aguardando Aprovação' })}
             activeOpacity={0.8}
           >
             <View style={styles.approverAlertLeft}>
               <Ionicons name="alert-circle" size={24} color="#D97706" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.approverAlertTitle}>Relatórios Pendentes de Aprovação</Text>
+                <Text style={styles.approverAlertTitle}>
+                  {alertCfg?.title || 'Relatórios Pendentes de Aprovação'}
+                </Text>
                 <Text style={styles.approverAlertSub}>
-                  Existem {relatoriosPendentes} relatório(s) aguardando sua revisão e carimbo técnico.
+                  {alertCfg?.custom_text || `Existem ${relatoriosPendentes} relatório(s) aguardando sua revisão e carimbo técnico.`}
                 </Text>
               </View>
             </View>
@@ -267,12 +309,14 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       case 'stats':
         const showAnyStat = widgetsConfig.showObrasAtivas || widgetsConfig.showRelatoriosPendentes || widgetsConfig.showVisitasAgendadas || widgetsConfig.showRelatoriosRascunho;
         if (!showAnyStat) return null;
+        const statsCfg = serverSections.find(s => s.id === 'stats');
+        if (statsCfg && !statsCfg.visible) return null;
         return (
           <View key="stats">
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
                 <Ionicons name="trending-up" size={20} color="#4E73DF" />
-                <Text style={styles.sectionTitle}>Métricas Rápidas</Text>
+                <Text style={styles.sectionTitle}>{statsCfg?.title || 'Métricas Rápidas'}</Text>
               </View>
               <View style={styles.onlinePill}>
                 <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
@@ -311,7 +355,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               {/* 3. Relatórios em Preenchimento (Amarelo) */}
               <TouchableOpacity 
                 style={[styles.webCard, { borderLeftColor: '#F59E0B', borderLeftWidth: 4 }]} 
-                onPress={() => navigation.navigate('PendentesTab')}
+                onPress={() => navigation.navigate('PendentesTab', { filterStatus: 'em_andamento' })}
                 activeOpacity={0.7}
               >
                 <View style={styles.cardContent}>
@@ -324,7 +368,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
               {/* 4. Relatórios Aprovados (Ciano) */}
               <TouchableOpacity 
                 style={[styles.webCard, { borderLeftColor: '#06B6D4', borderLeftWidth: 4 }]} 
-                onPress={() => navigation.navigate('PendentesTab')}
+                onPress={() => navigation.navigate('PendentesTab', { filterStatus: 'Aprovado' })}
                 activeOpacity={0.7}
               >
                 <View style={styles.cardContent}>
@@ -339,12 +383,14 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
       case 'quickActions':
         if (!widgetsConfig.showAcoesRapidas) return null;
+        const qaCfg = serverSections.find(s => s.id === 'quickActions');
+        if (qaCfg && !qaCfg.visible) return null;
         return (
           <View key="quickActions">
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
                 <Ionicons name="flash-outline" size={18} color="#2563EB" />
-                <Text style={styles.sectionTitle}>Ações Rápidas no Canteiro</Text>
+                <Text style={styles.sectionTitle}>{qaCfg?.title || 'Ações Rápidas no Canteiro'}</Text>
               </View>
             </View>
 
@@ -413,7 +459,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <Ionicons name="document-text-outline" size={18} color={Colors.text} />
                 <Text style={styles.sectionTitle}>Relatórios Recentes</Text>
               </View>
-              <TouchableOpacity onPress={() => navigation.navigate('PendentesTab')}>
+              <TouchableOpacity onPress={() => navigation.navigate('PendentesTab', { filterStatus: 'Todos' })}>
                 <Text style={styles.seeAllText}>Ver todos</Text>
               </TouchableOpacity>
             </View>
@@ -554,8 +600,33 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           </View>
         );
 
-      default:
-        return null;
+      default: {
+        const customSec = serverSections.find(s => s.id === sectionId);
+        if (!customSec || !customSec.visible) return null;
+        if (!screenConfigService.isSectionAllowedForUser(customSec, user)) return null;
+
+        return (
+          <TouchableOpacity 
+            key={customSec.id}
+            style={[styles.approverAlertBanner, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE', marginVertical: 8 }]}
+            onPress={() => handleCustomAction(customSec.action)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.approverAlertLeft}>
+              <Ionicons name="megaphone-outline" size={24} color="#2563EB" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.approverAlertTitle, { color: '#1E3A8A' }]}>{customSec.title}</Text>
+                {Boolean(customSec.custom_text || customSec.subtitle) && (
+                  <Text style={[styles.approverAlertSub, { color: '#3B82F6' }]}>
+                    {customSec.custom_text || customSec.subtitle}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#2563EB" />
+          </TouchableOpacity>
+        );
+      }
     }
   }
 

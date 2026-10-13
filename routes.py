@@ -1486,18 +1486,24 @@ def get_nearby_projects():
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/notificacoes')
-@login_required
+@csrf.exempt
 def listar_notificacoes():
-    """Listar notificações do usuário autenticado (48h ou não lidas)"""
+    """Listar notificações do usuário autenticado (web ou mobile) (48h ou não lidas)"""
     try:
         from notification_service import notification_service
+        
+        user = _resolve_mobile_user()
+        if not user or not user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Não autenticado', 'notificacoes': [], 'nao_lidas': 0}), 401
+        
+        target_user_id = user.id
         
         try:
             agora = now_brt()
             limite_48h = agora - timedelta(hours=48)
             
             notificacoes = Notificacao.query.filter(
-                Notificacao.user_id == current_user.id,
+                Notificacao.user_id == target_user_id,
                 db.or_(
                     Notificacao.created_at >= limite_48h,
                     Notificacao.status == 'nova'
@@ -2831,8 +2837,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.27"
-    version_code = 27
+    app_version = "1.0.28"
+    version_code = 28
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         app_json_path = os.path.join(base_dir, 'app.json')
@@ -2944,6 +2950,60 @@ def ajustes_apk_page():
                            total_legendas=total_legendas,
                            total_checklist=total_checklist,
                            aprovador_global_nome=aprovador_global_nome)
+
+@app.route('/admin/apk/editor-telas', methods=['GET'])
+@login_required
+def admin_apk_screen_editor():
+    """Construtor & Editor Visual de Telas do APK - exclusivo para usuários Master"""
+    if not current_user.is_master:
+        flash('Acesso restrito. Apenas administradores Master podem orquestrar telas do aplicativo.', 'error')
+        return redirect(url_for('painel_apk'))
+    
+    import apk_screen_service
+    configs = apk_screen_service.get_all_screen_configs()
+    return render_template('admin/apk_screen_editor.html',
+                           configs_json=json.dumps(configs, ensure_ascii=False))
+
+@app.route('/admin/apk/editor-telas/salvar', methods=['POST'])
+@login_required
+def admin_apk_screen_editor_save():
+    """Salvar layout e orquestração de tela configurada pelo Master"""
+    if not current_user.is_master:
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    
+    import apk_screen_service
+    data = request.get_json() or {}
+    screen_key = data.get('screen_key')
+    config_data = data.get('config')
+    
+    if not screen_key or not config_data:
+        return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
+    
+    success = apk_screen_service.save_screen_config(screen_key, config_data, user_id=current_user.id)
+    return jsonify({'success': success})
+
+@app.route('/admin/apk/editor-telas/reset/<screen_key>', methods=['POST'])
+@login_required
+def admin_apk_screen_editor_reset(screen_key):
+    """Restaurar tela do APK para padrão de fábrica"""
+    if not current_user.is_master:
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    
+    import apk_screen_service
+    success = apk_screen_service.reset_screen_config(screen_key)
+    fresh_config = apk_screen_service.get_screen_config(screen_key)
+    return jsonify({'success': success, 'config': fresh_config})
+
+@app.route('/api/apk/screen-configs', methods=['GET'])
+def api_apk_screen_configs():
+    """Endpoint consumido pelo APK nativo para obter layout dinâmico e orquestração das telas"""
+    import apk_screen_service
+    configs = apk_screen_service.get_all_screen_configs()
+    return jsonify({
+        'success': True,
+        'screens': configs,
+        'timestamp': datetime.now().isoformat()
+    }), 200
 
 @app.route('/apk-qr.png')
 def apk_qr_code():
@@ -12525,8 +12585,8 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.27'
-    current_vc = 27
+    current_v = '1.0.28'
+    current_vc = 28
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [
@@ -12552,7 +12612,7 @@ def get_app_version_info():
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': f'Atualização v{current_v}: Exclusão de visitas por Master, salvamento automático contínuo em obras e relatórios, busca CEP e autocomplete de logradouro, numeração sequencial automática REL na aprovação.',
+        'notes': f'Atualização v{current_v}: Cards de navegação exclusiva por status na aba de relatórios, envio automático de notificações aos aprovadores e mestres ao submeter relatórios.',
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 
@@ -13141,6 +13201,16 @@ def api_relatorios_collection():
                 _save_fotos_for_relatorio(relatorio.id, fotos_list)
 
             db.session.commit()
+
+            # Disparar notificação automática para os aprovadores quando submetido para aprovação
+            if relatorio.status == 'Aguardando Aprovação':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_relatorio_pendente(relatorio.id)
+                    current_app.logger.info(f"🔔 Notificação automática disparada para relatório {relatorio.numero}")
+                except Exception as notif_err:
+                    current_app.logger.warning(f"Aviso ao criar notificação de aprovação pendente: {notif_err}")
+
             return jsonify({
                 'success': True,
                 'message': 'Relatório sincronizado com sucesso',
@@ -13317,6 +13387,15 @@ def api_relatorio_detail_sync(relatorio_id):
 
             relatorio.updated_at = brazil_now()
             db.session.commit()
+
+            if relatorio.status == 'Aguardando Aprovação':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_relatorio_pendente(relatorio.id)
+                    current_app.logger.info(f"🔔 Notificação automática disparada via PUT para relatório {relatorio.numero}")
+                except Exception as notif_err:
+                    current_app.logger.warning(f"Aviso ao criar notificação de aprovação pendente no PUT: {notif_err}")
+
             return jsonify({'success': True, 'id': relatorio.id, 'numero': relatorio.numero, 'status': relatorio.status}), 200
 
 
@@ -13524,6 +13603,20 @@ def api_update_relatorio_status(relatorio_id):
             relatorio.comentario_aprovacao = data['comentario']
 
         db.session.commit()
+
+        # Disparar notificações conforme transição de status
+        try:
+            from notification_service import notification_service
+            if new_status == 'Aguardando Aprovação':
+                notification_service.criar_notificacao_relatorio_pendente(relatorio.id)
+            elif new_status == 'Aprovado':
+                user_approver_id = relatorio.aprovador_id or (user.id if user else None)
+                notification_service.criar_notificacao_relatorio_aprovado(relatorio.id, user_approver_id)
+            elif new_status == 'Rejeitado':
+                notification_service.criar_notificacao_relatorio_reprovado(relatorio.id, data.get('comentario'))
+        except Exception as notif_err:
+            current_app.logger.warning(f"Aviso ao criar notificação de mudança de status: {notif_err}")
+
         return jsonify({'success': True, 'id': relatorio.id, 'status': relatorio.status}), 200
     except Exception as e:
         db.session.rollback()
@@ -13636,6 +13729,15 @@ def api_relatorios_express_sync():
                 _save_fotos_for_relatorio_express(rel.id, fotos_payload)
 
             db.session.commit()
+
+            if rel.status == 'Aguardando Aprovação':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_express_pendente(rel.id)
+                    current_app.logger.info(f"🔔 Notificação disparada para relatório express {rel.numero}")
+                except Exception as notif_err:
+                    current_app.logger.warning(f"Aviso ao criar notificação de express pendente: {notif_err}")
+
             return jsonify({'success': True, 'id': rel.id, 'numero': rel.numero}), 201
         except Exception as e:
             db.session.rollback()
