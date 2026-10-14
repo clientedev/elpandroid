@@ -266,8 +266,7 @@ class NotificationService:
             ).filter_by(ativo=True).all()
             
             for ap in todos_aprovadores:
-                if ap.id != relatorio.autor_id:
-                    destinatarios_ids.add(ap.id)
+                destinatarios_ids.add(ap.id)
             
             if not destinatarios_ids:
                 # Se ainda estiver vazio, notificar o primeiro usuário master ou admin
@@ -282,7 +281,7 @@ class NotificationService:
             # Buscar informações do projeto para mensagem mais completa
             projeto = Projeto.query.get(relatorio.projeto_id) if relatorio.projeto_id else None
             projeto_nome = projeto.nome if projeto else "Sem projeto"
-            numero_rel = relatorio.numero or "S/N"
+            numero_rel = relatorio.numero or f"REL-{relatorio.id}"
             titulo_rel = relatorio.titulo or "Sem título"
             
             total_notificados = 0
@@ -306,7 +305,7 @@ class NotificationService:
     
     def criar_notificacao_relatorio_reprovado(self, relatorio_id, motivo_rejeicao=None):
         """
-        Cria notificação para o autor de um relatório reprovado
+        Cria notificação para o autor de um relatório reprovado/rejeitado
         
         Args:
             relatorio_id: ID do relatório reprovado
@@ -322,28 +321,70 @@ class NotificationService:
             
             projeto = Projeto.query.get(relatorio.projeto_id) if relatorio.projeto_id else None
             projeto_nome = projeto.nome if projeto else "Sem projeto"
-            numero_rel = relatorio.numero or "S/N"
+            numero_rel = relatorio.numero or f"REL-{relatorio.id}"
             
             # Usar motivo passado ou buscar do relatório
             motivo = motivo_rejeicao or getattr(relatorio, 'comentario_aprovacao', None)
             
             if motivo:
-                mensagem = f'O relatório nº {numero_rel} da obra "{projeto_nome}" foi reprovado. Motivo: {motivo}'
+                mensagem = f'O relatório nº {numero_rel} da obra "{projeto_nome}" foi rejeitado. Motivo: {motivo}'
             else:
-                mensagem = f'O relatório nº {numero_rel} da obra "{projeto_nome}" foi reprovado. Verifique as observações e corrija antes de reenviar.'
+                mensagem = f'O relatório nº {numero_rel} da obra "{projeto_nome}" foi rejeitado. Verifique as observações e corrija antes de reenviar.'
             
+            destinatario_id = relatorio.autor_id or getattr(relatorio, 'criado_por', None)
+            if not destinatario_id:
+                destinatario_id = 1
+
             resultado = self.criar_notificacao(
-                user_id=relatorio.autor_id,
+                user_id=destinatario_id,
                 tipo='relatorio_reprovado',
-                titulo='Relatório reprovado',
+                titulo='Relatório Rejeitado / Ajustes Solicitados',
                 mensagem=mensagem,
-                link_destino=f'/reports/{relatorio_id}/edit'
+                link_destino=f'/reports/{relatorio_id}'
             )
             
+            logger.info(f"✅ Notificação de relatório rejeitado {numero_rel} enviada para autor {destinatario_id}")
             return resultado
             
         except Exception as e:
             logger.error(f"❌ Erro ao criar notificação de relatório reprovado: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def criar_notificacao_relatorio_rejeitado(self, relatorio_id, motivo_rejeicao=None):
+        """Alias para criar_notificacao_relatorio_reprovado"""
+        return self.criar_notificacao_relatorio_reprovado(relatorio_id, motivo_rejeicao)
+
+    def criar_notificacao_relatorio_aprovado(self, relatorio_id, aprovador_id=None):
+        """
+        Cria notificação para o autor de um relatório aprovado
+        """
+        try:
+            from models import Relatorio, Projeto, User
+            relatorio = Relatorio.query.get(relatorio_id)
+            if not relatorio:
+                return {'success': False, 'error': 'Relatório não encontrado'}
+
+            projeto = Projeto.query.get(relatorio.projeto_id) if relatorio.projeto_id else None
+            projeto_nome = projeto.nome if projeto else "Sem projeto"
+            numero_rel = relatorio.numero or f"REL-{relatorio.id}"
+            
+            aprovador_nome = "um engenheiro responsável"
+            if aprovador_id:
+                ap_user = User.query.get(aprovador_id)
+                if ap_user:
+                    aprovador_nome = getattr(ap_user, 'nome_completo', ap_user.username)
+
+            destinatario_id = relatorio.autor_id or getattr(relatorio, 'criado_por', None) or 1
+            resultado = self.criar_notificacao(
+                user_id=destinatario_id,
+                tipo='relatorio_aprovado',
+                titulo='Relatório Aprovado',
+                mensagem=f'Parabéns! O relatório nº {numero_rel} da obra "{projeto_nome}" foi aprovado por {aprovador_nome}.',
+                link_destino=f'/reports/{relatorio_id}'
+            )
+            return resultado
+        except Exception as e:
+            logger.error(f"❌ Erro ao criar notificação de relatório aprovado: {e}")
             return {'success': False, 'error': str(e)}
     
     

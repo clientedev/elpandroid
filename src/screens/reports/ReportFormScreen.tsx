@@ -13,7 +13,7 @@ import {
   closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
   migrateLocalFotosRelatorioId, getDatabase, getLocalChecklistTemplate,
   getChecklistProgressoObra, saveBatchChecklistProgressoObra, getLocalRelatorios,
-  updateLocalProjetoInfoTecnica, getNextReportNumberForProject
+  updateLocalProjetoInfoTecnica, getNextReportNumberForProject, getLocalVisitantes
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,7 +21,7 @@ import { useNetwork } from '../../contexts/NetworkContext';
 import { apiClient } from '../../services/api';
 import { notificationService } from '../../services/notificationService';
 
-import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete, ChecklistProgressoObra } from '../../types';
+import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete, ChecklistProgressoObra, Visitante } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 import * as Location from 'expo-location';
 
@@ -100,6 +100,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   // Acompanhantes da Visita
   const [acompanhantesList, setAcompanhantesList] = useState<string[]>([]);
+  const [visitantesCadastrados, setVisitantesCadastrados] = useState<Visitante[]>([]);
   const [showAcompanhanteModal, setShowAcompanhanteModal] = useState(false);
   const [novoAcompNome, setNovoAcompNome] = useState('');
   const [novoAcompCargo, setNovoAcompCargo] = useState('');
@@ -540,6 +541,20 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       console.warn('Erro ao carregar checklist para a obra:', e);
     }
   }, []);
+
+  // Carregar visitantes cadastrados
+  useEffect(() => {
+    getLocalVisitantes().then(list => {
+      if (list && list.length > 0) setVisitantesCadastrados(list);
+    }).catch(() => null);
+  }, []);
+
+  function handleSelectVisitante(v: Visitante) {
+    const desc = `${v.nome.trim()}${v.cargo ? ` (${v.cargo.trim()})` : ''}${v.empresa ? ` - ${v.empresa.trim()}` : ''}`;
+    if (!acompanhantesList.includes(desc)) {
+      setAcompanhantesList(prev => [...prev, desc]);
+    }
+  }
 
   // Carregar rascunho existente
   useEffect(() => {
@@ -1447,8 +1462,62 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             </TouchableOpacity>
           </View>
 
+          {/* Sugestões de Visitantes Cadastrados com 1 toque */}
+          {visitantesCadastrados.length > 0 && (
+            <View style={{ marginBottom: 12, marginTop: 4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', marginBottom: 6 }}>
+                Visitantes Cadastrados (Toque para incluir):
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 2 }}>
+                {visitantesCadastrados.map((v) => {
+                  const desc = `${v.nome.trim()}${v.cargo ? ` (${v.cargo.trim()})` : ''}${v.empresa ? ` - ${v.empresa.trim()}` : ''}`;
+                  const isAdded = acompanhantesList.includes(desc);
+                  return (
+                    <TouchableOpacity
+                      key={v.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: isAdded ? '#E0F2FE' : '#F8FAFC',
+                        borderColor: isAdded ? '#0284C7' : '#E2E8F0',
+                        borderWidth: 1.5,
+                        borderRadius: 20,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        marginRight: 8,
+                      }}
+                      onPress={() => {
+                        if (isAdded) {
+                          setAcompanhantesList(prev => prev.filter(a => a !== desc));
+                        } else {
+                          handleSelectVisitante(v);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons 
+                        name={isAdded ? "checkmark-circle" : "person-add-outline"} 
+                        size={15} 
+                        color={isAdded ? "#0284C7" : "#64748B"} 
+                        style={{ marginRight: 5 }} 
+                      />
+                      <Text style={{ fontSize: 12, fontWeight: isAdded ? '700' : '600', color: isAdded ? '#0284C7' : '#334155' }}>
+                        {v.nome}
+                      </Text>
+                      {v.cargo ? (
+                        <Text style={{ fontSize: 11, color: isAdded ? '#0369A1' : '#64748B', marginLeft: 4 }}>
+                          • {v.cargo}
+                        </Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {acompanhantesList.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum acompanhante cadastrado (engenheiro residente, mestre de obras, etc.).</Text>
+            <Text style={styles.emptyText}>Nenhum acompanhante cadastrado. Toque no botão acima ou selecione um visitante frequente cadastrado.</Text>
           ) : (
             acompanhantesList.map((acomp, idx) => (
               <View key={idx} style={styles.acompItemRow}>
@@ -1682,6 +1751,37 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
+
+            {visitantesCadastrados.length > 0 && (
+              <View style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', marginBottom: 6 }}>
+                  Puxar de Visitantes Cadastrados:
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                  {visitantesCadastrados.map(v => (
+                    <TouchableOpacity
+                      key={v.id}
+                      style={{
+                        backgroundColor: '#F1F5F9',
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        marginRight: 6,
+                        borderWidth: 1,
+                        borderColor: '#CBD5E1',
+                      }}
+                      onPress={() => {
+                        setNovoAcompNome(v.nome);
+                        setNovoAcompCargo(v.cargo || '');
+                        setNovoAcompEmpresa(v.empresa || '');
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F172A' }}>{v.nome}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Nome Completo *</Text>

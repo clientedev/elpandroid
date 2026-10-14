@@ -153,257 +153,87 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
     }
   };
 
-  // Contadores dinâmicos para os cards de métricas
+  // Contadores dinâmicos para as abas minimalistas
+  const countTotal = relatorios.length;
   const countAprovacao = relatorios.filter(r => r.status === 'Aguardando Aprovação').length;
   const countAprovados = relatorios.filter(r => r.status === 'Aprovado').length;
   const countRascunhos = relatorios.filter(r => r.status === 'em_andamento' || r.status === 'preenchimento' || !r.status).length;
-  const countTotal = relatorios.length;
+  const countRejeitados = relatorios.filter(r => r.status === 'Rejeitado').length;
 
-  // Informações da visão exclusiva conforme o card selecionado
-  function getHeaderExclusiveInfo() {
-    switch (selectedStatus) {
-      case 'Aguardando Aprovação':
-        return {
-          title: 'Para Aprovação',
-          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório aguardando' : 'relatórios aguardando'} revisão técnica`,
-          exclusiveLabel: 'PÁGINA EXCLUSIVA: RELATÓRIOS PARA APROVAÇÃO',
-          bannerColor: '#B45309',
-          bannerBg: '#FEF3C7',
-          bannerBorder: '#FDE68A',
-          iconName: 'hourglass-outline' as const,
-          emptyTitle: 'Nenhum relatório pendente de aprovação',
-          emptySub: 'Parabéns! Todos os relatórios foram revisados ou ainda estão em preenchimento.'
-        };
-      case 'Aprovado':
-        return {
-          title: 'Relatórios Aprovados',
-          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'laudo técnico aprovado' : 'laudos técnicos aprovados'}`,
-          exclusiveLabel: 'PÁGINA EXCLUSIVA: LAUDOS TÉCNICOS APROVADOS',
-          bannerColor: '#065F46',
-          bannerBg: '#D1FAE5',
-          bannerBorder: '#A7F3D0',
-          iconName: 'checkmark-circle' as const,
-          emptyTitle: 'Nenhum relatório aprovado encontrado',
-          emptySub: 'Quando um relatório for aprovado por um engenheiro responsável, ele constará aqui.'
-        };
-      case 'em_andamento':
-        return {
-          title: 'Rascunhos em Aberto',
-          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório em elaboração' : 'relatórios em elaboração'}`,
-          exclusiveLabel: 'PÁGINA EXCLUSIVA: RASCUNHOS EM PREENCHIMENTO',
-          bannerColor: '#1D4ED8',
-          bannerBg: '#DBEAFE',
-          bannerBorder: '#BFDBFE',
-          iconName: 'document-text-outline' as const,
-          emptyTitle: 'Nenhum rascunho em aberto',
-          emptySub: 'Todos os relatórios iniciados foram enviados ou ainda não foram criados.'
-        };
-      case 'Rejeitado':
-        return {
-          title: 'Relatórios Rejeitados',
-          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório com correções solicitadas' : 'relatórios com correções solicitadas'}`,
-          exclusiveLabel: 'PÁGINA EXCLUSIVA: RELATÓRIOS REJEITADOS',
-          bannerColor: '#991B1B',
-          bannerBg: '#FEE2E2',
-          bannerBorder: '#FECACA',
-          iconName: 'close-circle-outline' as const,
-          emptyTitle: 'Nenhum relatório rejeitado',
-          emptySub: 'Não há relatórios com pendências ou correções solicitadas.'
-        };
-      default:
-        return {
-          title: 'Relatórios',
-          subtitle: `${filteredRelatorios.length} ${filteredRelatorios.length === 1 ? 'relatório disponível' : 'relatórios disponíveis'}`,
-          exclusiveLabel: null,
-          bannerColor: '#475569',
-          bannerBg: '#F1F5F9',
-          bannerBorder: '#E2E8F0',
-          iconName: 'albums-outline' as const,
-          emptyTitle: 'Nenhum relatório encontrado',
-          emptySub: 'Toque no botão + acima para iniciar um novo relatório de visita.'
-        };
-    }
-  }
-
-  const exclusiveInfo = getHeaderExclusiveInfo();
+  const filterTabs = [
+    { key: 'Todos', label: 'Todos', count: countTotal },
+    { key: 'Aguardando Aprovação', label: 'Aguardando', count: countAprovacao },
+    { key: 'em_andamento', label: 'Rascunhos', count: countRascunhos },
+    { key: 'Aprovado', label: 'Aprovados', count: countAprovados },
+    { key: 'Rejeitado', label: 'Rejeitados', count: countRejeitados },
+  ];
 
   return (
     <View style={styles.container}>
       <Header 
-        title={exclusiveInfo.title} 
-        subtitle={exclusiveInfo.subtitle}
+        title="Relatórios" 
+        subtitle={`${filteredRelatorios.length} de ${relatorios.length} ${relatorios.length === 1 ? 'relatório' : 'relatórios'}`}
         rightAction={
           <TouchableOpacity 
             style={styles.addBtn}
             onPress={() => navigation.navigate('ReportFormScreen')}
+            activeOpacity={0.8}
           >
-            <Ionicons name="add" size={24} color="#FFFFFF" />
+            <Ionicons name="add" size={22} color="#FFFFFF" />
           </TouchableOpacity>
         }
       />
 
-      {/* CARDS DE NAVEGAÇÃO EXCLUSIVA DE STATUS */}
-      <View style={styles.metricsContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.metricsScrollContent}
-        >
-          {/* Card 1: Para Aprovação */}
-          <TouchableOpacity 
-            style={[
-              styles.metricCard,
-              styles.cardApproval,
-              selectedStatus === 'Aguardando Aprovação' && styles.metricCardActiveApproval
-            ]}
-            onPress={() => handleStatusFilter('Aguardando Aprovação')}
-            activeOpacity={0.75}
-          >
-            <View style={styles.metricHeaderRow}>
-              <View style={[styles.metricIconBox, { backgroundColor: '#FEF3C7' }]}>
-                <Ionicons name="hourglass" size={16} color="#D97706" />
-              </View>
-              {selectedStatus === 'Aguardando Aprovação' && (
-                <View style={styles.activePillBadge}>
-                  <Text style={styles.activePillText}>Ativo</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.metricCount, { color: '#B45309' }]}>{countAprovacao}</Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Pra Aprovação</Text>
-          </TouchableOpacity>
-
-          {/* Card 2: Aprovados */}
-          <TouchableOpacity 
-            style={[
-              styles.metricCard,
-              styles.cardApproved,
-              selectedStatus === 'Aprovado' && styles.metricCardActiveApproved
-            ]}
-            onPress={() => handleStatusFilter('Aprovado')}
-            activeOpacity={0.75}
-          >
-            <View style={styles.metricHeaderRow}>
-              <View style={[styles.metricIconBox, { backgroundColor: '#D1FAE5' }]}>
-                <Ionicons name="checkmark-done-circle" size={16} color="#059669" />
-              </View>
-              {selectedStatus === 'Aprovado' && (
-                <View style={[styles.activePillBadge, { backgroundColor: '#059669' }]}>
-                  <Text style={styles.activePillText}>Ativo</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.metricCount, { color: '#065F46' }]}>{countAprovados}</Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Aprovados</Text>
-          </TouchableOpacity>
-
-          {/* Card 3: Rascunhos / Em Preenchimento */}
-          <TouchableOpacity 
-            style={[
-              styles.metricCard,
-              styles.cardDraft,
-              selectedStatus === 'em_andamento' && styles.metricCardActiveDraft
-            ]}
-            onPress={() => handleStatusFilter('em_andamento')}
-            activeOpacity={0.75}
-          >
-            <View style={styles.metricHeaderRow}>
-              <View style={[styles.metricIconBox, { backgroundColor: '#DBEAFE' }]}>
-                <Ionicons name="document-text" size={16} color="#2563EB" />
-              </View>
-              {selectedStatus === 'em_andamento' && (
-                <View style={[styles.activePillBadge, { backgroundColor: '#2563EB' }]}>
-                  <Text style={styles.activePillText}>Ativo</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.metricCount, { color: '#1E40AF' }]}>{countRascunhos}</Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Em Preenchimento</Text>
-          </TouchableOpacity>
-
-          {/* Card 4: Todos */}
-          <TouchableOpacity 
-            style={[
-              styles.metricCard,
-              styles.cardAll,
-              selectedStatus === 'Todos' && styles.metricCardActiveAll
-            ]}
-            onPress={() => handleStatusFilter('Todos')}
-            activeOpacity={0.75}
-          >
-            <View style={styles.metricHeaderRow}>
-              <View style={[styles.metricIconBox, { backgroundColor: '#F1F5F9' }]}>
-                <Ionicons name="albums-outline" size={16} color="#475569" />
-              </View>
-              {selectedStatus === 'Todos' && (
-                <View style={[styles.activePillBadge, { backgroundColor: '#475569' }]}>
-                  <Text style={styles.activePillText}>Ativo</Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.metricCount, { color: '#334155' }]}>{countTotal}</Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>Todos os Relatórios</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-
-      {/* BANNER DE SEÇÃO EXCLUSIVA (Quando filtrado) */}
-      {exclusiveInfo.exclusiveLabel && (
-        <View style={[
-          styles.exclusiveBannerContainer, 
-          { backgroundColor: exclusiveInfo.bannerBg, borderColor: exclusiveInfo.bannerBorder }
-        ]}>
-          <View style={styles.exclusiveBannerLeft}>
-            <Ionicons name={exclusiveInfo.iconName} size={18} color={exclusiveInfo.bannerColor} />
-            <Text style={[styles.exclusiveBannerText, { color: exclusiveInfo.bannerColor }]}>
-              {exclusiveInfo.exclusiveLabel}
-            </Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.exclusiveResetBtn}
-            onPress={() => handleStatusFilter('Todos')}
-          >
-            <Text style={styles.exclusiveResetText}>Ver Todos</Text>
-            <Ionicons name="close" size={14} color="#64748B" />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Search */}
+      {/* Busca Rápida Minimalista */}
       <View style={styles.searchContainer}>
         <View style={styles.searchWrapper}>
-          <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
+          <Ionicons name="search-outline" size={16} color="#64748B" />
           <TextInput
             style={styles.searchInput}
             placeholder="Buscar por obra, título ou número..."
-            placeholderTextColor={Colors.textMuted}
+            placeholderTextColor="#94A3B8"
             value={search}
             onChangeText={handleSearch}
           />
           {search ? (
-            <TouchableOpacity onPress={() => handleSearch('')}>
-              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+            <TouchableOpacity onPress={() => handleSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color="#94A3B8" />
             </TouchableOpacity>
           ) : null}
         </View>
       </View>
 
-      {/* Filter Tabs Chips */}
-      <View style={styles.filterRow}>
-        {['Todos', 'em_andamento', 'Aguardando Aprovação', 'Aprovado', 'Rejeitado'].map(st => (
-          <TouchableOpacity
-            key={st}
-            style={[styles.filterChip, selectedStatus === st && styles.filterChipActive]}
-            onPress={() => handleStatusFilter(st)}
-          >
-            <Text style={[styles.filterText, selectedStatus === st && styles.filterTextActive]}>
-              {st === 'em_andamento' ? 'Rascunhos' : st === 'Aguardando Aprovação' ? 'Aguardando' : st}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* Segmento de Filtros Minimalista com Contadores */}
+      <View style={styles.filterSection}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          {filterTabs.map(tab => {
+            const isActive = selectedStatus === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                onPress={() => handleStatusFilter(tab.key)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
+                  {tab.label}
+                </Text>
+                <View style={[styles.filterCountBadge, isActive && styles.filterCountBadgeActive]}>
+                  <Text style={[styles.filterCountText, isActive && styles.filterCountTextActive]}>
+                    {tab.count}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Reports List */}
+      {/* Lista de Relatórios */}
       <FlatList
         data={filteredRelatorios}
         keyExtractor={item => item.id.toString()}
@@ -411,22 +241,36 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name={exclusiveInfo.iconName} size={52} color={exclusiveInfo.bannerColor || Colors.textMuted} />
-            <Text style={styles.emptyTitle}>{exclusiveInfo.emptyTitle}</Text>
-            <Text style={styles.emptySub}>{exclusiveInfo.emptySub}</Text>
-            {selectedStatus !== 'Todos' && (
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="document-text-outline" size={32} color="#94A3B8" />
+            </View>
+            <Text style={styles.emptyTitle}>Nenhum relatório encontrado</Text>
+            <Text style={styles.emptySub}>
+              {selectedStatus !== 'Todos'
+                ? `Não há relatórios com o filtro "${selectedStatus}".`
+                : 'Você ainda não possui relatórios criados.'}
+            </Text>
+            {selectedStatus !== 'Todos' ? (
               <TouchableOpacity 
                 style={styles.emptyResetBtn} 
                 onPress={() => handleStatusFilter('Todos')}
               >
-                <Ionicons name="albums-outline" size={16} color="#FFFFFF" />
-                <Text style={styles.emptyResetBtnText}>Mostrar Todos os Relatórios</Text>
+                <Ionicons name="filter-outline" size={14} color="#2563EB" />
+                <Text style={styles.emptyResetBtnText}>Limpar Filtro</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={styles.emptyCreateBtn} 
+                onPress={() => navigation.navigate('ReportFormScreen')}
+              >
+                <Ionicons name="add" size={16} color="#FFFFFF" />
+                <Text style={styles.emptyCreateBtnText}>Novo Relatório</Text>
               </TouchableOpacity>
             )}
           </View>
         }
         renderItem={({ item }) => {
-          const isDraft = item.status === 'em_andamento';
+          const isDraft = item.status === 'em_andamento' || item.status === 'preenchimento' || !item.status;
           const hasOfficialNum = item.numero && item.numero.startsWith('REL-');
           const dateStr = formatReportDate(item);
           const rawFotos = (item as any).fotos;
@@ -457,52 +301,63 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                 }
               }}
             >
-              <View style={styles.cardHeader}>
-                {hasOfficialNum ? (
-                  <View style={styles.numBadge}>
-                    <Text style={styles.numText}>{item.numero}</Text>
+              {/* Linha Superior: Identificador / Status e Data */}
+              <View style={styles.cardTopRow}>
+                <View style={styles.cardTopLeft}>
+                  <View style={[styles.codeBadge, isDraft && styles.codeBadgeDraft]}>
+                    <Text style={[styles.codeBadgeText, isDraft && styles.codeBadgeTextDraft]}>
+                      {hasOfficialNum ? item.numero : 'RASCUNHO'}
+                    </Text>
                   </View>
-                ) : (
-                  <View style={[styles.numBadge, styles.numBadgeDraft]}>
-                    <Text style={styles.numTextDraft}>Rascunho</Text>
+                  <View style={[
+                    styles.statusPill, 
+                    item.status === 'Aprovado' ? styles.statusApproved : 
+                    item.status === 'Aguardando Aprovação' ? styles.statusWaiting : 
+                    item.status === 'Rejeitado' ? styles.statusRejected : styles.statusDraft
+                  ]}>
+                    <View style={[
+                      styles.statusDot,
+                      item.status === 'Aprovado' ? { backgroundColor: '#10B981' } :
+                      item.status === 'Aguardando Aprovação' ? { backgroundColor: '#F59E0B' } :
+                      item.status === 'Rejeitado' ? { backgroundColor: '#EF4444' } : { backgroundColor: '#64748B' }
+                    ]} />
+                    <Text style={[
+                      styles.statusPillText,
+                      item.status === 'Aprovado' ? { color: '#065F46' } :
+                      item.status === 'Aguardando Aprovação' ? { color: '#92400E' } :
+                      item.status === 'Rejeitado' ? { color: '#991B1B' } : { color: '#475569' }
+                    ]}>
+                      {isDraft ? 'Em aberto' : item.status}
+                    </Text>
                   </View>
-                )}
+                </View>
                 {dateStr ? (
-                  <Text style={styles.dateText}>{dateStr}</Text>
+                  <Text style={styles.cardDate}>{dateStr}</Text>
                 ) : null}
               </View>
 
+              {/* Título Principal */}
               <Text style={styles.cardTitle} numberOfLines={2}>
                 {item.titulo || 'Relatório de Visita'}
               </Text>
               
-              <View style={styles.projectRow}>
-                <Ionicons name="business-outline" size={13} color="#64748B" />
-                <Text style={styles.cardSub} numberOfLines={1}>
-                  {item.projeto_nome || 'Obra não especificada'}
-                </Text>
-              </View>
-
-              <View style={styles.cardFooter}>
-                <View style={[
-                  styles.statusTag, 
-                  item.status === 'Aprovado' ? styles.statusApproved : 
-                  item.status === 'Aguardando Aprovação' ? styles.statusWaiting : 
-                  item.status === 'Rejeitado' ? styles.statusRejected : styles.statusDraftTag
-                ]}>
-                  <Text style={styles.statusTagText}>
-                    {isDraft ? 'Rascunho' : item.status}
+              {/* Rodapé do Card: Obra e Indicadores */}
+              <View style={styles.cardBottomRow}>
+                <View style={styles.projectInfo}>
+                  <Ionicons name="business" size={13} color="#94A3B8" />
+                  <Text style={styles.projectText} numberOfLines={1}>
+                    {item.projeto_nome || 'Obra não especificada'}
                   </Text>
                 </View>
 
-                <View style={styles.footerRight}>
+                <View style={styles.cardMetaRight}>
                   {photoCount > 0 && (
-                    <View style={styles.photosIndicator}>
-                      <Ionicons name="camera-outline" size={13} color="#64748B" />
-                      <Text style={styles.photosCount}>{photoCount}</Text>
+                    <View style={styles.photoBadge}>
+                      <Ionicons name="camera" size={12} color="#64748B" />
+                      <Text style={styles.photoCountText}>{photoCount}</Text>
                     </View>
                   )}
-                  <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                  <Ionicons name="chevron-forward" size={15} color="#CBD5E1" />
                 </View>
               </View>
             </TouchableOpacity>
@@ -514,256 +369,256 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   addBtn: {
     backgroundColor: Colors.primary,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadows.sm,
   },
-  searchContainer: { paddingHorizontal: 16, paddingTop: 12 },
+  searchContainer: { 
+    paddingHorizontal: 16, 
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
   searchWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 12,
-    height: 44,
+    height: 38,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
     gap: 8,
   },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.text },
-  filterRow: {
-    flexDirection: 'row',
+  searchInput: { flex: 1, fontSize: 13.5, color: '#1E293B' },
+  
+  // Seção de Filtros Minimalista
+  filterSection: {
+    paddingVertical: 6,
+  },
+  filterScrollContent: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 6,
+    gap: 8,
   },
   filterChip: {
-    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
   },
-  filterChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  filterText: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
-  filterTextActive: { color: '#FFFFFF' },
-  listContent: { padding: 16, paddingTop: 4 },
+  filterChipActive: { 
+    backgroundColor: '#1E293B', 
+    borderColor: '#1E293B',
+  },
+  filterText: { 
+    fontSize: 12, 
+    fontWeight: '600', 
+    color: '#64748B',
+  },
+  filterTextActive: { 
+    color: '#FFFFFF',
+  },
+  filterCountBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  filterCountBadgeActive: {
+    backgroundColor: '#334155',
+  },
+  filterCountText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  filterCountTextActive: {
+    color: '#F8FAFC',
+  },
+
+  // Lista & Cards Minimalistas
+  listContent: { 
+    paddingHorizontal: 16, 
+    paddingTop: 4, 
+    paddingBottom: 24,
+  },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     ...Shadows.sm,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  numBadge: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 5,
-  },
-  numText: { color: Colors.primary, fontWeight: '700', fontSize: 11 },
-  numBadgeDraft: {
-    backgroundColor: '#FEF3C7',
-  },
-  numTextDraft: {
-    color: '#B45309',
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  dateText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 4, lineHeight: 20 },
-  projectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 10,
-  },
-  cardSub: { fontSize: 12.5, color: '#64748B', flex: 1 },
-  cardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 9,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  statusTag: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 5 },
-  statusApproved: { backgroundColor: '#DCFCE7' },
-  statusWaiting: { backgroundColor: '#FEF9C3' },
-  statusRejected: { backgroundColor: '#FEE2E2' },
-  statusDraftTag: { backgroundColor: '#F1F5F9' },
-  statusTagText: { fontSize: 11, fontWeight: '600', color: '#334155' },
-  footerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  photosIndicator: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  photosCount: { fontSize: 11, color: '#64748B', fontWeight: '600' },
-  emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginTop: 12 },
-  emptySub: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 4 },
-  metricsContainer: {
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  metricsScrollContent: {
-    paddingHorizontal: 16,
-    gap: 10,
-  },
-  metricCard: {
-    width: 145,
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    ...Shadows.sm,
-  },
-  cardApproval: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FDE68A',
-  },
-  cardApproved: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  cardDraft: {
-    backgroundColor: '#EFF6FF',
-    borderColor: '#BFDBFE',
-  },
-  cardAll: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
-  },
-  metricCardActiveApproval: {
-    borderColor: '#D97706',
-    borderWidth: 2,
-    backgroundColor: '#FEF3C7',
-    ...Shadows.md,
-  },
-  metricCardActiveApproved: {
-    borderColor: '#059669',
-    borderWidth: 2,
-    backgroundColor: '#D1FAE5',
-    ...Shadows.md,
-  },
-  metricCardActiveDraft: {
-    borderColor: '#2563EB',
-    borderWidth: 2,
-    backgroundColor: '#DBEAFE',
-    ...Shadows.md,
-  },
-  metricCardActiveAll: {
-    borderColor: '#0F172A',
-    borderWidth: 2,
-    backgroundColor: '#F1F5F9',
-    ...Shadows.md,
-  },
-  metricHeaderRow: {
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  metricIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activePillBadge: {
-    backgroundColor: '#D97706',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  activePillText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  metricCount: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  metricLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  exclusiveBannerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 2,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  exclusiveBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    flex: 1,
-  },
-  exclusiveBannerText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-    flex: 1,
-  },
-  exclusiveResetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  exclusiveResetText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  emptyResetBtn: {
-    marginTop: 16,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+  cardTopLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    ...Shadows.sm,
+  },
+  codeBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  codeBadgeDraft: {
+    backgroundColor: '#F1F5F9',
+  },
+  codeBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#2563EB',
+    letterSpacing: 0.2,
+  },
+  codeBadgeTextDraft: {
+    color: '#64748B',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusApproved: { backgroundColor: '#ECFDF5' },
+  statusWaiting: { backgroundColor: '#FFFBEB' },
+  statusRejected: { backgroundColor: '#FEF2F2' },
+  statusDraft: { backgroundColor: '#F8FAFC' },
+  statusPillText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+  },
+  cardDate: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  cardTitle: { 
+    fontSize: 14.5, 
+    fontWeight: '700', 
+    color: '#0F172A', 
+    lineHeight: 19,
+    marginBottom: 8,
+  },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  projectInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flex: 1,
+    marginRight: 8,
+  },
+  projectText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  cardMetaRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  photoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  photoCountText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+
+  // Empty State
+  emptyContainer: { 
+    padding: 36, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  emptyTitle: { 
+    fontSize: 15, 
+    fontWeight: '700', 
+    color: '#1E293B', 
+    marginBottom: 4,
+  },
+  emptySub: { 
+    fontSize: 12.5, 
+    color: '#64748B', 
+    textAlign: 'center', 
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  emptyResetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
   },
   emptyResetBtnText: {
+    color: '#2563EB',
+    fontWeight: '600',
+    fontSize: 12.5,
+  },
+  emptyCreateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: Colors.primary,
+  },
+  emptyCreateBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12.5,
   },
 });
+

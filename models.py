@@ -943,3 +943,34 @@ class ApkScreenConfig(db.Model):
             'config': parsed,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+
+class Visitante(db.Model):
+    """
+    Cadastro de Visitantes / Acompanhantes Frequentes de Visitas.
+    Permite puxar automaticamente em 'Acompanhantes da Visita' na criação de relatórios.
+    """
+    __tablename__ = 'visitantes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(150), nullable=False)
+    cargo = db.Column(db.String(100), nullable=True)   # Ex: Engenheiro Residente, Mestre de Obras, Fiscal
+    empresa = db.Column(db.String(150), nullable=True) # Ex: Construtora, Gerenciadora
+    telefone = db.Column(db.String(50), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    ativo = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=brazil_now)
+    updated_at = db.Column(db.DateTime, default=brazil_now, onupdate=brazil_now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'cargo': self.cargo or '',
+            'empresa': self.empresa or '',
+            'telefone': self.telefone or '',
+            'email': self.email or '',
+            'ativo': self.ativo,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

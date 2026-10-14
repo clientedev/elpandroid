@@ -1323,3 +1323,89 @@ export async function clearCompletedSyncQueue(): Promise<void> {
   const db = await getDatabase();
   await db.runAsync("DELETE FROM sync_queue WHERE status = 'completed'");
 }
+
+/**
+ * Migra o ID temporário de uma Obra criada offline para o ID real retornado pelo servidor,
+ * atualizando em cascata todas as tabelas relacionadas e os itens pendentes na fila de sincronização.
+ */
+export async function migrateLocalProjetoId(oldId: number, newId: number, newNumero?: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    'UPDATE projetos SET id = ?, numero = COALESCE(?, numero), sync_status = "synced" WHERE id = ?',
+    [newId, newNumero || null, oldId]
+  );
+  await db.runAsync('UPDATE relatorios SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
+  await db.runAsync('UPDATE visitas SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
+  await db.runAsync('UPDATE contatos SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
+  await db.runAsync('UPDATE lembretes SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
+
+  // Atualiza payloads na fila de sincronização
+  const pendingQueue = await db.getAllAsync<{ id: number; payload: string }>(
+    "SELECT id, payload FROM sync_queue WHERE status = 'pending' OR status = 'failed'"
+  );
+  for (const item of pendingQueue) {
+    if (item.payload && item.payload.includes(String(oldId))) {
+      try {
+        const p = JSON.parse(item.payload);
+        let changed = false;
+        if (p.projeto_id === oldId) {
+          p.projeto_id = newId;
+          changed = true;
+        }
+        if (newNumero && p.projeto_numero === oldId) {
+          p.projeto_numero = newNumero;
+          changed = true;
+        }
+        if (changed) {
+          await db.runAsync('UPDATE sync_queue SET payload = ? WHERE id = ?', [JSON.stringify(p), item.id]);
+        }
+      } catch {}
+    }
+  }
+}
+
+// ==================== VISITANTES (ACOMPANHANTES FREQUENTES) ====================
+export async function getLocalVisitantes(): Promise<import('../types').Visitante[]> {
+  const db = await getDatabase();
+  return await db.getAllAsync<import('../types').Visitante>(
+    'SELECT * FROM visitantes WHERE ativo = 1 ORDER BY nome ASC'
+  );
+}
+
+export async function saveLocalVisitante(
+  v: import('../types').Visitante, 
+  syncStatus: 'synced' | 'pending' = 'synced'
+): Promise<number> {
+  const db = await getDatabase();
+  const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM visitantes WHERE id = ?', [v.id]);
+  if (existing) {
+    await db.runAsync(
+      `UPDATE visitantes SET nome = ?, cargo = ?, empresa = ?, telefone = ?, email = ?, ativo = ?, sync_status = ?
+       WHERE id = ?`,
+      [v.nome, v.cargo || '', v.empresa || '', v.telefone || '', v.email || '', v.ativo !== false ? 1 : 0, syncStatus, v.id]
+    );
+    return v.id;
+  }
+  const res = await db.runAsync(
+    `INSERT INTO visitantes (id, nome, cargo, empresa, telefone, email, ativo, sync_status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      v.id || Date.now(), 
+      v.nome, 
+      v.cargo || '', 
+      v.empresa || '', 
+      v.telefone || '', 
+      v.email || '', 
+      v.ativo !== false ? 1 : 0, 
+      syncStatus, 
+      v.created_at || new Date().toISOString()
+    ]
+  );
+  return res.lastInsertRowId;
+}
+
+export async function deleteLocalVisitante(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM visitantes WHERE id = ?', [id]);
+}
+

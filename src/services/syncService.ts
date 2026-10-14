@@ -11,9 +11,9 @@ import {
   getLocalFotosExpress, saveLocalFotoExpress,
   updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase,
   getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade,
-  getDeletedEntityIds, clearDeletedEntityLocally
+  getDeletedEntityIds, clearDeletedEntityLocally, migrateLocalProjetoId, saveLocalVisitante
 } from '../database/db';
-import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato } from '../types';
+import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Visitante } from '../types';
 import { notificationService } from './notificationService';
 import { screenConfigService } from './screenConfigService';
 import { ensureProjectFolders } from './appFilesService';
@@ -155,11 +155,14 @@ class SyncService {
           await updateSyncQueueItem(item.id, 'processing');
 
           // Verificação inteligente para relatórios criados offline: se já foi sincronizado, evita duplicar POST
-          if (item.entity_type === 'relatorio' && item.method === 'POST') {
+          if (item.entity_type === 'relatorio') {
             const localRel = await getLocalRelatorioById(item.entity_id);
-            if (localRel && localRel.id < 2000000000 && localRel.sync_status === 'synced') {
-              item.method = 'PUT';
-              item.endpoint = `/api/relatorios/${localRel.id}`;
+            if (localRel) {
+              payload.projeto_id = localRel.projeto_id;
+              if (localRel.id < 2000000000 && localRel.sync_status === 'synced' && item.method === 'POST') {
+                item.method = 'PUT';
+                item.endpoint = `/api/relatorios/${localRel.id}`;
+              }
             }
           }
 
@@ -241,7 +244,14 @@ class SyncService {
           // Update local entity sync_status to 'synced'
           const db = await getDatabase();
           if (item.entity_type === 'projeto') {
-            await db.runAsync('UPDATE projetos SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+            const serverId = response?.data?.id;
+            const serverNumero = response?.data?.numero;
+            if (serverId && serverId !== item.entity_id) {
+              await migrateLocalProjetoId(item.entity_id, serverId, serverNumero);
+              console.log(`[SyncService] Obra local ${item.entity_id} migrada para ID servidor ${serverId} (${serverNumero})`);
+            } else {
+              await db.runAsync('UPDATE projetos SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+            }
           } else if (item.entity_type === 'visita') {
             await db.runAsync('UPDATE visitas SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'relatorio') {
@@ -518,18 +528,26 @@ class SyncService {
         }
       }
 
-      // 6. Limpeza de integridade referencial: garantir que nenhum registro órfão permaneça
-      await db.runAsync('DELETE FROM fotos_relatorio WHERE relatorio_id IN (SELECT id FROM relatorios WHERE projeto_id NOT IN (SELECT id FROM projetos));');
-      await db.runAsync('DELETE FROM relatorios WHERE projeto_id NOT IN (SELECT id FROM projetos);');
-      await db.runAsync('DELETE FROM visita_participantes WHERE visita_id IN (SELECT id FROM visitas WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos));');
-      await db.runAsync('DELETE FROM visitas WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
-      await db.runAsync('DELETE FROM lembretes WHERE projeto_id NOT IN (SELECT id FROM projetos);');
-      await db.runAsync('DELETE FROM contatos WHERE projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
+      // 6. Limpeza de integridade referencial: garantir que nenhum registro órfão permaneça (APENAS já sincronizados, NUNCA pendentes locais)
+      await db.runAsync('DELETE FROM fotos_relatorio WHERE sync_status = "synced" AND relatorio_id IN (SELECT id FROM relatorios WHERE sync_status = "synced" AND projeto_id NOT IN (SELECT id FROM projetos));');
+      await db.runAsync('DELETE FROM relatorios WHERE sync_status = "synced" AND projeto_id NOT IN (SELECT id FROM projetos);');
+      await db.runAsync('DELETE FROM visita_participantes WHERE visita_id IN (SELECT id FROM visitas WHERE sync_status = "synced" AND projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos));');
+      await db.runAsync('DELETE FROM visitas WHERE sync_status = "synced" AND projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
+      await db.runAsync('DELETE FROM lembretes WHERE sync_status = "synced" AND projeto_id NOT IN (SELECT id FROM projetos);');
+      await db.runAsync('DELETE FROM contatos WHERE sync_status = "synced" AND projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
 
-      // 7. Sincronizar notificações pendentes do servidor para o celular
+      // 7. Sincronizar visitantes cadastrados para o celular
+      const visitantesRes = await apiClient.axios.get('/api/visitantes', { timeout: 8000 }).catch(() => null);
+      if (visitantesRes && Array.isArray(visitantesRes.data)) {
+        for (const vis of visitantesRes.data) {
+          await saveLocalVisitante(vis, 'synced');
+        }
+      }
+
+      // 8. Sincronizar notificações pendentes do servidor para o celular
       await notificationService.syncServerNotifications().catch(() => null);
 
-      // 8. Sincronizar configurações dinâmicas de telas do APK (Server-Driven UI)
+      // 9. Sincronizar configurações dinâmicas de telas do APK (Server-Driven UI)
       await screenConfigService.syncFromServer().catch(() => null);
     } catch (pullErr) {
       console.warn('[SyncService] Inbound pull notice:', pullErr);

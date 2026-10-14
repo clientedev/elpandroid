@@ -258,3 +258,16 @@ export interface SyncQueueItem {
   retries: number;
   error_message?: string;
 }
+
+export interface Visitante {
+  id: number;
+  nome: string;
+  cargo?: string;
+  empresa?: string;
+  telefone?: string;
+  email?: string;
+  ativo?: boolean;
+  sync_status?: 'synced' | 'pending' | 'error';
+  created_at?: string;
+}
+

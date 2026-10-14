@@ -253,6 +253,18 @@ CREATE TABLE IF NOT EXISTS deleted_entities (
   deleted_at TEXT NOT NULL,
   PRIMARY KEY (entity_type, entity_id)
 );
+
+CREATE TABLE IF NOT EXISTS visitantes (
+  id INTEGER PRIMARY KEY,
+  nome TEXT NOT NULL,
+  cargo TEXT,
+  empresa TEXT,
+  telefone TEXT,
+  email TEXT,
+  ativo INTEGER DEFAULT 1,
+  sync_status TEXT DEFAULT 'synced',
+  created_at TEXT
+);
 `;
 
 export const SEED_CHECKLIST = [

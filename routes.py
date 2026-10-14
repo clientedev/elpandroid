@@ -688,8 +688,8 @@ def inject_approval_functions():
     return {
         'current_user_is_aprovador': current_user_is_aprovador,
         'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra,
-        'app_version': ver_info.get('version', '1.0.29'),
-        'app_version_code': ver_info.get('version_code', 29)
+        'app_version': ver_info.get('version', '1.0.30'),
+        'app_version_code': ver_info.get('version_code', 30)
     }
 
 @app.route('/api/checklist-padrao')
@@ -2841,8 +2841,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.29"
-    version_code = 29
+    app_version = "1.0.30"
+    version_code = 30
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -2952,17 +2952,28 @@ def ajustes_apk_page():
         total_checklist = ChecklistPadrao.query.count()
         aprovador_global = AprovadorPadrao.query.filter_by(is_global=True, ativo=True).first()
         aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Não definido"
+        try:
+            from models import Visitante
+            visitantes_list = Visitante.query.filter_by(ativo=True).order_by(Visitante.nome.asc()).all()
+            total_visitantes = len(visitantes_list)
+        except Exception:
+            visitantes_list = []
+            total_visitantes = 0
     except Exception as e:
         print(f"Erro ao carregar métricas de ajustes do APK: {e}")
         total_legendas = 0
         total_checklist = 0
         aprovador_global_nome = "Não definido"
+        visitantes_list = []
+        total_visitantes = 0
 
     return render_template('admin/ajustes_apk.html',
                            apk_info=apk_info,
                            total_legendas=total_legendas,
                            total_checklist=total_checklist,
-                           aprovador_global_nome=aprovador_global_nome)
+                           aprovador_global_nome=aprovador_global_nome,
+                           visitantes=visitantes_list,
+                           total_visitantes=total_visitantes)
 
 @app.route('/admin/apk/editor-telas', methods=['GET'])
 @login_required
@@ -12970,9 +12981,9 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.29'
-    current_vc = 29
-    release_notes = 'Atualização v1.0.29: Lógica de visitas editável pelo painel web, autosave contínuo em todos os módulos do APK e sincronização em tempo real com Railway.'
+    current_v = '1.0.30'
+    current_vc = 30
+    release_notes = 'Atualização v1.0.30: Correção de sincronização offline (obras e relatórios criados sem internet), notificações de rejeição e aprovação, cadastro de visitantes integrado nos ajustes e na criação de relatórios, e visualização minimalista da aba relatórios.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [
@@ -13091,6 +13102,90 @@ def _parse_iso_date(val, as_date=False, default=None):
             return dt.date() if as_date else dt
         except Exception:
             return default
+
+# --- VISITANTES (CADASTRO DE VISITANTES / ACOMPANHANTES FREQUENTES) ---
+def _ensure_visitantes_table():
+    try:
+        from models import Visitante
+        db.create_all()
+    except Exception as e:
+        current_app.logger.warning(f"Aviso ao garantir tabela de visitantes: {e}")
+
+@app.route('/api/visitantes', methods=['GET', 'POST'])
+@csrf.exempt
+def api_visitantes_collection():
+    """Coleção de visitantes/acompanhantes cadastrados (Web e Mobile)"""
+    _ensure_visitantes_table()
+    from models import Visitante
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or request.form or {}
+            nome = (data.get('nome') or '').strip()
+            if not nome:
+                return jsonify({'success': False, 'error': 'Nome do visitante é obrigatório'}), 400
+            
+            visitante = Visitante(
+                nome=nome,
+                cargo=(data.get('cargo') or '').strip(),
+                empresa=(data.get('empresa') or '').strip(),
+                telefone=(data.get('telefone') or '').strip(),
+                email=(data.get('email') or '').strip(),
+                ativo=bool(data.get('ativo', True))
+            )
+            db.session.add(visitante)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Visitante cadastrado com sucesso',
+                'visitante': visitante.to_dict()
+            }), 201
+        except Exception as err:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(err)}), 500
+
+    # GET
+    try:
+        visitantes = Visitante.query.filter_by(ativo=True).order_by(Visitante.nome.asc()).all()
+        return jsonify([v.to_dict() for v in visitantes]), 200
+    except Exception as err:
+        return jsonify([]), 200
+
+@app.route('/api/visitantes/<int:visitante_id>', methods=['PUT', 'DELETE'])
+@csrf.exempt
+def api_visitante_item(visitante_id):
+    """Atualização e exclusão de visitante"""
+    _ensure_visitantes_table()
+    from models import Visitante
+    try:
+        visitante = Visitante.query.get(visitante_id)
+        if not visitante:
+            return jsonify({'success': False, 'error': 'Visitante não encontrado'}), 404
+
+        if request.method == 'DELETE':
+            db.session.delete(visitante)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Visitante removido'}), 200
+
+        # PUT
+        data = request.get_json(silent=True) or request.form or {}
+        if 'nome' in data and data['nome']:
+            visitante.nome = data['nome'].strip()
+        if 'cargo' in data:
+            visitante.cargo = (data['cargo'] or '').strip()
+        if 'empresa' in data:
+            visitante.empresa = (data['empresa'] or '').strip()
+        if 'telefone' in data:
+            visitante.telefone = (data['telefone'] or '').strip()
+        if 'email' in data:
+            visitante.email = (data['email'] or '').strip()
+        if 'ativo' in data:
+            visitante.ativo = bool(data['ativo'])
+        visitante.updated_at = brazil_now()
+        db.session.commit()
+        return jsonify({'success': True, 'visitante': visitante.to_dict()}), 200
+    except Exception as err:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(err)}), 500
 
 # --- PROJETOS ---
 @app.route('/api/projetos', methods=['GET', 'POST'])
@@ -13472,7 +13567,26 @@ def api_relatorios_collection():
                 first_p = Projeto.query.first()
                 projeto_id = first_p.id if first_p else 1
             else:
-                projeto_id = int(projeto_id)
+                try:
+                    projeto_id = int(projeto_id)
+                except Exception:
+                    projeto_id = 1
+
+            # Garantir integridade de chave estrangeira: se projeto_id temporário não existir no banco,
+            # resolve por número da obra, nome da obra ou projeto mais recente
+            proj_check = Projeto.query.get(projeto_id)
+            if not proj_check:
+                p_num = (data.get('projeto_numero') or data.get('obra_numero') or '').strip()
+                p_nome = (data.get('projeto_nome') or data.get('obra_nome') or '').strip()
+                if p_num:
+                    proj_check = Projeto.query.filter_by(numero=p_num).first()
+                if not proj_check and p_nome:
+                    proj_check = Projeto.query.filter(Projeto.nome.ilike(f"%{p_nome}%")).first()
+                if not proj_check:
+                    proj_check = Projeto.query.order_by(Projeto.id.desc()).first()
+                if proj_check:
+                    projeto_id = proj_check.id
+                    current_app.logger.info(f"🔄 Projeto ID local resolvido para servidor ID {projeto_id} ({proj_check.nome})")
 
             visita_id = data.get('visita_id')
             if visita_id:
@@ -13605,6 +13719,13 @@ def api_relatorios_collection():
                     current_app.logger.info(f"🔔 Notificação automática disparada para relatório {relatorio.numero}")
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de aprovação pendente: {notif_err}")
+            elif relatorio.status == 'Rejeitado':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_relatorio_reprovado(relatorio.id, data.get('comentario') or data.get('comentario_aprovacao'))
+                    current_app.logger.info(f"🔔 Notificação de rejeição disparada para relatório {relatorio.numero}")
+                except Exception as notif_err:
+                    current_app.logger.warning(f"Aviso ao criar notificação de rejeição: {notif_err}")
 
             return jsonify({
                 'success': True,
@@ -13790,6 +13911,13 @@ def api_relatorio_detail_sync(relatorio_id):
                     current_app.logger.info(f"🔔 Notificação automática disparada via PUT para relatório {relatorio.numero}")
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de aprovação pendente no PUT: {notif_err}")
+            elif relatorio.status == 'Rejeitado':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_relatorio_reprovado(relatorio.id, relatorio.comentario_aprovacao)
+                    current_app.logger.info(f"🔔 Notificação de rejeição disparada via PUT para relatório {relatorio.numero}")
+                except Exception as notif_err:
+                    current_app.logger.warning(f"Aviso ao criar notificação de rejeição no PUT: {notif_err}")
 
             return jsonify({'success': True, 'id': relatorio.id, 'numero': relatorio.numero, 'status': relatorio.status}), 200
 

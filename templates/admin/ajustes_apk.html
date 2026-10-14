@@ -207,6 +207,174 @@
                 </div>
             </div>
         </div>
+
+        <!-- 5. Cadastro de Visitantes / Acompanhantes Frequentes -->
+        <div class="col-12 mt-4">
+            <div class="card border-0 shadow-sm rounded-3">
+                <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="card-title mb-0 fw-bold text-dark">
+                            <i class="fas fa-user-friends text-info me-2"></i>5. Cadastro de Visitantes & Acompanhantes de Visita
+                        </h5>
+                        <p class="text-muted small mb-0 mt-1">
+                            Pessoas registradas aqui são sugeridas e puxadas automaticamente no campo <strong>"Acompanhantes da Visita"</strong> durante a criação de relatórios no aplicativo mobile.
+                        </p>
+                    </div>
+                    <button class="btn btn-primary btn-sm fw-bold px-3" data-bs-toggle="modal" data-bs-target="#modalNovoVisitante">
+                        <i class="fas fa-plus me-1"></i> Cadastrar Visitante
+                    </button>
+                </div>
+                <div class="card-body p-4">
+                    {% if visitantes and visitantes|length > 0 %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="small text-muted text-uppercase">Nome Completo</th>
+                                    <th class="small text-muted text-uppercase">Função / Cargo</th>
+                                    <th class="small text-muted text-uppercase">Empresa / Construtora</th>
+                                    <th class="small text-muted text-uppercase">Contato</th>
+                                    <th class="small text-muted text-uppercase text-end">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for v in visitantes %}
+                                <tr id="row-visitante-{{ v.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-circle bg-info-subtle text-info fw-bold me-2" style="width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px;">
+                                                {{ v.nome[:1].upper() }}
+                                            </div>
+                                            <span class="fw-bold text-dark">{{ v.nome }}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-secondary border">{{ v.cargo or 'Não especificado' }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted small">{{ v.empresa or '-' }}</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ v.telefone or v.email or '-' }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-outline-danger btn-sm" onclick="excluirVisitante({{ v.id }}, '{{ v.nome }}')">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 bg-light rounded-3 border">
+                        <i class="fas fa-user-plus text-muted mb-2" style="font-size: 32px;"></i>
+                        <p class="text-dark fw-bold mb-1">Nenhum visitante cadastrado ainda</p>
+                        <p class="text-muted small mb-3">Cadastre engenheiros residentes, mestres de obras, clientes ou fiscais para agilizar o preenchimento em campo.</p>
+                        <button class="btn btn-outline-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalNovoVisitante">
+                            <i class="fas fa-plus me-1"></i> Cadastrar Primeiro Visitante
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<!-- Modal Novo Visitante -->
+<div class="modal fade" id="modalNovoVisitante" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-user-plus text-info me-2"></i>Cadastrar Visitante / Acompanhante</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="formNovoVisitante" onsubmit="salvarNovoVisitante(event)">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Nome Completo *</label>
+                        <input type="text" class="form-control" id="visNome" required placeholder="Ex: Eng. Carlos Silva">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Cargo / Função</label>
+                        <input type="text" class="form-control" id="visCargo" placeholder="Ex: Engenheiro Residente, Mestre de Obras">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Empresa / Construtora</label>
+                        <input type="text" class="form-control" id="visEmpresa" placeholder="Ex: Construtora Alpha">
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">Telefone / WhatsApp</label>
+                            <input type="text" class="form-control" id="visTelefone" placeholder="(11) 99999-9999">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small">E-mail</label>
+                            <input type="email" class="form-control" id="visEmail" placeholder="contato@empresa.com">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 pt-2">
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary btn-sm fw-bold" id="btnSalvarVis">Salvar Visitante</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function salvarNovoVisitante(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSalvarVis');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Salvando...';
+
+    const payload = {
+        nome: document.getElementById('visNome').value.trim(),
+        cargo: document.getElementById('visCargo').value.trim(),
+        empresa: document.getElementById('visEmpresa').value.trim(),
+        telefone: document.getElementById('visTelefone').value.trim(),
+        email: document.getElementById('visEmail').value.trim()
+    };
+
+    try {
+        const res = await fetch('/api/visitantes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Erro: ' + (data.error || 'Não foi possível cadastrar visitante'));
+            btn.disabled = false;
+            btn.innerText = 'Salvar Visitante';
+        }
+    } catch (err) {
+        alert('Erro ao conectar ao servidor: ' + err.message);
+        btn.disabled = false;
+        btn.innerText = 'Salvar Visitante';
+    }
+}
+
+async function excluirVisitante(id, nome) {
+    if (!confirm(`Deseja realmente excluir o visitante "${nome}"?`)) return;
+    try {
+        const res = await fetch(`/api/visitantes/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+            const row = document.getElementById(`row-visitante-${id}`);
+            if (row) row.remove();
+        } else {
+            alert('Erro ao excluir: ' + data.error);
+        }
+    } catch (err) {
+        alert('Erro na requisição: ' + err.message);
+    }
+}
+</script>
 {% endblock %}
