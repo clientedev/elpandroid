@@ -2845,8 +2845,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.35"
-    version_code = 35
+    app_version = "1.0.36"
+    version_code = 36
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -13044,8 +13044,8 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.35'
-    current_vc = 35
+    current_v = '1.0.36'
+    current_vc = 36
     release_notes = 'Atualização v1.0.34: Correção da indexação do Relatório Express para iniciar em EXP-0001 sem saltos de ano; revisão e unificação do fluxo de aprovação dos relatórios express no app e portal web; ações de edição e reenvio de relatórios express; geração de PDF e envio de e-mails em aprovações.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))

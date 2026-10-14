@@ -348,6 +348,10 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
   }
 
   async function handleNavigateToEdit(reportId: number, preProjId?: number) {
+    if ((relatorio as any)?.is_express) {
+      navigation.navigate('ExpressReportsScreen');
+      return;
+    }
     if (isOnline) {
       try {
         const res = await apiClient.axios.get(`/api/relatorios/${reportId}/lock-status`, { timeout: 4000 });
@@ -382,6 +386,18 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
         : relatorio.checklist_data;
     } catch {
       parsedChecklist = [];
+    }
+  }
+
+  // Parse informações técnicas da fachada (Relatórios Express)
+  let parsedTechInfo: Record<string, string> | null = null;
+  if ((relatorio as any)?.informacoes_tecnicas) {
+    try {
+      parsedTechInfo = typeof (relatorio as any).informacoes_tecnicas === 'string'
+        ? JSON.parse((relatorio as any).informacoes_tecnicas)
+        : (relatorio as any).informacoes_tecnicas;
+    } catch {
+      parsedTechInfo = null;
     }
   }
 
@@ -448,6 +464,20 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
             </Text>
           </View>
 
+          {relatorio.projeto_construtora ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Construtora:</Text>
+              <Text style={styles.value}>{relatorio.projeto_construtora}</Text>
+            </View>
+          ) : null}
+
+          {relatorio.projeto_endereco ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Endereço:</Text>
+              <Text style={styles.value}>{relatorio.projeto_endereco}</Text>
+            </View>
+          ) : null}
+
           <View style={styles.infoRow}>
             <Text style={styles.label}>Local Específico:</Text>
             <Text style={styles.value}>{relatorio.local || 'Geral na Obra'}</Text>
@@ -475,7 +505,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
               REGISTRO DE AUDITORIA & NUMERAÇÃO
             </Text>
             <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 2 }}>
-              • <Text style={{ fontWeight: '600' }}>Número Oficial:</Text> {relatorio.numero?.startsWith('REL-') ? relatorio.numero : 'Pendente de Atribuição pelo Servidor'}
+              • <Text style={{ fontWeight: '600' }}>Número Oficial:</Text> {(relatorio.numero?.startsWith('REL-') || relatorio.numero?.startsWith('EXP-')) ? relatorio.numero : 'Pendente de Atribuição pelo Servidor'}
             </Text>
             {relatorio.uuid ? (
               <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 2 }}>
@@ -522,6 +552,43 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
             </View>
           ) : null}
         </View>
+
+        {/* Informações Técnicas da Fachada (se for Relatório Express) */}
+        {parsedTechInfo && (() => {
+          const techFields = [
+            { label: 'Elementos Construtivos da Base', value: parsedTechInfo.elementos_construtivos_base },
+            { label: 'Chapisco Colante', value: parsedTechInfo.especificacao_chapisco_colante },
+            { label: 'Chapisco em Alvenaria', value: parsedTechInfo.especificacao_chapisco_alvenaria },
+            { label: 'Argamassa de Emboço', value: parsedTechInfo.especificacao_argamassa_emboco },
+            { label: 'Forma de Aplicação da Argamassa', value: parsedTechInfo.forma_aplicacao_argamassa },
+            { label: 'Acabamentos de Revestimento', value: parsedTechInfo.acabamentos_revestimento },
+            { label: 'Acabamento de Peitoris', value: parsedTechInfo.acabamento_peitoris },
+            { label: 'Acabamento de Muretas', value: parsedTechInfo.acabamento_muretas },
+            { label: 'Frisos e Cores', value: parsedTechInfo.definicao_frisos_cor },
+            { label: 'Face Inferior de Abas / Balanços', value: parsedTechInfo.definicao_face_inferior_abas },
+            { label: 'Observações do Projeto de Fachada', value: parsedTechInfo.observacoes_projeto_fachada },
+            { label: 'Outras Observações Técnicas', value: parsedTechInfo.outras_observacoes },
+          ].filter(f => f.value && typeof f.value === 'string' && f.value.trim().length > 0);
+
+          if (techFields.length === 0) return null;
+
+          return (
+            <View style={styles.card}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <Ionicons name="construct-outline" size={18} color="#0284C7" />
+                <Text style={styles.cardSectionTitle}>Informações Técnicas da Fachada ({techFields.length})</Text>
+              </View>
+              <View style={{ gap: 8 }}>
+                {techFields.map((tf, idx) => (
+                  <View key={idx} style={styles.techFieldRow}>
+                    <Text style={styles.techFieldLabel}>{tf.label}:</Text>
+                    <Text style={styles.techFieldValue}>{tf.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Acompanhantes da Visita (se houver) */}
         {(() => {
@@ -1214,5 +1281,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: '#065F46',
+  },
+  techFieldRow: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  techFieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  techFieldValue: {
+    fontSize: 12.5,
+    color: '#475569',
   },
 });

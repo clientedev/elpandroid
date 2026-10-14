@@ -786,7 +786,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           </View>
         }
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity 
+            style={styles.card} 
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id })}
+          >
             <View style={styles.cardHeader}>
               <View style={styles.badgeRow}>
                 <View style={styles.expBadge}>
@@ -803,6 +807,15 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
             <Text style={styles.construtoraText}>
               {item.obra_nome}{item.obra_construtora ? ` • ${item.obra_construtora}` : ''}
             </Text>
+
+            {/* Dica / Faixa de Toque para Visualização */}
+            <View style={styles.cardViewHintRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Ionicons name="eye-outline" size={13} color="#0284C7" />
+                <Text style={styles.cardViewHintText}>Toque para visualizar detalhes completos</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={13} color="#0284C7" />
+            </View>
 
             {item.observacoes_finais ? (
               <Text style={styles.obsText} numberOfLines={2}>
@@ -839,6 +852,15 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               </View>
 
               <View style={styles.cardActionsRow}>
+                {/* Botão Visualizar Sempre Visível */}
+                <TouchableOpacity 
+                  style={styles.viewBtn} 
+                  onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id })}
+                >
+                  <Ionicons name="eye-outline" size={13} color="#0284C7" />
+                  <Text style={styles.viewBtnText}>Visualizar</Text>
+                </TouchableOpacity>
+
                 {/* Ações de Aprovação / Rejeição diretas no Card */}
                 {item.status === 'Aguardando Aprovação' && canApprove && (
                   <>
@@ -896,7 +918,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
       />
 
@@ -1814,4 +1836,29 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   actionModalConfirmText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  cardViewHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+  },
+  cardViewHintText: { fontSize: 11, color: '#0369A1', fontWeight: '600' },
+  viewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  viewBtnText: { fontSize: 11, fontWeight: '700', color: '#0284C7' },
 });
