@@ -13,7 +13,7 @@ import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalRelatoriosExpress, saveLocalRelatorioExpress, 
   getLocalFotosExpress, saveLocalFotoExpress, addToSyncQueue,
-  getNextExpressReportNumber, getLocalVisitantes
+  getNextExpressReportNumber, getLocalVisitantes, updateLocalRelatorioExpressStatus
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { generateReportPDF } from '../../services/pdfService';
@@ -46,6 +46,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const [expressList, setExpressList] = useState<RelatorioExpress[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingReportId, setEditingReportId] = useState<number | null>(null);
 
   // Form state:
   const [titulo, setTitulo] = useState('Relatório Express de Visita');
@@ -205,6 +206,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
     setAttachedPhotos([]);
+    setEditingReportId(null);
     setModalVisible(true);
   }
 
@@ -223,6 +225,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setAcompanhantes(original.acompanhantes || '');
     setObservacoes(original.observacoes_finais || '');
     setAttachedPhotos([]);
+    setEditingReportId(null);
 
     // Extrair info técnica
     if (original.informacoes_tecnicas) {
@@ -260,6 +263,151 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     }
 
     setModalVisible(true);
+  }
+
+  async function handleEditReport(item: RelatorioExpress) {
+    setEditingReportId(item.id);
+    setTitulo(item.titulo || 'Relatório Express de Visita');
+    setNumero(item.numero || 'EXP-0001');
+    setDataVisita(item.data_relatorio ? item.data_relatorio.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setObraConstrutora(item.obra_construtora || '');
+    setObraNome(item.obra_nome || '');
+    setObraEndereco(item.obra_endereco || '');
+    const acompStr = typeof item.acompanhantes === 'string'
+      ? item.acompanhantes
+      : Array.isArray(item.acompanhantes as any)
+      ? (item.acompanhantes as any).join(', ')
+      : (item.acompanhantes || '');
+    setAcompanhantes(acompStr);
+    setObservacoes(item.observacoes_finais || '');
+
+    // Extrair info técnica
+    if (item.informacoes_tecnicas) {
+      try {
+        const t = typeof item.informacoes_tecnicas === 'string' 
+          ? JSON.parse(item.informacoes_tecnicas) 
+          : item.informacoes_tecnicas;
+        setTechElementosBase(t.elementos_construtivos_base || '');
+        setTechChapiscoColante(t.especificacao_chapisco_colante || '');
+        setTechChapiscoAlvenaria(t.especificacao_chapisco_alvenaria || '');
+        setTechArgamassaEmboco(t.especificacao_argamassa_emboco || '');
+        setTechFormaAplicacaoArgamassa(t.forma_aplicacao_argamassa || '');
+        setTechAcabamentosRevestimento(t.acabamentos_revestimento || '');
+        setTechAcabamentoPeitoris(t.acabamento_peitoris || '');
+        setTechAcabamentoMuretas(t.acabamento_muretas || '');
+        setTechDefinicaoFrisosCor(t.definicao_frisos_cor || '');
+        setTechDefinicaoFaceInferiorAbas(t.definicao_face_inferior_abas || '');
+        setTechObservacoesFachada(t.observacoes_projeto_fachada || '');
+        setTechOutrasObservacoes(t.outras_observacoes || '');
+        setShowTechInfo(true);
+      } catch {
+        setShowTechInfo(false);
+      }
+    } else {
+      setShowTechInfo(false);
+    }
+
+    // Extrair checklist
+    if (item.checklist_data) {
+      try {
+        const chk = typeof item.checklist_data === 'string'
+          ? JSON.parse(item.checklist_data)
+          : item.checklist_data;
+        if (Array.isArray(chk)) {
+          setChecklist(chk);
+          setShowChecklist(true);
+        } else {
+          setChecklist(DEFAULT_CHECKLIST);
+        }
+      } catch {
+        setChecklist(DEFAULT_CHECKLIST);
+      }
+    } else {
+      setChecklist(DEFAULT_CHECKLIST);
+    }
+
+    // Carregar fotos do relatório
+    try {
+      const fotosDb = await getLocalFotosExpress(item.id);
+      if (fotosDb && fotosDb.length > 0) {
+        setAttachedPhotos(fotosDb.map(f => ({
+          uri: f.uri_local || f.url || '',
+          base64: f.base64,
+        })));
+      } else {
+        setAttachedPhotos([]);
+      }
+    } catch {
+      setAttachedPhotos([]);
+    }
+
+    setModalVisible(true);
+  }
+
+  async function handleSendForApproval(item: RelatorioExpress) {
+    if (item.status === 'Aguardando Aprovação') {
+      Alert.alert('Aviso', 'Este relatório já foi enviado e está aguardando aprovação.');
+      return;
+    }
+    if (item.status === 'Aprovado') {
+      Alert.alert('Aviso', 'Este relatório já está aprovado.');
+      return;
+    }
+
+    Alert.alert(
+      'Enviar para Aprovação',
+      `Deseja enviar o Relatório Express ${item.numero} para aprovação?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Enviar',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await updateLocalRelatorioExpressStatus(
+                item.id,
+                'Aguardando Aprovação',
+                '',
+                undefined,
+                undefined,
+                'pending'
+              );
+
+              const fotosDb = await getLocalFotosExpress(item.id);
+              const fotosPayload = (fotosDb || []).map(f => ({
+                uri_local: f.uri_local,
+                base64: f.base64,
+                imagem_base64: f.base64,
+                titulo: f.titulo,
+                legenda: f.legenda,
+                ordem: f.ordem,
+              }));
+
+              await addToSyncQueue(
+                'relatorio_express',
+                item.id,
+                'update',
+                '/api/relatorios-express',
+                'POST',
+                {
+                  ...item,
+                  status: 'Aguardando Aprovação',
+                  fotos: fotosPayload,
+                }
+              );
+
+              if (isOnline) triggerSync();
+              await loadReports();
+              Alert.alert('Sucesso', `Relatório Express ${item.numero} enviado para aprovação!`);
+            } catch (e: any) {
+              Alert.alert('Erro', e.message || 'Falha ao enviar para aprovação.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   }
 
   // Captura Real de GPS do Dispositivo
@@ -354,8 +502,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
     setLoading(true);
     try {
-      const expId = Date.now();
-      const currentNumber = numero.startsWith('EXP-') ? numero : await getNextExpressReportNumber();
+      const expId = editingReportId || Date.now();
+      const currentNumber = (editingReportId && numero) ? numero : (numero.startsWith('EXP-') ? numero : await getNextExpressReportNumber());
 
       const techInfoPayload = {
         elementos_construtivos_base: techElementosBase.trim(),
@@ -431,7 +579,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       await addToSyncQueue(
         'relatorio_express',
         expId,
-        'create',
+        editingReportId ? 'update' : 'create',
         '/api/relatorios-express',
         'POST',
         {
@@ -447,6 +595,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
       if (isOnline) triggerSync();
 
+      setEditingReportId(null);
       setModalVisible(false);
       await loadReports();
       Alert.alert(
@@ -589,6 +738,26 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               </View>
 
               <View style={styles.cardActionsRow}>
+                {item.status !== 'Aprovado' && (
+                  <TouchableOpacity 
+                    style={styles.editBtn} 
+                    onPress={() => handleEditReport(item)}
+                  >
+                    <Ionicons name="create-outline" size={13} color="#D97706" />
+                    <Text style={styles.editBtnText}>Editar</Text>
+                  </TouchableOpacity>
+                )}
+
+                {(item.status === 'em_andamento' || item.status === 'Em preenchimento' || item.status === 'Rejeitado') && (
+                  <TouchableOpacity 
+                    style={styles.sendApprovalBtn} 
+                    onPress={() => handleSendForApproval(item)}
+                  >
+                    <Ionicons name="paper-plane-outline" size={13} color="#059669" />
+                    <Text style={styles.sendApprovalBtnText}>Enviar</Text>
+                  </TouchableOpacity>
+                )}
+
                 {item.status === 'Aprovado' && (
                   <TouchableOpacity 
                     style={styles.duplicateBtn} 
@@ -616,7 +785,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <Ionicons name="flash" size={20} color="#059669" />
-                <Text style={styles.modalTitle}>Novo Relatório Express</Text>
+                <Text style={styles.modalTitle}>{editingReportId ? `Editar ${numero}` : 'Novo Relatório Express'}</Text>
               </View>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color={Colors.text} />
@@ -1093,7 +1262,31 @@ const styles = StyleSheet.create({
   statusWaiting: { backgroundColor: '#FEF3C7' },
   statusDraft: { backgroundColor: '#F1F5F9' },
   statusPillText: { fontSize: 11, fontWeight: '700' },
-  cardActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  editBtnText: { fontSize: 11, fontWeight: '600', color: '#B45309' },
+  sendApprovalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  sendApprovalBtnText: { fontSize: 11, fontWeight: '600', color: '#047857' },
   duplicateBtn: {
     flexDirection: 'row',
     alignItems: 'center',

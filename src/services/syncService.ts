@@ -9,7 +9,7 @@ import {
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
   getLocalFotos, saveLocalFoto, 
   getLocalFotosExpress, saveLocalFotoExpress,
-  updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, getDatabase,
+  updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, migrateLocalFotosRelatorioExpressId, getDatabase,
   getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade,
   getDeletedEntityIds, clearDeletedEntityLocally, migrateLocalProjetoId, saveLocalVisitante
 } from '../database/db';
@@ -276,7 +276,21 @@ class SyncService {
               await db.runAsync('UPDATE relatorios SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
             }
           } else if (item.entity_type === 'relatorio_express') {
-            await db.runAsync('UPDATE relatorios_express SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+            const serverId = response?.data?.id;
+            const officialNumero = response?.data?.numero;
+            if (serverId) syncedEntitiesInBatch.add(`relatorio_express_${serverId}`);
+
+            if (serverId && serverId !== item.entity_id) {
+              await migrateLocalFotosRelatorioExpressId(item.entity_id, serverId);
+              const db = await getDatabase();
+              await db.runAsync(
+                'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
+                [serverId, officialNumero || null, new Date().toISOString(), item.entity_id]
+              );
+              console.log(`[SyncService] Relatório Express local ${item.entity_id} migrado para ID servidor ${serverId}`);
+            } else {
+              await db.runAsync('UPDATE relatorios_express SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+            }
           } else if (item.entity_type === 'lembrete') {
             await db.runAsync('UPDATE lembretes SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
           } else if (item.entity_type === 'contato') {
@@ -504,7 +518,7 @@ class SyncService {
 
         const localExpress = await db.getAllAsync<{ id: number; sync_status: string }>('SELECT id, sync_status FROM relatorios_express');
         for (const le of localExpress) {
-          if (le.sync_status === 'synced' && !serverExpressIds.has(le.id)) {
+          if (le.sync_status === 'synced' && le.id < 2000000000 && !serverExpressIds.has(le.id)) {
             await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ?;', [le.id]);
             await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [le.id]);
           }

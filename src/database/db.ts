@@ -844,6 +844,18 @@ export async function migrateLocalFotosRelatorioId(oldRelatorioId: number, newRe
   }
 }
 
+/** Migra fotos express no SQLite quando o ID provisório do relatório muda para o ID do servidor */
+export async function migrateLocalFotosRelatorioExpressId(oldRelatorioId: number, newRelatorioId: number): Promise<void> {
+  if (!oldRelatorioId || !newRelatorioId || oldRelatorioId === newRelatorioId) return;
+  const db = await getDatabase();
+  try {
+    await db.runAsync('UPDATE fotos_relatorio_express SET relatorio_express_id = ? WHERE relatorio_express_id = ?', [newRelatorioId, oldRelatorioId]);
+    console.log(`[db] Fotos express migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId}`);
+  } catch (err) {
+    console.warn('[db] Erro ao migrar fotos express:', err);
+  }
+}
+
 /** Atualiza especificações técnicas de uma obra no banco local SQLite */
 export async function updateLocalProjetoInfoTecnica(
   projetoId: number,
@@ -946,10 +958,36 @@ export async function getNextExpressReportNumber(): Promise<string> {
   let maxSeq = 0;
   for (const row of rows) {
     if (!row.numero) continue;
-    const match = row.numero.match(/EXP[-_ ]*(\d+)/i);
-    if (match) {
-      const val = parseInt(match[1], 10);
+    const trimmed = row.numero.trim();
+    // Legacy format EXP-YYYY-NNNN
+    const matchLegacyYear = trimmed.match(/^EXP-\d{4}-(\d+)$/i);
+    if (matchLegacyYear) {
+      const val = parseInt(matchLegacyYear[1], 10);
       if (!isNaN(val) && val > maxSeq) {
+        maxSeq = val;
+      }
+      continue;
+    }
+    // Standard format EXP-NNNN
+    const matchStandard = trimmed.match(/^EXP-(\d+)$/i);
+    if (matchStandard) {
+      const val = parseInt(matchStandard[1], 10);
+      if (!isNaN(val)) {
+        // Discard year bug sequences (e.g. 2026, 2027)
+        if (val >= 1900 && val <= 2099) {
+          continue;
+        }
+        if (val > maxSeq) {
+          maxSeq = val;
+        }
+      }
+      continue;
+    }
+    // General fallback: trailing digits
+    const matchEnd = trimmed.match(/(\d+)$/);
+    if (matchEnd) {
+      const val = parseInt(matchEnd[1], 10);
+      if (!isNaN(val) && val < 1900 && val > maxSeq) {
         maxSeq = val;
       }
     }

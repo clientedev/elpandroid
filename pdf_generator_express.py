@@ -14,27 +14,14 @@ logger = logging.getLogger(__name__)
 
 def gerar_numero_relatorio_express():
     """
-    Gera um número único para relatório express no formato EXP-YYYY-NNNN
+    Gera um número único para relatório express no formato EXP-NNNN (iniciando em EXP-0001)
     """
-    from app import db
-    from models import RelatorioExpress
-    
-    ano_atual = datetime.now().year
-    
-    ultimo_relatorio = RelatorioExpress.query.filter(
-        RelatorioExpress.numero.like(f'EXP-{ano_atual}-%')
-    ).order_by(RelatorioExpress.id.desc()).first()
-    
-    if ultimo_relatorio:
-        try:
-            ultimo_numero = int(ultimo_relatorio.numero.split('-')[-1])
-            novo_numero = ultimo_numero + 1
-        except (ValueError, IndexError):
-            novo_numero = 1
-    else:
-        novo_numero = 1
-    
-    return f"EXP-{ano_atual}-{novo_numero:04d}"
+    try:
+        from routes_express import generate_express_number
+        return generate_express_number()
+    except Exception as e:
+        logger.warning(f"Erro ao obter generate_express_number: {e}")
+        return "EXP-0001"
 
 
 def gerar_pdf_relatorio_express(relatorio_ou_id, output_path=None, salvar_arquivo=True):

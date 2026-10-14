@@ -688,8 +688,8 @@ def inject_approval_functions():
     return {
         'current_user_is_aprovador': current_user_is_aprovador,
         'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra,
-        'app_version': ver_info.get('version', '1.0.33'),
-        'app_version_code': ver_info.get('version_code', 33)
+        'app_version': ver_info.get('version', '1.0.34'),
+        'app_version_code': ver_info.get('version_code', 34)
     }
 
 @app.route('/api/checklist-padrao')
@@ -2845,8 +2845,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.33"
-    version_code = 33
+    app_version = "1.0.34"
+    version_code = 34
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -8806,52 +8806,60 @@ def reports_approval_dashboard():
 @app.route('/reports/<int:report_id>/approve', methods=['POST'])
 @login_required
 def report_approve(report_id):
-    """Approve or reject a report"""
+    """Approve or reject a report (supports both Relatorio and RelatorioExpress)"""
     if not current_user.is_master:
         return jsonify({'success': False, 'message': 'Acesso negado.'})
 
-    relatorio = Relatorio.query.get_or_404(report_id)
-    data = request.get_json()
+    is_express = False
+    relatorio = Relatorio.query.get(report_id)
+    if not relatorio:
+        relatorio = RelatorioExpress.query.get(report_id)
+        if relatorio:
+            is_express = True
+        else:
+            return jsonify({'success': False, 'message': 'Relatório não encontrado.'}), 404
+
+    data = request.get_json(silent=True) or request.form or {}
     action = data.get('action')
     comment = data.get('comment', '')
 
     if action == 'approve':
         relatorio.status = 'Aprovado'
-        flash_message = 'Relatório aprovado com sucesso.'
+        flash_message = f'Relatório {"Express " if is_express else ""}{relatorio.numero} aprovado com sucesso.'
 
-        # Fazer backup automático no Google Drive quando aprovado
-        try:
-            # Preparar dados do relatório para backup
-            fotos_paths = []
-            fotos = FotoRelatorio.query.filter_by(relatorio_id=report_id).all()
-            upload_folder = app.config.get('UPLOAD_FOLDER', 'uploads')
+        if not is_express:
+            # Fazer backup automático no Google Drive quando aprovado
+            try:
+                fotos_paths = []
+                fotos = FotoRelatorio.query.filter_by(relatorio_id=report_id).all()
+                upload_folder = app.config.get('UPLOAD_FOLDER', 'uploads')
 
-            for foto in fotos:
-                foto_path = os.path.join(upload_folder, foto.filename)
-                if os.path.exists(foto_path):
-                    fotos_paths.append(foto_path)
+                for foto in fotos:
+                    foto_path = os.path.join(upload_folder, foto.filename)
+                    if os.path.exists(foto_path):
+                        fotos_paths.append(foto_path)
 
-            report_data = {
-                'id': relatorio.id,
-                'numero': relatorio.numero,
-                'pdf_path': None,  # PDF será gerado se necessário
-                'images': fotos_paths
-            }
+                report_data = {
+                    'id': relatorio.id,
+                    'numero': relatorio.numero,
+                    'pdf_path': None,
+                    'images': fotos_paths
+                }
 
-            project_name = f"{relatorio.projeto.numero}_{relatorio.projeto.nome}"
-            backup_result = backup_to_drive(report_data, project_name)
+                project_name = f"{relatorio.projeto.numero}_{relatorio.projeto.nome}"
+                backup_result = backup_to_drive(report_data, project_name)
 
-            if backup_result.get('success'):
-                flash_message += f' Backup realizado: {backup_result.get("successful_uploads", 0)} arquivo(s) enviado(s).'
-            else:
-                flash_message += f' Aviso de backup: {backup_result.get("message", "Erro no backup")}'
+                if backup_result.get('success'):
+                    flash_message += f' Backup realizado: {backup_result.get("successful_uploads", 0)} arquivo(s) enviado(s).'
+                else:
+                    flash_message += f' Aviso de backup: {backup_result.get("message", "Erro no backup")}'
 
-        except Exception as e:
-            flash_message += f' Erro no backup: {str(e)}'
+            except Exception as e:
+                flash_message += f' Erro no backup: {str(e)}'
 
     elif action == 'reject':
         relatorio.status = 'Rejeitado'
-        flash_message = 'Relatório rejeitado.'
+        flash_message = f'Relatório {"Express " if is_express else ""}{relatorio.numero} rejeitado.'
     else:
         return jsonify({'success': False, 'message': 'Ação inválida.'})
 
@@ -8860,6 +8868,37 @@ def report_approve(report_id):
     relatorio.comentario_aprovacao = comment
 
     db.session.commit()
+
+    if is_express:
+        if action == 'approve':
+            try:
+                from notification_service import notification_service
+                notification_service.criar_notificacao_express_aprovado(relatorio.id, current_user.id)
+            except Exception as ne:
+                current_app.logger.warning(f"Erro ao criar notificação de express aprovado: {ne}")
+
+            try:
+                from pdf_generator_express import gerar_pdf_relatorio_express
+                from email_service_unified import get_email_service
+                res_pdf = gerar_pdf_relatorio_express(relatorio.id, salvar_arquivo=True)
+                if res_pdf.get('success'):
+                    pdf_path = res_pdf.get('path')
+                    if pdf_path and os.path.exists(pdf_path):
+                        email_service = get_email_service()
+                        resultado_email = email_service.send_approval_email(relatorio, pdf_path)
+                        enviados = resultado_email.get('enviados', 0)
+                        if enviados > 0:
+                            flash_message += f" {enviados} e-mail(s) de notificação enviado(s)."
+            except Exception as pe:
+                current_app.logger.error(f"Erro ao gerar PDF/enviar email express: {pe}")
+        elif action == 'reject':
+            try:
+                from notification_service import notification_service
+                notification_service.criar_notificacao_express_reprovado(relatorio.id, comment)
+            except Exception as nr:
+                current_app.logger.warning(f"Erro ao criar notificação de express rejeitado: {nr}")
+
+        return jsonify({'success': True, 'message': flash_message})
     
     # Enviar e-mail de aprovação para todos os envolvidos (após commit)
     if action == 'approve':
@@ -13005,9 +13044,9 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.33'
-    current_vc = 33
-    release_notes = 'Atualização v1.0.33: Correção do carregamento de dados do SQLite no Dashboard e Relatórios, consultas resilientes com migração automática, nova visualização de Visitas em forma de Calendário com navegação mensal e seleção de dias, compatibilidade 100% offline e sincronização garantida.'
+    current_v = '1.0.34'
+    current_vc = 34
+    release_notes = 'Atualização v1.0.34: Correção da indexação do Relatório Express para iniciar em EXP-0001 sem saltos de ano; revisão e unificação do fluxo de aprovação dos relatórios express no app e portal web; ações de edição e reenvio de relatórios express; geração de PDF e envio de e-mails em aprovações.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [
@@ -14224,6 +14263,7 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
 
 # --- RELATORIO EXPRESS ---
 @app.route('/api/relatorios-express', methods=['GET', 'POST'])
+@app.route('/api/relatorios-express/sync', methods=['GET', 'POST'])
 @csrf.exempt
 def api_relatorios_express_sync():
     """Endpoint de sincronizacao para Relatórios Express com suporte completo a fotos"""
@@ -14236,16 +14276,29 @@ def api_relatorios_express_sync():
             numero = (data.get('numero') or '').strip()
             existing = RelatorioExpress.query.filter_by(numero=numero).first() if numero else None
 
+            # Fallback por id caso o relatório já exista no servidor
+            if not existing and data.get('id'):
+                try:
+                    req_id = int(data.get('id'))
+                    if req_id < 2000000000:
+                        existing = RelatorioExpress.query.get(req_id)
+                except Exception:
+                    pass
+
             if existing:
                 rel = existing
             else:
                 if not numero:
-                    count = RelatorioExpress.query.count() + 1
-                    numero = f"EXP-{count:04d}"
+                    try:
+                        from routes_express import generate_express_number
+                        numero = generate_express_number()
+                    except Exception:
+                        count = RelatorioExpress.query.count() + 1
+                        numero = f"EXP-{count:04d}"
 
                 rel = RelatorioExpress(
                     numero=numero,
-                    empresa_nome=data.get('empresa_nome') or 'ELP Engenharia',
+                    empresa_nome=data.get('empresa_nome') or data.get('obra_nome') or 'ELP Engenharia',
                     empresa_responsavel=data.get('empresa_responsavel') or (user.nome_completo if user else 'Responsável'),
                     empresa_email=data.get('empresa_email') or 'engenharia@elp.com.br',
                     empresa_telefone=data.get('empresa_telefone'),
@@ -14253,24 +14306,58 @@ def api_relatorios_express_sync():
                 )
                 db.session.add(rel)
 
-            rel.obra_nome = data.get('obra_nome') or 'Obra Express'
-            rel.obra_tipo = data.get('obra_tipo')
-            rel.obra_construtora = data.get('obra_construtora')
-            rel.obra_responsavel = data.get('obra_responsavel')
-            rel.obra_email = data.get('obra_email')
-            rel.obra_endereco = data.get('obra_endereco')
-            rel.titulo = data.get('titulo') or 'Relatório Express de Visita'
-            rel.data_visita = _parse_iso_date(data.get('data_visita'), as_date=True, default=brazil_now().date())
-            rel.data_relatorio = _parse_iso_date(data.get('data_relatorio'), default=brazil_now())
-            rel.descricao = data.get('descricao') or ''
-            rel.observacoes_finais = data.get('observacoes_finais') or ''
-            rel.informacoes_tecnicas = data.get('informacoes_tecnicas') or ''
-            rel.checklist_data = data.get('checklist_data') or ''
-            rel.status = data.get('status') or 'Aguardando Aprovação'
-            rel.comentario_aprovacao = data.get('comentario') or data.get('comentario_aprovacao') or rel.comentario_aprovacao or ''
+            if 'obra_nome' in data and data.get('obra_nome'):
+                rel.obra_nome = data.get('obra_nome')
+            elif not rel.obra_nome:
+                rel.obra_nome = 'Obra Express'
+
+            if 'obra_tipo' in data:
+                rel.obra_tipo = data.get('obra_tipo')
+            if 'obra_construtora' in data and data.get('obra_construtora'):
+                rel.obra_construtora = data.get('obra_construtora')
+            if 'obra_responsavel' in data and data.get('obra_responsavel'):
+                rel.obra_responsavel = data.get('obra_responsavel')
+            if 'obra_email' in data and data.get('obra_email'):
+                rel.obra_email = data.get('obra_email')
+            if 'obra_endereco' in data and data.get('obra_endereco'):
+                rel.obra_endereco = data.get('obra_endereco')
+            if 'titulo' in data and data.get('titulo'):
+                rel.titulo = data.get('titulo')
+            if 'data_visita' in data and data.get('data_visita'):
+                rel.data_visita = _parse_iso_date(data.get('data_visita'), as_date=True, default=rel.data_visita or brazil_now().date())
+            if 'data_relatorio' in data and data.get('data_relatorio'):
+                rel.data_relatorio = _parse_iso_date(data.get('data_relatorio'), default=rel.data_relatorio or brazil_now())
+            if 'descricao' in data and data.get('descricao') is not None:
+                rel.descricao = data.get('descricao')
+            if 'observacoes_finais' in data and data.get('observacoes_finais') is not None:
+                rel.observacoes_finais = data.get('observacoes_finais')
+            if 'informacoes_tecnicas' in data and data.get('informacoes_tecnicas'):
+                rel.informacoes_tecnicas = data.get('informacoes_tecnicas')
+            if 'checklist_data' in data and data.get('checklist_data'):
+                rel.checklist_data = data.get('checklist_data')
+            if 'status' in data and data.get('status'):
+                rel.status = data.get('status')
+            if data.get('comentario') or data.get('comentario_aprovacao'):
+                rel.comentario_aprovacao = data.get('comentario') or data.get('comentario_aprovacao')
             if data.get('aprovador_id'):
                 rel.aprovador_id = data.get('aprovador_id')
                 rel.data_aprovacao = brazil_now()
+
+            # Processar acompanhantes com segurança para coluna JSONB
+            acomp_raw = data.get('acompanhantes')
+            if acomp_raw is not None:
+                if isinstance(acomp_raw, list):
+                    rel.acompanhantes = acomp_raw
+                elif isinstance(acomp_raw, str):
+                    try:
+                        rel.acompanhantes = json.loads(acomp_raw)
+                    except Exception:
+                        if ',' in acomp_raw:
+                            rel.acompanhantes = [x.strip() for x in acomp_raw.split(',') if x.strip()]
+                        elif acomp_raw.strip():
+                            rel.acompanhantes = [acomp_raw.strip()]
+                        else:
+                            rel.acompanhantes = []
 
             db.session.flush()
 
@@ -14295,6 +14382,21 @@ def api_relatorios_express_sync():
                     current_app.logger.info(f"🔔 Notificação de aprovação disparada para express {rel.numero}")
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de aprovação express: {notif_err}")
+
+                # Gerar PDF e disparar emails em background/síncrono
+                try:
+                    from pdf_generator_express import gerar_pdf_relatorio_express
+                    from email_service_unified import get_email_service
+                    res_pdf = gerar_pdf_relatorio_express(rel.id, salvar_arquivo=True)
+                    if res_pdf.get('success'):
+                        pdf_path = res_pdf.get('path')
+                        if pdf_path and os.path.exists(pdf_path):
+                            email_service = get_email_service()
+                            email_service.send_approval_email(rel, pdf_path)
+                            current_app.logger.info(f"✅ Email e PDF de aprovação express {rel.numero} gerados/enviados")
+                except Exception as post_aprov_err:
+                    current_app.logger.warning(f"Aviso no pós-aprovação do express: {post_aprov_err}")
+
             elif rel.status == 'Rejeitado':
                 try:
                     from notification_service import notification_service

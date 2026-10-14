@@ -4,6 +4,7 @@ Funcionalidade independente com obra criada junto do relatório
 Status: Em preenchimento → Aguardando Aprovação → Aprovado / Rejeitado
 """
 import os
+import re
 import json
 import logging
 from datetime import datetime
@@ -17,15 +18,41 @@ from models import RelatorioExpress, FotoRelatorioExpress, User, ChecklistPadrao
 logger = logging.getLogger(__name__)
 
 def generate_express_number():
-    """Gera o próximo número para Relatório Express"""
-    last_report = RelatorioExpress.query.order_by(RelatorioExpress.id.desc()).first()
-    if last_report:
-        try:
-            num = int(last_report.numero.replace('EXP-', ''))
-            return f"EXP-{str(num + 1).zfill(4)}"
-        except:
-            pass
-    return "EXP-0001"
+    """Gera o próximo número sequencial para Relatório Express (iniciando em EXP-0001)"""
+    try:
+        reports = RelatorioExpress.query.all()
+        max_seq = 0
+        for r in reports:
+            if not r.numero:
+                continue
+            num_str = r.numero.strip()
+            # 1. Formato legado com ano: EXP-YYYY-NNNN (ex: EXP-2026-0001)
+            m_leg = re.match(r'^EXP-\d{4}-(\d+)$', num_str, re.IGNORECASE)
+            if m_leg:
+                v = int(m_leg.group(1))
+                if v > max_seq:
+                    max_seq = v
+                continue
+            # 2. Formato padrão: EXP-NNNN (ex: EXP-0001)
+            m_std = re.match(r'^EXP-(\d+)$', num_str, re.IGNORECASE)
+            if m_std:
+                v = int(m_std.group(1))
+                # Ignorar sequências que vieram de bug de ano (ex: 2026, 2027)
+                if 1900 <= v <= 2099:
+                    continue
+                if v > max_seq:
+                    max_seq = v
+                continue
+            # 3. Fallback: dígitos finais
+            m_end = re.search(r'(\d+)$', num_str)
+            if m_end:
+                v = int(m_end.group(1))
+                if v < 1900 and v > max_seq:
+                    max_seq = v
+        return f"EXP-{max_seq + 1:04d}"
+    except Exception as e:
+        logger.warning(f"Erro ao gerar número express: {e}")
+        return "EXP-0001"
 
 
 @app.route('/relatorios-express')
