@@ -688,8 +688,8 @@ def inject_approval_functions():
     return {
         'current_user_is_aprovador': current_user_is_aprovador,
         'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra,
-        'app_version': ver_info.get('version', '1.0.30'),
-        'app_version_code': ver_info.get('version_code', 30)
+        'app_version': ver_info.get('version', '1.0.31'),
+        'app_version_code': ver_info.get('version_code', 31)
     }
 
 @app.route('/api/checklist-padrao')
@@ -2841,8 +2841,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.30"
-    version_code = 30
+    app_version = "1.0.31"
+    version_code = 31
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -9174,7 +9174,7 @@ def api_visits_calendar():
             total_participantes = len(participantes)
             has_multiple_participants = total_participantes > 1
             
-            display_title = f"{visit.numero or f'VIS-{visit.id:04d}'} • {projeto_nome}"
+            display_title = f"{visit.numero or f'VISIT-{visit.id:04d}'} • {projeto_nome}"
             if has_multiple_participants:
                 display_title = f"{display_title} ({total_participantes})"
             
@@ -9183,7 +9183,7 @@ def api_visits_calendar():
             visits_data.append({
                 'id': f"visit-{visit.id}",
                 'visit_id': visit.id,
-                'numero': visit.numero or f"VIS-{visit.id:04d}",
+                'numero': visit.numero or f"VISIT-{visit.id:04d}",
                 'title': display_title,
                 'start': visit.data_inicio.isoformat() if visit.data_inicio else None,
                 'end': visit.data_fim.isoformat() if visit.data_fim else None,
@@ -9503,11 +9503,11 @@ def api_visits_list():
             data_inicio = parse_dt(data.get('data_inicio') or data.get('data_agendada'))
             data_fim = parse_dt(data.get('data_fim'), default=data_inicio)
 
-            # Generate or use visit number
+            # Generate or use visit number formatted as VISIT-0001
             numero = (data.get('numero') or '').strip()
-            if not numero or Visita.query.filter_by(numero=numero).first():
-                visitas_count = Visita.query.count() + 1
-                numero = f"VIS-{visitas_count:04d}"
+            if not numero or not numero.upper().startswith('VISIT-') or Visita.query.filter_by(numero=numero).first():
+                from utils import generate_visit_number
+                numero = generate_visit_number()
 
             projeto_id = data.get('projeto_id')
             if projeto_id:
@@ -9537,6 +9537,25 @@ def api_visits_list():
             )
 
             db.session.add(visita)
+            db.session.flush()
+
+            # Salvar participantes se fornecidos
+            participantes_raw = data.get('participantes') or data.get('participantes_detalhes') or []
+            if isinstance(participantes_raw, list):
+                adicionados_set = set()
+                for p_item in participantes_raw:
+                    try:
+                        p_uid = int(p_item['user_id'] if isinstance(p_item, dict) and p_item.get('user_id') else (p_item['id'] if isinstance(p_item, dict) and p_item.get('id') else p_item))
+                        if p_uid > 0 and p_uid not in adicionados_set:
+                            db.session.add(VisitaParticipante(
+                                visita_id=visita.id,
+                                user_id=p_uid,
+                                confirmado=False
+                            ))
+                            adicionados_set.add(p_uid)
+                    except Exception:
+                        pass
+
             db.session.commit()
 
             return jsonify({
@@ -12981,9 +13000,9 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.30'
-    current_vc = 30
-    release_notes = 'Atualização v1.0.30: Correção de sincronização offline (obras e relatórios criados sem internet), notificações de rejeição e aprovação, cadastro de visitantes integrado nos ajustes e na criação de relatórios, e visualização minimalista da aba relatórios.'
+    current_v = '1.0.31'
+    current_vc = 31
+    release_notes = 'Atualização v1.0.31: Visitas indexadas como VISIT-0001, formulário com Obra e Outros, início, fim, observações, responsável dos usuários, participantes em cards com função e compromisso pessoal, 3 cards editáveis no dashboard e fluxos de notificações.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [

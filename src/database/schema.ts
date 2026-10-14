@@ -77,7 +77,10 @@ CREATE TABLE IF NOT EXISTS visitas (
 CREATE TABLE IF NOT EXISTS visita_participantes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   visita_id INTEGER NOT NULL,
-  user_id INTEGER NOT NULL,
+  user_id INTEGER,
+  nome TEXT,
+  funcao TEXT,
+  tipo TEXT,
   confirmado INTEGER DEFAULT 0
 );
 

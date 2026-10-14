@@ -57,6 +57,14 @@ export interface CategoriaObra {
   sync_status?: 'synced' | 'pending' | 'error';
 }
 
+export interface VisitaParticipanteItem {
+  id?: number;
+  user_id?: number;
+  nome: string;
+  funcao?: string;
+  tipo?: 'usuario' | 'visitante' | 'outro';
+}
+
 export interface Visita {
   id: number;
   numero: string;
@@ -78,6 +86,7 @@ export interface Visita {
   criado_por?: number;
   sync_status?: 'synced' | 'pending' | 'error';
   participantes?: number[];
+  participantes_detalhes?: VisitaParticipanteItem[];
 }
 
 export interface Relatorio {

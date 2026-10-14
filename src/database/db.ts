@@ -4,7 +4,8 @@ import {
   Projeto, Visita, Relatorio, FotoRelatorio, 
   RelatorioExpress, FotoRelatorioExpress, 
   Contato, Lembrete, Notificacao, LegendaPredefinida, 
-  SyncQueueItem, User, ChecklistCustomItem, ChecklistProgressoObra 
+  SyncQueueItem, User, ChecklistCustomItem, ChecklistProgressoObra,
+  VisitaParticipanteItem
 } from '../types';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
@@ -127,6 +128,17 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
   // Ensure deleted_entities table exists for tombstone reconciliation
   try {
     await db.execAsync('CREATE TABLE IF NOT EXISTS deleted_entities (entity_type TEXT NOT NULL, entity_id INTEGER NOT NULL, deleted_at TEXT NOT NULL, PRIMARY KEY (entity_type, entity_id));');
+  } catch {}
+
+  // Migrations para participantes da visita (cards com nome e função)
+  try {
+    await db.execAsync('ALTER TABLE visita_participantes ADD COLUMN nome TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE visita_participantes ADD COLUMN funcao TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE visita_participantes ADD COLUMN tipo TEXT;');
   } catch {}
   
   // Seed/Sync legendas predefinidas garantindo todas as 12 categorias tecnicas solicitadas
@@ -369,6 +381,51 @@ export async function deleteLocalProjetoCascade(projetoId: number): Promise<void
 }
 
 // ================= VISITAS =================
+export async function getNextVisitNumber(): Promise<string> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ numero: string }>('SELECT numero FROM visitas');
+  let maxSeq = 0;
+  for (const row of rows) {
+    if (!row.numero) continue;
+    const match = row.numero.match(/VIS(?:IT)?[-_ ]*(\d+)/i);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      if (!isNaN(val) && val > maxSeq) {
+        maxSeq = val;
+      }
+    }
+  }
+  const nextSeq = maxSeq + 1;
+  return `VISIT-${String(nextSeq).padStart(4, '0')}`;
+}
+
+export async function getVisitaParticipantes(visitaId: number): Promise<VisitaParticipanteItem[]> {
+  const db = await getDatabase();
+  try {
+    return await db.getAllAsync<VisitaParticipanteItem>(
+      'SELECT id, user_id, nome, funcao, tipo FROM visita_participantes WHERE visita_id = ? ORDER BY id ASC',
+      [visitaId]
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function saveVisitaParticipantes(visitaId: number, participantes: VisitaParticipanteItem[]): Promise<void> {
+  const db = await getDatabase();
+  try {
+    await db.runAsync('DELETE FROM visita_participantes WHERE visita_id = ?', [visitaId]);
+    for (const p of participantes) {
+      await db.runAsync(
+        'INSERT INTO visita_participantes (visita_id, user_id, nome, funcao, tipo, confirmado) VALUES (?, ?, ?, ?, ?, ?)',
+        [visitaId, p.user_id || null, p.nome || '', p.funcao || '', p.tipo || 'usuario', 0]
+      );
+    }
+  } catch (e) {
+    console.warn('[DB] Erro ao salvar participantes da visita:', e);
+  }
+}
+
 export async function getLocalVisitas(projetoId?: number): Promise<Visita[]> {
   const db = await getDatabase();
   let query = 'SELECT * FROM visitas';
@@ -379,17 +436,29 @@ export async function getLocalVisitas(projetoId?: number): Promise<Visita[]> {
   }
   query += ' ORDER BY data_inicio DESC';
   const rows = await db.getAllAsync<any>(query, params);
-  return rows.map(r => ({
-    ...r,
-    is_pessoal: Boolean(r.is_pessoal)
-  }));
+  
+  const visits: Visita[] = [];
+  for (const r of rows) {
+    const parts = await getVisitaParticipantes(r.id);
+    visits.push({
+      ...r,
+      is_pessoal: Boolean(r.is_pessoal),
+      participantes_detalhes: parts
+    });
+  }
+  return visits;
 }
 
 export async function getLocalVisitaById(id: number): Promise<Visita | null> {
   const db = await getDatabase();
   const row = await db.getFirstAsync<any>('SELECT * FROM visitas WHERE id = ?', [id]);
   if (!row) return null;
-  return { ...row, is_pessoal: Boolean(row.is_pessoal) };
+  const parts = await getVisitaParticipantes(row.id);
+  return { 
+    ...row, 
+    is_pessoal: Boolean(row.is_pessoal),
+    participantes_detalhes: parts
+  };
 }
 
 export async function saveLocalVisita(v: Visita, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
@@ -408,6 +477,10 @@ export async function saveLocalVisita(v: Visita, syncStatus: 'synced' | 'pending
       v.longitude || null, v.is_pessoal ? 1 : 0, syncStatus
     ]
   );
+
+  if (v.participantes_detalhes && Array.isArray(v.participantes_detalhes)) {
+    await saveVisitaParticipantes(v.id, v.participantes_detalhes);
+  }
 }
 
 export async function deleteLocalVisita(id: number): Promise<void> {

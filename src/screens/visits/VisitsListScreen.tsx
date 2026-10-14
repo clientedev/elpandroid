@@ -220,6 +220,8 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
           const timeStr = dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           const teamTheme = getTeamTheme(item.responsavel_nome);
 
+          const displayNum = item.numero ? (item.numero.startsWith('VIS-') ? item.numero.replace('VIS-', 'VISIT-') : item.numero) : 'VISIT-0001';
+
           return (
             <TouchableOpacity 
               style={styles.card}
@@ -233,7 +235,7 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                 <View style={styles.cardHeader}>
                   <View style={styles.badgeRow}>
                     <View style={styles.numBadge}>
-                      <Text style={styles.numText}>{item.numero}</Text>
+                      <Text style={styles.numText}>{displayNum}</Text>
                     </View>
                     
                     {/* Team Member Badge */}
@@ -246,6 +248,15 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                     {item.is_pessoal ? (
                       <View style={styles.pessoalBadge}>
                         <Text style={styles.pessoalText}>Pessoal</Text>
+                      </View>
+                    ) : null}
+
+                    {item.participantes_detalhes && item.participantes_detalhes.length > 0 ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                        <Ionicons name="people" size={11} color="#64748B" />
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#475569' }}>
+                          +{item.participantes_detalhes.length}
+                        </Text>
                       </View>
                     ) : null}
                   </View>

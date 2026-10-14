@@ -327,25 +327,27 @@ def generate_report_number(projeto_id=None):
         return "REL-0001"
 
 def generate_visit_number():
-    """Generate sequential visit number"""
+    """Generate sequential visit number indexed as VISIT-0001"""
     from models import Visita
     from app import db
+    import re
     
     try:
-        last_visit = Visita.query.order_by(Visita.id.desc()).first()
-        if last_visit:
-            # Extract number from existing format like "VIS-0001"
-            if last_visit.numero and 'VIS-' in last_visit.numero:
-                try:
-                    last_num = int(last_visit.numero.split('-')[1])
-                    return f"VIS-{last_num + 1:04d}"
-                except:
-                    pass
-        
-        # Default start
-        return "VIS-0001"
+        visits = Visita.query.all()
+        max_num = 0
+        for v in visits:
+            if v.numero:
+                m = re.search(r'VIS(?:IT)?[-_ ]*(\d+)', v.numero, re.IGNORECASE)
+                if m:
+                    try:
+                        val = int(m.group(1))
+                        if val > max_num:
+                            max_num = val
+                    except:
+                        pass
+        return f"VISIT-{max_num + 1:04d}"
     except:
-        return "VIS-0001"
+        return "VISIT-0001"
 
 def send_report_email(report, email, name):
     """Send report via email"""

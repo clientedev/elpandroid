@@ -307,7 +307,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         );
 
       case 'stats':
-        const showAnyStat = widgetsConfig.showObrasAtivas || widgetsConfig.showRelatoriosPendentes || widgetsConfig.showVisitasAgendadas || widgetsConfig.showRelatoriosRascunho;
+        const showAnyStat = widgetsConfig.showObrasAtivas || widgetsConfig.showRelatoriosPendentes || widgetsConfig.showVisitasAgendadas;
         if (!showAnyStat) return null;
         const statsCfg = serverSections.find(s => s.id === 'stats');
         if (statsCfg && !statsCfg.visible) return null;
@@ -315,68 +315,105 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
           <View key="stats">
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
-                <Ionicons name="trending-up" size={20} color="#4E73DF" />
-                <Text style={styles.sectionTitle}>{statsCfg?.title || 'Métricas Rápidas'}</Text>
+                <Ionicons name="trending-up" size={18} color="#2563EB" />
+                <Text style={styles.sectionTitle}>{statsCfg?.title || 'Indicadores Principais'}</Text>
               </View>
-              <View style={styles.onlinePill}>
-                <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-                <Text style={styles.onlinePillText}>{isOnline ? 'Online' : 'Offline'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TouchableOpacity 
+                  style={styles.customizeStatsBtn}
+                  onPress={() => setShowConfigModal(true)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="create-outline" size={13} color="#2563EB" />
+                  <Text style={styles.customizeStatsText}>Editar</Text>
+                </TouchableOpacity>
+
+                <View style={styles.onlinePill}>
+                  <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+                  <Text style={styles.onlinePillText}>{isOnline ? 'Online' : 'Offline'}</Text>
+                </View>
               </View>
             </View>
 
-            {/* 4 Cards Coloridos em Grade (Seção 15.3 do Manual) */}
+            {/* Três Cards Principais Solicitados: Obras Ativas, Relatórios Pendentes, Visitas Agendadas */}
             <View style={styles.cardsGrid}>
-              {/* 1. Obras Ativas (Verde) */}
-              <TouchableOpacity 
-                style={[styles.webCard, { borderLeftColor: '#10B981', borderLeftWidth: 4 }]} 
-                onPress={() => navigation.navigate('ObrasTab')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardContent}>
-                  <Text style={[styles.cardLabel, { color: '#059669' }]}>OBRAS ATIVAS</Text>
-                  <Text style={[styles.cardValue, { color: '#065F46' }]}>{obrasAtivas}</Text>
-                </View>
-                <Ionicons name="business" size={36} color="#A7F3D0" />
-              </TouchableOpacity>
+              {/* 1. Obras Ativas */}
+              {widgetsConfig.showObrasAtivas && (
+                <TouchableOpacity 
+                  style={[styles.webCard, { borderLeftColor: '#10B981', borderLeftWidth: 4 }]} 
+                  onPress={() => navigation.navigate('ObrasTab')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardHeaderRowTop}>
+                      <Text style={[styles.cardLabel, { color: '#059669' }]}>OBRAS ATIVAS</Text>
+                      <TouchableOpacity 
+                        onPress={(e) => { e.stopPropagation(); setShowConfigModal(true); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="create-outline" size={15} color="#10B981" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.cardValue, { color: '#065F46' }]}>{obrasAtivas}</Text>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                      {obrasAtivas === 1 ? 'Obra em acompanhamento ativo' : 'Obras em acompanhamento ativo'}
+                    </Text>
+                  </View>
+                  <Ionicons name="business" size={34} color="#A7F3D0" />
+                </TouchableOpacity>
+              )}
 
-              {/* 2. Visitas Agendadas (Azul) */}
-              <TouchableOpacity 
-                style={[styles.webCard, { borderLeftColor: '#2563EB', borderLeftWidth: 4 }]} 
-                onPress={() => navigation.navigate('VisitasTab')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardContent}>
-                  <Text style={[styles.cardLabel, { color: '#2563EB' }]}>VISITAS AGENDADAS</Text>
-                  <Text style={[styles.cardValue, { color: '#1E3A8A' }]}>{visitasAgendadas}</Text>
-                </View>
-                <Ionicons name="calendar" size={36} color="#BFDBFE" />
-              </TouchableOpacity>
+              {/* 2. Relatórios Pendentes */}
+              {widgetsConfig.showRelatoriosPendentes && (
+                <TouchableOpacity 
+                  style={[styles.webCard, { borderLeftColor: '#F59E0B', borderLeftWidth: 4 }]} 
+                  onPress={() => navigation.navigate('PendentesTab', { filterStatus: 'Aguardando Aprovação' })}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardHeaderRowTop}>
+                      <Text style={[styles.cardLabel, { color: '#D97706' }]}>RELATÓRIOS PENDENTES</Text>
+                      <TouchableOpacity 
+                        onPress={(e) => { e.stopPropagation(); setShowConfigModal(true); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="create-outline" size={15} color="#F59E0B" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.cardValue, { color: '#92400E' }]}>{relatoriosPendentes}</Text>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                      {relatoriosPendentes === 1 ? 'Relatório aguardando aprovação técnica' : 'Relatórios aguardando aprovação técnica'}
+                    </Text>
+                  </View>
+                  <Ionicons name="hourglass" size={34} color="#FDE68A" />
+                </TouchableOpacity>
+              )}
 
-              {/* 3. Relatórios em Preenchimento (Amarelo) */}
-              <TouchableOpacity 
-                style={[styles.webCard, { borderLeftColor: '#F59E0B', borderLeftWidth: 4 }]} 
-                onPress={() => navigation.navigate('PendentesTab', { filterStatus: 'em_andamento' })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardContent}>
-                  <Text style={[styles.cardLabel, { color: '#D97706' }]}>EM PREENCHIMENTO</Text>
-                  <Text style={[styles.cardValue, { color: '#92400E' }]}>{relatoriosRascunho}</Text>
-                </View>
-                <Ionicons name="document-text" size={36} color="#FDE68A" />
-              </TouchableOpacity>
-
-              {/* 4. Relatórios Aprovados (Ciano) */}
-              <TouchableOpacity 
-                style={[styles.webCard, { borderLeftColor: '#06B6D4', borderLeftWidth: 4 }]} 
-                onPress={() => navigation.navigate('PendentesTab', { filterStatus: 'Aprovado' })}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardContent}>
-                  <Text style={[styles.cardLabel, { color: '#0891B2' }]}>RELATÓRIOS APROVADOS</Text>
-                  <Text style={[styles.cardValue, { color: '#155E75' }]}>{relatoriosAprovados}</Text>
-                </View>
-                <Ionicons name="checkmark-done-circle" size={36} color="#BAE6FD" />
-              </TouchableOpacity>
+              {/* 3. Visitas Agendadas */}
+              {widgetsConfig.showVisitasAgendadas && (
+                <TouchableOpacity 
+                  style={[styles.webCard, { borderLeftColor: '#2563EB', borderLeftWidth: 4 }]} 
+                  onPress={() => navigation.navigate('VisitasTab')}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.cardContent}>
+                    <View style={styles.cardHeaderRowTop}>
+                      <Text style={[styles.cardLabel, { color: '#2563EB' }]}>VISITAS AGENDADAS</Text>
+                      <TouchableOpacity 
+                        onPress={(e) => { e.stopPropagation(); setShowConfigModal(true); }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="create-outline" size={15} color="#2563EB" />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.cardValue, { color: '#1E3A8A' }]}>{visitasAgendadas}</Text>
+                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                      {visitasAgendadas === 1 ? 'Vistoria programada na agenda' : 'Vistorias programadas na agenda'}
+                    </Text>
+                  </View>
+                  <Ionicons name="calendar" size={34} color="#BFDBFE" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         );
@@ -1204,9 +1241,31 @@ const styles = StyleSheet.create({
     color: '#2563EB',
     fontWeight: '600',
   },
+  customizeStatsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  customizeStatsText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  cardHeaderRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   cardsGrid: {
-    gap: 12,
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 8,
   },
   webCard: {
     backgroundColor: '#FFFFFF',

@@ -13,6 +13,7 @@ import {
 } from '../database/db';
 import { Notificacao } from '../types';
 import { notificationService } from '../services/notificationService';
+import { useNavigation } from '@react-navigation/native';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 44;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -34,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user } = useAuth();
   const { isOnline, syncState, pendingCount, triggerSync } = useNetwork();
+  const navigation = useNavigation<any>();
   
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -93,6 +95,44 @@ export const Header: React.FC<HeaderProps> = ({
     if (!item.lida) {
       await markNotificacaoAsRead(item.id);
       await loadNotificacoes();
+    }
+    setDrawerOpen(false);
+
+    try {
+      if (item.link) {
+        const matchRel = item.link.match(/\/relatorios?\/(\d+)/i);
+        if (matchRel) {
+          navigation.navigate('ReportDetailScreen', { reportId: parseInt(matchRel[1], 10) });
+          return;
+        }
+        const matchVis = item.link.match(/\/visits?\/(\d+)/i);
+        if (matchVis) {
+          navigation.navigate('VisitDetailScreen', { visitId: parseInt(matchVis[1], 10) });
+          return;
+        }
+        const matchProj = item.link.match(/\/projetos?\/(\d+)/i) || item.link.match(/\/obras?\/(\d+)/i);
+        if (matchProj) {
+          navigation.navigate('ProjectDetailScreen', { projectId: parseInt(matchProj[1], 10) });
+          return;
+        }
+      }
+
+      // Direcionamento por tipo da notificação
+      if (item.tipo === 'relatorio_pendente' || item.tipo === 'aprovacao') {
+        navigation.navigate('PendentesTab', { filterStatus: 'Aguardando Aprovação' });
+      } else if (item.tipo === 'relatorio_rejeitado' || item.tipo === 'rejeicao') {
+        navigation.navigate('PendentesTab', { filterStatus: 'Rejeitado' });
+      } else if (item.tipo === 'relatorio') {
+        navigation.navigate('PendentesTab');
+      } else if (item.tipo === 'visita_agendada' || item.tipo === 'visita_convite' || item.tipo === 'visita') {
+        navigation.navigate('VisitasTab');
+      } else if (item.tipo === 'obra_criada' || item.tipo === 'obra') {
+        navigation.navigate('ObrasTab');
+      } else if (item.tipo === 'lembrete') {
+        navigation.navigate('RemindersScreen');
+      }
+    } catch (err) {
+      console.warn('Erro ao navegar da notificacao:', err);
     }
   }
 
@@ -325,10 +365,16 @@ export const Header: React.FC<HeaderProps> = ({
                           {item.mensagem}
                         </Text>
                         <View style={styles.notifMetaRow}>
-                          <Ionicons name="time-outline" size={11} color="#94A3B8" />
-                          <Text style={styles.notifDate}>
-                            {new Date(item.created_at).toLocaleDateString('pt-BR')} às {new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                          </Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Ionicons name="time-outline" size={11} color="#94A3B8" />
+                            <Text style={styles.notifDate}>
+                              {new Date(item.created_at).toLocaleDateString('pt-BR')} às {new Date(item.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: iconColor }}>Ver detalhes</Text>
+                            <Ionicons name="chevron-forward" size={12} color={iconColor} />
+                          </View>
                         </View>
                       </View>
                     </TouchableOpacity>
