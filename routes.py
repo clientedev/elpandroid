@@ -688,8 +688,8 @@ def inject_approval_functions():
     return {
         'current_user_is_aprovador': current_user_is_aprovador,
         'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra,
-        'app_version': ver_info.get('version', '1.0.28'),
-        'app_version_code': ver_info.get('version_code', 28)
+        'app_version': ver_info.get('version', '1.0.29'),
+        'app_version_code': ver_info.get('version_code', 29)
     }
 
 @app.route('/api/checklist-padrao')
@@ -2845,14 +2845,23 @@ def get_apk_info():
     version_code = 29
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        app_json_path = os.path.join(base_dir, 'app.json')
-        if os.path.exists(app_json_path):
-            with open(app_json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                expo_data = data.get('expo', {})
-                app_version = str(expo_data.get('version', app_version))
-                if 'android' in expo_data and 'versionCode' in expo_data['android']:
-                    version_code = int(expo_data['android']['versionCode'])
+        version_json_path = os.path.join(base_dir, 'version.json')
+        if os.path.exists(version_json_path):
+            with open(version_json_path, 'r', encoding='utf-8') as f:
+                vdata = json.load(f)
+                if 'version' in vdata:
+                    app_version = str(vdata['version'])
+                if 'versionCode' in vdata:
+                    version_code = int(vdata['versionCode'])
+        else:
+            app_json_path = os.path.join(base_dir, 'app.json')
+            if os.path.exists(app_json_path):
+                with open(app_json_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    expo_data = data.get('expo', {})
+                    app_version = str(expo_data.get('version', app_version))
+                    if 'android' in expo_data and 'versionCode' in expo_data['android']:
+                        version_code = int(expo_data['android']['versionCode'])
     except Exception as e:
         pass
 
@@ -12963,24 +12972,34 @@ def get_app_version_info():
     )
     current_v = '1.0.29'
     current_vc = 29
+    release_notes = 'Atualização v1.0.29: Lógica de visitas editável pelo painel web, autosave contínuo em todos os módulos do APK e sincronização em tempo real com Railway.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [
+            os.path.join(base_dir, 'version.json'),
+            os.path.join(os.getcwd(), 'version.json'),
             os.path.join(base_dir, 'app.json'),
             os.path.join(os.getcwd(), 'app.json'),
         ]
-        for app_json_path in candidates:
-            if os.path.exists(app_json_path):
-                with open(app_json_path, 'r', encoding='utf-8') as f:
+        for cfg_path in candidates:
+            if os.path.exists(cfg_path):
+                with open(cfg_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    expo_data = data.get('expo', {})
-                    if 'version' in expo_data:
-                        current_v = str(expo_data['version'])
-                    if 'android' in expo_data and 'versionCode' in expo_data['android']:
-                        current_vc = int(expo_data['android']['versionCode'])
-                break
+                    if 'version' in data and 'expo' not in data:
+                        current_v = str(data['version'])
+                        current_vc = int(data.get('versionCode', current_vc))
+                        if data.get('notes'):
+                            release_notes = data['notes']
+                        break
+                    elif 'expo' in data:
+                        expo_data = data.get('expo', {})
+                        if 'version' in expo_data:
+                            current_v = str(expo_data['version'])
+                        if 'android' in expo_data and 'versionCode' in expo_data['android']:
+                            current_vc = int(expo_data['android']['versionCode'])
+                        break
     except Exception as e:
-        print(f"[app-version] Erro ao ler versao de app.json: {e}")
+        print(f"[app-version] Erro ao ler versao: {e}")
 
     return jsonify({
         'version': current_v,
@@ -12988,7 +13007,7 @@ def get_app_version_info():
         'appName': 'ELP',
         'deployId': deploy_id,
         'buildTime': _SERVER_BOOT_TIME,
-        'notes': 'Atualização v1.0.29: Lógica de visitas editável pelo painel web, autosave contínuo em todos os módulos do APK e sincronização em tempo real com Railway.',
+        'notes': release_notes,
         'downloadUrl': 'https://elpandroid-production.up.railway.app/download/ELP.apk'
     }), 200
 

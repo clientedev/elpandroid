@@ -9,11 +9,27 @@ logger = logging.getLogger(__name__)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_current_version_info():
-    """Retorna a versão atual e versionCode lidos de app.json"""
+    """Retorna a versão atual e versionCode lidos de version.json ou app.json"""
+    version = "1.0.29"
+    version_code = 29
+
+    version_json_path = os.path.join(BASE_DIR, 'version.json')
+    if os.path.exists(version_json_path):
+        try:
+            with open(version_json_path, 'r', encoding='utf-8') as f:
+                vdata = json.load(f)
+                if 'version' in vdata:
+                    version = str(vdata['version'])
+                if 'versionCode' in vdata:
+                    version_code = int(vdata['versionCode'])
+            return {
+                'version': version,
+                'version_code': version_code
+            }
+        except Exception as e:
+            logger.error(f"Erro ao ler version.json: {e}")
+
     app_json_path = os.path.join(BASE_DIR, 'app.json')
-    version = "1.0.28"
-    version_code = 28
-    
     if os.path.exists(app_json_path):
         try:
             with open(app_json_path, 'r', encoding='utf-8') as f:
