@@ -19,6 +19,7 @@ import {
   getLocalVisitas,
   getLocalRelatorios,
   getPendingSyncQueue,
+  clearFailedSyncQueue,
 } from '../../database/db';
 import { Colors } from '../../theme/colors';
 
@@ -549,6 +550,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  clearQueueBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    gap: 6,
+  },
+  clearQueueBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#DC2626',
   },
   logoutBtn: {
     flexDirection: 'row',

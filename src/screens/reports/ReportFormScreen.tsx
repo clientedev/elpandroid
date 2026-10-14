@@ -1167,26 +1167,33 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             </View>
           </View>
 
-          {/* 2º Campo: Obra do Relatório (Valor Fixo) */}
+          {/* 2º Campo: Obra do Relatório em Menu Dropdown */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>2. Obra do Relatório</Text>
-            <View style={styles.fixedProjectCard}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <Text style={styles.label}>2. Obra do Relatório *</Text>
+              <Text style={{ fontSize: 11, color: '#0284C7', fontWeight: '600' }}>Toque para alterar obra</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.fixedProjectCard}
+              onPress={() => setShowProjectPickerModal(true)}
+              activeOpacity={0.7}
+            >
               <View style={styles.fixedProjectIconWrap}>
                 <Ionicons name="business" size={22} color="#0284C7" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.fixedProjectName}>
-                  {selectedProj?.numero ? `[${selectedProj.numero}] ` : ''}{selectedProj?.nome || 'Obra Selecionada'}
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.fixedProjectName} numberOfLines={1}>
+                  {selectedProj?.numero ? `[${selectedProj.numero}] ` : ''}{selectedProj?.nome || 'Toque para selecionar a obra...'}
                 </Text>
-                <Text style={styles.fixedProjectSub}>
+                <Text style={styles.fixedProjectSub} numberOfLines={1}>
                   {selectedProj?.construtora || 'ObraFlow'} • {selectedProj?.tipo_obra || 'Edificação'}
                 </Text>
               </View>
-              <View style={styles.fixedProjectLockBadge}>
-                <Ionicons name="lock-closed" size={13} color="#64748B" />
-                <Text style={styles.fixedProjectLockText}>Fixo</Text>
+              <View style={[styles.fixedProjectLockBadge, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
+                <Text style={[styles.fixedProjectLockText, { color: '#0284C7', fontWeight: '700' }]}>Dropdown</Text>
+                <Ionicons name="chevron-down" size={14} color="#0284C7" />
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {/* 3º Campo: Número do Relatório */}
@@ -1944,10 +1951,14 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                 return (
                   <TouchableOpacity
                     style={[styles.projectModalItemRow, isSel && styles.projectModalItemRowActive]}
-                    onPress={() => {
+                    onPress={async () => {
                       setSelectedProjectId(item.id);
                       setShowProjectPickerModal(false);
                       setProjectSearchQuery('');
+                      try {
+                        const nextNum = await getNextReportNumberForProject(item.id);
+                        if (nextNum) setReportNumber(nextNum);
+                      } catch (e) {}
                     }}
                   >
                     <Ionicons 

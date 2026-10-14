@@ -50,6 +50,10 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
   // 7. Por último: Check de Compromisso Pessoal
   const [isPessoal, setIsPessoal] = useState(false);
 
+  // Dropdown de Obra
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [projectSearch, setProjectSearch] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string | null>(null);
 
@@ -308,51 +312,43 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
           ) : null}
         </View>
 
-        {/* 1º CAMPO: OBRA (E CAMPO OUTROS ABAIXO QUANDO SELECIONADO) */}
+        {/* 1º CAMPO: OBRA EM MENU DROPDOWN (E CAMPO OUTROS ABAIXO QUANDO SELECIONADO) */}
         <View style={styles.formCard}>
           <View style={styles.fieldHeader}>
             <Ionicons name="business" size={16} color="#2563EB" />
             <Text style={styles.fieldTitle}>1. Obra / Projeto</Text>
           </View>
-          <Text style={styles.fieldDesc}>Selecione o local da visita ou escolha "Outros":</Text>
+          <Text style={styles.fieldDesc}>Selecione o local da visita no menu dropdown:</Text>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-            {projetos.map(p => {
-              const isSelected = selectedProjectId === p.id && !isPessoal;
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[styles.chipButton, isSelected && styles.chipButtonActive]}
-                  onPress={() => setSelectedProjectId(p.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.chipText, isSelected && styles.chipTextActive]}>
-                    {p.numero} - {p.nome}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-            {/* Opção Outros */}
-            <TouchableOpacity
-              style={[
-                styles.chipButton, 
-                styles.chipButtonOther,
-                selectedProjectId === 'outros' && styles.chipButtonOtherActive
-              ]}
-              onPress={() => setSelectedProjectId('outros')}
-              activeOpacity={0.7}
-            >
+          {/* Botão Trigger do Dropdown */}
+          <TouchableOpacity
+            style={styles.dropdownTrigger}
+            onPress={() => setShowProjectDropdown(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.dropdownIconWrap}>
               <Ionicons 
-                name="ellipsis-horizontal-circle" 
-                size={14} 
-                color={selectedProjectId === 'outros' ? '#FFFFFF' : '#475569'} 
+                name={selectedProjectId === 'outros' ? "ellipsis-horizontal-circle" : "business"} 
+                size={20} 
+                color="#2563EB" 
               />
-              <Text style={[styles.chipText, selectedProjectId === 'outros' && styles.chipTextActive]}>
-                Outros
+            </View>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={styles.dropdownTriggerTitle} numberOfLines={1}>
+                {selectedProjectId === 'outros'
+                  ? 'Outros (Outro Local / Destino Especial)'
+                  : (typeof selectedProjectId === 'number' && projetos.find(p => p.id === selectedProjectId))
+                    ? `${projetos.find(p => p.id === selectedProjectId)?.numero ? `[${projetos.find(p => p.id === selectedProjectId)?.numero}] ` : ''}${projetos.find(p => p.id === selectedProjectId)?.nome}`
+                    : 'Toque para selecionar a obra...'}
               </Text>
-            </TouchableOpacity>
-          </ScrollView>
+              {typeof selectedProjectId === 'number' && projetos.find(p => p.id === selectedProjectId) && (
+                <Text style={styles.dropdownTriggerSub} numberOfLines={1}>
+                  {projetos.find(p => p.id === selectedProjectId)?.construtora || 'ObraFlow'} • {projetos.find(p => p.id === selectedProjectId)?.tipo_obra || 'Edificação'}
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-down" size={20} color="#64748B" />
+          </TouchableOpacity>
 
           {/* Campo que aparece logo abaixo quando 'Outros' está selecionado */}
           {selectedProjectId === 'outros' && (
@@ -651,6 +647,123 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
           </View>
         </View>
       </Modal>
+
+      {/* Modal Dropdown para Seleção de Obra */}
+      <Modal
+        visible={showProjectDropdown}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowProjectDropdown(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.dropdownModalContent}>
+            <View style={styles.dropdownModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="business" size={20} color="#2563EB" />
+                <Text style={styles.dropdownModalTitle}>Selecionar Obra / Projeto</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowProjectDropdown(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Barra de Pesquisa */}
+            <View style={styles.dropdownSearchWrap}>
+              <Ionicons name="search-outline" size={18} color="#64748B" />
+              <TextInput
+                style={styles.dropdownSearchInput}
+                placeholder="Filtrar obras por nome ou número..."
+                placeholderTextColor="#94A3B8"
+                value={projectSearch}
+                onChangeText={setProjectSearch}
+              />
+              {projectSearch.length > 0 && (
+                <TouchableOpacity onPress={() => setProjectSearch('')}>
+                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+              {/* Opção Outros */}
+              <TouchableOpacity
+                style={[
+                  styles.dropdownItemRow,
+                  selectedProjectId === 'outros' && styles.dropdownItemRowActive
+                ]}
+                onPress={() => {
+                  setSelectedProjectId('outros');
+                  setShowProjectDropdown(false);
+                  setProjectSearch('');
+                }}
+              >
+                <View style={[styles.dropdownItemIcon, { backgroundColor: '#F1F5F9' }]}>
+                  <Ionicons name="ellipsis-horizontal-circle" size={20} color="#475569" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.dropdownItemTitle, selectedProjectId === 'outros' && { color: '#2563EB', fontWeight: '700' }]}>
+                    Outros (Outro Local / Destino Especial)
+                  </Text>
+                  <Text style={styles.dropdownItemSub}>
+                    Permite digitar manualmente o local da visita abaixo
+                  </Text>
+                </View>
+                {selectedProjectId === 'outros' && (
+                  <Ionicons name="checkmark-circle" size={20} color="#2563EB" />
+                )}
+              </TouchableOpacity>
+
+              {/* Lista de Obras */}
+              {projetos
+                .filter(p => {
+                  if (!projectSearch.trim()) return true;
+                  const q = projectSearch.toLowerCase();
+                  return (
+                    (p.nome && p.nome.toLowerCase().includes(q)) ||
+                    (p.numero && p.numero.toLowerCase().includes(q)) ||
+                    (p.construtora && p.construtora.toLowerCase().includes(q))
+                  );
+                })
+                .map(p => {
+                  const isSelected = selectedProjectId === p.id;
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[
+                        styles.dropdownItemRow,
+                        isSelected && styles.dropdownItemRowActive
+                      ]}
+                      onPress={() => {
+                        setSelectedProjectId(p.id);
+                        setShowProjectDropdown(false);
+                        setProjectSearch('');
+                      }}
+                    >
+                      <View style={[styles.dropdownItemIcon, isSelected && { backgroundColor: '#EFF6FF' }]}>
+                        <Ionicons 
+                          name="business" 
+                          size={18} 
+                          color={isSelected ? "#2563EB" : "#64748B"} 
+                        />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={[styles.dropdownItemTitle, isSelected && { color: '#2563EB', fontWeight: '700' }]}>
+                          {p.numero ? `[${p.numero}] ` : ''}{p.nome}
+                        </Text>
+                        <Text style={styles.dropdownItemSub}>
+                          {p.construtora || 'ObraFlow'} • {p.tipo_obra || 'Edificação'}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={20} color="#2563EB" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -708,6 +821,103 @@ const styles = StyleSheet.create({
   fieldDesc: { fontSize: 12, color: '#64748B', marginBottom: 10 },
 
   horizontalScroll: { marginTop: 4, marginBottom: 6 },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  dropdownIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  dropdownTriggerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  dropdownTriggerSub: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  dropdownModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  dropdownModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  dropdownSearchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginHorizontal: 16,
+    marginVertical: 12,
+    paddingHorizontal: 10,
+    height: 42,
+  },
+  dropdownSearchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  dropdownItemRowActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  dropdownItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownItemTitle: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  dropdownItemSub: {
+    fontSize: 11.5,
+    color: '#64748B',
+    marginTop: 2,
+  },
   chipButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,

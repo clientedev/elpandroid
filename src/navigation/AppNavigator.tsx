@@ -31,6 +31,7 @@ import ChecklistCustomizerScreen from '../screens/settings/ChecklistCustomizerSc
 import LegendSettingsScreen from '../screens/settings/LegendSettingsScreen';
 import AppFilesScreen from '../screens/settings/AppFilesScreen';
 import NotificationsSettingsScreen from '../screens/settings/NotificationsSettingsScreen';
+import { VisitorsSettingsScreen } from '../screens/settings/VisitorsSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -147,6 +148,7 @@ export const AppNavigator: React.FC = () => {
             <Stack.Screen name="LegendSettingsScreen" component={LegendSettingsScreen} />
             <Stack.Screen name="AppFilesScreen" component={AppFilesScreen} />
             <Stack.Screen name="NotificationsSettingsScreen" component={NotificationsSettingsScreen} />
+            <Stack.Screen name="VisitorsSettingsScreen" component={VisitorsSettingsScreen} />
           </>
         )}
       </Stack.Navigator>

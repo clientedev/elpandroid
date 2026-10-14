@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
-import { getLocalRelatorios } from '../../database/db';
+import { getLocalRelatorios, getLocalRelatoriosExpress } from '../../database/db';
 import { Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
@@ -96,16 +96,58 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
 
   const loadRelatorios = useCallback(async () => {
     try {
-      const data = await getLocalRelatorios();
-      setRelatorios(data);
+      const [data, expData] = await Promise.all([
+        getLocalRelatorios(),
+        getLocalRelatoriosExpress(),
+      ]);
+      const expressAdapted: Relatorio[] = (expData || []).map(exp => ({
+        id: exp.id,
+        numero: exp.numero,
+        titulo: exp.titulo || 'Relatório Express de Visita',
+        projeto_id: 0,
+        projeto_nome: exp.obra_nome || 'Obra Express',
+        projeto_construtora: exp.obra_construtora,
+        autor_id: exp.autor_id || 1,
+        autor_nome: exp.autor_nome || 'Fiscal',
+        data_relatorio: exp.data_relatorio,
+        data_criacao_local: exp.data_relatorio,
+        status: exp.status as any,
+        sync_status: exp.sync_status as any,
+        fotos_count: exp.fotos_count || 0,
+        observacoes_finais: exp.observacoes_finais,
+        is_express: true,
+      }));
+      const combined = [...data, ...expressAdapted];
+      setRelatorios(combined);
       const activeStatus = route?.params?.filterStatus || selectedStatus;
-      filterReports(data, search, activeStatus);
+      filterReports(combined, search, activeStatus);
 
       if (isOnline) {
         syncService.syncAll().then(async () => {
-          const fresh = await getLocalRelatorios();
-          setRelatorios(fresh);
-          filterReports(fresh, search, activeStatus);
+          const [fresh, freshExp] = await Promise.all([
+            getLocalRelatorios(),
+            getLocalRelatoriosExpress(),
+          ]);
+          const freshExpAdapted: Relatorio[] = (freshExp || []).map(exp => ({
+            id: exp.id,
+            numero: exp.numero,
+            titulo: exp.titulo || 'Relatório Express de Visita',
+            projeto_id: 0,
+            projeto_nome: exp.obra_nome || 'Obra Express',
+            projeto_construtora: exp.obra_construtora,
+            autor_id: exp.autor_id || 1,
+            autor_nome: exp.autor_nome || 'Fiscal',
+            data_relatorio: exp.data_relatorio,
+            data_criacao_local: exp.data_relatorio,
+            status: exp.status as any,
+            sync_status: exp.sync_status as any,
+            fotos_count: exp.fotos_count || 0,
+            observacoes_finais: exp.observacoes_finais,
+            is_express: true,
+          }));
+          const freshCombined = [...fresh, ...freshExpAdapted];
+          setRelatorios(freshCombined);
+          filterReports(freshCombined, search, activeStatus);
         }).catch(() => null);
       }
     } catch (e) {
@@ -295,7 +337,13 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                       }
                     } catch {}
                   }
-                  navigation.navigate('ReportFormScreen', { reportId: item.id });
+                  if ((item as any).is_express) {
+                    navigation.navigate('ExpressReportsScreen');
+                  } else {
+                    navigation.navigate('ReportFormScreen', { reportId: item.id });
+                  }
+                } else if ((item as any).is_express) {
+                  navigation.navigate('ExpressReportsScreen');
                 } else {
                   navigation.navigate('ReportDetailScreen', { reportId: item.id });
                 }
@@ -304,9 +352,9 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
               {/* Linha Superior: Identificador / Status e Data */}
               <View style={styles.cardTopRow}>
                 <View style={styles.cardTopLeft}>
-                  <View style={[styles.codeBadge, isDraft && styles.codeBadgeDraft]}>
-                    <Text style={[styles.codeBadgeText, isDraft && styles.codeBadgeTextDraft]}>
-                      {hasOfficialNum ? item.numero : 'RASCUNHO'}
+                  <View style={[styles.codeBadge, isDraft && styles.codeBadgeDraft, (item as any).is_express && { backgroundColor: '#FDF4FF', borderColor: '#F0ABFC' }]}>
+                    <Text style={[styles.codeBadgeText, isDraft && styles.codeBadgeTextDraft, (item as any).is_express && { color: '#A21CAF' }]}>
+                      {(item as any).is_express ? `⚡ ${item.numero}` : (hasOfficialNum ? item.numero : 'RASCUNHO')}
                     </Text>
                   </View>
                   <View style={[

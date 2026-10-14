@@ -902,6 +902,24 @@ export async function deleteLocalFoto(id: number): Promise<void> {
 }
 
 // ================= RELATORIOS EXPRESS =================
+export async function getNextExpressReportNumber(): Promise<string> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<{ numero: string }>('SELECT numero FROM relatorios_express');
+  let maxSeq = 0;
+  for (const row of rows) {
+    if (!row.numero) continue;
+    const match = row.numero.match(/EXP[-_ ]*(\d+)/i);
+    if (match) {
+      const val = parseInt(match[1], 10);
+      if (!isNaN(val) && val > maxSeq) {
+        maxSeq = val;
+      }
+    }
+  }
+  const nextSeq = maxSeq + 1;
+  return `EXP-${String(nextSeq).padStart(4, '0')}`;
+}
+
 export async function getLocalRelatoriosExpress(): Promise<RelatorioExpress[]> {
   const db = await getDatabase();
   return await db.getAllAsync<RelatorioExpress>(`
@@ -982,6 +1000,23 @@ export async function deleteLocalRelatorioExpress(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ?', [id]);
   await db.runAsync('DELETE FROM relatorios_express WHERE id = ?', [id]);
+}
+
+export async function updateLocalRelatorioExpressStatus(
+  id: number,
+  status: string,
+  comentario: string = '',
+  aprovadorId?: number,
+  aprovadorNome?: string,
+  syncStatus: 'synced' | 'pending' = 'pending'
+): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `UPDATE relatorios_express SET status = ?, comentario_aprovacao = ?, aprovador_id = COALESCE(?, aprovador_id),
+     aprovador_nome = COALESCE(?, aprovador_nome), sync_status = ?, updated_at = ?
+     WHERE id = ?`,
+    [status, comentario, aprovadorId || null, aprovadorNome || null, syncStatus, new Date().toISOString(), id]
+  );
 }
 
 // ================= LOCK COLABORATIVO DE RELATÓRIOS =================
@@ -1380,7 +1415,7 @@ export async function addToSyncQueue(
 export async function getPendingSyncQueue(): Promise<SyncQueueItem[]> {
   const db = await getDatabase();
   return await db.getAllAsync<SyncQueueItem>(
-    "SELECT * FROM sync_queue WHERE status = 'pending' OR status = 'failed' ORDER BY id ASC"
+    "SELECT * FROM sync_queue WHERE status = 'pending' OR (status = 'failed' AND retries < 3) ORDER BY id ASC"
   );
 }
 
@@ -1392,9 +1427,26 @@ export async function updateSyncQueueItem(id: number, status: 'pending' | 'proce
   );
 }
 
+export async function getPendingSyncCount(): Promise<number> {
+  const db = await getDatabase();
+  try {
+    const row = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM sync_queue WHERE status = 'pending'"
+    );
+    return row?.count || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function clearFailedSyncQueue(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync("DELETE FROM sync_queue WHERE status = 'failed' OR retries >= 3");
+}
+
 export async function clearCompletedSyncQueue(): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync("DELETE FROM sync_queue WHERE status = 'completed'");
+  await db.runAsync("DELETE FROM sync_queue WHERE status = 'completed' OR (status = 'failed' AND retries >= 5)");
 }
 
 /**

@@ -10,8 +10,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def get_current_version_info():
     """Retorna a versão atual e versionCode lidos de version.json ou app.json"""
-    version = "1.0.31"
-    version_code = 31
+    version = "1.0.32"
+    version_code = 32
 
     version_json_path = os.path.join(BASE_DIR, 'version.json')
     if os.path.exists(version_json_path):

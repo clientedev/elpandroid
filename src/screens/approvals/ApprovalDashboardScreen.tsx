@@ -9,7 +9,8 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalRelatorios, updateLocalRelatorioStatus, addToSyncQueue,
-  getLocalFotos, saveBatchChecklistProgressoObra 
+  getLocalFotos, saveBatchChecklistProgressoObra,
+  getLocalRelatoriosExpress, updateLocalRelatorioExpressStatus
 } from '../../database/db';
 import { generateReportPDF } from '../../services/pdfService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,8 +33,35 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
 
   const loadPending = useCallback(async () => {
     try {
-      const data = await getLocalRelatorios();
-      setPendingReports(data.filter(r => r.status === 'Aguardando Aprovação'));
+      const [data, expData] = await Promise.all([
+        getLocalRelatorios(),
+        getLocalRelatoriosExpress(),
+      ]);
+      const expressPending: Relatorio[] = (expData || [])
+        .filter(r => r.status === 'Aguardando Aprovação')
+        .map(exp => ({
+          id: exp.id,
+          numero: exp.numero,
+          titulo: exp.titulo || 'Relatório Express de Visita',
+          autor_id: exp.autor_id || 1,
+          autor_nome: exp.autor_nome || 'Fiscal',
+          projeto_id: 0,
+          projeto_nome: exp.obra_nome || 'Obra Express',
+          projeto_construtora: exp.obra_construtora,
+          data_relatorio: exp.data_relatorio,
+          data_criacao_local: exp.data_relatorio,
+          status: exp.status as any,
+          sync_status: exp.sync_status as any,
+          fotos_count: exp.fotos_count || 0,
+          checklist_data: exp.checklist_data,
+          observacoes_finais: exp.observacoes_finais,
+          is_express: true,
+        }));
+      const allPending = [
+        ...data.filter(r => r.status === 'Aguardando Aprovação'),
+        ...expressPending,
+      ];
+      setPendingReports(allPending);
     } catch (e) {
       console.warn('Erro ao carregar aprovações:', e);
     }
@@ -51,23 +79,51 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
     }
 
     try {
-      await updateLocalRelatorioStatus(
-        selectedReport.id,
-        modalAction,
-        comment.trim(),
-        user?.id,
-        user?.username,
-        'pending'
-      );
+      const isExpress = (selectedReport as any).is_express;
+      if (isExpress) {
+        await updateLocalRelatorioExpressStatus(
+          selectedReport.id,
+          modalAction,
+          comment.trim(),
+          user?.id,
+          user?.username,
+          'pending'
+        );
 
-      await addToSyncQueue(
-        'relatorio',
-        selectedReport.id,
-        modalAction === 'Aprovado' ? 'approve' : 'reject',
-        `/api/relatorios/${selectedReport.id}/status`,
-        'POST',
-        { status: modalAction, comentario: comment.trim(), aprovador_id: user?.id }
-      );
+        await addToSyncQueue(
+          'relatorio_express',
+          selectedReport.id,
+          modalAction === 'Aprovado' ? 'approve' : 'reject',
+          '/api/relatorios-express',
+          'POST',
+          {
+            id: selectedReport.id,
+            numero: selectedReport.numero,
+            status: modalAction,
+            comentario: comment.trim(),
+            comentario_aprovacao: comment.trim(),
+            aprovador_id: user?.id,
+          }
+        );
+      } else {
+        await updateLocalRelatorioStatus(
+          selectedReport.id,
+          modalAction,
+          comment.trim(),
+          user?.id,
+          user?.username,
+          'pending'
+        );
+
+        await addToSyncQueue(
+          'relatorio',
+          selectedReport.id,
+          modalAction === 'Aprovado' ? 'approve' : 'reject',
+          `/api/relatorios/${selectedReport.id}/status`,
+          'POST',
+          { status: modalAction, comentario: comment.trim(), aprovador_id: user?.id }
+        );
+      }
 
       // Se for aprovado, salva histórico do checklist e PDF em background
       if (modalAction === 'Aprovado') {

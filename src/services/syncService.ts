@@ -4,7 +4,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { apiClient } from './api';
 import { readPhotoBase64 } from './imageService';
 import { 
-  getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue,
+  getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue, getPendingSyncCount,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
   saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
   getLocalFotos, saveLocalFoto, 
@@ -99,8 +99,7 @@ class SyncService {
 
   async getPendingCount(): Promise<number> {
     try {
-      const queue = await getPendingSyncQueue();
-      return queue.length;
+      return await getPendingSyncCount();
     } catch {
       return 0;
     }
@@ -286,9 +285,17 @@ class SyncService {
         } catch (itemErr: any) {
           failedCount++;
           console.warn(`[SyncService] Queue item ${item.id} (${item.endpoint}) error:`, itemErr?.message);
-          // If offline / network dropped mid-sync, mark pending for next retry
-          const isNetErr = !itemErr.response;
-          await updateSyncQueueItem(item.id, isNetErr ? 'pending' : 'failed', itemErr?.message);
+          const status = itemErr?.response?.status;
+          // Se o servidor retornou 409 (conflito/já cadastrado) ou 404 em exclusão, conclui o item para não travar a fila
+          if (status === 409 || (status === 404 && item.method === 'DELETE')) {
+            console.log(`[SyncService] Item ${item.id} já resolvido no servidor (HTTP ${status}), concluindo fila.`);
+            await updateSyncQueueItem(item.id, 'completed');
+          } else {
+            const isNetErr = !itemErr.response;
+            // Se já tentou mais de 3 vezes com erro irrecuperável do servidor, não fica como pendente
+            const nextStatus = isNetErr ? 'pending' : (item.retries >= 3 ? 'failed' : 'pending');
+            await updateSyncQueueItem(item.id, nextStatus, itemErr?.message);
+          }
         }
       }
 

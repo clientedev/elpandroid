@@ -121,6 +121,9 @@ export interface Relatorio {
   data_sincronizacao?: string;
   sync_status?: 'synced' | 'pending' | 'error';
   fotos_count?: number;
+  projeto_construtora?: string;
+  projeto_endereco?: string;
+  is_express?: boolean;
 }
 
 export interface FotoRelatorio {

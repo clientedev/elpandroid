@@ -4,19 +4,40 @@ import {
   RefreshControl, Alert, Modal, ScrollView, Image, ActivityIndicator 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalRelatoriosExpress, saveLocalRelatorioExpress, 
-  getLocalFotosExpress, saveLocalFotoExpress, addToSyncQueue 
+  getLocalFotosExpress, saveLocalFotoExpress, addToSyncQueue,
+  getNextExpressReportNumber, getLocalVisitantes
 } from '../../database/db';
-import { takePhoto, pickImage, savePhotoToDeviceGallery, readPhotoBase64 } from '../../services/imageService';
-import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
+import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
+import { generateReportPDF } from '../../services/pdfService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio } from '../../types';
+import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio, Visitante, Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+
+export interface ChecklistItemState {
+  id: number;
+  item: string;
+  checked: boolean;
+  observacao: string;
+}
+
+const DEFAULT_CHECKLIST: ChecklistItemState[] = [
+  { id: 1, item: 'Chapisco colante e regularização da base estrutural', checked: false, observacao: '' },
+  { id: 2, item: 'Aplicação de tela metálica / fibra de reforço e ancoragem', checked: false, observacao: '' },
+  { id: 3, item: 'Aplicação e tempo de cura da argamassa de emboço', checked: false, observacao: '' },
+  { id: 4, item: 'Assentamento de revestimentos cerâmicos / pastilhas de fachada', checked: false, observacao: '' },
+  { id: 5, item: 'Selamento de juntas de dilatação, frisos e caimentos', checked: false, observacao: '' },
+  { id: 6, item: 'Verificação de peitoris, pingadeiras, muretas e impermeabilização', checked: false, observacao: '' },
+  { id: 7, item: 'Limpeza e desincrustação final da fachada', checked: false, observacao: '' },
+];
 
 export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
@@ -26,30 +47,53 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // Form state ordered per specification:
-  // Título -> Número -> Data (editável) -> Cliente/Construtora -> Nome da Obra -> Endereço (GPS) -> Acompanhantes -> Info Técnica -> Checklist -> Obs Gerais -> Fotos
+  // Form state:
   const [titulo, setTitulo] = useState('Relatório Express de Visita');
-  const [numero, setNumero] = useState(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [numero, setNumero] = useState('EXP-0001');
   const [dataVisita, setDataVisita] = useState(new Date().toISOString().split('T')[0]);
   const [obraConstrutora, setObraConstrutora] = useState('');
   const [obraNome, setObraNome] = useState('');
   const [obraEndereco, setObraEndereco] = useState('');
   const [acompanhantes, setAcompanhantes] = useState('');
-  const [informacoesTecnicas, setInformacoesTecnicas] = useState('');
-  const [checklistData, setChecklistData] = useState('');
   const [observacoes, setObservacoes] = useState('');
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  
+  // 12 Campos de Informações Técnicas da Fachada (Idênticos ao Relatório Normal)
+  const [techElementosBase, setTechElementosBase] = useState('');
+  const [techChapiscoColante, setTechChapiscoColante] = useState('');
+  const [techChapiscoAlvenaria, setTechChapiscoAlvenaria] = useState('');
+  const [techArgamassaEmboco, setTechArgamassaEmboco] = useState('');
+  const [techFormaAplicacaoArgamassa, setTechFormaAplicacaoArgamassa] = useState('');
+  const [techAcabamentosRevestimento, setTechAcabamentosRevestimento] = useState('');
+  const [techAcabamentoPeitoris, setTechAcabamentoPeitoris] = useState('');
+  const [techAcabamentoMuretas, setTechAcabamentoMuretas] = useState('');
+  const [techDefinicaoFrisosCor, setTechDefinicaoFrisosCor] = useState('');
+  const [techDefinicaoFaceInferiorAbas, setTechDefinicaoFaceInferiorAbas] = useState('');
+  const [techObservacoesFachada, setTechObservacoesFachada] = useState('');
+  const [techOutrasObservacoes, setTechOutrasObservacoes] = useState('');
 
-  // Collapsible toggle sections
+  // Checklist de Verificação (Idêntico ao Relatório Normal)
+  const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
+
+  // Visitantes cadastrados para sugestão com 1 toque
+  const [visitantesCadastrados, setVisitantesCadastrados] = useState<Visitante[]>([]);
+
+  // Fotos anexadas
+  const [attachedPhotos, setAttachedPhotos] = useState<{ uri: string; base64?: string; filename?: string }[]>([]);
+
+  // Toggles de Sanfonas
   const [showTechInfo, setShowTechInfo] = useState(false);
   const [showChecklist, setShowChecklist] = useState(false);
 
   const [loadingGps, setLoadingGps] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string | null>(null);
 
   const loadReports = useCallback(async () => {
     try {
-      const data = await getLocalRelatoriosExpress();
+      const [data, vis] = await Promise.all([
+        getLocalRelatoriosExpress(),
+        getLocalVisitantes(),
+      ]);
       const enriched = await Promise.all(
         data.map(async (r) => {
           const fotos = await getLocalFotosExpress(r.id);
@@ -61,6 +105,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         })
       );
       setExpressList(enriched);
+      setVisitantesCadastrados(vis || []);
     } catch (e) {
       console.warn('Erro ao carregar express:', e);
     }
@@ -70,89 +115,235 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     loadReports();
   }, [loadReports]);
 
-  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string | null>(null);
-
   // Autosave contínuo para Relatório Express
   useEffect(() => {
     if (!modalVisible) return;
     const timer = setTimeout(() => {
-      if (obraNome.trim() || obraConstrutora.trim() || observacoes.trim()) {
-        import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
-          AsyncStorage.setItem('@elp_express_report_draft', JSON.stringify({
-            titulo,
-            dataVisita,
-            obraConstrutora,
-            obraNome,
-            obraEndereco,
-            acompanhantes,
-            informacoesTecnicas,
-            checklistData,
-            observacoes
-          })).then(() => {
+      if (obraNome.trim() || obraConstrutora.trim() || observacoes.trim() || techElementosBase.trim()) {
+        const draftPayload = {
+          titulo,
+          dataVisita,
+          obraConstrutora,
+          obraNome,
+          obraEndereco,
+          acompanhantes,
+          observacoes,
+          techElementosBase,
+          techChapiscoColante,
+          techChapiscoAlvenaria,
+          techArgamassaEmboco,
+          techFormaAplicacaoArgamassa,
+          techAcabamentosRevestimento,
+          techAcabamentoPeitoris,
+          techAcabamentoMuretas,
+          techDefinicaoFrisosCor,
+          techDefinicaoFaceInferiorAbas,
+          techObservacoesFachada,
+          techOutrasObservacoes,
+          checklist,
+        };
+        AsyncStorage.setItem('@elp_express_report_draft', JSON.stringify(draftPayload))
+          .then(() => {
             setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-          }).catch(() => null);
-        });
+          })
+          .catch(() => null);
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [modalVisible, titulo, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, informacoesTecnicas, checklistData, observacoes]);
+  }, [
+    modalVisible, titulo, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, observacoes,
+    techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa,
+    techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor,
+    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist
+  ]);
 
-  function handleOpenNew() {
-    import('@react-native-async-storage/async-storage').then(({ default: AsyncStorage }) => {
-      AsyncStorage.getItem('@elp_express_report_draft').then(draftStr => {
-        if (draftStr) {
-          try {
-            const d = JSON.parse(draftStr);
-            if (d.obraNome) setObraNome(d.obraNome);
-            if (d.obraConstrutora) setObraConstrutora(d.obraConstrutora);
-            if (d.obraEndereco) setObraEndereco(d.obraEndereco);
-            if (d.observacoes) setObservacoes(d.observacoes);
-            if (d.acompanhantes) setAcompanhantes(d.acompanhantes);
-            if (d.informacoesTecnicas) {
-              setInformacoesTecnicas(d.informacoesTecnicas);
-              setShowTechInfo(true);
-            }
-            if (d.checklistData) {
-              setChecklistData(d.checklistData);
-              setShowChecklist(true);
-            }
-            setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-          } catch(e) {}
+  async function handleOpenNew() {
+    let nextNum = 'EXP-0001';
+    try {
+      nextNum = await getNextExpressReportNumber();
+    } catch (e) {
+      console.warn('Erro ao calcular próximo EXP:', e);
+    }
+
+    try {
+      const draftStr = await AsyncStorage.getItem('@elp_express_report_draft');
+      if (draftStr) {
+        const d = JSON.parse(draftStr);
+        if (d.obraNome) setObraNome(d.obraNome);
+        if (d.obraConstrutora) setObraConstrutora(d.obraConstrutora);
+        if (d.obraEndereco) setObraEndereco(d.obraEndereco);
+        if (d.observacoes) setObservacoes(d.observacoes);
+        if (d.acompanhantes) setAcompanhantes(d.acompanhantes);
+
+        if (d.techElementosBase) setTechElementosBase(d.techElementosBase);
+        if (d.techChapiscoColante) setTechChapiscoColante(d.techChapiscoColante);
+        if (d.techChapiscoAlvenaria) setTechChapiscoAlvenaria(d.techChapiscoAlvenaria);
+        if (d.techArgamassaEmboco) setTechArgamassaEmboco(d.techArgamassaEmboco);
+        if (d.techFormaAplicacaoArgamassa) setTechFormaAplicacaoArgamassa(d.techFormaAplicacaoArgamassa);
+        if (d.techAcabamentosRevestimento) setTechAcabamentosRevestimento(d.techAcabamentosRevestimento);
+        if (d.techAcabamentoPeitoris) setTechAcabamentoPeitoris(d.techAcabamentoPeitoris);
+        if (d.techAcabamentoMuretas) setTechAcabamentoMuretas(d.techAcabamentoMuretas);
+        if (d.techDefinicaoFrisosCor) setTechDefinicaoFrisosCor(d.techDefinicaoFrisosCor);
+        if (d.techDefinicaoFaceInferiorAbas) setTechDefinicaoFaceInferiorAbas(d.techDefinicaoFaceInferiorAbas);
+        if (d.techObservacoesFachada) setTechObservacoesFachada(d.techObservacoesFachada);
+        if (d.techOutrasObservacoes) setTechOutrasObservacoes(d.techOutrasObservacoes);
+
+        if (d.checklist && Array.isArray(d.checklist)) {
+          setChecklist(d.checklist);
+        } else {
+          setChecklist(DEFAULT_CHECKLIST);
         }
-      });
-    });
+        setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      } else {
+        setChecklist(DEFAULT_CHECKLIST);
+      }
+    } catch (e) {
+      setChecklist(DEFAULT_CHECKLIST);
+    }
 
     setTitulo('Relatório Express de Visita');
-    setNumero(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
+    setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
-    setPhotoUri(null);
+    setAttachedPhotos([]);
     setModalVisible(true);
   }
 
-  function handleDuplicateReport(original: RelatorioExpress) {
+  async function handleDuplicateReport(original: RelatorioExpress) {
+    let nextNum = 'EXP-0001';
+    try {
+      nextNum = await getNextExpressReportNumber();
+    } catch {}
+
     setTitulo(`${original.titulo || 'Relatório Express'} (Cópia)`);
-    setNumero(`EXP-${Math.floor(1000 + Math.random() * 9000)}`);
+    setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
     setObraConstrutora(original.obra_construtora || '');
     setObraNome(original.obra_nome || '');
     setObraEndereco(original.obra_endereco || '');
     setAcompanhantes(original.acompanhantes || '');
-    setInformacoesTecnicas(original.informacoes_tecnicas || '');
-    setChecklistData(original.checklist_data || '');
     setObservacoes(original.observacoes_finais || '');
-    setPhotoUri(null);
-    setShowTechInfo(Boolean(original.informacoes_tecnicas));
-    setShowChecklist(Boolean(original.checklist_data));
+    setAttachedPhotos([]);
+
+    // Extrair info técnica
+    if (original.informacoes_tecnicas) {
+      try {
+        const t = typeof original.informacoes_tecnicas === 'string' 
+          ? JSON.parse(original.informacoes_tecnicas) 
+          : original.informacoes_tecnicas;
+        setTechElementosBase(t.elementos_construtivos_base || '');
+        setTechChapiscoColante(t.especificacao_chapisco_colante || '');
+        setTechChapiscoAlvenaria(t.especificacao_chapisco_alvenaria || '');
+        setTechArgamassaEmboco(t.especificacao_argamassa_emboco || '');
+        setTechFormaAplicacaoArgamassa(t.forma_aplicacao_argamassa || '');
+        setTechAcabamentosRevestimento(t.acabamentos_revestimento || '');
+        setTechAcabamentoPeitoris(t.acabamento_peitoris || '');
+        setTechAcabamentoMuretas(t.acabamento_muretas || '');
+        setTechDefinicaoFrisosCor(t.definicao_frisos_cor || '');
+        setTechDefinicaoFaceInferiorAbas(t.definicao_face_inferior_abas || '');
+        setTechObservacoesFachada(t.observacoes_projeto_fachada || '');
+        setTechOutrasObservacoes(t.outras_observacoes || '');
+        setShowTechInfo(true);
+      } catch {}
+    }
+
+    // Extrair checklist
+    if (original.checklist_data) {
+      try {
+        const chk = typeof original.checklist_data === 'string'
+          ? JSON.parse(original.checklist_data)
+          : original.checklist_data;
+        if (Array.isArray(chk)) {
+          setChecklist(chk);
+          setShowChecklist(true);
+        }
+      } catch {}
+    }
+
     setModalVisible(true);
   }
 
-  function handleCaptureGpsAddress() {
+  // Captura Real de GPS do Dispositivo
+  async function handleCaptureGpsAddress() {
     setLoadingGps(true);
-    setTimeout(() => {
-      setObraEndereco('Av. das Nações Unidas, 14401 - Chácara Santo Antônio, São Paulo - SP');
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permissão de GPS Necessária',
+          'Permita o acesso à localização precisa do dispositivo para capturar o endereço exato da obra.'
+        );
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+
+      const newLat = location.coords.latitude;
+      const newLon = location.coords.longitude;
+
+      const reverseGeocode = await Location.reverseGeocodeAsync({
+        latitude: newLat,
+        longitude: newLon,
+      });
+
+      if (reverseGeocode && reverseGeocode.length > 0) {
+        const item = reverseGeocode[0];
+        const parts: string[] = [];
+
+        const logradouro = item.street || item.name || '';
+        const num = item.streetNumber || '';
+        if (logradouro) {
+          parts.push(num ? `${logradouro}, ${num}` : logradouro);
+        }
+
+        if (item.district || item.subregion) {
+          parts.push(item.district || item.subregion || '');
+        }
+
+        const cidade = item.city || item.subregion || '';
+        const uf = item.region || '';
+        if (cidade) {
+          parts.push(uf ? `${cidade} - ${uf}` : cidade);
+        }
+
+        if (item.postalCode) {
+          parts.push(`CEP ${item.postalCode}`);
+        }
+
+        const fullAddr = parts.join(', ');
+        setObraEndereco(fullAddr || `Lat: ${newLat.toFixed(5)}, Lon: ${newLon.toFixed(5)}`);
+        Alert.alert('GPS Capturado', 'Localização do dispositivo obtida com sucesso:\n\n' + fullAddr);
+      } else {
+        const coordAddr = `Lat: ${newLat.toFixed(5)}, Lon: ${newLon.toFixed(5)}`;
+        setObraEndereco(coordAddr);
+        Alert.alert('GPS Capturado', `Coordenadas: ${coordAddr}`);
+      }
+    } catch (err: any) {
+      Alert.alert('Erro ao obter GPS', err.message || 'Verifique se o GPS está ativado no aparelho.');
+    } finally {
       setLoadingGps(false);
-      Alert.alert('GPS Capturado', 'Coordenadas obtidas e endereço formatado com sucesso!');
-    }, 700);
+    }
+  }
+
+  async function handleAddPhotoCamera() {
+    const projName = obraNome.trim() || 'Obra_Express';
+    const photo = await takePhoto(projName);
+    if (photo) {
+      setAttachedPhotos(prev => [...prev, photo]);
+    }
+  }
+
+  async function handleAddPhotoGallery() {
+    const projName = obraNome.trim() || 'Obra_Express';
+    const photo = await pickImage(projName);
+    if (photo) {
+      setAttachedPhotos(prev => [...prev, photo]);
+    }
+  }
+
+  function handleRemovePhoto(index: number) {
+    setAttachedPhotos(prev => prev.filter((_, idx) => idx !== index));
   }
 
   async function handleCreateExpress(status: 'em_andamento' | 'Aguardando Aprovação' = 'Aguardando Aprovação') {
@@ -164,50 +355,75 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setLoading(true);
     try {
       const expId = Date.now();
-      const attachedFotos: any[] = [];
+      const currentNumber = numero.startsWith('EXP-') ? numero : await getNextExpressReportNumber();
 
-      if (photoUri) {
-        let b64 = await readPhotoBase64(photoUri);
+      const techInfoPayload = {
+        elementos_construtivos_base: techElementosBase.trim(),
+        especificacao_chapisco_colante: techChapiscoColante.trim(),
+        especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+        especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+        forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+        acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+        acabamento_peitoris: techAcabamentoPeitoris.trim(),
+        acabamento_muretas: techAcabamentoMuretas.trim(),
+        definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+        definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+        observacoes_projeto_fachada: techObservacoesFachada.trim(),
+        outras_observacoes: techOutrasObservacoes.trim(),
+      };
+
+      const techInfoJson = JSON.stringify(techInfoPayload);
+      const checklistJson = JSON.stringify(checklist);
+
+      // Salva fotos anexadas
+      const savedFotosList: any[] = [];
+      for (let i = 0; i < attachedPhotos.length; i++) {
+        const ap = attachedPhotos[i];
+        let b64 = ap.base64;
+        if (!b64 && ap.uri) {
+          b64 = await readPhotoBase64(ap.uri);
+        }
+
         const fotoObj: FotoRelatorioExpress = {
-          id: Date.now() + 1,
+          id: Date.now() + i + 1,
           relatorio_express_id: expId,
-          uri_local: photoUri,
+          uri_local: ap.uri,
           base64: b64,
           local: obraNome.trim(),
-          titulo: `Foto Express - ${obraNome.trim()}`,
+          titulo: `Foto ${i + 1} - ${obraNome.trim()}`,
           legenda: observacoes || 'Registro Fotográfico Express',
-          ordem: 0,
+          ordem: i,
           sync_status: 'pending'
         };
         await saveLocalFotoExpress(fotoObj, 'pending');
 
-        attachedFotos.push({
-          uri_local: photoUri,
+        savedFotosList.push({
+          uri_local: ap.uri,
           base64: b64,
           imagem_base64: b64,
-          titulo: `Foto Express - ${obraNome.trim()}`,
+          titulo: `Foto ${i + 1} - ${obraNome.trim()}`,
           legenda: observacoes || 'Registro Fotográfico Express',
-          ordem: 0
+          ordem: i
         });
       }
 
       const newExp: RelatorioExpress = {
         id: expId,
-        numero: numero.trim(),
+        numero: currentNumber.trim(),
         titulo: titulo.trim(),
         autor_id: user?.id || 1,
-        autor_nome: user?.username || 'Fiscal Técnico',
+        autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
         data_relatorio: dataVisita,
         obra_nome: obraNome.trim(),
         obra_endereco: obraEndereco.trim(),
         obra_construtora: obraConstrutora.trim(),
         acompanhantes: acompanhantes.trim(),
-        informacoes_tecnicas: informacoesTecnicas.trim(),
-        checklist_data: checklistData.trim(),
+        informacoes_tecnicas: techInfoJson,
+        checklist_data: checklistJson,
         observacoes_finais: observacoes.trim(),
         status: status,
         sync_status: 'pending',
-        fotos_count: attachedFotos.length,
+        fotos_count: savedFotosList.length,
       };
 
       await saveLocalRelatorioExpress(newExp, 'pending');
@@ -220,9 +436,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         'POST',
         {
           ...newExp,
-          fotos: attachedFotos
+          fotos: savedFotosList
         }
       );
+
+      // Limpa rascunho após submissão de sucesso
+      if (status === 'Aguardando Aprovação') {
+        AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
+      }
 
       if (isOnline) triggerSync();
 
@@ -231,8 +452,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       Alert.alert(
         'Sucesso', 
         status === 'Aguardando Aprovação' 
-          ? `Relatório Express ${numero} submetido para aprovação!` 
-          : `Rascunho do Relatório Express ${numero} salvo localmente!`
+          ? `Relatório Express ${currentNumber} enviado para aprovação com sucesso!` 
+          : `Rascunho do Relatório Express ${currentNumber} salvo localmente!`
       );
     } catch (err: any) {
       Alert.alert('Erro ao Salvar', err.message);
@@ -249,41 +470,49 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       const convertedFotos: FotoRelatorio[] = (fotosExp || []).map(f => ({
         id: f.id,
         relatorio_id: f.relatorio_express_id,
-        url: f.url,
-        filename: f.filename,
         uri_local: f.uri_local,
+        url: f.url,
+        base64: f.base64,
         titulo: f.titulo,
         legenda: f.legenda,
-        descricao: f.descricao,
-        local: f.local || item.obra_nome,
         ordem: f.ordem,
-        sync_status: 'synced'
       }));
-      const pdfUri = await generateReportPDF(item, convertedFotos);
-      await shareReportPDF(pdfUri);
-    } catch (e: any) {
-      Alert.alert('Erro no PDF', e.message);
+
+      const mockNormalRel: Relatorio = {
+        id: item.id,
+        numero: item.numero,
+        titulo: item.titulo,
+        autor_id: item.autor_id || 1,
+        autor_nome: item.autor_nome || 'Fiscal',
+        data_relatorio: item.data_relatorio,
+        status: item.status,
+        projeto_id: 0,
+        projeto_nome: item.obra_nome,
+        projeto_construtora: item.obra_construtora,
+        projeto_endereco: item.obra_endereco,
+        acompanhantes: item.acompanhantes,
+        observacoes_finais: item.observacoes_finais,
+        checklist_data: item.checklist_data,
+        fotos_count: convertedFotos.length,
+      };
+
+      await generateReportPDF(mockNormalRel, convertedFotos);
+    } catch (err: any) {
+      Alert.alert('Erro ao gerar PDF', err.message);
     }
   }
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadReports();
-    setRefreshing(false);
-  };
+  const completedChecks = checklist.filter(c => c.checked).length;
+  const totalChecks = checklist.length;
+  const progressPercent = totalChecks > 0 ? Math.round((completedChecks / totalChecks) * 100) : 0;
 
   return (
     <View style={styles.container}>
       <Header 
-        title="Relatório Express" 
-        subtitle="Vistorias rápidas e simplificadas"
-        showBack
-        onBack={() => navigation.goBack()}
+        title="Relatórios Express" 
+        showBack 
         rightAction={
-          <TouchableOpacity 
-            style={styles.addBtn}
-            onPress={handleOpenNew}
-          >
+          <TouchableOpacity style={styles.addBtn} onPress={handleOpenNew} activeOpacity={0.8}>
             <Ionicons name="add" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         }
@@ -294,17 +523,17 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         data={expressList}
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadReports} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={48} color={Colors.textMuted} />
+            <Ionicons name="flash-outline" size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>Nenhum relatório express</Text>
             <Text style={styles.emptySub}>
               Crie vistorias pontuais e rápidas tocando no botão "+".
             </Text>
             <TouchableOpacity style={styles.createBtn} onPress={handleOpenNew}>
               <Ionicons name="add-circle" size={18} color="#FFFFFF" />
-              <Text style={styles.createBtnText}>Criar Primeiro Relatório</Text>
+              <Text style={styles.createBtnText}>Criar Relatório EXP-0001</Text>
             </TouchableOpacity>
           </View>
         }
@@ -347,18 +576,19 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
             <View style={styles.cardFooter}>
               <View style={[
                 styles.statusPill,
-                item.status === 'Aprovado' ? styles.statusApproved : styles.statusWaiting
+                item.status === 'Aprovado' ? styles.statusApproved : 
+                item.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusDraft
               ]}>
                 <Text style={[
                   styles.statusPillText,
-                  item.status === 'Aprovado' && { color: '#065F46' }
+                  item.status === 'Aprovado' ? { color: '#065F46' } :
+                  item.status === 'Aguardando Aprovação' ? { color: '#92400E' } : { color: '#475569' }
                 ]}>
                   {item.status}
                 </Text>
               </View>
 
               <View style={styles.cardActionsRow}>
-                {/* Duplicate Report (Item 5.2) */}
                 {item.status === 'Aprovado' && (
                   <TouchableOpacity 
                     style={styles.duplicateBtn} 
@@ -379,7 +609,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         )}
       />
 
-      {/* Modal Form: Simplified Order (Item 5.1) */}
+      {/* Modal Form: Relatório Express com Paridade ao Relatório Normal */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -393,7 +623,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            {lastAutoSaveTime && (
+              <View style={styles.draftAutoSaveBar}>
+                <Ionicons name="checkmark-circle" size={12} color="#16A34A" />
+                <Text style={styles.draftAutoSaveText}>Salvo automaticamente às {lastAutoSaveTime}</Text>
+              </View>
+            )}
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
               {/* 1. Título */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>1. Título do Relatório *</Text>
@@ -404,16 +641,16 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 />
               </View>
 
-              {/* 2. Número */}
+              {/* 2. Número Sequencial EXP-XXXX */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>2. Número do Relatório</Text>
+                <Text style={styles.label}>2. Número do Relatório (Sequencial)</Text>
                 <View style={styles.lockedNumberBox}>
                   <Ionicons name="lock-closed" size={14} color={Colors.textMuted} />
                   <Text style={styles.lockedNumberText}>{numero}</Text>
                 </View>
               </View>
 
-              {/* 3. Data (editável) */}
+              {/* 3. Data */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>3. Data da Vistoria *</Text>
                 <TextInput 
@@ -446,13 +683,13 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 />
               </View>
 
-              {/* 6. Endereço com botão GPS */}
+              {/* 6. Endereço com botão GPS Real do Dispositivo */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>6. Endereço da Obra</Text>
+                <Text style={styles.label}>6. Endereço da Obra (GPS do Celular)</Text>
                 <View style={styles.addressWithGpsRow}>
                   <TextInput 
                     style={[styles.input, { flex: 1 }]} 
-                    placeholder="Rua, número, bairro..." 
+                    placeholder="Rua, número, bairro, cidade..." 
                     value={obraEndereco} 
                     onChangeText={setObraEndereco} 
                   />
@@ -473,7 +710,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 </View>
               </View>
 
-              {/* 7. Funcionários / Acompanhantes */}
+              {/* 7. Funcionários / Acompanhantes com Sugestões de Visitantes */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>7. Funcionários / Acompanhantes da Visita</Text>
                 <TextInput 
@@ -482,51 +719,231 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                   value={acompanhantes} 
                   onChangeText={setAcompanhantes} 
                 />
+
+                {visitantesCadastrados.length > 0 && (
+                  <View style={{ marginTop: 8 }}>
+                    <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600', marginBottom: 4 }}>
+                      Acompanhantes Cadastrados nos Ajustes (Toque para incluir):
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
+                      {visitantesCadastrados.map(v => (
+                        <TouchableOpacity
+                          key={v.id}
+                          style={styles.visitorSuggestionChip}
+                          onPress={() => {
+                            const add = [v.nome, v.cargo || v.empresa].filter(Boolean).join(' - ');
+                            setAcompanhantes(prev => prev ? `${prev}, ${add}` : add);
+                          }}
+                        >
+                          <Ionicons name="person-add-outline" size={12} color="#2563EB" />
+                          <Text style={styles.visitorSuggestionText}>{v.nome}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
 
-              {/* 8. Botão Informações Técnicas */}
-              <TouchableOpacity 
-                style={styles.accordionToggleBtn}
-                onPress={() => setShowTechInfo(!showTechInfo)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="construct-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.accordionToggleText}>8. Informações Técnicas</Text>
-                </View>
-                <Ionicons name={showTechInfo ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
-              </TouchableOpacity>
-              {showTechInfo && (
-                <TextInput 
-                  style={[styles.input, styles.textArea, { marginBottom: 12 }]} 
-                  multiline 
-                  placeholder="Especificações de fachada, argamassa, juntas..." 
-                  value={informacoesTecnicas} 
-                  onChangeText={setInformacoesTecnicas} 
-                />
-              )}
+              {/* 8. Sanfona 1: Informações Técnicas da Fachada (12 Campos do Laudo Normal) */}
+              <View style={styles.accordionContainer}>
+                <TouchableOpacity 
+                  style={styles.accordionHeader}
+                  onPress={() => setShowTechInfo(!showTechInfo)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="construct-outline" size={16} color="#FFFFFF" />
+                    <Text style={styles.accordionTitle}>8. Informações Técnicas da Fachada</Text>
+                  </View>
+                  <Ionicons name={showTechInfo ? "chevron-up" : "chevron-down"} size={18} color="#FFFFFF" />
+                </TouchableOpacity>
 
-              {/* 9. Botão Checklist */}
-              <TouchableOpacity 
-                style={styles.accordionToggleBtn}
-                onPress={() => setShowChecklist(!showChecklist)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="checkbox-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.accordionToggleText}>9. Checklist de Verificação</Text>
-                </View>
-                <Ionicons name={showChecklist ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
-              </TouchableOpacity>
-              {showChecklist && (
-                <TextInput 
-                  style={[styles.input, styles.textArea, { marginBottom: 12 }]} 
-                  multiline 
-                  placeholder="Itens verificados e conformidades..." 
-                  value={checklistData} 
-                  onChangeText={setChecklistData} 
-                />
-              )}
+                {showTechInfo && (
+                  <View style={styles.accordionBody}>
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Elementos construtivos da base</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techElementosBase} 
+                        onChangeText={setTechElementosBase} 
+                        placeholder="Ex: Concreto armado e alvenaria de blocos..."
+                      />
+                    </View>
 
-              {/* 10. Observações Gerais */}
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Especificação chapisco colante</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techChapiscoColante} 
+                        onChangeText={setTechChapiscoColante} 
+                        placeholder="Ex: Chapisco com aditivo de alto desempenho..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Especificação chapisco da alvenaria</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techChapiscoAlvenaria} 
+                        onChangeText={setTechChapiscoAlvenaria} 
+                        placeholder="Ex: Traço 1:3 com areia média..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Especificação da argamassa de emboço</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techArgamassaEmboco} 
+                        onChangeText={setTechArgamassaEmboco} 
+                        placeholder="Ex: Argamassa usinada com fibras..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Forma da aplicação da argamassa de emboço</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techFormaAplicacaoArgamassa} 
+                        onChangeText={setTechFormaAplicacaoArgamassa} 
+                        placeholder="Ex: Projeção mecânica / sarrafeamento..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Acabamentos do revestimento</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techAcabamentosRevestimento} 
+                        onChangeText={setTechAcabamentosRevestimento} 
+                        placeholder="Ex: Textura acrílica / pastilha cerâmica..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Acabamento em peitoris de janela</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techAcabamentoPeitoris} 
+                        onChangeText={setTechAcabamentoPeitoris} 
+                        placeholder="Ex: Granito com pingadeira e caimento..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Acabamento em muretas de terraços</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techAcabamentoMuretas} 
+                        onChangeText={setTechAcabamentoMuretas} 
+                        placeholder="Ex: Rufo com vedação e pingadeira..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Definição sobre frisos de mudança de cor de textura</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techDefinicaoFrisosCor} 
+                        onChangeText={setTechDefinicaoFrisosCor} 
+                        placeholder="Ex: Frisos de 2x2cm com selante..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Definição sobre face inferior das abas</Text>
+                      <TextInput 
+                        style={styles.techInput} 
+                        value={techDefinicaoFaceInferiorAbas} 
+                        onChangeText={setTechDefinicaoFaceInferiorAbas} 
+                        placeholder="Ex: Pingadeira com corte inferior a 3cm..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Caso haja projeto de fachada, especificar projetista e divergências</Text>
+                      <TextInput 
+                        style={[styles.techInput, styles.techInputMultiline]} 
+                        value={techObservacoesFachada} 
+                        onChangeText={setTechObservacoesFachada} 
+                        multiline
+                        placeholder="Ex: Projetista / Observações técnicas..."
+                      />
+                    </View>
+
+                    <View style={styles.techInputGroup}>
+                      <Text style={styles.techInputLabel}>Outras observações técnicas</Text>
+                      <TextInput 
+                        style={[styles.techInput, styles.techInputMultiline]} 
+                        value={techOutrasObservacoes} 
+                        onChangeText={setTechOutrasObservacoes} 
+                        multiline
+                        placeholder="Observações adicionais..."
+                      />
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* 9. Sanfona 2: Checklist de Verificação com Barra de Progresso */}
+              <View style={styles.accordionContainer}>
+                <TouchableOpacity 
+                  style={[styles.accordionHeader, { backgroundColor: '#0284C7' }]}
+                  onPress={() => setShowChecklist(!showChecklist)}
+                >
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="checkbox" size={16} color="#FFFFFF" />
+                        <Text style={styles.accordionTitle}>9. Checklist de Verificação ({completedChecks}/{totalChecks})</Text>
+                      </View>
+                      <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>{progressPercent}%</Text>
+                    </View>
+                    <View style={styles.headerProgressTrack}>
+                      <View style={[styles.headerProgressFill, { width: `${progressPercent}%` }]} />
+                    </View>
+                  </View>
+                  <Ionicons name={showChecklist ? "chevron-up" : "chevron-down"} size={18} color="#FFFFFF" />
+                </TouchableOpacity>
+
+                {showChecklist && (
+                  <View style={styles.accordionBody}>
+                    {checklist.map((item, idx) => (
+                      <View key={item.id} style={styles.checkItemContainer}>
+                        <TouchableOpacity 
+                          style={[styles.checkItemRow, item.checked && styles.checkItemRowActive]}
+                          onPress={() => {
+                            const updated = [...checklist];
+                            updated[idx] = { ...updated[idx], checked: !updated[idx].checked };
+                            setChecklist(updated);
+                          }}
+                        >
+                          <Ionicons 
+                            name={item.checked ? "checkbox" : "square-outline"} 
+                            size={22} 
+                            color={item.checked ? "#16A34A" : "#94A3B8"} 
+                          />
+                          <Text style={[styles.checkItemText, item.checked && styles.checkItemTextChecked]}>
+                            {item.item}
+                          </Text>
+                        </TouchableOpacity>
+                        <TextInput 
+                          style={styles.checkItemObsInput}
+                          placeholder="Observação deste item..."
+                          placeholderTextColor="#94A3B8"
+                          value={item.observacao}
+                          onChangeText={(txt) => {
+                            const updated = [...checklist];
+                            updated[idx] = { ...updated[idx], observacao: txt };
+                            setChecklist(updated);
+                          }}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* 10. Observações Gerais & Parecer */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>10. Observações Gerais & Parecer</Text>
                 <TextInput 
@@ -539,16 +956,13 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 />
               </View>
 
-              {/* 11. Captura de Fotos */}
+              {/* 11. Captura de Fotos (com Salvamento em Pasta e Galeria) */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>11. Captura de Fotos</Text>
+                <Text style={styles.label}>11. Captura de Fotos da Obra</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <TouchableOpacity 
                     style={styles.photoActionBtn} 
-                    onPress={async () => {
-                      const u = await takePhoto(obraNome || 'Obra Express');
-                      if (u) setPhotoUri(u.uri);
-                    }}
+                    onPress={handleAddPhotoCamera}
                   >
                     <Ionicons name="camera" size={18} color="#FFFFFF" />
                     <Text style={styles.photoActionText}>Câmera</Text>
@@ -556,24 +970,33 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
                   <TouchableOpacity 
                     style={[styles.photoActionBtn, { backgroundColor: '#0F172A' }]}
-                    onPress={async () => {
-                      const u = await pickImage(obraNome || 'Obra Express');
-                      if (u) setPhotoUri(u.uri);
-                    }}
+                    onPress={handleAddPhotoGallery}
                   >
                     <Ionicons name="images" size={18} color="#FFFFFF" />
                     <Text style={styles.photoActionText}>Galeria</Text>
                   </TouchableOpacity>
                 </View>
 
-                {photoUri && (
-                  <Image source={{ uri: photoUri }} style={styles.modalPhotoThumb} />
+                {/* Grid de fotos anexadas */}
+                {attachedPhotos.length > 0 && (
+                  <View style={styles.photosGrid}>
+                    {attachedPhotos.map((p, idx) => (
+                      <View key={idx} style={styles.photoThumbWrap}>
+                        <Image source={{ uri: p.uri }} style={styles.modalPhotoThumb} />
+                        <TouchableOpacity 
+                          style={styles.removePhotoBtn}
+                          onPress={() => handleRemovePhoto(idx)}
+                        >
+                          <Ionicons name="close-circle" size={20} color="#DC2626" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
 
-              {/* Disposição dos Botões Inferiores (Um de Cada Lado - Seção 15.9 & 16) */}
+              {/* Botões Inferiores: Salvar Rascunho & Enviar Aprovação */}
               <View style={styles.modalExpressFooterRow}>
-                {/* Lado Esquerdo (50% de largura): Botão "Salvar Rascunho" */}
                 <TouchableOpacity 
                   style={[styles.btnExpressDraft, loading && { opacity: 0.6 }]}
                   onPress={() => handleCreateExpress('em_andamento')}
@@ -583,7 +1006,6 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                   <Text style={styles.btnExpressDraftText}>Salvar Rascunho</Text>
                 </TouchableOpacity>
 
-                {/* Lado Direito (50% de largura): Botão "Enviar Aprovação" */}
                 <TouchableOpacity 
                   style={[styles.btnExpressSubmit, loading && { opacity: 0.6 }]}
                   onPress={() => handleCreateExpress('Aguardando Aprovação')}
@@ -623,73 +1045,95 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   expBadge: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#ECFDF5',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
   },
-  expBadgeText: { color: '#065F46', fontWeight: 'bold', fontSize: 12 },
-  dateText: { fontSize: 11, color: Colors.textMuted },
-  obraTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text, marginBottom: 2 },
-  construtoraText: { fontSize: 12, color: Colors.textSecondary, marginBottom: 6 },
-  obsText: { fontSize: 13, color: '#475569', marginBottom: 10, lineHeight: 18 },
+  expBadgeText: { fontSize: 12, fontWeight: '700', color: '#059669' },
+  dateText: { fontSize: 12, color: Colors.textMuted },
+  obraTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 2 },
+  construtoraText: { fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
+  obsText: { fontSize: 12, color: Colors.textSecondary, marginBottom: 10, fontStyle: 'italic' },
+  cardPhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cardPhotoThumb: { width: 44, height: 44, borderRadius: 6, backgroundColor: '#CBD5E1' },
+  photoCountLabel: { fontSize: 12, fontWeight: '600', color: Colors.text },
+  photoDescLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
   cardFooter: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 10,
+    alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F8FAFC',
+    borderTopColor: '#F1F5F9',
+    paddingTop: 10,
   },
   statusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  statusWaiting: { backgroundColor: '#FEF3C7' },
   statusApproved: { backgroundColor: '#D1FAE5' },
-  statusPillText: { fontSize: 11, fontWeight: 'bold', color: '#92400E' },
-  cardActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  statusWaiting: { backgroundColor: '#FEF3C7' },
+  statusDraft: { backgroundColor: '#F1F5F9' },
+  statusPillText: { fontSize: 11, fontWeight: '700' },
+  cardActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   duplicateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#E0F2FE',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  duplicateBtnText: { fontSize: 12, fontWeight: '600', color: '#0284C7' },
+  pdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 6,
   },
-  duplicateBtnText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#0284C7',
+  pdfBtnText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
-  pdfBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pdfBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
-  emptyContainer: { padding: 30, alignItems: 'center' },
-  emptyTitle: { fontSize: 17, fontWeight: 'bold', color: Colors.text, marginTop: 12 },
-  emptySub: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginTop: 12 },
+  emptySub: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', marginTop: 4, paddingHorizontal: 32 },
   createBtn: {
-    backgroundColor: '#059669',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 14,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 16,
   },
-  createBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  createBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -699,22 +1143,38 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 18,
+    padding: 16,
     maxHeight: '92%',
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  modalTitle: { fontSize: 16, fontWeight: 'bold', color: Colors.text },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  draftAutoSaveBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  draftAutoSaveText: { fontSize: 11, color: '#16A34A', fontWeight: '600' },
   inputGroup: { marginBottom: 12 },
-  label: { fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 4 },
+  label: { fontSize: 12.5, fontWeight: '600', color: '#334155', marginBottom: 4 },
   input: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#CBD5E1',
     borderRadius: 8,
     paddingHorizontal: 12,
     height: 42,
@@ -727,131 +1187,161 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: '#E2E8F0',
     borderRadius: 8,
     paddingHorizontal: 12,
-    height: 40,
+    height: 42,
   },
-  lockedNumberText: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#475569',
-  },
-  addressWithGpsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
+  lockedNumberText: { fontSize: 13, fontWeight: '700', color: '#475569' },
+  textArea: { height: 72, textAlignVertical: 'top', paddingTop: 8 },
+  addressWithGpsRow: { flexDirection: 'row', gap: 8 },
   gpsButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    backgroundColor: '#0284C7',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 4,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    justifyContent: 'center',
   },
-  gpsButtonText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  accordionToggleBtn: {
+  gpsButtonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+  visitorSuggestionChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
     borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 10,
+    borderColor: '#BFDBFE',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginRight: 6,
+  },
+  visitorSuggestionText: { fontSize: 11, color: '#1E40AF', fontWeight: '600' },
+  accordionContainer: {
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  accordionHeader: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  accordionTitle: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  headerProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  headerProgressFill: {
+    height: 4,
+    backgroundColor: '#10B981',
+    borderRadius: 2,
+  },
+  accordionBody: {
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+  },
+  techInputGroup: { marginBottom: 10 },
+  techInputLabel: { fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 3 },
+  techInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    height: 38,
+    fontSize: 12.5,
+    color: '#0F172A',
+  },
+  techInputMultiline: { height: 64, textAlignVertical: 'top', paddingTop: 6 },
+  checkItemContainer: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
+    padding: 10,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  accordionToggleText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.text,
+  checkItemRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  checkItemRowActive: {},
+  checkItemText: { flex: 1, fontSize: 12.5, color: '#334155', fontWeight: '500' },
+  checkItemTextChecked: { color: '#16A34A', fontWeight: '700' },
+  checkItemObsInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    height: 34,
+    fontSize: 11.5,
+    marginTop: 6,
+    color: '#334155',
   },
-  textArea: { height: 70, textAlignVertical: 'top', paddingVertical: 8 },
   photoActionBtn: {
     flex: 1,
-    backgroundColor: Colors.primary,
-    height: 40,
-    borderRadius: 8,
+    backgroundColor: '#2563EB',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-  },
-  photoActionText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
-  modalPhotoThumb: {
-    width: '100%',
-    height: 120,
+    height: 40,
     borderRadius: 8,
-    marginTop: 8,
+  },
+  photoActionText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  photosGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  photoThumbWrap: { position: 'relative' },
+  modalPhotoThumb: { width: 70, height: 70, borderRadius: 8, backgroundColor: '#E2E8F0' },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
   },
   modalExpressFooterRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 14,
-    marginBottom: 20,
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
   },
   btnExpressDraft: {
     flex: 1,
-    height: 48,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#0284C7',
-    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    ...Shadows.sm,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    height: 46,
+    borderRadius: 10,
   },
-  btnExpressDraftText: {
-    color: '#0284C7',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
+  btnExpressDraftText: { color: '#0284C7', fontWeight: '700', fontSize: 13 },
   btnExpressSubmit: {
     flex: 1,
-    height: 48,
-    backgroundColor: '#16A34A',
-    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    ...Shadows.md,
+    backgroundColor: '#059669',
+    height: 46,
+    borderRadius: 10,
   },
-  btnExpressSubmitText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-  cardPhotoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
-    padding: 8,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  cardPhotoThumb: {
-    width: 50,
-    height: 50,
-    borderRadius: 6,
-    backgroundColor: '#E2E8F0',
-  },
-  photoCountLabel: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: Colors.text,
-  },
-  photoDescLabel: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
+  btnExpressSubmitText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
 });

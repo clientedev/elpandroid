@@ -11,7 +11,7 @@ import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
-  getLocalProjetos, getLocalVisitas, getLocalRelatorios, 
+  getLocalProjetos, getLocalVisitas, getLocalRelatorios, getLocalRelatoriosExpress,
   saveLocalProjeto, saveLocalVisita, saveLocalRelatorio 
 } from '../../database/db';
 import { Projeto, Visita, Relatorio } from '../../types';
@@ -176,19 +176,41 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const loadData = useCallback(async () => {
     try {
-      const p = await getLocalProjetos();
-      const v = await getLocalVisitas();
-      const r = await getLocalRelatorios();
+      const [p, v, r, expR] = await Promise.all([
+        getLocalProjetos(),
+        getLocalVisitas(),
+        getLocalRelatorios(),
+        getLocalRelatoriosExpress(),
+      ]);
+
+      const expressAdapted: Relatorio[] = (expR || []).map(exp => ({
+        id: exp.id,
+        numero: exp.numero,
+        titulo: exp.titulo || 'Relatório Express de Visita',
+        autor_id: exp.autor_id || 1,
+        autor_nome: exp.autor_nome || 'Fiscal',
+        projeto_id: 0,
+        projeto_nome: exp.obra_nome || 'Obra Express',
+        projeto_construtora: exp.obra_construtora,
+        data_relatorio: exp.data_relatorio,
+        data_criacao_local: exp.data_relatorio,
+        status: exp.status as any,
+        sync_status: exp.sync_status as any,
+        fotos_count: exp.fotos_count || 0,
+        is_express: true,
+      }));
+
+      const allR = [...r, ...expressAdapted];
 
       setProjetos(p);
       setVisitas(v);
-      r.sort((a, b) => {
+      allR.sort((a, b) => {
         const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
         const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
         if (timeB !== timeA) return timeB - timeA;
         return (b.id || 0) - (a.id || 0);
       });
-      setRelatorios(r);
+      setRelatorios(allR);
     } catch (err) {
       console.warn('Erro ao carregar dados do SQLite:', err);
     }

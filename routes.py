@@ -688,8 +688,8 @@ def inject_approval_functions():
     return {
         'current_user_is_aprovador': current_user_is_aprovador,
         'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra,
-        'app_version': ver_info.get('version', '1.0.31'),
-        'app_version_code': ver_info.get('version_code', 31)
+        'app_version': ver_info.get('version', '1.0.32'),
+        'app_version_code': ver_info.get('version_code', 32)
     }
 
 @app.route('/api/checklist-padrao')
@@ -1223,9 +1223,13 @@ def api_dashboard_stats():
         # Buscar dados reais do PostgreSQL
         projetos_ativos = Projeto.query.filter_by(status='Ativo').count()
         visitas_agendadas = Visita.query.filter_by(status='Agendada').count()
-        relatorios_pendentes = Relatorio.query.filter(
+        relatorios_pendentes_normais = Relatorio.query.filter(
             Relatorio.status.in_(['Rascunho', 'Aguardando Aprovação', 'em_andamento'])
         ).count()
+        relatorios_pendentes_express = RelatorioExpress.query.filter(
+            RelatorioExpress.status.in_(['Aguardando Aprovação', 'Em preenchimento', 'em_andamento'])
+        ).count()
+        relatorios_pendentes = relatorios_pendentes_normais + relatorios_pendentes_express
 
         # Reembolsos com verificação de tabela
         try:
@@ -2841,8 +2845,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.31"
-    version_code = 31
+    app_version = "1.0.32"
+    version_code = 32
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -8795,8 +8799,9 @@ def reports_approval_dashboard():
 
     # Get reports awaiting approval
     relatorios = Relatorio.query.filter_by(status='Aguardando Aprovação').order_by(Relatorio.created_at.desc()).all()
+    relatorios_express = RelatorioExpress.query.filter_by(status='Aguardando Aprovação').order_by(RelatorioExpress.created_at.desc()).all()
 
-    return render_template('reports/approval_dashboard.html', relatorios=relatorios)
+    return render_template('reports/approval_dashboard.html', relatorios=relatorios, relatorios_express=relatorios_express)
 
 @app.route('/reports/<int:report_id>/approve', methods=['POST'])
 @login_required
@@ -13000,9 +13005,9 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.31'
-    current_vc = 31
-    release_notes = 'Atualização v1.0.31: Visitas indexadas como VISIT-0001, formulário com Obra e Outros, início, fim, observações, responsável dos usuários, participantes em cards com função e compromisso pessoal, 3 cards editáveis no dashboard e fluxos de notificações.'
+    current_v = '1.0.32'
+    current_vc = 32
+    release_notes = 'Atualização v1.0.32: Cadastro e gestão de acompanhantes/visitantes em Ajustes com inclusão em visitas e relatórios; Seleção de obras com dropdown interativo; Correção da fila de sincronização offline; Relatório Express com indexação EXP-0001, GPS real do dispositivo, 12 especificações técnicas de fachada, checklist de verificação completo, autosave e fluxo completo de aprovação.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [
@@ -14262,6 +14267,10 @@ def api_relatorios_express_sync():
             rel.informacoes_tecnicas = data.get('informacoes_tecnicas') or ''
             rel.checklist_data = data.get('checklist_data') or ''
             rel.status = data.get('status') or 'Aguardando Aprovação'
+            rel.comentario_aprovacao = data.get('comentario') or data.get('comentario_aprovacao') or rel.comentario_aprovacao or ''
+            if data.get('aprovador_id'):
+                rel.aprovador_id = data.get('aprovador_id')
+                rel.data_aprovacao = brazil_now()
 
             db.session.flush()
 
@@ -14279,6 +14288,20 @@ def api_relatorios_express_sync():
                     current_app.logger.info(f"🔔 Notificação disparada para relatório express {rel.numero}")
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de express pendente: {notif_err}")
+            elif rel.status == 'Aprovado':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_express_aprovado(rel.id, rel.aprovador_id or 1)
+                    current_app.logger.info(f"🔔 Notificação de aprovação disparada para express {rel.numero}")
+                except Exception as notif_err:
+                    current_app.logger.warning(f"Aviso ao criar notificação de aprovação express: {notif_err}")
+            elif rel.status == 'Rejeitado':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_express_reprovado(rel.id, rel.comentario_aprovacao)
+                    current_app.logger.info(f"🔔 Notificação de rejeição disparada para express {rel.numero}")
+                except Exception as notif_err:
+                    current_app.logger.warning(f"Aviso ao criar notificação de rejeição express: {notif_err}")
 
             return jsonify({'success': True, 'id': rel.id, 'numero': rel.numero}), 201
         except Exception as e:
