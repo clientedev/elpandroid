@@ -33,10 +33,8 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
 
   const loadPending = useCallback(async () => {
     try {
-      const [data, expData] = await Promise.all([
-        getLocalRelatorios(),
-        getLocalRelatoriosExpress(),
-      ]);
+      const data = await getLocalRelatorios().catch(() => []);
+      const expData = await getLocalRelatoriosExpress().catch(() => []);
       const expressPending: Relatorio[] = (expData || [])
         .filter(r => r.status === 'Aguardando Aprovação')
         .map(exp => ({

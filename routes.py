@@ -688,8 +688,8 @@ def inject_approval_functions():
     return {
         'current_user_is_aprovador': current_user_is_aprovador,
         'current_user_is_aprovador_da_obra': current_user_is_aprovador_da_obra,
-        'app_version': ver_info.get('version', '1.0.32'),
-        'app_version_code': ver_info.get('version_code', 32)
+        'app_version': ver_info.get('version', '1.0.33'),
+        'app_version_code': ver_info.get('version_code', 33)
     }
 
 @app.route('/api/checklist-padrao')
@@ -2845,8 +2845,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.32"
-    version_code = 32
+    app_version = "1.0.33"
+    version_code = 33
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -13005,9 +13005,9 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.32'
-    current_vc = 32
-    release_notes = 'Atualização v1.0.32: Cadastro e gestão de acompanhantes/visitantes em Ajustes com inclusão em visitas e relatórios; Seleção de obras com dropdown interativo; Correção da fila de sincronização offline; Relatório Express com indexação EXP-0001, GPS real do dispositivo, 12 especificações técnicas de fachada, checklist de verificação completo, autosave e fluxo completo de aprovação.'
+    current_v = '1.0.33'
+    current_vc = 33
+    release_notes = 'Atualização v1.0.33: Correção do carregamento de dados do SQLite no Dashboard e Relatórios, consultas resilientes com migração automática, nova visualização de Visitas em forma de Calendário com navegação mensal e seleção de dias, compatibilidade 100% offline e sincronização garantida.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [

@@ -176,12 +176,22 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const loadData = useCallback(async () => {
     try {
-      const [p, v, r, expR] = await Promise.all([
-        getLocalProjetos(),
-        getLocalVisitas(),
-        getLocalRelatorios(),
-        getLocalRelatoriosExpress(),
-      ]);
+      const p = await getLocalProjetos().catch(e => {
+        console.warn('Erro ao carregar projetos locais:', e);
+        return [];
+      });
+      const v = await getLocalVisitas().catch(e => {
+        console.warn('Erro ao carregar visitas locais:', e);
+        return [];
+      });
+      const r = await getLocalRelatorios().catch(e => {
+        console.warn('Erro ao carregar relatórios locais:', e);
+        return [];
+      });
+      const expR = await getLocalRelatoriosExpress().catch(e => {
+        console.warn('Erro ao carregar relatórios express locais:', e);
+        return [];
+      });
 
       const expressAdapted: Relatorio[] = (expR || []).map(exp => ({
         id: exp.id,
@@ -200,10 +210,10 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         is_express: true,
       }));
 
-      const allR = [...r, ...expressAdapted];
+      const allR = [...(r || []), ...expressAdapted];
 
-      setProjetos(p);
-      setVisitas(v);
+      setProjetos(p || []);
+      setVisitas(v || []);
       allR.sort((a, b) => {
         const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
         const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
@@ -212,7 +222,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       });
       setRelatorios(allR);
     } catch (err) {
-      console.warn('Erro ao carregar dados do SQLite:', err);
+      console.warn('Erro ao carregar dados do SQLite no Dashboard:', err);
     }
   }, [user]);
 

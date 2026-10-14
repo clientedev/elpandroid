@@ -159,6 +159,8 @@ CREATE TABLE IF NOT EXISTS relatorios_express (
   comentario_aprovacao TEXT,
   acompanhantes TEXT,
   created_at TEXT,
+  updated_at TEXT,
+  data_criacao_local TEXT,
   sync_status TEXT DEFAULT 'synced'
 );
 

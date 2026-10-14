@@ -96,10 +96,15 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
 
   const loadRelatorios = useCallback(async () => {
     try {
-      const [data, expData] = await Promise.all([
-        getLocalRelatorios(),
-        getLocalRelatoriosExpress(),
-      ]);
+      const data = await getLocalRelatorios().catch(e => {
+        console.warn('Erro ao carregar relatórios locais:', e);
+        return [];
+      });
+      const expData = await getLocalRelatoriosExpress().catch(e => {
+        console.warn('Erro ao carregar relatórios express locais:', e);
+        return [];
+      });
+
       const expressAdapted: Relatorio[] = (expData || []).map(exp => ({
         id: exp.id,
         numero: exp.numero,
@@ -117,17 +122,15 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
         observacoes_finais: exp.observacoes_finais,
         is_express: true,
       }));
-      const combined = [...data, ...expressAdapted];
+      const combined = [...(data || []), ...expressAdapted];
       setRelatorios(combined);
       const activeStatus = route?.params?.filterStatus || selectedStatus;
       filterReports(combined, search, activeStatus);
 
       if (isOnline) {
         syncService.syncAll().then(async () => {
-          const [fresh, freshExp] = await Promise.all([
-            getLocalRelatorios(),
-            getLocalRelatoriosExpress(),
-          ]);
+          const fresh = await getLocalRelatorios().catch(() => []);
+          const freshExp = await getLocalRelatoriosExpress().catch(() => []);
           const freshExpAdapted: Relatorio[] = (freshExp || []).map(exp => ({
             id: exp.id,
             numero: exp.numero,
@@ -145,7 +148,7 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
             observacoes_finais: exp.observacoes_finais,
             is_express: true,
           }));
-          const freshCombined = [...fresh, ...freshExpAdapted];
+          const freshCombined = [...(fresh || []), ...freshExpAdapted];
           setRelatorios(freshCombined);
           filterReports(freshCombined, search, activeStatus);
         }).catch(() => null);

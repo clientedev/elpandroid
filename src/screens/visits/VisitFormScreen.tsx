@@ -26,10 +26,16 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
   const [selectedProjectId, setSelectedProjectId] = useState<number | 'outros' | null>(preSelectedProjectId || null);
   const [outroNome, setOutroNome] = useState('');
 
+  const initialDate = route?.params?.initialDate;
+
   // 2. Data e Hora de Início e 3. Data e Hora Fim
   const now = new Date();
-  const defaultStart = now.toISOString().substring(0, 16).replace('T', ' ');
-  const defaultEnd = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString().substring(0, 16).replace('T', ' ');
+  const defaultStart = initialDate 
+    ? `${initialDate} 09:00` 
+    : now.toISOString().substring(0, 16).replace('T', ' ');
+  const defaultEnd = initialDate 
+    ? `${initialDate} 11:00` 
+    : new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString().substring(0, 16).replace('T', ' ');
   const [dataInicio, setDataInicio] = useState(defaultStart);
   const [dataFim, setDataFim] = useState(defaultEnd);
 

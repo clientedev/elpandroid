@@ -140,6 +140,44 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
   try {
     await db.execAsync('ALTER TABLE visita_participantes ADD COLUMN tipo TEXT;');
   } catch {}
+
+  // Migrations para relatórios express (garantir todas as colunas mesmo em bancos existentes)
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN updated_at TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN data_criacao_local TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN informacoes_tecnicas TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN checklist_data TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN acompanhantes TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN obra_construtora TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN obra_endereco TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN status TEXT DEFAULT "Em preenchimento";');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN comentario_aprovacao TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN aprovador_id INTEGER;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN aprovador_nome TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN sync_status TEXT DEFAULT "synced";');
+  } catch {}
   
   // Seed/Sync legendas predefinidas garantindo todas as 12 categorias tecnicas solicitadas
   for (const leg of SEED_LEGENDAS) {
@@ -921,14 +959,19 @@ export async function getNextExpressReportNumber(): Promise<string> {
 }
 
 export async function getLocalRelatoriosExpress(): Promise<RelatorioExpress[]> {
-  const db = await getDatabase();
-  return await db.getAllAsync<RelatorioExpress>(`
-    SELECT r.*, COUNT(f.id) as fotos_count 
-    FROM relatorios_express r 
-    LEFT JOIN fotos_relatorio_express f ON r.id = f.relatorio_express_id 
-    GROUP BY COALESCE(NULLIF(r.numero, ""), r.id) 
-    ORDER BY COALESCE(r.updated_at, r.data_criacao_local, r.data_relatorio) DESC, r.id DESC
-  `);
+  try {
+    const db = await getDatabase();
+    return await db.getAllAsync<RelatorioExpress>(`
+      SELECT r.*, COUNT(f.id) as fotos_count 
+      FROM relatorios_express r 
+      LEFT JOIN fotos_relatorio_express f ON r.id = f.relatorio_express_id 
+      GROUP BY r.id 
+      ORDER BY r.id DESC
+    `);
+  } catch (err) {
+    console.warn('Erro ao buscar relatórios express:', err);
+    return [];
+  }
 }
 
 export async function getLocalRelatorioExpressById(id: number): Promise<RelatorioExpress | null> {
