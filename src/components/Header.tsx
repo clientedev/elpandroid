@@ -141,7 +141,7 @@ export const Header: React.FC<HeaderProps> = ({
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent />
       <View style={styles.left}>
         {showBack ? (
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+          <TouchableOpacity onPress={onBack || (() => navigation.goBack())} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
         ) : (

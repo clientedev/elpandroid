@@ -11,7 +11,8 @@ import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
   getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue, deleteLocalRelatorio,
-  saveBatchChecklistProgressoObra, getNextReportNumberForProject, getDatabase
+  saveBatchChecklistProgressoObra, getNextReportNumberForProject, getDatabase,
+  getLocalRelatorioExpressById, getLocalFotosExpress, updateLocalRelatorioExpressStatus
 } from '../../database/db';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
 import { apiClient } from '../../services/api';
@@ -42,10 +43,49 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
 
   async function loadReport() {
     try {
-      const r = await getLocalRelatorioById(reportId);
+      let r = await getLocalRelatorioById(reportId);
+      let isExpress = false;
+      if (!r) {
+        const exp = await getLocalRelatorioExpressById(reportId);
+        if (exp) {
+          isExpress = true;
+          r = {
+            id: exp.id,
+            numero: exp.numero,
+            titulo: exp.titulo || `Relatório Express ${exp.numero}`,
+            projeto_id: 0,
+            projeto_nome: exp.obra_nome || 'Obra Express',
+            projeto_construtora: exp.obra_construtora,
+            projeto_endereco: exp.obra_endereco,
+            autor_id: exp.autor_id || 1,
+            autor_nome: exp.autor_nome || 'Fiscal Técnico',
+            data_relatorio: exp.data_relatorio,
+            status: exp.status as any,
+            sync_status: exp.sync_status as any,
+            fotos_count: exp.fotos_count || 0,
+            observacoes_finais: exp.observacoes_finais,
+            checklist_data: exp.checklist_data,
+            acompanhantes: exp.acompanhantes,
+            is_express: true,
+          } as any;
+        }
+      }
       setRelatorio(r);
-      const f = await getLocalFotos(reportId, r?.uuid);
-      setFotos(f);
+      let f = await getLocalFotos(reportId, r?.uuid);
+      if ((!f || f.length === 0) && (isExpress || (r as any)?.is_express)) {
+        const expFotos = await getLocalFotosExpress(reportId);
+        f = (expFotos || []).map(ef => ({
+          id: ef.id,
+          relatorio_id: ef.relatorio_express_id,
+          uri_local: ef.uri_local,
+          url: ef.url,
+          base64: ef.base64,
+          titulo: ef.titulo,
+          legenda: ef.legenda,
+          ordem: ef.ordem,
+        }));
+      }
+      setFotos(f || []);
     } catch (e) {
       console.warn('Erro ao carregar relatório:', e);
     }
@@ -86,22 +126,50 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     if (!relatorio || !isApprover) return;
     setApproving(true);
     try {
-      await updateLocalRelatorioStatus(
-        relatorio.id,
-        'Aprovado',
-        'Relatório aprovado pelo responsável',
-        user?.id,
-        user?.username,
-        'pending'
-      );
-      await addToSyncQueue(
-        'relatorio',
-        relatorio.id,
-        'approve',
-        `/api/relatorios/${relatorio.id}/status`,
-        'POST',
-        { status: 'Aprovado', aprovador_id: user?.id }
-      );
+      if ((relatorio as any)?.is_express) {
+        await updateLocalRelatorioExpressStatus(
+          relatorio.id,
+          'Aprovado',
+          'Relatório aprovado pelo responsável',
+          user?.id,
+          user?.nome_completo || user?.username,
+          'pending'
+        );
+        await addToSyncQueue(
+          'relatorio_express',
+          relatorio.id,
+          'approve',
+          '/api/relatorios-express',
+          'POST',
+          {
+            id: relatorio.id,
+            numero: relatorio.numero,
+            status: 'Aprovado',
+            comentario: 'Relatório aprovado pelo responsável',
+            comentario_aprovacao: 'Relatório aprovado pelo responsável',
+            aprovador_id: user?.id,
+            aprovador_nome: user?.nome_completo || user?.username,
+          }
+        );
+      } else {
+        await updateLocalRelatorioStatus(
+          relatorio.id,
+          'Aprovado',
+          'Relatório aprovado pelo responsável',
+          user?.id,
+          user?.username,
+          'pending'
+        );
+        await addToSyncQueue(
+          'relatorio',
+          relatorio.id,
+          'approve',
+          `/api/relatorios/${relatorio.id}/status`,
+          'POST',
+          { status: 'Aprovado', aprovador_id: user?.id }
+        );
+      }
+
       // 1. Grava no histórico cumulativo da obra todos os itens que foram aprovados nesta vistoria
       if (relatorio.checklist_data) {
         try {
@@ -120,7 +188,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                 data_aprovacao: new Date().toISOString(),
                 observacao: item.observacao || null
               }));
-            if (aprovados.length > 0) {
+            if (aprovados.length > 0 && relatorio.projeto_id) {
               await saveBatchChecklistProgressoObra(relatorio.projeto_id, aprovados);
             }
           }
@@ -148,22 +216,49 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     }
     setApproving(true);
     try {
-      await updateLocalRelatorioStatus(
-        relatorio.id,
-        'Rejeitado',
-        rejectComment.trim(),
-        user?.id,
-        user?.username,
-        'pending'
-      );
-      await addToSyncQueue(
-        'relatorio',
-        relatorio.id,
-        'reject',
-        `/api/relatorios/${relatorio.id}/status`,
-        'POST',
-        { status: 'Rejeitado', comentario: rejectComment.trim(), aprovador_id: user?.id }
-      );
+      if ((relatorio as any)?.is_express) {
+        await updateLocalRelatorioExpressStatus(
+          relatorio.id,
+          'Rejeitado',
+          rejectComment.trim(),
+          user?.id,
+          user?.nome_completo || user?.username,
+          'pending'
+        );
+        await addToSyncQueue(
+          'relatorio_express',
+          relatorio.id,
+          'reject',
+          '/api/relatorios-express',
+          'POST',
+          {
+            id: relatorio.id,
+            numero: relatorio.numero,
+            status: 'Rejeitado',
+            comentario: rejectComment.trim(),
+            comentario_aprovacao: rejectComment.trim(),
+            aprovador_id: user?.id,
+            aprovador_nome: user?.nome_completo || user?.username,
+          }
+        );
+      } else {
+        await updateLocalRelatorioStatus(
+          relatorio.id,
+          'Rejeitado',
+          rejectComment.trim(),
+          user?.id,
+          user?.username,
+          'pending'
+        );
+        await addToSyncQueue(
+          'relatorio',
+          relatorio.id,
+          'reject',
+          `/api/relatorios/${relatorio.id}/status`,
+          'POST',
+          { status: 'Rejeitado', comentario: rejectComment.trim(), aprovador_id: user?.id }
+        );
+      }
       if (isOnline) triggerSync();
       setShowRejectBox(false);
       setRejectComment('');

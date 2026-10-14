@@ -48,8 +48,29 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReportId, setEditingReportId] = useState<number | null>(null);
 
+  // Modal de Aprovação / Rejeição
+  const [approvalModalVisible, setApprovalModalVisible] = useState(false);
+  const [reportToApprove, setReportToApprove] = useState<RelatorioExpress | null>(null);
+  const [approvalAction, setApprovalAction] = useState<'Aprovado' | 'Rejeitado'>('Aprovado');
+  const [approvalComment, setApprovalComment] = useState('');
+
+  const isMasterOrAdmin = Boolean(
+    user?.is_master || 
+    (user as any)?.is_admin || 
+    (user as any)?.role === 'admin' || 
+    (user as any)?.role === 'master' ||
+    user?.username?.toLowerCase() === 'admin'
+  );
+  const hasApproverPrivilege = Boolean(
+    isMasterOrAdmin || 
+    (user as any)?.is_aprovador || 
+    user?.is_aprovador_express || 
+    (user as any)?.role === 'aprovador'
+  );
+  const canApprove = isMasterOrAdmin || hasApproverPrivilege;
+
   // Form state:
-  const [titulo, setTitulo] = useState('Relatório Express de Visita');
+  const [titulo, setTitulo] = useState('Relatório Express EXP-0001');
   const [numero, setNumero] = useState('EXP-0001');
   const [dataVisita, setDataVisita] = useState(new Date().toISOString().split('T')[0]);
   const [obraConstrutora, setObraConstrutora] = useState('');
@@ -202,7 +223,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       setChecklist(DEFAULT_CHECKLIST);
     }
 
-    setTitulo('Relatório Express de Visita');
+    setTitulo(`Relatório Express ${nextNum}`);
     setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
     setAttachedPhotos([]);
@@ -216,7 +237,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       nextNum = await getNextExpressReportNumber();
     } catch {}
 
-    setTitulo(`${original.titulo || 'Relatório Express'} (Cópia)`);
+    setTitulo(`Relatório Express ${nextNum} (Cópia)`);
     setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
     setObraConstrutora(original.obra_construtora || '');
@@ -267,8 +288,9 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   async function handleEditReport(item: RelatorioExpress) {
     setEditingReportId(item.id);
-    setTitulo(item.titulo || 'Relatório Express de Visita');
-    setNumero(item.numero || 'EXP-0001');
+    const itemNum = item.numero || 'EXP-0001';
+    setTitulo(item.titulo || `Relatório Express ${itemNum}`);
+    setNumero(itemNum);
     setDataVisita(item.data_relatorio ? item.data_relatorio.split('T')[0] : new Date().toISOString().split('T')[0]);
     setObraConstrutora(item.obra_construtora || '');
     setObraNome(item.obra_nome || '');
@@ -410,6 +432,75 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     );
   }
 
+  function handleOpenApproveModal(item: RelatorioExpress) {
+    setReportToApprove(item);
+    setApprovalAction('Aprovado');
+    setApprovalComment('Relatório aprovado em conformidade técnica.');
+    setApprovalModalVisible(true);
+  }
+
+  function handleOpenRejectModal(item: RelatorioExpress) {
+    setReportToApprove(item);
+    setApprovalAction('Rejeitado');
+    setApprovalComment('');
+    setApprovalModalVisible(true);
+  }
+
+  async function handleConfirmApprovalAction() {
+    if (!reportToApprove) return;
+    if (approvalAction === 'Rejeitado' && !approvalComment.trim()) {
+      Alert.alert('Justificativa Obrigatória', 'Informe o motivo da rejeição do relatório express.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const approverName = user?.nome_completo || user?.username || 'Responsável Técnico';
+      const comment = approvalComment.trim() || (approvalAction === 'Aprovado' ? 'Relatório aprovado em conformidade técnica.' : 'Necessita correções');
+      
+      await updateLocalRelatorioExpressStatus(
+        reportToApprove.id,
+        approvalAction,
+        comment,
+        user?.id,
+        approverName,
+        'pending'
+      );
+
+      await addToSyncQueue(
+        'relatorio_express',
+        reportToApprove.id,
+        approvalAction === 'Aprovado' ? 'approve' : 'reject',
+        '/api/relatorios-express',
+        'POST',
+        {
+          id: reportToApprove.id,
+          numero: reportToApprove.numero,
+          status: approvalAction,
+          comentario: comment,
+          comentario_aprovacao: comment,
+          aprovador_id: user?.id,
+          aprovador_nome: approverName,
+        }
+      );
+
+      if (isOnline) triggerSync();
+      setApprovalModalVisible(false);
+      const affectedNum = reportToApprove.numero;
+      setReportToApprove(null);
+      await loadReports();
+
+      Alert.alert(
+        approvalAction === 'Aprovado' ? 'Relatório Aprovado' : 'Relatório Rejeitado',
+        `O Relatório Express ${affectedNum} foi marcado como ${approvalAction.toLowerCase()}.`
+      );
+    } catch (e: any) {
+      Alert.alert('Erro', e.message || 'Falha ao processar ação no relatório.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   // Captura Real de GPS do Dispositivo
   async function handleCaptureGpsAddress() {
     setLoadingGps(true);
@@ -503,7 +594,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setLoading(true);
     try {
       const expId = editingReportId || Date.now();
-      const currentNumber = (editingReportId && numero) ? numero : (numero.startsWith('EXP-') ? numero : await getNextExpressReportNumber());
+      let currentNumber = (editingReportId && numero) ? numero : (numero.startsWith('EXP-') ? numero : await getNextExpressReportNumber());
+      if (!editingReportId) {
+        currentNumber = await getNextExpressReportNumber();
+      }
+
+      const finalTitle = (!titulo || titulo.trim() === 'Relatório Express de Visita' || titulo.startsWith('Relatório Express EXP-') || titulo === 'Relatório Express')
+        ? `Relatório Express ${currentNumber}`
+        : titulo.trim();
 
       const techInfoPayload = {
         elementos_construtivos_base: techElementosBase.trim(),
@@ -558,7 +656,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       const newExp: RelatorioExpress = {
         id: expId,
         numero: currentNumber.trim(),
-        titulo: titulo.trim(),
+        titulo: finalTitle,
         autor_id: user?.id || 1,
         autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
         data_relatorio: dataVisita,
@@ -660,6 +758,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       <Header 
         title="Relatórios Express" 
         showBack 
+        onBack={() => navigation.goBack()}
         rightAction={
           <TouchableOpacity style={styles.addBtn} onPress={handleOpenNew} activeOpacity={0.8}>
             <Ionicons name="add" size={24} color="#FFFFFF" />
@@ -700,8 +799,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               <SyncStatusBadge status={item.sync_status} />
             </View>
 
-            <Text style={styles.obraTitle}>{item.obra_nome}</Text>
-            <Text style={styles.construtoraText}>{item.obra_construtora || item.titulo}</Text>
+            <Text style={styles.obraTitle}>{item.titulo || `Relatório Express ${item.numero}`}</Text>
+            <Text style={styles.construtoraText}>
+              {item.obra_nome}{item.obra_construtora ? ` • ${item.obra_construtora}` : ''}
+            </Text>
 
             {item.observacoes_finais ? (
               <Text style={styles.obsText} numberOfLines={2}>
@@ -738,6 +839,27 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               </View>
 
               <View style={styles.cardActionsRow}>
+                {/* Ações de Aprovação / Rejeição diretas no Card */}
+                {item.status === 'Aguardando Aprovação' && canApprove && (
+                  <>
+                    <TouchableOpacity 
+                      style={styles.cardApproveBtn} 
+                      onPress={() => handleOpenApproveModal(item)}
+                    >
+                      <Ionicons name="checkmark-circle" size={13} color="#FFFFFF" />
+                      <Text style={styles.cardApproveBtnText}>Aprovar</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      style={styles.cardRejectBtn} 
+                      onPress={() => handleOpenRejectModal(item)}
+                    >
+                      <Ionicons name="close-circle" size={13} color="#FFFFFF" />
+                      <Text style={styles.cardRejectBtnText}>Rejeitar</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
                 {item.status !== 'Aprovado' && (
                   <TouchableOpacity 
                     style={styles.editBtn} 
@@ -1164,8 +1286,25 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 )}
               </View>
 
-              {/* Botões Inferiores: Salvar Rascunho & Enviar Aprovação */}
+              {/* Botões Inferiores: Salvar Rascunho, Enviar Aprovação e Aprovar */}
               <View style={styles.modalExpressFooterRow}>
+                {editingReportId && expressList.find(r => r.id === editingReportId)?.status === 'Aguardando Aprovação' && canApprove && (
+                  <TouchableOpacity
+                    style={[styles.btnExpressApproveModal, loading && { opacity: 0.6 }]}
+                    onPress={() => {
+                      const rep = expressList.find(r => r.id === editingReportId);
+                      if (rep) {
+                        setModalVisible(false);
+                        handleOpenApproveModal(rep);
+                      }
+                    }}
+                    disabled={loading}
+                  >
+                    <Ionicons name="checkmark-done" size={17} color="#FFFFFF" />
+                    <Text style={styles.btnExpressApproveModalText}>Aprovar</Text>
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity 
                   style={[styles.btnExpressDraft, loading && { opacity: 0.6 }]}
                   onPress={() => handleCreateExpress('em_andamento')}
@@ -1185,6 +1324,69 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 </TouchableOpacity>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de Parecer de Aprovação / Rejeição do Relatório Express */}
+      <Modal visible={approvalModalVisible} animationType="fade" transparent>
+        <View style={styles.actionModalOverlay}>
+          <View style={styles.actionModalBox}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Ionicons 
+                name={approvalAction === 'Aprovado' ? 'checkmark-circle' : 'close-circle'} 
+                size={22} 
+                color={approvalAction === 'Aprovado' ? '#059669' : '#DC2626'} 
+              />
+              <Text style={styles.actionModalTitle}>
+                {approvalAction === 'Aprovado' ? 'Aprovar Relatório Express' : 'Rejeitar Relatório Express'}
+              </Text>
+            </View>
+
+            <Text style={styles.actionModalSub}>
+              {reportToApprove?.numero} - {reportToApprove?.obra_nome}
+            </Text>
+
+            <Text style={styles.actionModalInputLabel}>
+              {approvalAction === 'Aprovado' ? 'Parecer Técnico (opcional):' : 'Motivo da Rejeição (obrigatório):'}
+            </Text>
+            <TextInput
+              style={styles.actionModalInput}
+              multiline
+              numberOfLines={3}
+              placeholder={approvalAction === 'Aprovado' ? 'Relatório aprovado em conformidade técnica...' : 'Descreva as correções necessárias...'}
+              value={approvalComment}
+              onChangeText={setApprovalComment}
+            />
+
+            <View style={styles.actionModalButtons}>
+              <TouchableOpacity 
+                style={styles.actionModalCancelBtn} 
+                onPress={() => {
+                  setApprovalModalVisible(false);
+                  setReportToApprove(null);
+                }}
+              >
+                <Text style={styles.actionModalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[
+                  styles.actionModalConfirmBtn,
+                  approvalAction === 'Aprovado' ? { backgroundColor: '#059669' } : { backgroundColor: '#DC2626' }
+                ]}
+                onPress={handleConfirmApprovalAction}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.actionModalConfirmText}>
+                    {approvalAction === 'Aprovado' ? 'Confirmar Aprovação' : 'Confirmar Rejeição'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1537,4 +1739,79 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   btnExpressSubmitText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  cardApproveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#059669',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  cardApproveBtnText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
+  cardRejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  cardRejectBtnText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
+  btnExpressApproveModal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#059669',
+    paddingHorizontal: 14,
+    height: 46,
+    borderRadius: 10,
+  },
+  btnExpressApproveModalText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  actionModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  actionModalBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 400,
+    ...Shadows.md,
+  },
+  actionModalTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  actionModalSub: { fontSize: 12.5, color: '#64748B', marginTop: 2, marginBottom: 12 },
+  actionModalInputLabel: { fontSize: 12, fontWeight: '600', color: '#334155', marginBottom: 6 },
+  actionModalInput: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 13,
+    color: '#0F172A',
+    minHeight: 70,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+  },
+  actionModalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  actionModalCancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  actionModalCancelText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  actionModalConfirmBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  actionModalConfirmText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
 });

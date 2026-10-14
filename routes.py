@@ -2845,8 +2845,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.34"
-    version_code = 34
+    app_version = "1.0.35"
+    version_code = 35
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -13044,8 +13044,8 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.34'
-    current_vc = 34
+    current_v = '1.0.35'
+    current_vc = 35
     release_notes = 'Atualização v1.0.34: Correção da indexação do Relatório Express para iniciar em EXP-0001 sem saltos de ano; revisão e unificação do fluxo de aprovação dos relatórios express no app e portal web; ações de edição e reenvio de relatórios express; geração de PDF e envio de e-mails em aprovações.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14274,16 +14274,33 @@ def api_relatorios_express_sync():
             autor_id = user.id if user else 1
 
             numero = (data.get('numero') or '').strip()
-            existing = RelatorioExpress.query.filter_by(numero=numero).first() if numero else None
-
-            # Fallback por id caso o relatório já exista no servidor
-            if not existing and data.get('id'):
-                try:
+            req_id = None
+            try:
+                if data.get('id'):
                     req_id = int(data.get('id'))
-                    if req_id < 2000000000:
-                        existing = RelatorioExpress.query.get(req_id)
-                except Exception:
-                    pass
+            except Exception:
+                pass
+
+            is_new_mobile = (req_id is not None and req_id >= 2000000000) or data.get('action') == 'create'
+
+            existing = None
+            if not is_new_mobile:
+                if req_id and req_id < 2000000000:
+                    existing = RelatorioExpress.query.get(req_id)
+                if not existing and numero:
+                    existing = RelatorioExpress.query.filter_by(numero=numero).first()
+            else:
+                # É um novo relatório criado no mobile!
+                # Se o número já existir no servidor, gera novo número sequencial para não colidir nem sobrescrever
+                if numero:
+                    collision = RelatorioExpress.query.filter_by(numero=numero).first()
+                    if collision:
+                        try:
+                            from routes_express import generate_express_number
+                            numero = generate_express_number()
+                        except Exception:
+                            count = RelatorioExpress.query.count() + 1
+                            numero = f"EXP-{count:04d}"
 
             if existing:
                 rel = existing
@@ -14321,8 +14338,12 @@ def api_relatorios_express_sync():
                 rel.obra_email = data.get('obra_email')
             if 'obra_endereco' in data and data.get('obra_endereco'):
                 rel.obra_endereco = data.get('obra_endereco')
-            if 'titulo' in data and data.get('titulo'):
-                rel.titulo = data.get('titulo')
+
+            raw_titulo = data.get('titulo')
+            if raw_titulo and raw_titulo != 'Relatório Express de Visita' and not raw_titulo.startswith('Relatório Express EXP-'):
+                rel.titulo = raw_titulo
+            elif not rel.titulo or rel.titulo == 'Relatório Express de Visita' or rel.titulo.startswith('Relatório Express EXP-') or rel.titulo == 'Relatório Express':
+                rel.titulo = f"Relatório Express {rel.numero}"
             if 'data_visita' in data and data.get('data_visita'):
                 rel.data_visita = _parse_iso_date(data.get('data_visita'), as_date=True, default=rel.data_visita or brazil_now().date())
             if 'data_relatorio' in data and data.get('data_relatorio'):

@@ -954,41 +954,44 @@ export async function deleteLocalFoto(id: number): Promise<void> {
 // ================= RELATORIOS EXPRESS =================
 export async function getNextExpressReportNumber(): Promise<string> {
   const db = await getDatabase();
-  const rows = await db.getAllAsync<{ numero: string }>('SELECT numero FROM relatorios_express');
+  const rows = await db.getAllAsync<{ numero: string; titulo?: string }>('SELECT numero, titulo FROM relatorios_express');
   let maxSeq = 0;
   for (const row of rows) {
-    if (!row.numero) continue;
-    const trimmed = row.numero.trim();
-    // Legacy format EXP-YYYY-NNNN
-    const matchLegacyYear = trimmed.match(/^EXP-\d{4}-(\d+)$/i);
-    if (matchLegacyYear) {
-      const val = parseInt(matchLegacyYear[1], 10);
-      if (!isNaN(val) && val > maxSeq) {
-        maxSeq = val;
-      }
-      continue;
-    }
-    // Standard format EXP-NNNN
-    const matchStandard = trimmed.match(/^EXP-(\d+)$/i);
-    if (matchStandard) {
-      const val = parseInt(matchStandard[1], 10);
-      if (!isNaN(val)) {
-        // Discard year bug sequences (e.g. 2026, 2027)
-        if (val >= 1900 && val <= 2099) {
-          continue;
-        }
-        if (val > maxSeq) {
+    const candidateStrings = [row.numero, row.titulo].filter(Boolean) as string[];
+    for (const raw of candidateStrings) {
+      if (!raw) continue;
+      const trimmed = raw.trim();
+      // Legacy format EXP-YYYY-NNNN
+      const matchLegacyYear = trimmed.match(/EXP-\d{4}-(\d+)/i);
+      if (matchLegacyYear) {
+        const val = parseInt(matchLegacyYear[1], 10);
+        if (!isNaN(val) && val > maxSeq) {
           maxSeq = val;
         }
+        continue;
       }
-      continue;
-    }
-    // General fallback: trailing digits
-    const matchEnd = trimmed.match(/(\d+)$/);
-    if (matchEnd) {
-      const val = parseInt(matchEnd[1], 10);
-      if (!isNaN(val) && val < 1900 && val > maxSeq) {
-        maxSeq = val;
+      // Standard format EXP-NNNN
+      const matchStandard = trimmed.match(/EXP-(\d+)/i);
+      if (matchStandard) {
+        const val = parseInt(matchStandard[1], 10);
+        if (!isNaN(val)) {
+          // Discard year bug sequences (e.g. 2026, 2027)
+          if (val >= 1900 && val <= 2099) {
+            continue;
+          }
+          if (val > maxSeq) {
+            maxSeq = val;
+          }
+        }
+        continue;
+      }
+      // General fallback: trailing digits if contains EXP
+      const matchEnd = trimmed.match(/EXP.*?(\d+)$/i);
+      if (matchEnd) {
+        const val = parseInt(matchEnd[1], 10);
+        if (!isNaN(val) && val < 1900 && val > maxSeq) {
+          maxSeq = val;
+        }
       }
     }
   }
@@ -1020,13 +1023,16 @@ export async function getLocalRelatorioExpressById(id: number): Promise<Relatori
 export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
 
-  // Deduplicação por número
+  // Previne sobrescrita indevida de relatórios diferentes por colisão de número
   try {
     if (r.numero && !r.numero.includes('Pendente')) {
-      const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios_express WHERE numero = ?', [r.numero]);
-      if (existing && existing.id !== r.id) {
-        await db.runAsync('UPDATE fotos_relatorio_express SET relatorio_express_id = ? WHERE relatorio_express_id = ?', [r.id, existing.id]);
-        await db.runAsync('DELETE FROM relatorios_express WHERE id = ?', [existing.id]);
+      const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios_express WHERE numero = ? AND id != ?', [r.numero, r.id]);
+      if (existing) {
+        const freshNum = await getNextExpressReportNumber();
+        r.numero = freshNum;
+        if (!r.titulo || r.titulo === 'Relatório Express de Visita' || r.titulo.startsWith('Relatório Express EXP-')) {
+          r.titulo = `Relatório Express ${freshNum}`;
+        }
       }
     }
   } catch (e) {}
