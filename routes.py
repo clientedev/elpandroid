@@ -2931,17 +2931,19 @@ def get_apk_info():
     }
 
 # Main routes
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    """Site oficial da ELP - Apresentação institucional sobre o sistema e foco no APK"""
-    return render_template('landing.html', apk_info=get_apk_info())
+    """Portal corporativo de login direto - Sem landing institucional"""
+    if current_user.is_authenticated:
+        return redirect(url_for('painel_apk'))
+    return login()
 
 @app.route('/sobre')
 @app.route('/apresentacao')
 @app.route('/landing')
 def landing_page():
-    """Página institucional que apresenta o sistema ELP e o aplicativo Android"""
-    return render_template('landing.html', apk_info=get_apk_info())
+    """Redirecionamento para a página principal de acesso"""
+    return redirect(url_for('index'))
 
 @app.route('/painel')
 @app.route('/portal')
