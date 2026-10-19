@@ -621,6 +621,12 @@ def sync_imported_legacy_users():
                     synced_count += 1
                     logging.info(f"✅ Usuário atualizado: {user.username}")
 
+        # Limpar usuário de teste temporário se existir
+        test_u = User.query.filter_by(username='test_ping_import').first()
+        if test_u:
+            db.session.delete(test_u)
+            logging.info("🧹 Usuário de teste test_ping_import removido com sucesso.")
+
         db.session.commit()
         logging.info(f"🎉 Sincronização de usuários legados finalizada: {synced_count} alterações.")
         return synced_count

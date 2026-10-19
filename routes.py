@@ -15014,6 +15014,7 @@ def api_users_collection():
                 'is_aprovador_express': bool(u.is_aprovador_express),
                 'ativo': bool(u.ativo),
                 'tipo_acesso': tipo,
+                'cor_agenda': getattr(u, 'cor_agenda', '#0EA5E9') or '#0EA5E9',
                 'created_at': u.created_at.isoformat() if u.created_at else None
             })
         return jsonify(result), 200
