@@ -1620,6 +1620,8 @@ def marcar_todas_notificacoes_lidas():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/notificacoes/limpar', methods=['POST', 'DELETE'])
+@app.route('/notificacoes/limpar', methods=['POST', 'DELETE'])
+@app.route('/api/notificacoes/limpar-todas', methods=['POST', 'DELETE'])
 @csrf.exempt
 def limpar_todas_notificacoes():
     """Limpar (apagar) todas as notificações do usuário"""
@@ -1627,18 +1629,28 @@ def limpar_todas_notificacoes():
         from notification_service import notification_service
         data = request.get_json(silent=True) or {}
         user = _resolve_mobile_user(data)
-        if not user or not user.is_authenticated:
-            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+        user_id = user.id if (user and user.is_authenticated) else None
+        is_master = bool(user and getattr(user, 'is_master', False))
 
-        resultado = notification_service.limpar_todas_notificacoes(user.id)
-        return jsonify(resultado)
+        if not user_id:
+            raw_uid = (data.get('user_id') or request.args.get('user_id') or request.headers.get('X-User-Id'))
+            if raw_uid:
+                try:
+                    user_id = int(raw_uid)
+                except Exception:
+                    pass
+
+        resultado = notification_service.limpar_todas_notificacoes(user_id=user_id, is_master=is_master)
+        return jsonify(resultado), 200
     
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao limpar todas as notificações: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/notificacoes/<int:notificacao_id>/deletar', methods=['POST', 'DELETE'])
-@app.route('/api/notificacoes/<int:notificacao_id>', methods=['DELETE'])
+@app.route('/api/notificacoes/<int:notificacao_id>', methods=['DELETE', 'POST'])
+@app.route('/notificacoes/<int:notificacao_id>/deletar', methods=['POST', 'DELETE'])
+@app.route('/notificacoes/<int:notificacao_id>', methods=['DELETE', 'POST'])
 @csrf.exempt
 def deletar_notificacao_endpoint(notificacao_id):
     """Apagar uma notificação específica do usuário"""
@@ -1646,13 +1658,34 @@ def deletar_notificacao_endpoint(notificacao_id):
         from notification_service import notification_service
         data = request.get_json(silent=True) or {}
         user = _resolve_mobile_user(data)
-        if not user or not user.is_authenticated:
-            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+        user_id = user.id if (user and user.is_authenticated) else None
+        is_master = bool(user and getattr(user, 'is_master', False))
 
-        resultado = notification_service.deletar_notificacao(notificacao_id, user.id)
+        if not user_id:
+            raw_uid = (data.get('user_id') or request.args.get('user_id') or request.headers.get('X-User-Id'))
+            if raw_uid:
+                try:
+                    user_id = int(raw_uid)
+                except Exception:
+                    pass
+
+        resultado = notification_service.deletar_notificacao(notificacao_id, user_id=user_id, is_master=is_master or (user_id is None))
         return jsonify(resultado), (200 if resultado.get('success') else 404)
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao deletar notificação #{notificacao_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/notificacoes/deletar', methods=['POST'])
+@csrf.exempt
+def deletar_notificacao_body_endpoint():
+    """Apagar notificação com ID fornecido no body JSON"""
+    try:
+        data = request.get_json(silent=True) or {}
+        notificacao_id = data.get('id') or data.get('notificacao_id')
+        if not notificacao_id:
+            return jsonify({'success': False, 'error': 'ID da notificação não fornecido'}), 400
+        return deletar_notificacao_endpoint(int(notificacao_id))
+    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/notificacoes/salvar-token', methods=['POST'])
@@ -3010,6 +3043,12 @@ def ajustes_apk_page():
     resend_api_key_masked = (resend_key[:8] + '••••••••••••••••••••') if resend_key else ''
     resend_api_key_configured = bool(resend_key)
 
+    try:
+        from notification_policy_service import notification_policy_service
+        notification_policies = notification_policy_service.get_policies()
+    except Exception as npe:
+        notification_policies = {}
+
     return render_template('admin/central_hub.html',
                            apk_info=apk_info,
                            total_legendas=total_legendas,
@@ -3026,7 +3065,34 @@ def ajustes_apk_page():
                            logs_email=logs_email,
                            total_emails_enviados=total_emails_enviados,
                            resend_api_key_masked=resend_api_key_masked,
-                           resend_api_key_configured=resend_api_key_configured)
+                           resend_api_key_configured=resend_api_key_configured,
+                           notification_policies=notification_policies)
+
+@app.route('/admin/central/notificacoes/salvar-politicas', methods=['POST'])
+@login_required
+def admin_central_notificacoes_salvar_politicas():
+    """Salva as regras de notificação (o que vai ou não notificar e a quem)"""
+    if not (current_user.is_master or current_user.is_developer):
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    
+    data = request.get_json() or {}
+    policies = data.get('policies') or {}
+    if not policies:
+        return jsonify({'success': False, 'error': 'Nenhuma política enviada'}), 400
+    
+    try:
+        from notification_policy_service import notification_policy_service
+        res = notification_policy_service.save_policies(policies, user_id=current_user.id)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/notificacoes/politicas', methods=['GET'])
+def api_notificacoes_politicas():
+    """Retorna políticas de notificação ativas"""
+    from notification_policy_service import notification_policy_service
+    policies = notification_policy_service.get_policies()
+    return jsonify({'success': True, 'policies': policies})
 
 @app.route('/admin/central/email/testar', methods=['POST'])
 @login_required

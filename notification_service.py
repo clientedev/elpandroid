@@ -53,6 +53,15 @@ class NotificationService:
         try:
             from models import Notificacao, User
             
+            # Verificação de Política de Notificação Dinâmica
+            try:
+                from notification_policy_service import notification_policy_service
+                if not notification_policy_service.should_notify(tipo, channel='sistema'):
+                    logger.info(f"🚫 [POLÍTICA] Notificação do tipo '{tipo}' está desativada nas configurações da Central.")
+                    return {'success': True, 'skipped': True, 'reason': f"Tipo '{tipo}' desativado nas políticas."}
+            except Exception as pe:
+                logger.debug(f"Aviso ao consultar políticas: {pe}")
+
             destino = link_destino or link
             
             notificacao = Notificacao(
@@ -67,6 +76,15 @@ class NotificationService:
             db.session.add(notificacao)
             db.session.flush()
             
+            if enviar_push:
+                try:
+                    from notification_policy_service import notification_policy_service
+                    if not notification_policy_service.should_notify(tipo, channel='push'):
+                        enviar_push = False
+                        logger.info(f"🚫 [POLÍTICA] Canal Push para evento '{tipo}' desativado nas configurações.")
+                except Exception:
+                    pass
+
             if enviar_push:
                 from models import UserDevice
                 
@@ -1013,31 +1031,44 @@ class NotificationService:
             logger.error(f"❌ Erro ao marcar todas como lidas: {e}")
             return {'success': False, 'error': str(e)}
 
-    def limpar_todas_notificacoes(self, user_id):
+    def limpar_todas_notificacoes(self, user_id=None, is_master=False):
         """Apaga definitivamente todas as notificações do usuário"""
         try:
             from models import Notificacao
-            total_apagadas = Notificacao.query.filter(
-                db.or_(Notificacao.user_id == user_id, Notificacao.user_id == 0)
-            ).delete(synchronize_session=False)
+            if user_id:
+                total_apagadas = Notificacao.query.filter(
+                    db.or_(
+                        Notificacao.user_id == user_id,
+                        Notificacao.user_id == 0,
+                        Notificacao.user_id.is_(None)
+                    )
+                ).delete(synchronize_session=False)
+            else:
+                total_apagadas = Notificacao.query.delete(synchronize_session=False)
+
             db.session.commit()
-            logger.info(f"🗑️ {total_apagadas} notificações do usuário #{user_id} apagadas com sucesso.")
+            logger.info(f"🗑️ {total_apagadas} notificações apagadas com sucesso.")
             return {'success': True, 'count': total_apagadas}
         except Exception as e:
             db.session.rollback()
             logger.error(f"❌ Erro ao apagar todas as notificações: {e}")
             return {'success': False, 'error': str(e)}
 
-    def deletar_notificacao(self, notificacao_id, user_id=None):
-        """Apaga uma notificação específica"""
+    def deletar_notificacao(self, notificacao_id, user_id=None, is_master=False):
+        """Apaga definitivamente uma notificação específica"""
         try:
             from models import Notificacao
-            query = Notificacao.query.filter_by(id=notificacao_id)
-            if user_id:
-                query = query.filter(db.or_(Notificacao.user_id == user_id, Notificacao.user_id == 0))
-            notif = query.first()
+            notif = Notificacao.query.get(notificacao_id)
             if not notif:
-                return {'success': False, 'error': 'Notificação não encontrada'}
+                # Já não existe no banco, considera como sucesso
+                return {'success': True, 'message': 'Notificação já removida'}
+
+            # Validação de permissão: master pode apagar qualquer notificação
+            if not is_master and user_id:
+                if notif.user_id is not None and notif.user_id != 0 and notif.user_id != user_id:
+                    logger.warning(f"⚠️ Usuário #{user_id} tentou apagar notificação #{notificacao_id} de outro usuário.")
+                    return {'success': False, 'error': 'Permissão negada'}
+
             db.session.delete(notif)
             db.session.commit()
             logger.info(f"🗑️ Notificação #{notificacao_id} apagada com sucesso.")

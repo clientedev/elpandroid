@@ -169,19 +169,19 @@ class NotificationService {
       await deleteLocalNotificacao(id);
       
       // Registrar no conjunto de notificações apagadas para não re-baixar do servidor
-      if (keyIdentifier) {
-        try {
-          const raw = await AsyncStorage.getItem(DELETED_NOTIFS_STORAGE_KEY);
-          const set = raw ? JSON.parse(raw) : [];
-          set.push(keyIdentifier);
-          // Manter histórico dos últimos 500 apagados
-          await AsyncStorage.setItem(DELETED_NOTIFS_STORAGE_KEY, JSON.stringify(set.slice(-500)));
-        } catch {}
-      }
+      try {
+        const raw = await AsyncStorage.getItem(DELETED_NOTIFS_STORAGE_KEY);
+        const set: string[] = raw ? JSON.parse(raw) : [];
+        if (keyIdentifier) set.push(keyIdentifier);
+        if (id) set.push(String(id));
+        // Manter histórico dos últimos 500 apagados sem duplicatas
+        const uniqueSet = Array.from(new Set(set)).slice(-500);
+        await AsyncStorage.setItem(DELETED_NOTIFS_STORAGE_KEY, JSON.stringify(uniqueSet));
+      } catch {}
 
       // Notificar o servidor
       try {
-        await apiClient.axios.post(`/api/notificacoes/${id}/deletar`, {}, { timeout: 4000 });
+        await apiClient.axios.post(`/api/notificacoes/${id}/deletar`, { id, notificacao_id: id }, { timeout: 4000 });
       } catch {}
 
       this.listeners.forEach(cb => { try { cb(); } catch {} });
@@ -199,7 +199,7 @@ class NotificationService {
       await AsyncStorage.setItem(CLEARED_TIMESTAMP_STORAGE_KEY, Date.now().toString());
 
       try {
-        await apiClient.axios.post('/api/notificacoes/limpar', {}, { timeout: 4000 });
+        await apiClient.axios.post('/api/notificacoes/limpar', { user_id: userId }, { timeout: 4000 });
       } catch {}
 
       this.listeners.forEach(cb => { try { cb(); } catch {} });
