@@ -974,4 +974,78 @@ class NotificationService:
         }
         return icones.get(tipo, '🔔')
 
+    def marcar_como_lida(self, notificacao_id, user_id=None):
+        """Marca uma notificação específica como lida"""
+        try:
+            from models import Notificacao
+            query = Notificacao.query.filter_by(id=notificacao_id)
+            if user_id:
+                query = query.filter(db.or_(Notificacao.user_id == user_id, Notificacao.user_id == 0))
+            notif = query.first()
+            if not notif:
+                return {'success': False, 'error': 'Notificação não encontrada'}
+            notif.status = 'lida'
+            notif.lida_em = now_brt()
+            db.session.commit()
+            logger.info(f"✅ Notificação #{notificacao_id} marcada como lida.")
+            return {'success': True}
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao marcar notificação como lida: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def marcar_todas_como_lidas(self, user_id):
+        """Marca todas as notificações do usuário como lidas"""
+        try:
+            from models import Notificacao
+            Notificacao.query.filter(
+                db.or_(Notificacao.user_id == user_id, Notificacao.user_id == 0),
+                Notificacao.status == 'nova'
+            ).update({
+                'status': 'lida',
+                'lida_em': now_brt()
+            }, synchronize_session=False)
+            db.session.commit()
+            logger.info(f"✅ Todas as notificações do usuário #{user_id} marcadas como lidas.")
+            return {'success': True}
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao marcar todas como lidas: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def limpar_todas_notificacoes(self, user_id):
+        """Apaga definitivamente todas as notificações do usuário"""
+        try:
+            from models import Notificacao
+            total_apagadas = Notificacao.query.filter(
+                db.or_(Notificacao.user_id == user_id, Notificacao.user_id == 0)
+            ).delete(synchronize_session=False)
+            db.session.commit()
+            logger.info(f"🗑️ {total_apagadas} notificações do usuário #{user_id} apagadas com sucesso.")
+            return {'success': True, 'count': total_apagadas}
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao apagar todas as notificações: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def deletar_notificacao(self, notificacao_id, user_id=None):
+        """Apaga uma notificação específica"""
+        try:
+            from models import Notificacao
+            query = Notificacao.query.filter_by(id=notificacao_id)
+            if user_id:
+                query = query.filter(db.or_(Notificacao.user_id == user_id, Notificacao.user_id == 0))
+            notif = query.first()
+            if not notif:
+                return {'success': False, 'error': 'Notificação não encontrada'}
+            db.session.delete(notif)
+            db.session.commit()
+            logger.info(f"🗑️ Notificação #{notificacao_id} apagada com sucesso.")
+            return {'success': True}
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"❌ Erro ao apagar notificação #{notificacao_id}: {e}")
+            return {'success': False, 'error': str(e)}
+
 notification_service = NotificationService()
+

@@ -68,8 +68,14 @@ export default function NotificationsSettingsScreen() {
   };
 
   const handleMarkAllRead = async () => {
-    await markAllNotificacoesAsRead(user?.id);
+    await notificationService.markAllAsRead(user?.id);
     await loadData();
+  };
+
+  const handleDeleteOne = async (item: Notificacao) => {
+    const key = `${item.titulo}_${item.created_at}`;
+    await notificationService.deleteNotification(item.id, key);
+    setNotificacoes(prev => prev.filter(n => n.id !== item.id));
   };
 
   const handleClearAll = () => {
@@ -82,8 +88,8 @@ export default function NotificationsSettingsScreen() {
           text: 'Limpar',
           style: 'destructive',
           onPress: async () => {
-            await clearLocalNotificacoes(user?.id);
-            await loadData();
+            await notificationService.clearAllNotifications(user?.id);
+            setNotificacoes([]);
           },
         },
       ]
@@ -100,7 +106,16 @@ export default function NotificationsSettingsScreen() {
         />
       </View>
       <View style={styles.cardContent}>
-        <Text style={styles.itemTitle}>{item.titulo}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={[styles.itemTitle, { flex: 1, marginRight: 6 }]}>{item.titulo}</Text>
+          <TouchableOpacity 
+            onPress={() => handleDeleteOne(item)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            style={{ padding: 4 }}
+          >
+            <Ionicons name="trash-outline" size={16} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.itemMessage}>{item.mensagem}</Text>
         <Text style={styles.itemDate}>
           {item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : ''}

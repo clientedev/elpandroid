@@ -1265,6 +1265,11 @@ export async function clearLocalNotificacoes(userId?: number): Promise<void> {
   }
 }
 
+export async function deleteLocalNotificacao(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM notificacoes WHERE id = ?', [id]);
+}
+
 // ================= LEGENDAS =================
 export async function getLocalLegendas(categoria?: string): Promise<LegendaPredefinida[]> {
   const db = await getDatabase();

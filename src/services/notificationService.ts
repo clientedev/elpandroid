@@ -1,5 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, PermissionsAndroid, Vibration, Linking } from 'react-native';
-import { saveLocalNotificacao, getLocalNotificacoes } from '../database/db';
+import { 
+  saveLocalNotificacao, getLocalNotificacoes, deleteLocalNotificacao, 
+  clearLocalNotificacoes, markAllNotificacoesAsRead, markNotificacaoAsRead 
+} from '../database/db';
 import { apiClient } from './api';
 
 export type NotificationType = 'sistema' | 'relatorio' | 'sincronizacao' | 'aprovacao' | 'lembrete';
@@ -9,6 +13,9 @@ export interface ToastPayload {
   mensagem: string;
   tipo: NotificationType;
 }
+
+const DELETED_NOTIFS_STORAGE_KEY = '@elp_deleted_notif_keys_v1';
+const CLEARED_TIMESTAMP_STORAGE_KEY = '@elp_cleared_notifs_timestamp_v1';
 
 class NotificationService {
   private hasPermission: boolean = false;
@@ -155,6 +162,85 @@ class NotificationService {
   }
 
   /**
+   * Apaga definitivamente uma notificação localmente e no servidor
+   */
+  async deleteNotification(id: number, keyIdentifier?: string): Promise<void> {
+    try {
+      await deleteLocalNotificacao(id);
+      
+      // Registrar no conjunto de notificações apagadas para não re-baixar do servidor
+      if (keyIdentifier) {
+        try {
+          const raw = await AsyncStorage.getItem(DELETED_NOTIFS_STORAGE_KEY);
+          const set = raw ? JSON.parse(raw) : [];
+          set.push(keyIdentifier);
+          // Manter histórico dos últimos 500 apagados
+          await AsyncStorage.setItem(DELETED_NOTIFS_STORAGE_KEY, JSON.stringify(set.slice(-500)));
+        } catch {}
+      }
+
+      // Notificar o servidor
+      try {
+        await apiClient.axios.post(`/api/notificacoes/${id}/deletar`, {}, { timeout: 4000 });
+      } catch {}
+
+      this.listeners.forEach(cb => { try { cb(); } catch {} });
+    } catch (e) {
+      console.warn('[NotificationService] Erro ao apagar notificação:', e);
+    }
+  }
+
+  /**
+   * Apaga todas as notificações do usuário tanto local quanto no servidor
+   */
+  async clearAllNotifications(userId?: number): Promise<void> {
+    try {
+      await clearLocalNotificacoes(userId);
+      await AsyncStorage.setItem(CLEARED_TIMESTAMP_STORAGE_KEY, Date.now().toString());
+
+      try {
+        await apiClient.axios.post('/api/notificacoes/limpar', {}, { timeout: 4000 });
+      } catch {}
+
+      this.listeners.forEach(cb => { try { cb(); } catch {} });
+    } catch (e) {
+      console.warn('[NotificationService] Erro ao limpar todas notificações:', e);
+    }
+  }
+
+  /**
+   * Marca todas as notificações como lidas local e no servidor
+   */
+  async markAllAsRead(userId?: number): Promise<void> {
+    try {
+      await markAllNotificacoesAsRead(userId);
+      try {
+        await apiClient.axios.post('/api/notificacoes/marcar-todas-lidas', {}, { timeout: 4000 });
+      } catch {}
+
+      this.listeners.forEach(cb => { try { cb(); } catch {} });
+    } catch (e) {
+      console.warn('[NotificationService] Erro ao marcar todas como lidas:', e);
+    }
+  }
+
+  /**
+   * Marca notificação individual como lida
+   */
+  async markAsRead(id: number): Promise<void> {
+    try {
+      await markNotificacaoAsRead(id);
+      try {
+        await apiClient.axios.post('/api/notificacoes/marcar-lida', { notificacao_id: id }, { timeout: 4000 });
+      } catch {}
+
+      this.listeners.forEach(cb => { try { cb(); } catch {} });
+    } catch (e) {
+      console.warn('[NotificationService] Erro ao marcar como lida:', e);
+    }
+  }
+
+  /**
    * Sincroniza notificações pendentes do servidor Railway para o banco SQLite local
    */
   async syncServerNotifications(userId?: number): Promise<number> {
@@ -168,11 +254,36 @@ class NotificationService {
       const localList = await getLocalNotificacoes(userId);
       const localTitles = new Set(localList.map(n => `${n.titulo}_${n.created_at}`));
 
+      // Verificar timestamp de limpeza completa
+      let clearedTimestamp = 0;
+      try {
+        const rawTime = await AsyncStorage.getItem(CLEARED_TIMESTAMP_STORAGE_KEY);
+        if (rawTime) clearedTimestamp = parseInt(rawTime, 10);
+      } catch {}
+
+      // Carregar chaves de notificações deletadas individualmente
+      let deletedKeys = new Set<string>();
+      try {
+        const rawKeys = await AsyncStorage.getItem(DELETED_NOTIFS_STORAGE_KEY);
+        if (rawKeys) deletedKeys = new Set(JSON.parse(rawKeys));
+      } catch {}
+
       let newCount = 0;
       for (const item of serverList) {
         const key = `${item.titulo}_${item.created_at}`;
+        const itemCreatedTime = item.created_at ? new Date(item.created_at).getTime() : 0;
+
+        // Se foi criada antes do momento que o usuário mandou limpar tudo, ou foi deletada individualmente, ignora!
+        if (clearedTimestamp > 0 && itemCreatedTime <= clearedTimestamp) {
+          continue;
+        }
+        if (deletedKeys.has(key) || (item.id && deletedKeys.has(String(item.id)))) {
+          continue;
+        }
+
         if (!localTitles.has(key)) {
           await saveLocalNotificacao({
+            id: item.id || Date.now() + Math.floor(Math.random() * 1000),
             user_id: userId || 1,
             titulo: item.titulo || 'Novo Aviso do Sistema',
             mensagem: item.mensagem || '',
@@ -197,6 +308,7 @@ class NotificationService {
       return 0;
     }
   }
+
 
   /**
    * Permite componentes assinarem para atualizar o sino em tempo real

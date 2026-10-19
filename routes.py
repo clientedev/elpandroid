@@ -1600,75 +1600,97 @@ def listar_notificacoes():
         return jsonify({'success': False, 'error': 'Erro ao carregar notificações. Tente novamente.'}), 500
 
 @app.route('/api/notificacoes/marcar-lida', methods=['POST'])
-@login_required
+@csrf.exempt
 def marcar_notificacao_lida():
-    """Marcar uma notificação como lida"""
+    """Marcar uma notificação como lida (web ou mobile)"""
     try:
         from notification_service import notification_service
-        
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        user = _resolve_mobile_user(data)
+        if not user or not user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+
         notificacao_id = data.get('notificacao_id')
-        
         if not notificacao_id:
             return jsonify({'success': False, 'error': 'ID da notificação não fornecido'}), 400
         
-        resultado = notification_service.marcar_como_lida(notificacao_id, current_user.id)
-        
-        if resultado['success']:
-            return jsonify({'success': True})
-        else:
-            return jsonify(resultado), 404
+        resultado = notification_service.marcar_como_lida(int(notificacao_id), user.id)
+        return jsonify(resultado), (200 if resultado.get('success') else 404)
     
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao marcar notificação como lida: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/notificacoes/marcar-todas-lidas', methods=['POST'])
-@login_required
+@csrf.exempt
 def marcar_todas_notificacoes_lidas():
     """Marcar todas as notificações do usuário como lidas"""
     try:
         from notification_service import notification_service
-        
-        resultado = notification_service.marcar_todas_como_lidas(current_user.id)
-        
+        data = request.get_json(silent=True) or {}
+        user = _resolve_mobile_user(data)
+        if not user or not user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+
+        resultado = notification_service.marcar_todas_como_lidas(user.id)
         return jsonify(resultado)
     
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao marcar todas as notificações como lidas: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/notificacoes/limpar', methods=['POST'])
-@login_required
+@app.route('/api/notificacoes/limpar', methods=['POST', 'DELETE'])
+@csrf.exempt
 def limpar_todas_notificacoes():
-    """Limpar (deletar) todas as notificações do usuário"""
+    """Limpar (apagar) todas as notificações do usuário"""
     try:
         from notification_service import notification_service
-        
-        resultado = notification_service.limpar_todas_notificacoes(current_user.id)
-        
+        data = request.get_json(silent=True) or {}
+        user = _resolve_mobile_user(data)
+        if not user or not user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+
+        resultado = notification_service.limpar_todas_notificacoes(user.id)
         return jsonify(resultado)
     
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao limpar todas as notificações: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/notificacoes/<int:notificacao_id>/deletar', methods=['POST', 'DELETE'])
+@app.route('/api/notificacoes/<int:notificacao_id>', methods=['DELETE'])
+@csrf.exempt
+def deletar_notificacao_endpoint(notificacao_id):
+    """Apagar uma notificação específica do usuário"""
+    try:
+        from notification_service import notification_service
+        data = request.get_json(silent=True) or {}
+        user = _resolve_mobile_user(data)
+        if not user or not user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+
+        resultado = notification_service.deletar_notificacao(notificacao_id, user.id)
+        return jsonify(resultado), (200 if resultado.get('success') else 404)
+    except Exception as e:
+        current_app.logger.error(f"❌ Erro ao deletar notificação #{notificacao_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/notificacoes/salvar-token', methods=['POST'])
-@login_required
+@csrf.exempt
 def salvar_fcm_token():
     """Salvar o FCM token do usuário para push notifications"""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
+        user = _resolve_mobile_user(data)
+        if not user or not user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+
         fcm_token = data.get('fcm_token')
-        
         if not fcm_token:
             return jsonify({'success': False, 'error': 'FCM token não fornecido'}), 400
         
-        current_user.fcm_token = fcm_token
+        user.fcm_token = fcm_token
         db.session.commit()
-        
-        current_app.logger.info(f"✅ FCM token salvo para usuário {current_user.username}")
-        
         return jsonify({'success': True})
     
     except Exception as e:
@@ -1676,19 +1698,18 @@ def salvar_fcm_token():
         current_app.logger.error(f"❌ Erro ao salvar FCM token: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/notificacoes/<int:notificacao_id>/ler', methods=['PUT'])
-@login_required
+@app.route('/api/notificacoes/<int:notificacao_id>/ler', methods=['PUT', 'POST'])
+@csrf.exempt
 def marcar_notificacao_lida_put(notificacao_id):
-    """Marcar uma notificação como lida usando PUT"""
+    """Marcar uma notificação como lida usando PUT ou POST"""
     try:
         from notification_service import notification_service
-        
-        resultado = notification_service.marcar_como_lida(notificacao_id, current_user.id)
-        
-        if resultado['success']:
-            return jsonify({'success': True})
-        else:
-            return jsonify(resultado), 404
+        user = _resolve_mobile_user()
+        if not user or not user.is_authenticated:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+
+        resultado = notification_service.marcar_como_lida(notificacao_id, user.id)
+        return jsonify(resultado), (200 if resultado.get('success') else 404)
     
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao marcar notificação como lida: {e}")

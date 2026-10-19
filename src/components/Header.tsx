@@ -7,9 +7,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNetwork } from '../contexts/NetworkContext';
 import { Colors, Shadows } from '../theme/colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   getLocalNotificacoes, markNotificacaoAsRead, markAllNotificacoesAsRead, 
-  clearLocalNotificacoes, saveLocalNotificacao 
+  clearLocalNotificacoes, saveLocalNotificacao, deleteLocalNotificacao 
 } from '../database/db';
 import { Notificacao } from '../types';
 import { notificationService } from '../services/notificationService';
@@ -44,8 +45,10 @@ export const Header: React.FC<HeaderProps> = ({
   const loadNotificacoes = useCallback(async () => {
     try {
       let list = await getLocalNotificacoes(user?.id);
-      if (list.length === 0) {
-        // Seed initial notifications if empty
+      const welcomed = await AsyncStorage.getItem('@elp_welcomed_v1');
+      if (!welcomed && list.length === 0) {
+        // Seed initial notifications ONLY ONCE on very first launch
+        await AsyncStorage.setItem('@elp_welcomed_v1', 'true');
         await saveLocalNotificacao({
           user_id: user?.id || 1,
           titulo: 'Bem-vindo ao ObraFlow / ELP',
@@ -82,21 +85,29 @@ export const Header: React.FC<HeaderProps> = ({
   const unreadCount = notificacoes.filter(n => !n.lida).length;
 
   async function handleMarkAllRead() {
-    await markAllNotificacoesAsRead(user?.id);
+    await notificationService.markAllAsRead(user?.id);
     await loadNotificacoes();
   }
 
   async function handleClearAll() {
-    await clearLocalNotificacoes(user?.id);
-    await loadNotificacoes();
+    await notificationService.clearAllNotifications(user?.id);
+    setNotificacoes([]);
+  }
+
+  async function handleDeleteOne(item: Notificacao, e?: any) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const key = `${item.titulo}_${item.created_at}`;
+    await notificationService.deleteNotification(item.id, key);
+    setNotificacoes(prev => prev.filter(n => n.id !== item.id));
   }
 
   async function handleNotificationClick(item: Notificacao) {
     if (!item.lida) {
-      await markNotificacaoAsRead(item.id);
+      await notificationService.markAsRead(item.id);
       await loadNotificacoes();
     }
     setDrawerOpen(false);
+
 
     try {
       if (item.link) {
@@ -356,10 +367,19 @@ export const Header: React.FC<HeaderProps> = ({
                       </View>
                       <View style={styles.notifContentCol}>
                         <View style={styles.notifHeaderRow}>
-                          <Text style={[styles.notifTitle, !item.lida && styles.notifTitleBold]} numberOfLines={1}>
+                          <Text style={[styles.notifTitle, !item.lida && styles.notifTitleBold, { flex: 1, marginRight: 6 }]} numberOfLines={1}>
                             {item.titulo}
                           </Text>
-                          {!item.lida && <View style={styles.unreadDot} />}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            {!item.lida && <View style={styles.unreadDot} />}
+                            <TouchableOpacity 
+                              onPress={(e) => handleDeleteOne(item, e)}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              style={{ padding: 4 }}
+                            >
+                              <Ionicons name="trash-outline" size={15} color="#94A3B8" />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                         <Text style={styles.notifMessage} numberOfLines={3}>
                           {item.mensagem}

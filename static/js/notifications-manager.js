@@ -185,9 +185,20 @@ class NotificationsManager {
                         <i class="far fa-clock me-1"></i>${timeAgo}
                     </small>
                 </div>
+                <button type="button" class="btn btn-sm btn-link text-danger p-1 ms-2 delete-notif-btn" title="Excluir notificação">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
             </div>
         `;
         
+        const deleteBtn = div.querySelector('.delete-notif-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deletarNotificacao(notif.id);
+            });
+        }
+
         div.addEventListener('click', () => {
             this.marcarComoLida(notif.id);
             
@@ -234,6 +245,28 @@ class NotificationsManager {
             }
         } catch (error) {
             console.error('❌ Erro ao marcar notificação como lida:', error);
+        }
+    }
+    
+    async deletarNotificacao(notifId) {
+        try {
+            const response = await fetch(`/api/notificacoes/${notifId}/deletar`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCsrfToken()
+                }
+            });
+            
+            if (response.ok) {
+                this.notificacoes = this.notificacoes.filter(n => String(n.id) !== String(notifId));
+                const naoLidas = this.notificacoes.filter(n => n.status === 'nao_lida').length;
+                this.atualizarContador(naoLidas);
+                this.renderizarNotificacoes();
+                console.log(`✅ Notificação ${notifId} deletada`);
+            }
+        } catch (error) {
+            console.error('❌ Erro ao deletar notificação:', error);
         }
     }
     
