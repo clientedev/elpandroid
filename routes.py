@@ -15401,3 +15401,194 @@ def api_sync_legacy_users():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+# ==================== PERSONALIZADOR DE TELAS E APP POR USUÁRIO ====================
+
+@app.route('/admin/personalizar-app', methods=['GET'])
+@app.route('/admin/personalizar-app/<int:user_id>', methods=['GET'])
+@login_required
+def admin_user_app_customizer(user_id=None):
+    """
+    Interface Web para o Admin personalizar e enxergar a visualização do app de cada pessoa:
+    - Modo Claro / Escuro
+    - Cor de fundo e tema
+    - Módulos e botões exibidos
+    - Ordem e posição das abas e botões
+    - Atribuições extras por usuário
+    - Simulador interativo em tempo real de smartphone
+    """
+    if not (current_user.username == 'admin' or getattr(current_user, 'is_master', False)):
+        flash('Acesso restrito. Apenas administradores podem personalizar a experiência do app dos usuários.', 'error')
+        return redirect(url_for('index'))
+
+    from models import UserAppCustomization
+    users = User.query.filter_by(ativo=True).order_by(User.nome_completo.asc(), User.username.asc()).all()
+    if not users:
+        flash('Nenhum usuário ativo encontrado para personalização.', 'warning')
+        return redirect(url_for('users_list'))
+
+    selected_user = None
+    if user_id:
+        selected_user = User.query.get(user_id)
+    if not selected_user:
+        selected_user = users[0]
+
+    # Obter customizações de todos os usuários
+    customizations_by_user = {}
+    for u in users:
+        cust = UserAppCustomization.query.filter_by(user_id=u.id).first()
+        if not cust:
+            cust = UserAppCustomization(user_id=u.id)
+            cust.user = u
+        customizations_by_user[str(u.id)] = cust.to_dict()
+
+    return render_template(
+        'admin/user_app_customizer.html',
+        users=users,
+        selected_user=selected_user,
+        customizations_json=json.dumps(customizations_by_user, ensure_ascii=False)
+    )
+
+
+@app.route('/api/admin/users/<int:user_id>/app-customization', methods=['GET', 'POST'])
+@csrf.exempt
+def api_admin_user_app_customization(user_id):
+    """Obter ou salvar customizações do app de um usuário específico"""
+    user_req = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    is_admin = (
+        (user_req and (user_req.is_master or user_req.username == 'admin')) or
+        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
+    )
+    if not is_admin:
+        return jsonify({'success': False, 'error': 'Acesso negado.'}), 403
+
+    from models import UserAppCustomization
+    target_user = User.query.get(user_id)
+    if not target_user:
+        return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
+
+    cust = UserAppCustomization.query.filter_by(user_id=user_id).first()
+
+    if request.method == 'GET':
+        if not cust:
+            cust = UserAppCustomization(user_id=user_id)
+            cust.user = target_user
+        return jsonify({'success': True, 'customization': cust.to_dict()}), 200
+
+    # POST (Salvar)
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        if not cust:
+            cust = UserAppCustomization(user_id=user_id)
+            db.session.add(cust)
+
+        if 'tema' in data:
+            cust.tema = data['tema']
+        if 'cor_fundo' in data:
+            cust.cor_fundo = data['cor_fundo']
+        if 'cor_primaria' in data:
+            cust.cor_primaria = data['cor_primaria']
+            target_user.cor_agenda = data['cor_primaria']
+        if 'cor_card' in data:
+            cust.cor_card = data['cor_card']
+        if 'cor_texto' in data:
+            cust.cor_texto = data['cor_texto']
+
+        if 'modulos_visiveis' in data:
+            mv = data['modulos_visiveis']
+            cust.modulos_visiveis = json.dumps(mv) if isinstance(mv, (dict, list)) else str(mv)
+
+        if 'posicao_botoes' in data:
+            pb = data['posicao_botoes']
+            cust.posicao_botoes = json.dumps(pb) if isinstance(pb, (dict, list)) else str(pb)
+
+        if 'atribuicoes_extras' in data:
+            ae = data['atribuicoes_extras']
+            cust.atribuicoes_extras = json.dumps(ae) if isinstance(ae, (dict, list)) else str(ae)
+            if isinstance(ae, dict):
+                if 'pode_aprovar_relatorios' in ae:
+                    target_user.is_master = bool(ae['pode_aprovar_relatorios'])
+                if 'pode_aprovar_express' in ae:
+                    target_user.is_aprovador_express = bool(ae['pode_aprovar_express'])
+
+        if current_user and current_user.is_authenticated:
+            cust.updated_by_id = current_user.id
+        elif user_req:
+            cust.updated_by_id = user_req.id
+
+        cust.updated_at = brazil_now()
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Configuração do aplicativo para {target_user.nome_completo} salva com sucesso!',
+            'customization': cust.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/admin/users/<int:user_id>/app-customization/reset', methods=['POST'])
+@csrf.exempt
+def api_admin_user_app_customization_reset(user_id):
+    """Restaura as configurações do aplicativo de um usuário para os padrões de fábrica"""
+    user_req = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    is_admin = (
+        (user_req and (user_req.is_master or user_req.username == 'admin')) or
+        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
+    )
+    if not is_admin:
+        return jsonify({'success': False, 'error': 'Acesso negado.'}), 403
+
+    from models import UserAppCustomization
+    target_user = User.query.get(user_id)
+    if not target_user:
+        return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
+
+    try:
+        cust = UserAppCustomization.query.filter_by(user_id=user_id).first()
+        if cust:
+            db.session.delete(cust)
+            db.session.commit()
+
+        fresh = UserAppCustomization(user_id=user_id)
+        fresh.user = target_user
+        return jsonify({
+            'success': True,
+            'message': f'Configurações de {target_user.nome_completo} restauradas para o padrão!',
+            'customization': fresh.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/user/app-customization', methods=['GET'])
+@app.route('/api/mobile/app-customization', methods=['GET'])
+@csrf.exempt
+def api_mobile_user_app_customization():
+    """Endpoint consumido pelo APK nativo para carregar tema, layout e permissões do usuário logado"""
+    user = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    if not user and current_user and current_user.is_authenticated:
+        user = current_user
+
+    if not user:
+        from models import UserAppCustomization
+        guest_cust = UserAppCustomization(user_id=0)
+        return jsonify({'success': True, 'customization': guest_cust.to_dict()}), 200
+
+    from models import UserAppCustomization
+    cust = UserAppCustomization.query.filter_by(user_id=user.id).first()
+    if not cust:
+        cust = UserAppCustomization(user_id=user.id)
+        cust.user = user
+
+    return jsonify({
+        'success': True,
+        'user_id': user.id,
+        'username': user.username,
+        'customization': cust.to_dict()
+    }), 200
+
+

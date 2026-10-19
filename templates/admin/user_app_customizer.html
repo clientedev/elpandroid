@@ -1,0 +1,1347 @@
+{% extends "base.html" %}
+
+{% block title %}Personalizador de Visualização do App por Usuário - ObraFlow{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-lg-4 py-3">
+    <!-- Header Principal -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 border-bottom pb-3">
+        <div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary px-3 py-2 fs-6 rounded-pill">
+                    <i class="fas fa-mobile-alt me-1"></i> Studio Mobile
+                </span>
+                <span class="badge bg-dark px-3 py-2 fs-6 rounded-pill">
+                    <i class="fas fa-eye me-1"></i> Simulador em Tempo Real
+                </span>
+            </div>
+            <h1 class="h3 fw-bold mt-2 mb-1 text-dark">
+                Personalizar Visualização do App de Cada Pessoa
+            </h1>
+            <p class="text-muted small mb-0">
+                Ajuste temas claro/escuro, cores de fundo, ordem dos botões, módulos visíveis e conceda atribuições extras por usuário.
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('users_list') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-users me-1"></i> Lista de Usuários
+            </a>
+            <button type="button" class="btn btn-outline-danger" id="btnResetConfig" onclick="resetUserConfig()">
+                <i class="fas fa-undo me-1"></i> Restaurar Padrão
+            </button>
+            <button type="button" class="btn btn-success px-4 fw-bold shadow-sm" id="btnSaveConfig" onclick="saveUserConfig()">
+                <i class="fas fa-save me-1"></i> Salvar no App
+            </button>
+        </div>
+    </div>
+
+    <!-- Seletor de Usuário Ativo -->
+    <div class="card border-0 shadow-sm mb-4 bg-light">
+        <div class="card-body p-3">
+            <div class="row align-items-center g-3">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold mb-1 text-secondary small text-uppercase">
+                        <i class="fas fa-user-circle me-1 text-primary"></i> Selecione a Pessoa para Configurar e Enxergar o App:
+                    </label>
+                    <select class="form-select form-select-lg fw-bold shadow-none border-primary" id="userSelect" onchange="switchUser(this.value)">
+                        {% for u in users %}
+                            <option value="{{ u.id }}" {% if u.id == selected_user.id %}selected{% endif %}>
+                                {{ u.nome_completo }} (@{{ u.username }}) - {{ u.cargo or 'Engenheiro' }} {% if u.is_master %}[Master]{% endif %} {% if u.is_aprovador_express %}[⚡ Express]{% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-7">
+                    <div class="d-flex flex-wrap align-items-center gap-2 pt-md-4" id="userInfoPills">
+                        <span class="badge bg-primary px-3 py-2 rounded-pill" id="badgeCargo">
+                            <i class="fas fa-id-badge me-1"></i> {{ selected_user.cargo or 'Engenheiro' }}
+                        </span>
+                        <span class="badge bg-secondary px-3 py-2 rounded-pill" id="badgeEmail">
+                            <i class="fas fa-envelope me-1"></i> {{ selected_user.email }}
+                        </span>
+                        <span class="badge {% if selected_user.is_master %}bg-danger{% else %}bg-secondary{% endif %} px-3 py-2 rounded-pill" id="badgeMaster">
+                            {{ '👑 Master / Administrador' if selected_user.is_master else '👤 Usuário Padrão' }}
+                        </span>
+                        <span class="badge {% if selected_user.is_aprovador_express %}bg-warning text-dark{% else %}bg-light text-muted border{% endif %} px-3 py-2 rounded-pill" id="badgeExpress">
+                            <i class="fas fa-bolt me-1"></i> {{ 'Aprovador Express Ativo' if selected_user.is_aprovador_express else 'Sem Aprov. Express' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout Grid: 2 Colunas (Esquerda: Controles / Direita: Simulador de Smartphone) -->
+    <div class="row g-4">
+        <!-- Coluna Esquerda: Abas de Configuração -->
+        <div class="col-12 col-xl-7">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+                <div class="card-header bg-white border-bottom p-0">
+                    <ul class="nav nav-pills nav-fill p-2 gap-2" id="customizerTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active fw-bold py-2 rounded-3" id="tab-theme-btn" data-bs-toggle="pill" data-bs-target="#tab-theme" type="button" role="tab">
+                                <i class="fas fa-palette me-1 text-primary"></i> 1. Tema & Cores
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold py-2 rounded-3" id="tab-modules-btn" data-bs-toggle="pill" data-bs-target="#tab-modules" type="button" role="tab">
+                                <i class="fas fa-puzzle-piece me-1 text-success"></i> 2. Módulos & Exibição
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold py-2 rounded-3" id="tab-buttons-btn" data-bs-toggle="pill" data-bs-target="#tab-buttons" type="button" role="tab">
+                                <i class="fas fa-arrows-alt me-1 text-warning"></i> 3. Posição de Botões
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link fw-bold py-2 rounded-3" id="tab-permissions-btn" data-bs-toggle="pill" data-bs-target="#tab-permissions" type="button" role="tab">
+                                <i class="fas fa-shield-alt me-1 text-danger"></i> 4. Atribuições Extras
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="tab-content" id="customizerTabContent">
+                        
+                        <!-- TAB 1: TEMA E CORES -->
+                        <div class="tab-pane fade show active" id="tab-theme" role="tabpanel">
+                            <h5 class="fw-bold mb-3 text-dark">
+                                <i class="fas fa-adjust me-2 text-primary"></i>Modo de Iluminação do Aplicativo
+                            </h5>
+                            
+                            <div class="row g-3 mb-4">
+                                <div class="col-4">
+                                    <input type="radio" class="btn-check" name="themeMode" id="themeLight" value="claro" onchange="updateThemeMode('claro')">
+                                    <label class="btn btn-outline-light text-dark border p-3 w-100 rounded-3 text-center shadow-xs" for="themeLight">
+                                        <i class="fas fa-sun fa-2x mb-2 text-warning d-block"></i>
+                                        <span class="fw-bold d-block">Modo Claro</span>
+                                        <small class="text-muted d-block" style="font-size: 11px;">Fundo claro e nítido</small>
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <input type="radio" class="btn-check" name="themeMode" id="themeDark" value="escuro" onchange="updateThemeMode('escuro')">
+                                    <label class="btn btn-outline-dark p-3 w-100 rounded-3 text-center shadow-xs" for="themeDark">
+                                        <i class="fas fa-moon fa-2x mb-2 text-primary d-block"></i>
+                                        <span class="fw-bold d-block">Modo Escuro</span>
+                                        <small class="text-muted d-block" style="font-size: 11px;">Descanso visual</small>
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <input type="radio" class="btn-check" name="themeMode" id="themeSystem" value="sistema" onchange="updateThemeMode('sistema')">
+                                    <label class="btn btn-outline-secondary p-3 w-100 rounded-3 text-center shadow-xs" for="themeSystem">
+                                        <i class="fas fa-mobile-alt fa-2x mb-2 text-success d-block"></i>
+                                        <span class="fw-bold d-block">Sistema</span>
+                                        <small class="text-muted d-block" style="font-size: 11px;">Segue o Android</small>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <hr class="my-4">
+
+                            <h5 class="fw-bold mb-3 text-dark">
+                                <i class="fas fa-fill-drip me-2 text-primary"></i>Paleta de Cores do Canteiro
+                            </h5>
+
+                            <div class="row g-4">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Cor de Fundo da Tela do App:</label>
+                                    <div class="input-group">
+                                        <input type="color" class="form-control form-control-color" id="pickerBg" onchange="updateColor('cor_fundo', this.value)">
+                                        <input type="text" class="form-control fw-bold" id="inputBg" oninput="updateColor('cor_fundo', this.value)">
+                                    </div>
+                                    <div class="d-flex gap-1 mt-2">
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#F8FAFC;" title="Gelo Padrão" onclick="updateColor('cor_fundo', '#F8FAFC')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#FFFFFF;" title="Branco Puro" onclick="updateColor('cor_fundo', '#FFFFFF')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#0F172A;" title="Dark Slate" onclick="updateColor('cor_fundo', '#0F172A')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#000000;" title="AMOLED Black" onclick="updateColor('cor_fundo', '#000000')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#1E293B;" title="Azul Noturno" onclick="updateColor('cor_fundo', '#1E293B')"></button>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Cor Primária & Destaque dos Botões:</label>
+                                    <div class="input-group">
+                                        <input type="color" class="form-control form-control-color" id="pickerPrimary" onchange="updateColor('cor_primaria', this.value)">
+                                        <input type="text" class="form-control fw-bold" id="inputPrimary" oninput="updateColor('cor_primaria', this.value)">
+                                    </div>
+                                    <div class="d-flex gap-1 mt-2">
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#0EA5E9;" title="Azul ObraFlow" onclick="updateColor('cor_primaria', '#0EA5E9')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#10B981;" title="Verde Esmeralda" onclick="updateColor('cor_primaria', '#10B981')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#F59E0B;" title="Âmbar / Express" onclick="updateColor('cor_primaria', '#F59E0B')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#8B5CF6;" title="Roxo Moderno" onclick="updateColor('cor_primaria', '#8B5CF6')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#EF4444;" title="Vermelho Coral" onclick="updateColor('cor_primaria', '#EF4444')"></button>
+                                        <button class="btn btn-sm border rounded-circle p-2" style="background:#0000FF;" title="Azul Leopoldo" onclick="updateColor('cor_primaria', '#0000FF')"></button>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Cor dos Cards & Caixas:</label>
+                                    <div class="input-group">
+                                        <input type="color" class="form-control form-control-color" id="pickerCard" onchange="updateColor('cor_card', this.value)">
+                                        <input type="text" class="form-control fw-bold" id="inputCard" oninput="updateColor('cor_card', this.value)">
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold small text-muted text-uppercase">Cor dos Textos Principais:</label>
+                                    <div class="input-group">
+                                        <input type="color" class="form-control form-control-color" id="pickerText" onchange="updateColor('cor_texto', this.value)">
+                                        <input type="text" class="form-control fw-bold" id="inputText" oninput="updateColor('cor_texto', this.value)">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAB 2: MÓDULOS & VISIBILIDADE -->
+                        <div class="tab-pane fade" id="tab-modules" role="tabpanel">
+                            <h5 class="fw-bold mb-3 text-dark">
+                                <i class="fas fa-toggle-on me-2 text-success"></i>O Que É Exibido para este Usuário no App
+                            </h5>
+                            <p class="text-muted small">Ative ou desative seções inteiras da tela inicial e do menu conforme a função desta pessoa.</p>
+
+                            <div class="list-group list-group-flush border rounded-3 mb-3">
+                                
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-bolt text-warning me-2"></i>Aba & Atalho de Relatório Express</div>
+                                        <small class="text-muted">Acesso instantâneo para emissão rápida de vistorias de 1 foto</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_express_tab" onchange="toggleModule('express_tab', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-chart-line text-primary me-2"></i>Cards de Métricas & Indicadores</div>
+                                        <small class="text-muted">Mostra contadores de Obras Ativas, Visitas e Relatórios Aprovados</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_dashboard_stats" onchange="toggleModule('dashboard_stats', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-th-large text-info me-2"></i>Ações Rápidas do Canteiro</div>
+                                        <small class="text-muted">Botões de Novo Relatório, Nova Obra e Agendar Visita</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_quick_actions" onchange="toggleModule('quick_actions', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-exclamation-triangle text-danger me-2"></i>Banner de Alertas de Aprovação</div>
+                                        <small class="text-muted">Exibe aviso quando há relatórios aguardando carimbo do engenheiro</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_alertas_aprovacao" onchange="toggleModule('alertas_aprovacao', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-file-alt text-secondary me-2"></i>Lista de Relatórios Recentes</div>
+                                        <small class="text-muted">Últimos laudos criados com atalho para visualizar e continuar preenchimento</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_recent_reports" onchange="toggleModule('recent_reports', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-calendar-alt text-success me-2"></i>Próximas Visitas Agendadas</div>
+                                        <small class="text-muted">Bloco com agenda de vistorias técnicas programadas na tela inicial</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_upcoming_visits" onchange="toggleModule('upcoming_visits', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-sticky-note text-warning me-2"></i>Lembretes Rápidos do Canteiro</div>
+                                        <small class="text-muted">Anotações e tarefas diárias pendentes</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_lembretes_card" onchange="toggleModule('lembretes_card', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-building text-primary me-2"></i>Aba de Obras no Rodapé</div>
+                                        <small class="text-muted">Permite ao usuário navegar pela lista e cadastro de canteiros</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_projetos_tab" onchange="toggleModule('projetos_tab', this.checked)">
+                                    </div>
+                                </label>
+
+                                <label class="list-group-item d-flex justify-content-between align-items-center py-3">
+                                    <div>
+                                        <div class="fw-bold"><i class="fas fa-calendar-check text-success me-2"></i>Aba de Visitas no Rodapé</div>
+                                        <small class="text-muted">Permite ver o calendário e agendamento de vistorias</small>
+                                    </div>
+                                    <div class="form-check form-switch fs-5">
+                                        <input class="form-check-input" type="checkbox" id="mod_visitas_tab" onchange="toggleModule('visitas_tab', this.checked)">
+                                    </div>
+                                </label>
+
+                            </div>
+                        </div>
+
+                        <!-- TAB 3: POSIÇÃO E ORDEM DOS BOTÕES -->
+                        <div class="tab-pane fade" id="tab-buttons" role="tabpanel">
+                            <h5 class="fw-bold mb-3 text-dark">
+                                <i class="fas fa-sort-numeric-down me-2 text-warning"></i>Posição e Ordem das Abas do Rodapé
+                            </h5>
+                            <p class="text-muted small">Suba ou desça as abas para definir a ordem exata de navegação no aplicativo desta pessoa:</p>
+
+                            <div class="border rounded-3 p-2 mb-4 bg-light" id="tabOrderContainer">
+                                <!-- Itens de abas preenchidos dinamicamente -->
+                            </div>
+
+                            <hr class="my-4">
+
+                            <h5 class="fw-bold mb-3 text-dark">
+                                <i class="fas fa-th me-2 text-warning"></i>Disposição dos Botões de Ação Rápida
+                            </h5>
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-4">
+                                    <input type="radio" class="btn-check" name="btnLayout" id="layoutGrid2" value="grid_2" onchange="updateButtonLayout('grid_2')">
+                                    <label class="btn btn-outline-secondary p-3 w-100 rounded-3 text-center" for="layoutGrid2">
+                                        <i class="fas fa-th-large fa-2x mb-2 text-primary d-block"></i>
+                                        <span class="fw-bold d-block">Grade 2x2</span>
+                                        <small class="text-muted d-block" style="font-size: 11px;">2 botões por linha</small>
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <input type="radio" class="btn-check" name="btnLayout" id="layoutGrid3" value="grid_3" onchange="updateButtonLayout('grid_3')">
+                                    <label class="btn btn-outline-secondary p-3 w-100 rounded-3 text-center" for="layoutGrid3">
+                                        <i class="fas fa-grip-horizontal fa-2x mb-2 text-success d-block"></i>
+                                        <span class="fw-bold d-block">Grade 3x3</span>
+                                        <small class="text-muted d-block" style="font-size: 11px;">Botões compactos</small>
+                                    </label>
+                                </div>
+                                <div class="col-4">
+                                    <input type="radio" class="btn-check" name="btnLayout" id="layoutList" value="lista" onchange="updateButtonLayout('lista')">
+                                    <label class="btn btn-outline-secondary p-3 w-100 rounded-3 text-center" for="layoutList">
+                                        <i class="fas fa-bars fa-2x mb-2 text-warning d-block"></i>
+                                        <span class="fw-bold d-block">Lista Completa</span>
+                                        <small class="text-muted d-block" style="font-size: 11px;">Linhas largas</small>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <h6 class="fw-bold text-dark mb-2">Ordem dos Botões de Ação:</h6>
+                            <div class="border rounded-3 p-2 bg-light" id="quickActionsOrderContainer">
+                                <!-- Preenchido dinamicamente -->
+                            </div>
+                        </div>
+
+                        <!-- TAB 4: ATRIBUIÇÕES EXTRAS & PERMISSÕES -->
+                        <div class="tab-pane fade" id="tab-permissions" role="tabpanel">
+                            <h5 class="fw-bold mb-3 text-dark">
+                                <i class="fas fa-user-shield me-2 text-danger"></i>Atribuições & Poderes Especiais no Aplicativo
+                            </h5>
+                            <p class="text-muted small">Defina com precisão cirúrgica o que este usuário tem autorização de fazer diretamente pelo celular:</p>
+
+                            <div class="row g-3 mb-4">
+                                
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_aprovar_relatorios" onchange="updatePermission('pode_aprovar_relatorios', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_aprovar_relatorios">
+                                                Aprovador de Relatórios (Master)
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Permite revisar, aprovar e emitir carimbo técnico nos laudos da equipe.</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_aprovar_express" onchange="updatePermission('pode_aprovar_express', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_aprovar_express">
+                                                Aprovador de Relatório Express
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Pode validar vistorias instantâneas de 1 foto enviadas pelos fiscais.</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_criar_express" onchange="updatePermission('pode_criar_express', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_criar_express">
+                                                Pode Criar Relatório Express
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Habilita a criação de vistorias rápidas e upload de fotos no canteiro.</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_excluir_registros" onchange="updatePermission('pode_excluir_registros', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_excluir_registros">
+                                                Pode Excluir Registros e Fotos
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Autoriza deletar relatórios e itens fotográficos sem supervisão.</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_editar_finalizados" onchange="updatePermission('pode_editar_finalizados', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_editar_finalizados">
+                                                Pode Editar Laudos Finalizados
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Permite reabrir laudos já emitidos para correções ou inclusões.</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_gerenciar_obras" onchange="updatePermission('pode_gerenciar_obras', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_gerenciar_obras">
+                                                Gerenciar Canteiros & Obras
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Pode cadastrar novas obras, alterar construtoras e editar dados técnicos.</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_agendar_visitas" onchange="updatePermission('pode_agendar_visitas', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_agendar_visitas">
+                                                Agendamento de Vistorias
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Pode marcar novas visitas técnicas no calendário.</small>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_exportar_pdf" onchange="updatePermission('pode_exportar_pdf', this.checked)">
+                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_exportar_pdf">
+                                                Exportar e Baixar PDFs
+                                            </label>
+                                        </div>
+                                        <small class="text-muted">Pode gerar os PDFs completos com fotos em alta definição.</small>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <hr class="my-4">
+
+                            <h6 class="fw-bold text-dark mb-2">
+                                <i class="fas fa-tags me-1 text-primary"></i>Tags / Atribuições Especiais Personalizadas:
+                            </h6>
+                            <p class="text-muted small">Adicione crachás adicionais visíveis no perfil deste usuário (ex: "Fiscal Chefe", "Auditor de Qualidade", "Acesso Canteiro Sul"):</p>
+
+                            <div class="input-group mb-2">
+                                <input type="text" class="form-control" id="newTagInput" placeholder="Digite uma atribuição extra e pressione Enter..." onkeydown="if(event.key==='Enter'){addCustomTag();event.preventDefault();}">
+                                <button class="btn btn-primary" type="button" onclick="addCustomTag()">
+                                    <i class="fas fa-plus me-1"></i> Adicionar Tag
+                                </button>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 pt-2" id="tagsContainer">
+                                <!-- Tags dinâmicas -->
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Direita: O Simulador Interativo de Smartphone -->
+        <div class="col-12 col-xl-5">
+            <div class="sticky-top" style="top: 20px; z-index: 10;">
+                <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+                    <span class="small fw-bold text-uppercase text-muted">
+                        <i class="fas fa-satellite-dish text-success me-1"></i> Pré-visualização Dinâmica
+                    </span>
+                    <span class="badge bg-secondary rounded-pill" id="liveUserIndicator">
+                        Visualizando como: {{ selected_user.username }}
+                    </span>
+                </div>
+
+                <!-- Frame de Smartphone Ultra-Realista -->
+                <div class="phone-mockup-wrapper mx-auto shadow-lg">
+                    <div class="phone-screen" id="simScreen">
+                        
+                        <!-- Barra de Status do Celular -->
+                        <div class="phone-status-bar d-flex justify-content-between align-items-center px-4 pt-3 pb-2" id="simStatusBar">
+                            <span class="fw-bold" style="font-size: 13px;" id="simClock">15:58</span>
+                            <div class="phone-camera-island"></div>
+                            <div class="d-flex align-items-center gap-1" style="font-size: 11px;">
+                                <i class="fas fa-signal"></i>
+                                <i class="fas fa-wifi"></i>
+                                <i class="fas fa-battery-full"></i>
+                            </div>
+                        </div>
+
+                        <!-- Header do App -->
+                        <div class="p-3 d-flex justify-content-between align-items-center border-bottom shadow-2xs" id="simHeader">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-xs" id="simAvatar" style="width: 38px; height: 38px; background: #0EA5E9;">
+                                    {{ selected_user.nome_completo[:2].upper() if selected_user.nome_completo else 'US' }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold lh-1" style="font-size: 14px;" id="simUserName">{{ selected_user.nome_completo }}</div>
+                                    <small class="text-muted" style="font-size: 11px;" id="simUserRole">{{ selected_user.cargo or 'Engenheiro' }}</small>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <button class="btn btn-sm p-1 text-muted" type="button"><i class="fas fa-bell"></i></button>
+                                <button class="btn btn-sm p-1 text-muted" type="button"><i class="fas fa-cog"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Conteúdo com Scroll do Celular -->
+                        <div class="phone-content-scroll p-3" id="simScrollArea">
+                            
+                            <!-- Tags Extras no Topo -->
+                            <div class="d-flex flex-wrap gap-1 mb-2" id="simExtraTagsArea"></div>
+
+                            <!-- Alerta de Aprovações Pendentes -->
+                            <div class="card mb-3 border-0 border-start border-4 border-warning shadow-xs rounded-3 p-2 bg-warning-subtle" id="simAlertCard">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fas fa-bell text-warning fs-5"></i>
+                                    <div>
+                                        <div class="fw-bold text-dark" style="font-size: 12px;">Aprovações Pendentes</div>
+                                        <div class="text-muted" style="font-size: 11px;">Existem laudos aguardando revisão.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Banner Relatório Express Destacado (se ativo) -->
+                            <div class="card mb-3 text-white border-0 shadow-xs rounded-4 p-3 position-relative overflow-hidden" id="simExpressBanner" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-white text-dark rounded-pill px-2 py-1 mb-1 fw-bold" style="font-size: 10px;">⚡ NOVO</span>
+                                        <h6 class="fw-bold mb-0 text-white" style="font-size: 14px;">Relatório Express</h6>
+                                        <small class="text-white-50" style="font-size: 10px;">Vistoria instantânea com 1 foto</small>
+                                    </div>
+                                    <button class="btn btn-light btn-sm rounded-pill fw-bold px-3 py-1 text-dark shadow-xs" style="font-size: 11px;">
+                                        Abrir <i class="fas fa-arrow-right ms-1"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Bloco de Métricas / Cards de Indicadores -->
+                            <div class="mb-3" id="simStatsBlock">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <div class="sim-card p-2 rounded-3 text-center border shadow-3xs" id="simStat1">
+                                            <div class="text-muted text-uppercase" style="font-size: 10px;">Obras Ativas</div>
+                                            <div class="fw-bold fs-5 text-success" id="simValObras">4</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="sim-card p-2 rounded-3 text-center border shadow-3xs" id="simStat2">
+                                            <div class="text-muted text-uppercase" style="font-size: 10px;">Visitas Agendadas</div>
+                                            <div class="fw-bold fs-5 text-primary" id="simValVisitas">2</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="sim-card p-2 rounded-3 text-center border shadow-3xs" id="simStat3">
+                                            <div class="text-muted text-uppercase" style="font-size: 10px;">Em Andamento</div>
+                                            <div class="fw-bold fs-5 text-warning" id="simValPendentes">3</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="sim-card p-2 rounded-3 text-center border shadow-3xs" id="simStat4">
+                                            <div class="text-muted text-uppercase" style="font-size: 10px;">Aprovados</div>
+                                            <div class="fw-bold fs-5 text-info" id="simValAprovados">22</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bloco de Ações Rápidas -->
+                            <div class="mb-3" id="simQuickActionsBlock">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold" style="font-size: 12px;" id="simTitleAcoes">Ações Rápidas</span>
+                                </div>
+                                <div class="row g-2" id="simActionsContainer">
+                                    <!-- Botões renderizados na ordem configurada -->
+                                </div>
+                            </div>
+
+                            <!-- Lembretes do Canteiro -->
+                            <div class="sim-card p-2 rounded-3 border mb-3 shadow-3xs" id="simLembretesCard">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-bold" style="font-size: 11px;"><i class="fas fa-sticky-note text-warning me-1"></i> Lembrete do Canteiro</span>
+                                    <span class="badge bg-light text-muted border" style="font-size: 9px;">Hoje</span>
+                                </div>
+                                <p class="text-muted mb-0" style="font-size: 11px;">Conferir teste de estanqueidade na fachada norte.</p>
+                            </div>
+
+                            <!-- Relatórios Recentes -->
+                            <div class="mb-3" id="simRecentReportsBlock">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold" style="font-size: 12px;">Relatórios Recentes</span>
+                                    <small class="text-primary fw-bold" style="font-size: 10px;">Ver todos</small>
+                                </div>
+                                <div class="sim-card p-2 rounded-3 border mb-2 shadow-3xs" id="simRep1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="fw-bold" style="font-size: 12px;">Relatório #104</div>
+                                        <span class="badge bg-success" style="font-size: 9px;">Aprovado</span>
+                                    </div>
+                                    <small class="text-muted" style="font-size: 10px;">Residencial Jardins • Bloco B</small>
+                                </div>
+                                <div class="sim-card p-2 rounded-3 border shadow-3xs" id="simRep2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div class="fw-bold" style="font-size: 12px;">Relatório #105</div>
+                                        <span class="badge bg-warning text-dark" style="font-size: 9px;">Rascunho</span>
+                                    </div>
+                                    <small class="text-muted" style="font-size: 10px;">Edifício Horizonte • Fachada Leste</small>
+                                </div>
+                            </div>
+
+                            <!-- Próximas Visitas -->
+                            <div class="mb-3" id="simUpcomingVisitsBlock">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold" style="font-size: 12px;">Próximas Visitas</span>
+                                    <small class="text-primary fw-bold" style="font-size: 10px;">Calendário</small>
+                                </div>
+                                <div class="sim-card p-2 rounded-3 border shadow-3xs" id="simVis1">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="badge bg-primary rounded-3 p-2 text-center" style="font-size: 10px;">
+                                            <div>24</div>
+                                            <div>OUT</div>
+                                        </div>
+                                        <div>
+                                            <div class="fw-bold" style="font-size: 12px;">Vistoria Estrutural</div>
+                                            <small class="text-muted" style="font-size: 10px;">09:30 • Torre Comercial</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- Barra de Navegação Inferior (Bottom Tabs) -->
+                        <div class="phone-bottom-nav border-top d-flex justify-content-around align-items-center py-2" id="simBottomNav">
+                            <!-- Abas renderizadas dinamicamente na ordem exata configurada -->
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST FLUTUANTE DE NOTIFICAÇÃO -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
+    <div id="liveToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-bold" id="toastMessage">
+                Configurações salvas com sucesso!
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos do Mockup de Smartphone */
+.phone-mockup-wrapper {
+    width: 360px;
+    height: 720px;
+    background: #111827;
+    border-radius: 46px;
+    padding: 12px;
+    box-shadow: 0 25px 60px -15px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1);
+    position: relative;
+    border: 4px solid #1E293B;
+}
+
+.phone-screen {
+    width: 100%;
+    height: 100%;
+    background: #F8FAFC;
+    border-radius: 36px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.phone-camera-island {
+    width: 90px;
+    height: 18px;
+    background: #000000;
+    border-radius: 20px;
+    margin: 0 auto;
+}
+
+.phone-content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+.phone-content-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+.phone-content-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.15);
+    border-radius: 10px;
+}
+
+.phone-bottom-nav {
+    background: #FFFFFF;
+    transition: background-color 0.2s ease;
+}
+
+.sim-nav-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 10px;
+    color: #64748B;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+.sim-nav-tab i {
+    font-size: 17px;
+    margin-bottom: 2px;
+}
+.sim-nav-tab.active {
+    font-weight: bold;
+}
+
+.sim-card {
+    background: #FFFFFF;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.shadow-xs {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.shadow-2xs {
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.shadow-3xs {
+    box-shadow: 0 1px 1px rgba(0,0,0,0.02);
+}
+</style>
+
+<script>
+// Dados recebidos do Backend
+const allCustomizations = {{ customizations_json | safe }};
+let currentUserId = "{{ selected_user.id }}";
+let activeConfig = allCustomizations[currentUserId] || {};
+
+// Definições de Dicionários de Ações e Abas
+const TAB_DEFINITIONS = {
+    'DashboardTab': { key: 'DashboardTab', label: 'Início', icon: 'fas fa-home', color: '#0EA5E9' },
+    'ExpressTab': { key: 'ExpressTab', label: 'Express', icon: 'fas fa-bolt', color: '#F59E0B' },
+    'ReportsTab': { key: 'ReportsTab', label: 'Relatórios', icon: 'fas fa-file-alt', color: '#0EA5E9' },
+    'VisitasTab': { key: 'VisitasTab', label: 'Visitas', icon: 'fas fa-calendar-alt', color: '#10B981' },
+    'ProjectsTab': { key: 'ProjectsTab', label: 'Obras', icon: 'fas fa-building', color: '#6366F1' },
+    'ProfileTab': { key: 'ProfileTab', label: 'Perfil', icon: 'fas fa-user', color: '#64748B' }
+};
+
+const ACTION_DEFINITIONS = {
+    'novo_relatorio': { key: 'novo_relatorio', label: 'Novo Laudo', icon: 'fas fa-file-medical', bg: 'bg-primary-subtle', text: 'text-primary' },
+    'relatorio_express': { key: 'relatorio_express', label: 'Foto Express', icon: 'fas fa-bolt', bg: 'bg-warning-subtle', text: 'text-warning' },
+    'nova_obra': { key: 'nova_obra', label: 'Nova Obra', icon: 'fas fa-building', bg: 'bg-info-subtle', text: 'text-info' },
+    'agendar_visita': { key: 'agendar_visita', label: 'Agendar Visita', icon: 'fas fa-calendar-plus', bg: 'bg-success-subtle', text: 'text-success' },
+    'lembrete': { key: 'lembrete', label: 'Lembrete', icon: 'fas fa-sticky-note', bg: 'bg-secondary-subtle', text: 'text-secondary' }
+};
+
+// Inicialização da Página
+document.addEventListener('DOMContentLoaded', function() {
+    loadUserIntoForm(currentUserId);
+    updateClock();
+    setInterval(updateClock, 30000);
+});
+
+function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const el = document.getElementById('simClock');
+    if (el) el.innerText = `${h}:${m}`;
+}
+
+// Trocar de Usuário Selecionado
+function switchUser(userId) {
+    currentUserId = userId;
+    activeConfig = allCustomizations[userId] || {};
+    loadUserIntoForm(userId);
+}
+
+// Carregar Dados do Usuário Ativo nos Controles
+function loadUserIntoForm(userId) {
+    if (!activeConfig) return;
+
+    // Atualizar info no header
+    const sel = document.getElementById('userSelect');
+    const opt = sel.options[sel.selectedIndex];
+    const userText = opt ? opt.text : '';
+
+    const userName = activeConfig.nome_completo || activeConfig.username || 'Usuário';
+    const userRole = activeConfig.cargo || 'Engenheiro';
+
+    document.getElementById('simUserName').innerText = userName;
+    document.getElementById('simUserRole').innerText = userRole;
+    document.getElementById('simAvatar').innerText = userName.substring(0, 2).toUpperCase();
+    document.getElementById('liveUserIndicator').innerText = `Visualizando como: @${activeConfig.username || userId}`;
+
+    // Badges do Header
+    const badgeCargo = document.getElementById('badgeCargo');
+    if (badgeCargo) badgeCargo.innerHTML = `<i class="fas fa-id-badge me-1"></i> ${userRole}`;
+    
+    const badgeMaster = document.getElementById('badgeMaster');
+    if (badgeMaster) {
+        badgeMaster.className = `badge ${activeConfig.is_master ? 'bg-danger' : 'bg-secondary'} px-3 py-2 rounded-pill`;
+        badgeMaster.innerText = activeConfig.is_master ? '👑 Master / Administrador' : '👤 Usuário Padrão';
+    }
+
+    const badgeExpress = document.getElementById('badgeExpress');
+    if (badgeExpress) {
+        badgeExpress.className = `badge ${activeConfig.is_aprovador_express ? 'bg-warning text-dark' : 'bg-light text-muted border'} px-3 py-2 rounded-pill`;
+        badgeExpress.innerHTML = `<i class="fas fa-bolt me-1"></i> ${activeConfig.is_aprovador_express ? 'Aprovador Express Ativo' : 'Sem Aprov. Express'}`;
+    }
+
+    // 1. Tema
+    const tema = activeConfig.tema || 'claro';
+    if (tema === 'escuro') document.getElementById('themeDark').checked = true;
+    else if (tema === 'sistema') document.getElementById('themeSystem').checked = true;
+    else document.getElementById('themeLight').checked = true;
+
+    // Cores
+    document.getElementById('pickerBg').value = activeConfig.cor_fundo || (tema === 'escuro' ? '#0F172A' : '#F8FAFC');
+    document.getElementById('inputBg').value = activeConfig.cor_fundo || (tema === 'escuro' ? '#0F172A' : '#F8FAFC');
+
+    document.getElementById('pickerPrimary').value = activeConfig.cor_primaria || '#0EA5E9';
+    document.getElementById('inputPrimary').value = activeConfig.cor_primaria || '#0EA5E9';
+
+    document.getElementById('pickerCard').value = activeConfig.cor_card || (tema === 'escuro' ? '#1E293B' : '#FFFFFF');
+    document.getElementById('inputCard').value = activeConfig.cor_card || (tema === 'escuro' ? '#1E293B' : '#FFFFFF');
+
+    document.getElementById('pickerText').value = activeConfig.cor_texto || (tema === 'escuro' ? '#F8FAFC' : '#0F172A');
+    document.getElementById('inputText').value = activeConfig.cor_texto || (tema === 'escuro' ? '#F8FAFC' : '#0F172A');
+
+    // 2. Módulos
+    const mods = activeConfig.modulos_visiveis || {};
+    for (const [key, val] of Object.entries(mods)) {
+        const input = document.getElementById(`mod_${key}`);
+        if (input) input.checked = Boolean(val);
+    }
+
+    // 3. Layout dos botões
+    const pos = activeConfig.posicao_botoes || {};
+    const layout = pos.layout_botoes || 'grid_2';
+    if (layout === 'grid_3') document.getElementById('layoutGrid3').checked = true;
+    else if (layout === 'lista') document.getElementById('layoutList').checked = true;
+    else document.getElementById('layoutGrid2').checked = true;
+
+    // Renderizar ordenadores de Abas e Ações Rápidas
+    renderTabOrderList(pos.tab_order || ['DashboardTab', 'ExpressTab', 'ReportsTab', 'VisitasTab', 'ProjectsTab']);
+    renderQuickActionsOrderList(pos.quick_actions_order || ['novo_relatorio', 'relatorio_express', 'nova_obra', 'agendar_visita', 'lembrete']);
+
+    // 4. Atribuições Extras
+    const atribs = activeConfig.atribuicoes_extras || {};
+    for (const [key, val] of Object.entries(atribs)) {
+        if (key === 'tags_personalizadas') continue;
+        const input = document.getElementById(`perm_${key}`);
+        if (input) input.checked = Boolean(val);
+    }
+    renderTags(atribs.tags_personalizadas || []);
+
+    // Atualizar Simulação Visual
+    renderSimulator();
+}
+
+// Renderizar Ordenador de Abas do Rodapé
+function renderTabOrderList(tabOrder) {
+    const container = document.getElementById('tabOrderContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    tabOrder.forEach((tabKey, idx) => {
+        const def = TAB_DEFINITIONS[tabKey] || { label: tabKey, icon: 'fas fa-square' };
+        const isFirst = idx === 0;
+        const isLast = idx === tabOrder.length - 1;
+
+        const row = document.createElement('div');
+        row.className = 'd-flex justify-content-between align-items-center bg-white p-2 mb-2 rounded border shadow-3xs';
+        row.innerHTML = `
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary rounded-circle" style="width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;">${idx + 1}</span>
+                <i class="${def.icon} text-primary me-1"></i>
+                <span class="fw-bold text-dark" style="font-size: 13px;">${def.label}</span>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" onclick="moveTabOrder(${idx}, -1)" ${isFirst ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="moveTabOrder(${idx}, 1)" ${isLast ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function moveTabOrder(idx, delta) {
+    const list = activeConfig.posicao_botoes.tab_order;
+    const targetIdx = idx + delta;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const temp = list[idx];
+    list[idx] = list[targetIdx];
+    list[targetIdx] = temp;
+    renderTabOrderList(list);
+    renderSimulator();
+}
+
+// Renderizar Ordenador de Ações Rápidas
+function renderQuickActionsOrderList(actionsOrder) {
+    const container = document.getElementById('quickActionsOrderContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    actionsOrder.forEach((actionKey, idx) => {
+        const def = ACTION_DEFINITIONS[actionKey] || { label: actionKey, icon: 'fas fa-star' };
+        const isFirst = idx === 0;
+        const isLast = idx === actionsOrder.length - 1;
+
+        const row = document.createElement('div');
+        row.className = 'd-flex justify-content-between align-items-center bg-white p-2 mb-2 rounded border shadow-3xs';
+        row.innerHTML = `
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary rounded-circle" style="width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;">${idx + 1}</span>
+                <i class="${def.icon} text-warning me-1"></i>
+                <span class="fw-bold text-dark" style="font-size: 13px;">${def.label}</span>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" onclick="moveActionOrder(${idx}, -1)" ${isFirst ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="moveActionOrder(${idx}, 1)" ${isLast ? 'disabled' : ''}>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function moveActionOrder(idx, delta) {
+    const list = activeConfig.posicao_botoes.quick_actions_order;
+    const targetIdx = idx + delta;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    const temp = list[idx];
+    list[idx] = list[targetIdx];
+    list[targetIdx] = temp;
+    renderQuickActionsOrderList(list);
+    renderSimulator();
+}
+
+// Atualização de Tema e Cores
+function updateThemeMode(mode) {
+    activeConfig.tema = mode;
+    if (mode === 'escuro') {
+        activeConfig.cor_fundo = '#0F172A';
+        activeConfig.cor_card = '#1E293B';
+        activeConfig.cor_texto = '#F8FAFC';
+    } else {
+        activeConfig.cor_fundo = '#F8FAFC';
+        activeConfig.cor_card = '#FFFFFF';
+        activeConfig.cor_texto = '#0F172A';
+    }
+
+    document.getElementById('pickerBg').value = activeConfig.cor_fundo;
+    document.getElementById('inputBg').value = activeConfig.cor_fundo;
+    document.getElementById('pickerCard').value = activeConfig.cor_card;
+    document.getElementById('inputCard').value = activeConfig.cor_card;
+    document.getElementById('pickerText').value = activeConfig.cor_texto;
+    document.getElementById('inputText').value = activeConfig.cor_texto;
+
+    renderSimulator();
+}
+
+function updateColor(type, value) {
+    activeConfig[type] = value;
+    if (type === 'cor_fundo') {
+        document.getElementById('pickerBg').value = value;
+        document.getElementById('inputBg').value = value;
+    } else if (type === 'cor_primaria') {
+        document.getElementById('pickerPrimary').value = value;
+        document.getElementById('inputPrimary').value = value;
+    } else if (type === 'cor_card') {
+        document.getElementById('pickerCard').value = value;
+        document.getElementById('inputCard').value = value;
+    } else if (type === 'cor_texto') {
+        document.getElementById('pickerText').value = value;
+        document.getElementById('inputText').value = value;
+    }
+    renderSimulator();
+}
+
+// Toggle de Módulos
+function toggleModule(modKey, isChecked) {
+    if (!activeConfig.modulos_visiveis) activeConfig.modulos_visiveis = {};
+    activeConfig.modulos_visiveis[modKey] = isChecked;
+    renderSimulator();
+}
+
+// Atualizar Layout dos Botões
+function updateButtonLayout(layoutKey) {
+    if (!activeConfig.posicao_botoes) activeConfig.posicao_botoes = {};
+    activeConfig.posicao_botoes.layout_botoes = layoutKey;
+    renderSimulator();
+}
+
+// Atualizar Permissão
+function updatePermission(permKey, isChecked) {
+    if (!activeConfig.atribuicoes_extras) activeConfig.atribuicoes_extras = {};
+    activeConfig.atribuicoes_extras[permKey] = isChecked;
+    
+    // Sincronizar badges se alterar master ou express
+    if (permKey === 'pode_aprovar_relatorios') {
+        activeConfig.is_master = isChecked;
+        const b = document.getElementById('badgeMaster');
+        if (b) {
+            b.className = `badge ${isChecked ? 'bg-danger' : 'bg-secondary'} px-3 py-2 rounded-pill`;
+            b.innerText = isChecked ? '👑 Master / Administrador' : '👤 Usuário Padrão';
+        }
+    }
+    if (permKey === 'pode_aprovar_express') {
+        activeConfig.is_aprovador_express = isChecked;
+        const b = document.getElementById('badgeExpress');
+        if (b) {
+            b.className = `badge ${isChecked ? 'bg-warning text-dark' : 'bg-light text-muted border'} px-3 py-2 rounded-pill`;
+            b.innerHTML = `<i class="fas fa-bolt me-1"></i> ${isChecked ? 'Aprovador Express Ativo' : 'Sem Aprov. Express'}`;
+        }
+    }
+    renderSimulator();
+}
+
+// Adicionar / Remover Tags Personalizadas
+function addCustomTag() {
+    const input = document.getElementById('newTagInput');
+    const val = (input.value || '').trim();
+    if (!val) return;
+
+    if (!activeConfig.atribuicoes_extras) activeConfig.atribuicoes_extras = {};
+    if (!activeConfig.atribuicoes_extras.tags_personalizadas) activeConfig.atribuicoes_extras.tags_personalizadas = [];
+
+    if (!activeConfig.atribuicoes_extras.tags_personalizadas.includes(val)) {
+        activeConfig.atribuicoes_extras.tags_personalizadas.push(val);
+    }
+    input.value = '';
+    renderTags(activeConfig.atribuicoes_extras.tags_personalizadas);
+    renderSimulator();
+}
+
+function removeCustomTag(idx) {
+    if (activeConfig.atribuicoes_extras && activeConfig.atribuicoes_extras.tags_personalizadas) {
+        activeConfig.atribuicoes_extras.tags_personalizadas.splice(idx, 1);
+        renderTags(activeConfig.atribuicoes_extras.tags_personalizadas);
+        renderSimulator();
+    }
+}
+
+function renderTags(tags) {
+    const container = document.getElementById('tagsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!tags || tags.length === 0) {
+        container.innerHTML = '<small class="text-muted fst-italic">Nenhuma tag extra definida para este usuário.</small>';
+        return;
+    }
+
+    tags.forEach((tag, idx) => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-dark px-3 py-2 rounded-pill d-inline-flex align-items-center gap-2';
+        badge.innerHTML = `
+            <span>${tag}</span>
+            <i class="fas fa-times text-danger" style="cursor: pointer;" onclick="removeCustomTag(${idx})"></i>
+        `;
+        container.appendChild(badge);
+    });
+}
+
+// ==========================================
+// RENDERIZADOR DO SIMULADOR DE SMARTPHONE
+// ==========================================
+function renderSimulator() {
+    const isDark = (activeConfig.tema === 'escuro');
+    const bgColor = activeConfig.cor_fundo || (isDark ? '#0F172A' : '#F8FAFC');
+    const cardColor = activeConfig.cor_card || (isDark ? '#1E293B' : '#FFFFFF');
+    const textColor = activeConfig.cor_texto || (isDark ? '#F8FAFC' : '#0F172A');
+    const primaryColor = activeConfig.cor_primaria || '#0EA5E9';
+
+    // 1. Cores da Tela do Celular
+    const screen = document.getElementById('simScreen');
+    if (screen) {
+        screen.style.backgroundColor = bgColor;
+        screen.style.color = textColor;
+    }
+
+    // 2. Barra de Status e Header
+    const statusBar = document.getElementById('simStatusBar');
+    if (statusBar) {
+        statusBar.style.color = isDark ? '#F8FAFC' : '#0F172A';
+    }
+
+    const header = document.getElementById('simHeader');
+    if (header) {
+        header.style.backgroundColor = cardColor;
+        header.style.borderColor = isDark ? '#334155' : '#E2E8F0';
+    }
+    const avatar = document.getElementById('simAvatar');
+    if (avatar) avatar.style.backgroundColor = primaryColor;
+
+    // 3. Tags Extras do Usuário no Topo
+    const extraTagsArea = document.getElementById('simExtraTagsArea');
+    if (extraTagsArea) {
+        extraTagsArea.innerHTML = '';
+        const tags = (activeConfig.atribuicoes_extras && activeConfig.atribuicoes_extras.tags_personalizadas) || [];
+        tags.forEach(t => {
+            const el = document.createElement('span');
+            el.className = 'badge rounded-pill text-white shadow-3xs';
+            el.style.backgroundColor = primaryColor;
+            el.style.fontSize = '9px';
+            el.innerText = t;
+            extraTagsArea.appendChild(el);
+        });
+    }
+
+    // 4. Módulos Visíveis (Liga / Desliga)
+    const mods = activeConfig.modulos_visiveis || {};
+    
+    // Alerta de Aprovações
+    const simAlert = document.getElementById('simAlertCard');
+    if (simAlert) {
+        simAlert.style.display = (mods.alertas_aprovacao !== false && activeConfig.atribuicoes_extras && activeConfig.atribuicoes_extras.pode_aprovar_relatorios) ? 'block' : 'none';
+    }
+
+    // Banner Express
+    const simExpressBanner = document.getElementById('simExpressBanner');
+    if (simExpressBanner) {
+        simExpressBanner.style.display = (mods.express_tab !== false) ? 'block' : 'none';
+    }
+
+    // Cards de Métricas
+    const simStats = document.getElementById('simStatsBlock');
+    if (simStats) {
+        simStats.style.display = (mods.dashboard_stats !== false) ? 'block' : 'none';
+    }
+
+    // Ações Rápidas
+    const simQuick = document.getElementById('simQuickActionsBlock');
+    if (simQuick) {
+        simQuick.style.display = (mods.quick_actions !== false) ? 'block' : 'none';
+    }
+
+    // Lembretes
+    const simLembretes = document.getElementById('simLembretesCard');
+    if (simLembretes) {
+        simLembretes.style.display = (mods.lembretes_card !== false) ? 'block' : 'none';
+    }
+
+    // Relatórios Recentes
+    const simRecent = document.getElementById('simRecentReportsBlock');
+    if (simRecent) {
+        simRecent.style.display = (mods.recent_reports !== false) ? 'block' : 'none';
+    }
+
+    // Próximas Visitas
+    const simVisitas = document.getElementById('simUpcomingVisitsBlock');
+    if (simVisitas) {
+        simVisitas.style.display = (mods.upcoming_visits !== false) ? 'block' : 'none';
+    }
+
+    // Aplicar cor do card em todos os cards simulados
+    document.querySelectorAll('.sim-card').forEach(card => {
+        card.style.backgroundColor = cardColor;
+        card.style.borderColor = isDark ? '#334155' : '#E2E8F0';
+        card.style.color = textColor;
+    });
+
+    // 5. Renderizar Botões de Ação Rápida na Ordem e Layout Definidos
+    const actionsContainer = document.getElementById('simActionsContainer');
+    if (actionsContainer) {
+        actionsContainer.innerHTML = '';
+        const layout = (activeConfig.posicao_botoes && activeConfig.posicao_botoes.layout_botoes) || 'grid_2';
+        const actionsOrder = (activeConfig.posicao_botoes && activeConfig.posicao_botoes.quick_actions_order) || ['novo_relatorio', 'relatorio_express', 'nova_obra', 'agendar_visita', 'lembrete'];
+
+        let colClass = 'col-6';
+        if (layout === 'grid_3') colClass = 'col-4';
+        if (layout === 'lista') colClass = 'col-12';
+
+        actionsOrder.forEach(key => {
+            // Se express foi desligado nos módulos, não exibir o botão dele
+            if (key === 'relatorio_express' && mods.express_tab === false) return;
+
+            const def = ACTION_DEFINITIONS[key] || { label: key, icon: 'fas fa-star' };
+            const col = document.createElement('div');
+            col.className = colClass;
+
+            if (layout === 'lista') {
+                col.innerHTML = `
+                    <div class="sim-card p-2 rounded-3 border d-flex align-items-center gap-2 shadow-3xs" style="background:${cardColor}; border-color:${isDark ? '#334155' : '#E2E8F0'}; color:${textColor};">
+                        <div class="rounded-3 d-flex align-items-center justify-content-center text-white" style="width: 28px; height: 28px; background:${primaryColor};">
+                            <i class="${def.icon}" style="font-size: 12px;"></i>
+                        </div>
+                        <span class="fw-bold" style="font-size: 11px;">${def.label}</span>
+                    </div>
+                `;
+            } else {
+                col.innerHTML = `
+                    <div class="sim-card p-2 rounded-3 border text-center shadow-3xs" style="background:${cardColor}; border-color:${isDark ? '#334155' : '#E2E8F0'}; color:${textColor};">
+                        <div class="rounded-circle mx-auto d-flex align-items-center justify-content-center text-white mb-1" style="width: 32px; height: 32px; background:${key === 'relatorio_express' ? '#F59E0B' : primaryColor};">
+                            <i class="${def.icon}" style="font-size: 13px;"></i>
+                        </div>
+                        <span class="fw-bold d-block text-truncate" style="font-size: 10px;">${def.label}</span>
+                    </div>
+                `;
+            }
+            actionsContainer.appendChild(col);
+        });
+    }
+
+    // 6. Renderizar Bottom Navigation Bar (Abas do Rodapé)
+    const navBar = document.getElementById('simBottomNav');
+    if (navBar) {
+        navBar.innerHTML = '';
+        navBar.style.backgroundColor = cardColor;
+        navBar.style.borderColor = isDark ? '#334155' : '#E2E8F0';
+
+        const tabOrder = (activeConfig.posicao_botoes && activeConfig.posicao_botoes.tab_order) || ['DashboardTab', 'ExpressTab', 'ReportsTab', 'VisitasTab', 'ProjectsTab'];
+        
+        tabOrder.forEach((tabKey, idx) => {
+            // Checar visibilidade por módulo
+            if (tabKey === 'ExpressTab' && mods.express_tab === false) return;
+            if (tabKey === 'ProjectsTab' && mods.projetos_tab === false) return;
+            if (tabKey === 'VisitasTab' && mods.visitas_tab === false) return;
+            if (tabKey === 'ReportsTab' && mods.relatorios_tab === false) return;
+
+            const def = TAB_DEFINITIONS[tabKey] || { label: tabKey, icon: 'fas fa-square' };
+            const isActive = idx === 0;
+
+            const tab = document.createElement('div');
+            tab.className = `sim-nav-tab ${isActive ? 'active' : ''}`;
+            tab.style.color = isActive ? primaryColor : (isDark ? '#94A3B8' : '#64748B');
+
+            if (tabKey === 'ExpressTab') {
+                tab.innerHTML = `
+                    <div class="rounded-circle text-white d-flex align-items-center justify-content-center shadow-xs" style="width: 28px; height: 28px; background: #F59E0B; margin-top: -6px;">
+                        <i class="fas fa-bolt" style="font-size: 13px;"></i>
+                    </div>
+                    <span style="font-size: 9px; font-weight: bold; color: #F59E0B;">Express</span>
+                `;
+            } else {
+                tab.innerHTML = `
+                    <i class="${def.icon}"></i>
+                    <span>${def.label}</span>
+                `;
+            }
+            navBar.appendChild(tab);
+        });
+    }
+}
+
+// Salvar Configurações no Servidor via AJAX
+function saveUserConfig() {
+    const btn = document.getElementById('btnSaveConfig');
+    const originalHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Salvando...';
+    btn.disabled = true;
+
+    fetch(`/api/admin/users/${currentUserId}/app-customization`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(activeConfig)
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        if (data.success) {
+            allCustomizations[currentUserId] = data.customization;
+            activeConfig = data.customization;
+            showToast('✅ Configurações salvas e aplicadas ao app com sucesso!');
+        } else {
+            alert('Erro ao salvar: ' + (data.error || 'Falha inesperada'));
+        }
+    })
+    .catch(err => {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        alert('Erro na requisição: ' + err);
+    });
+}
+
+// Restaurar Padrões de Fábrica
+function resetUserConfig() {
+    if (!confirm('Deseja restaurar as configurações deste usuário para os padrões originais do sistema?')) return;
+
+    fetch(`/api/admin/users/${currentUserId}/app-customization/reset`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            allCustomizations[currentUserId] = data.customization;
+            activeConfig = data.customization;
+            loadUserIntoForm(currentUserId);
+            showToast('🔄 Configurações restauradas para o padrão de fábrica!');
+        } else {
+            alert('Erro ao restaurar: ' + (data.error || 'Falha'));
+        }
+    })
+    .catch(err => alert('Erro na conexão: ' + err));
+}
+
+// Exibir Toast Flutuante
+function showToast(msg) {
+    const toastEl = document.getElementById('liveToast');
+    const msgEl = document.getElementById('toastMessage');
+    if (msgEl) msgEl.innerText = msg;
+    if (toastEl) {
+        const toast = new bootstrap.Toast(toastEl, { delay: 3500 });
+        toast.show();
+    }
+}
+</script>
+{% endblock %}

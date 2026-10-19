@@ -10,9 +10,14 @@
                 <i class="fas fa-users me-2"></i>
                 Usuários do Sistema
             </h1>
-            <a href="{{ url_for('register') }}" class="btn btn-primary">
-                <i class="fas fa-plus me-2"></i>Novo Usuário
-            </a>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('admin_user_app_customizer') }}" class="btn btn-outline-primary shadow-sm fw-bold">
+                    <i class="fas fa-mobile-alt me-1"></i>Personalizar App por Usuário
+                </a>
+                <a href="{{ url_for('register') }}" class="btn btn-primary shadow-sm">
+                    <i class="fas fa-plus me-1"></i>Novo Usuário
+                </a>
+            </div>
         </div>
         
         <!-- Busca Simples -->
@@ -92,9 +97,14 @@
                                         </td>
                                         <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
                                         <td>
-                                            <a href="{{ url_for('user_edit', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
+                                            <div class="d-flex gap-1">
+                                                <a href="{{ url_for('admin_user_app_customizer', user_id=user.id) }}" class="btn btn-sm btn-outline-info" title="Personalizar Visualização do App">
+                                                    <i class="fas fa-mobile-alt"></i>
+                                                </a>
+                                                <a href="{{ url_for('user_edit', user_id=user.id) }}" class="btn btn-sm btn-outline-primary" title="Editar Usuário">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                     {% endfor %}
@@ -132,7 +142,10 @@
                                     <div><strong>Cargo:</strong> {{ user.cargo or '-' }}</div>
                                     <div><strong>Cadastrado em:</strong> {{ user.created_at.strftime('%d/%m/%Y') }}</div>
                                 </div>
-                                <div class="d-flex justify-content-end">
+                                <div class="d-flex justify-content-end gap-2">
+                                    <a href="{{ url_for('admin_user_app_customizer', user_id=user.id) }}" class="btn btn-sm btn-outline-info">
+                                        <i class="fas fa-mobile-alt me-1"></i>App
+                                    </a>
                                     <a href="{{ url_for('user_edit', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-edit me-1"></i>Editar
                                     </a>

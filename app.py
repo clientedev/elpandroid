@@ -665,8 +665,20 @@ def init_database():
 
             # Ensure imported legacy users exist
             sync_imported_legacy_users()
+
+            # Ensure user app customizations table exists
+            ensure_user_app_customizations_table()
     except Exception as e:
         logging.error(f"Database initialization error: {e}")
+
+def ensure_user_app_customizations_table():
+    """Garante que a tabela user_app_customizations existe no banco de dados"""
+    try:
+        from models import UserAppCustomization
+        UserAppCustomization.__table__.create(db.engine, checkfirst=True)
+        logging.info("✅ Tabela user_app_customizations verificada/criada com sucesso")
+    except Exception as e:
+        logging.warning(f"⚠️ Erro ao verificar/criar user_app_customizations: {e}")
 
 def ensure_relatorios_uuid_columns():
     """Garante a existência das colunas uuid, data_criacao_local e data_sincronizacao na tabela relatorios"""
@@ -734,6 +746,7 @@ if os.environ.get("RAILWAY_ENVIRONMENT") or (os.environ.get("DATABASE_URL") and 
             create_default_legendas()
             ensure_relatorios_uuid_columns()
             sync_imported_legacy_users()
+            ensure_user_app_customizations_table()
 
             # Test reports route functionality
             logging.info("🧪 Testing reports functionality...")

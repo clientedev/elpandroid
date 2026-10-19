@@ -974,3 +974,105 @@ class Visitante(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+
+class UserAppCustomization(db.Model):
+    """
+    Personalização da visualização do APK exclusiva por usuário.
+    Permite ao Admin customizar e enxergar a tela de cada pessoa no app:
+    - Modo Claro / Escuro / Sistema
+    - Cores (fundo, primária/destaque, cards, texto)
+    - Módulos e seções visíveis
+    - Ordem e posição de botões e abas de navegação
+    - Atribuições extras e permissões especiais concedidas
+    """
+    __tablename__ = 'user_app_customizations'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False, index=True)
+    
+    # Aparência e Tema
+    tema = db.Column(db.String(20), default='claro') # 'claro', 'escuro', 'sistema'
+    cor_fundo = db.Column(db.String(20), default='#F8FAFC')
+    cor_primaria = db.Column(db.String(20), default='#0EA5E9')
+    cor_card = db.Column(db.String(20), default='#FFFFFF')
+    cor_texto = db.Column(db.String(20), default='#0F172A')
+
+    # Módulos, botões e posições (armazenados em JSON formatado)
+    posicao_botoes = db.Column(db.Text, nullable=True) # JSON da ordem das abas e botões rápidos
+    modulos_visiveis = db.Column(db.Text, nullable=True) # JSON de toggles de visibilidade
+    atribuicoes_extras = db.Column(db.Text, nullable=True) # JSON de permissões/atribuições adicionais
+
+    updated_at = db.Column(db.DateTime, default=brazil_now, onupdate=brazil_now)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('app_customization', uselist=False, cascade='all, delete-orphan'))
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+
+    def to_dict(self):
+        def parse_json(val, default):
+            if not val:
+                return default
+            try:
+                return json.loads(val)
+            except Exception:
+                return default
+
+        default_modulos = {
+            'dashboard_stats': True,
+            'quick_actions': True,
+            'recent_reports': True,
+            'upcoming_visits': True,
+            'express_button': True,
+            'projetos_tab': True,
+            'visitas_tab': True,
+            'relatorios_tab': True,
+            'express_tab': True,
+            'perfil_tab': True,
+            'lembretes_card': True,
+            'alertas_aprovacao': True
+        }
+
+        default_posicoes = {
+            'tab_order': ['DashboardTab', 'ExpressTab', 'ReportsTab', 'VisitasTab', 'ProjectsTab'],
+            'quick_actions_order': ['novo_relatorio', 'relatorio_express', 'nova_obra', 'agendar_visita', 'lembrete'],
+            'layout_botoes': 'grid_2' # 'grid_2', 'grid_3', 'lista'
+        }
+
+        default_atribuicoes = {
+            'pode_aprovar_relatorios': bool(self.user.is_master) if self.user else False,
+            'pode_aprovar_express': bool(self.user.is_aprovador_express) if self.user else False,
+            'pode_criar_express': True,
+            'pode_excluir_registros': bool(self.user.is_master) if self.user else False,
+            'pode_editar_finalizados': bool(self.user.is_master) if self.user else False,
+            'pode_gerenciar_obras': bool(self.user.is_master) if self.user else False,
+            'pode_agendar_visitas': True,
+            'pode_exportar_pdf': True,
+            'pode_ver_todas_obras': True,
+            'tags_personalizadas': []
+        }
+
+        # Cores coerentes com tema se não estiverem definidas
+        is_dark = (self.tema == 'escuro')
+        resolved_bg = self.cor_fundo or ('#0F172A' if is_dark else '#F8FAFC')
+        resolved_card = self.cor_card or ('#1E293B' if is_dark else '#FFFFFF')
+        resolved_text = self.cor_texto or ('#F8FAFC' if is_dark else '#0F172A')
+
+        return {
+            'user_id': self.user_id,
+            'username': self.user.username if self.user else None,
+            'nome_completo': self.user.nome_completo if self.user else None,
+            'cargo': self.user.cargo if self.user else None,
+            'is_master': self.user.is_master if self.user else False,
+            'is_aprovador_express': self.user.is_aprovador_express if self.user else False,
+            'cor_agenda': self.user.cor_agenda if self.user else '#0EA5E9',
+            'tema': self.tema or 'claro',
+            'cor_fundo': resolved_bg,
+            'cor_primaria': self.cor_primaria or '#0EA5E9',
+            'cor_card': resolved_card,
+            'cor_texto': resolved_text,
+            'modulos_visiveis': {**default_modulos, **parse_json(self.modulos_visiveis, {})},
+            'posicao_botoes': {**default_posicoes, **parse_json(self.posicao_botoes, {})},
+            'atribuicoes_extras': {**default_atribuicoes, **parse_json(self.atribuicoes_extras, {})},
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
