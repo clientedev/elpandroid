@@ -2949,7 +2949,13 @@ def painel_apk():
 
 @app.route('/admin/ajustes-apk')
 @app.route('/admin/central')
+@app.route('/admin/central-apk')
+@app.route('/admin/central-do-apk')
 @app.route('/admin/central-inteligente')
+@app.route('/central')
+@app.route('/central-apk')
+@app.route('/central-do-apk')
+@app.route('/ajustes-apk')
 @login_required
 def ajustes_apk_page():
     """Central Inteligente de Gerenciamento do Aplicativo Android (Server-Driven UI, E-mails, Obras e Build)"""

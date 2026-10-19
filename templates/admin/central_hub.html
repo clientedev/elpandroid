@@ -707,7 +707,7 @@ body {
                                                         <td><small class="text-muted">{{ log.data_envio.strftime('%d/%m/%Y %H:%M') if log.data_envio else 'Recente' }}</small></td>
                                                         <td><strong>{{ log.projeto.nome if log.projeto else 'Obra' }}</strong></td>
                                                         <td><code>#{{ log.relatorio_id }}</code></td>
-                                                        <td><span class="badge bg-light text-dark border">{{ log.destinatarios[:45] }}...</span></td>
+                                                        <td><span class="badge bg-light text-dark border">{{ (log.destinatarios or 'N/A')[:45] }}...</span></td>
                                                         <td>
                                                             {% if log.status == 'enviado' %}
                                                                 <span class="badge bg-success-subtle text-success border border-success-subtle">ENVIADO</span>
@@ -894,9 +894,9 @@ body {
                                             {% for r in relatorios_recentes %}
                                             <tr>
                                                 <td><strong>{{ r.numero or 'RDO' }}</strong></td>
-                                                <td>{{ r.projeto.nome if r.projeto else (r.obra_nome if hasattr(r, 'obra_nome') else 'Obra') }}</td>
-                                                <td><span class="badge bg-light text-dark border">{{ 'Express' if hasattr(r, 'obra_nome') else 'Comum (RDO)' }}</span></td>
-                                                <td>{{ r.data_visita.strftime('%d/%m/%Y') if hasattr(r, 'data_visita') and r.data_visita and hasattr(r.data_visita, 'strftime') else 'Recente' }}</td>
+                                                <td>{{ r.projeto.nome if (r.projeto and r.projeto.nome) else (r.obra_nome if (r.obra_nome is defined and r.obra_nome) else 'Obra') }}</td>
+                                                <td><span class="badge bg-light text-dark border">{{ 'Express' if (r.obra_nome is defined and r.obra_nome) else 'Comum (RDO)' }}</span></td>
+                                                <td>{{ r.data_visita.strftime('%d/%m/%Y') if (r.data_visita is defined and r.data_visita and r.data_visita.strftime is defined) else 'Recente' }}</td>
                                                 <td>
                                                     <span class="badge bg-success-subtle text-success border border-success-subtle">{{ r.status or 'Aprovado' }}</span>
                                                 </td>

@@ -207,7 +207,9 @@ def inject_brazil_date():
     now_brazil = datetime.now(BRAZIL_TZ)
     return {
         'today_br': now_brazil.strftime('%Y-%m-%d'),  # For HTML date inputs
-        'now_brazil': now_brazil
+        'now_brazil': now_brazil,
+        'hasattr': hasattr,
+        'getattr': getattr
     }
 
 @login_manager.user_loader
