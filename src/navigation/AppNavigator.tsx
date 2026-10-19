@@ -61,7 +61,7 @@ function TabNavigator() {
           shadowRadius: 4,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 9.5,
           fontWeight: '600',
           marginTop: -2,
         },
@@ -72,6 +72,9 @@ function TabNavigator() {
             iconName = focused ? 'speedometer' : 'speedometer-outline';
           } else if (route.name === 'ObrasTab') {
             iconName = focused ? 'business' : 'business-outline';
+          } else if (route.name === 'ExpressTab') {
+            iconName = focused ? 'flash' : 'flash-outline';
+            return <Ionicons name={iconName} size={22} color={focused ? '#D97706' : color} />;
           } else if (route.name === 'PendentesTab') {
             iconName = focused ? 'document-text' : 'document-text-outline';
           } else if (route.name === 'VisitasTab') {
@@ -93,6 +96,14 @@ function TabNavigator() {
         name="ObrasTab" 
         component={ProjectsListScreen} 
         options={{ tabBarLabel: 'Obras' }} 
+      />
+      <Tab.Screen 
+        name="ExpressTab" 
+        component={ExpressReportsScreen} 
+        options={{ 
+          tabBarLabel: 'Express',
+          tabBarActiveTintColor: '#D97706',
+        }} 
       />
       <Tab.Screen 
         name="PendentesTab" 
