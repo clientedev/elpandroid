@@ -106,10 +106,12 @@ def init_scheduler(app):
             replace_existing=True
         )
         
-        # Iniciar scheduler
-        scheduler.start()
-        
-        logger.info("✅ Scheduler iniciado com sucesso")
+        # Iniciar scheduler apenas se não estiver em execução
+        if not scheduler.running:
+            scheduler.start()
+            logger.info("✅ Scheduler iniciado com sucesso")
+        else:
+            logger.info("ℹ️ Scheduler já está em execução")
         logger.info("📅 Tarefas agendadas:")
         logger.info("   - Limpeza de notificações a cada 6 horas")
         logger.info("   - Limpeza diária às 3h da manhã")

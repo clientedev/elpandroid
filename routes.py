@@ -572,26 +572,6 @@ def debug_db_test():
             'database_connection': 'FAILED'
         }), 500
 
-
-    """Full health check with database connectivity"""
-    try:
-        # Basic database connectivity test
-        db.session.execute(db.text('SELECT 1'))
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': now_brt().isoformat(),
-            'database': 'connected',
-            'service': 'flask-app'
-        }), 200
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'timestamp': now_brt().isoformat(),
-            'database': 'disconnected',
-            'error': str(e),
-            'service': 'flask-app'
-        }), 503
-
 from models import User, Projeto, Contato, ContatoProjeto, Visita, Relatorio, FotoRelatorio, Reembolso, EnvioRelatorio, ChecklistTemplate, ChecklistItem, ComunicacaoVisita, EmailCliente, ChecklistPadrao, LogEnvioEmail, ConfiguracaoEmail, LegendaPredefinida, FuncionarioProjeto, AprovadorPadrao, ProjetoChecklistConfig, ChecklistObra, VisitaParticipante, Notificacao
 from forms import LoginForm, RegisterForm, UserForm, ProjetoForm, VisitaForm, VisitaRealizadaForm, EmailClienteForm, RelatorioForm, FotoRelatorioForm, ReembolsoForm, ContatoForm, ContatoProjetoForm, LegendaPredefinidaForm, FirstLoginForm
 from forms_email import ConfiguracaoEmailForm, EnvioEmailForm
@@ -10297,103 +10277,126 @@ def visit_export_outlook(visit_id):
         return redirect(url_for('visits_list'))
 
 # =====================
-# ROTAS DE GERENCIAMENTO DE E-MAILS DE CLIENTES
-# =====================
+# =============================================================================
+# SISTEMA DE GERENCIAMENTO DE E-MAILS DE CLIENTES POR OBRA
+# =============================================================================
+
+@app.route('/admin/emails')
+@login_required
+def admin_emails():
+    """Painel administrativo para gerenciar todos os e-mails de clientes por obra"""
+    if not (current_user.is_master or current_user.is_developer):
+        flash('Acesso negado. Apenas administradores podem acessar esta área.', 'error')
+        return redirect(url_for('index'))
+    
+    # Buscar projetos que possuem e-mails ativos cadastrados
+    projetos_com_emails = Projeto.query.join(EmailCliente).filter(EmailCliente.ativo == True).distinct().order_by(Projeto.nome).all()
+    
+    # Estatísticas
+    total_emails = EmailCliente.query.filter_by(ativo=True).count()
+    emails_principais = EmailCliente.query.filter_by(ativo=True).count()
+    projetos_sem_email = Projeto.query.filter(~Projeto.id.in_(
+        db.session.query(EmailCliente.projeto_id).filter_by(ativo=True).distinct()
+    )).count()
+    
+    return render_template('emails/admin.html', 
+                         projetos=projetos_com_emails, 
+                         total_emails=total_emails,
+                         emails_principais=emails_principais,
+                         projetos_sem_email=projetos_sem_email)
 
 @app.route('/projetos/<int:projeto_id>/emails')
 @login_required
 def projeto_emails(projeto_id):
-    """Lista todos os e-mails de clientes de um projeto"""
+    """Lista todos os e-mails de clientes de um projeto/obra"""
     projeto = Projeto.query.get_or_404(projeto_id)
     emails = EmailCliente.query.filter_by(projeto_id=projeto_id, ativo=True).order_by(
         EmailCliente.nome_contato
     ).all()
-
+    
     return render_template('emails/list.html', projeto=projeto, emails=emails)
 
 @app.route('/projetos/<int:projeto_id>/emails/novo', methods=['GET', 'POST'])
 @login_required
 def novo_email_cliente(projeto_id):
-    """Adiciona novo e-mail de cliente ao projeto"""
+    """Adiciona novo e-mail/contato de cliente ao projeto"""
     projeto = Projeto.query.get_or_404(projeto_id)
     form = EmailClienteForm()
-
+    
     if form.validate_on_submit():
-        # Verificar se o e-mail já existe para este projeto (apenas e-mails ativos)
-        email_existente = EmailCliente.query.filter_by(
-            projeto_id=projeto_id,
-            email=form.email.data.lower().strip(),
-            ativo=True
-        ).first()
-
-        if email_existente:
-            flash('Este e-mail já está cadastrado para esta obra.', 'error')
-            return render_template('emails/form.html', form=form, projeto=projeto, titulo='Novo E-mail de Cliente')
-
-        # Criar novo e-mail
+        email_clean = (form.email.data or '').lower().strip() or None
+        if email_clean:
+            email_existente = EmailCliente.query.filter_by(
+                projeto_id=projeto_id,
+                email=email_clean,
+                ativo=True
+            ).first()
+            if email_existente:
+                flash('Este e-mail já está cadastrado para este projeto.', 'error')
+                return render_template('emails/form.html', form=form, projeto=projeto, titulo='Novo E-mail de Cliente')
+        
         email_cliente = EmailCliente(
             projeto_id=projeto_id,
-            email=form.email.data.lower().strip(),
-            nome_contato=form.nome_contato.data,
-            cargo=form.cargo.data,
-            empresa=form.empresa.data,
-            telefone=form.telefone.data,
+            email=email_clean,
+            nome_contato=form.nome_contato.data.strip(),
+            cargo=form.cargo.data or None,
+            empresa=form.empresa.data or None,
+            telefone=form.telefone.data or None,
             receber_notificacoes=form.receber_notificacoes.data,
             receber_relatorios=form.receber_relatorios.data,
             ativo=form.ativo.data
         )
-
+        
         try:
             db.session.add(email_cliente)
             db.session.commit()
-            flash(f'E-mail {email_cliente.email} adicionado com sucesso!', 'success')
+            flash(f'Contato {email_cliente.nome_contato} adicionado com sucesso!', 'success')
             return redirect(url_for('projeto_emails', projeto_id=projeto_id))
         except Exception as e:
             db.session.rollback()
-            flash('Erro ao adicionar e-mail. Tente novamente.', 'error')
-
+            flash(f'Erro ao adicionar contato: {str(e)}', 'error')
+    
     return render_template('emails/form.html', form=form, projeto=projeto, titulo='Novo E-mail de Cliente')
 
 @app.route('/emails/<int:email_id>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_email_cliente(email_id):
-    """Edita e-mail de cliente"""
+    """Edita e-mail/contato de cliente"""
     email_cliente = EmailCliente.query.get_or_404(email_id)
     projeto = email_cliente.projeto
     form = EmailClienteForm(obj=email_cliente)
-
+    
     if form.validate_on_submit():
-        # Verificar se mudou o e-mail e se já existe outro com o mesmo e-mail (apenas e-mails ativos)
-        if form.email.data.lower().strip() != email_cliente.email:
+        email_clean = (form.email.data or '').lower().strip() or None
+        if email_clean:
             email_existente = EmailCliente.query.filter_by(
                 projeto_id=projeto.id,
-                email=form.email.data.lower().strip(),
+                email=email_clean,
                 ativo=True
             ).filter(EmailCliente.id != email_id).first()
-
+            
             if email_existente:
-                flash('Este e-mail já está cadastrado para esta obra.', 'error')
+                flash('Este e-mail já está cadastrado para este projeto.', 'error')
                 return render_template('emails/form.html', form=form, projeto=projeto, titulo='Editar E-mail de Cliente')
-
-        # Atualizar dados
-        email_cliente.email = form.email.data.lower().strip()
-        email_cliente.nome_contato = form.nome_contato.data
-        email_cliente.cargo = form.cargo.data
-        email_cliente.empresa = form.empresa.data
-        email_cliente.telefone = form.telefone.data
+        
+        email_cliente.email = email_clean
+        email_cliente.nome_contato = form.nome_contato.data.strip()
+        email_cliente.cargo = form.cargo.data or None
+        email_cliente.empresa = form.empresa.data or None
+        email_cliente.telefone = form.telefone.data or None
         email_cliente.receber_notificacoes = form.receber_notificacoes.data
         email_cliente.receber_relatorios = form.receber_relatorios.data
         email_cliente.ativo = form.ativo.data
-        email_cliente.updated_at = now_brt()
-
+        email_cliente.updated_at = brazil_now()
+        
         try:
             db.session.commit()
-            flash('E-mail atualizado com sucesso!', 'success')
+            flash('Contato atualizado com sucesso!', 'success')
             return redirect(url_for('projeto_emails', projeto_id=projeto.id))
         except Exception as e:
             db.session.rollback()
-            flash('Erro ao atualizar e-mail. Tente novamente.', 'error')
-
+            flash(f'Erro ao atualizar contato: {str(e)}', 'error')
+    
     return render_template('emails/form.html', form=form, projeto=projeto, titulo='Editar E-mail de Cliente')
 
 @app.route('/emails/<int:email_id>/remover', methods=['POST'])
@@ -10402,38 +10405,17 @@ def remover_email_cliente(email_id):
     """Remove (desativa) e-mail de cliente"""
     email_cliente = EmailCliente.query.get_or_404(email_id)
     projeto_id = email_cliente.projeto_id
-
+    
     try:
         email_cliente.ativo = False
-        email_cliente.updated_at = now_brt()
+        email_cliente.updated_at = brazil_now()
         db.session.commit()
         flash('E-mail removido com sucesso!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash('Erro ao remover e-mail. Tente novamente.', 'error')
-
+        flash(f'Erro ao remover e-mail: {str(e)}', 'error')
+    
     return redirect(url_for('projeto_emails', projeto_id=projeto_id))
-
-@app.route('/admin/emails')
-@login_required
-def admin_emails():
-    """Painel administrativo para gerenciar todos os e-mails de clientes"""
-    if not current_user.is_master:
-        flash('Acesso negado. Apenas usuários master podem acessar esta área.', 'error')
-        return redirect(url_for('index'))
-
-    # Buscar todos os projetos com seus e-mails (usando DISTINCT para evitar duplicatas)
-    projetos_com_emails = db.session.query(EmailCliente.projeto_id).filter(EmailCliente.ativo == True).distinct().subquery()
-    projetos = Projeto.query.filter(Projeto.id.in_(projetos_com_emails)).all()
-
-    # Contar estatísticas
-    total_emails = EmailCliente.query.filter_by(ativo=True).count()
-    projetos_sem_email = Projeto.query.filter(~Projeto.id.in_(projetos_com_emails)).count()
-
-    return render_template('emails/admin.html', 
-                         projetos=projetos, 
-                         total_emails=total_emails,
-                         projetos_sem_email=projetos_sem_email)
 
 # Rotas para Legendas Pré-definidas (exclusivo para Administradores)
 @app.route('/admin/legendas')
@@ -11870,146 +11852,6 @@ def admin_checklist_reorder():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
-
-# =============================================================================
-# SISTEMA DE GERENCIAMENTO DE E-MAILS DE CLIENTES POR OBRA
-# =============================================================================
-
-@app.route('/admin/emails')
-@login_required
-def admin_emails():
-    """Painel administrativo para gerenciar todos os e-mails de clientes por obra"""
-    if not (current_user.is_master or current_user.is_developer):
-        flash('Acesso negado. Apenas administradores podem acessar esta área.', 'error')
-        return redirect(url_for('index'))
-    
-    # Buscar projetos que possuem e-mails ativos cadastrados
-    projetos_com_emails = Projeto.query.join(EmailCliente).filter(EmailCliente.ativo == True).distinct().order_by(Projeto.nome).all()
-    
-    # Estatísticas
-    total_emails = EmailCliente.query.filter_by(ativo=True).count()
-    emails_principais = EmailCliente.query.filter_by(ativo=True).count()
-    projetos_sem_email = Projeto.query.filter(~Projeto.id.in_(
-        db.session.query(EmailCliente.projeto_id).filter_by(ativo=True).distinct()
-    )).count()
-    
-    return render_template('emails/admin.html', 
-                         projetos=projetos_com_emails, 
-                         total_emails=total_emails,
-                         emails_principais=emails_principais,
-                         projetos_sem_email=projetos_sem_email)
-
-@app.route('/projetos/<int:projeto_id>/emails')
-@login_required
-def projeto_emails(projeto_id):
-    """Lista todos os e-mails de clientes de um projeto/obra"""
-    projeto = Projeto.query.get_or_404(projeto_id)
-    emails = EmailCliente.query.filter_by(projeto_id=projeto_id, ativo=True).order_by(
-        EmailCliente.nome_contato
-    ).all()
-    
-    return render_template('emails/list.html', projeto=projeto, emails=emails)
-
-@app.route('/projetos/<int:projeto_id>/emails/novo', methods=['GET', 'POST'])
-@login_required
-def novo_email_cliente(projeto_id):
-    """Adiciona novo e-mail/contato de cliente ao projeto"""
-    projeto = Projeto.query.get_or_404(projeto_id)
-    form = EmailClienteForm()
-    
-    if form.validate_on_submit():
-        email_clean = (form.email.data or '').lower().strip() or None
-        if email_clean:
-            email_existente = EmailCliente.query.filter_by(
-                projeto_id=projeto_id,
-                email=email_clean,
-                ativo=True
-            ).first()
-            if email_existente:
-                flash('Este e-mail já está cadastrado para este projeto.', 'error')
-                return render_template('emails/form.html', form=form, projeto=projeto, titulo='Novo E-mail de Cliente')
-        
-        email_cliente = EmailCliente(
-            projeto_id=projeto_id,
-            email=email_clean,
-            nome_contato=form.nome_contato.data.strip(),
-            cargo=form.cargo.data or None,
-            empresa=form.empresa.data or None,
-            telefone=form.telefone.data or None,
-            receber_notificacoes=form.receber_notificacoes.data,
-            receber_relatorios=form.receber_relatorios.data,
-            ativo=form.ativo.data
-        )
-        
-        try:
-            db.session.add(email_cliente)
-            db.session.commit()
-            flash(f'Contato {email_cliente.nome_contato} adicionado com sucesso!', 'success')
-            return redirect(url_for('projeto_emails', projeto_id=projeto_id))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Erro ao adicionar contato: {str(e)}', 'error')
-    
-    return render_template('emails/form.html', form=form, projeto=projeto, titulo='Novo E-mail de Cliente')
-
-@app.route('/emails/<int:email_id>/editar', methods=['GET', 'POST'])
-@login_required
-def editar_email_cliente(email_id):
-    """Edita e-mail/contato de cliente"""
-    email_cliente = EmailCliente.query.get_or_404(email_id)
-    projeto = email_cliente.projeto
-    form = EmailClienteForm(obj=email_cliente)
-    
-    if form.validate_on_submit():
-        email_clean = (form.email.data or '').lower().strip() or None
-        if email_clean:
-            email_existente = EmailCliente.query.filter_by(
-                projeto_id=projeto.id,
-                email=email_clean,
-                ativo=True
-            ).filter(EmailCliente.id != email_id).first()
-            
-            if email_existente:
-                flash('Este e-mail já está cadastrado para este projeto.', 'error')
-                return render_template('emails/form.html', form=form, projeto=projeto, titulo='Editar E-mail de Cliente')
-        
-        email_cliente.email = email_clean
-        email_cliente.nome_contato = form.nome_contato.data.strip()
-        email_cliente.cargo = form.cargo.data or None
-        email_cliente.empresa = form.empresa.data or None
-        email_cliente.telefone = form.telefone.data or None
-        email_cliente.receber_notificacoes = form.receber_notificacoes.data
-        email_cliente.receber_relatorios = form.receber_relatorios.data
-        email_cliente.ativo = form.ativo.data
-        email_cliente.updated_at = brazil_now()
-        
-        try:
-            db.session.commit()
-            flash('Contato atualizado com sucesso!', 'success')
-            return redirect(url_for('projeto_emails', projeto_id=projeto.id))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Erro ao atualizar contato: {str(e)}', 'error')
-    
-    return render_template('emails/form.html', form=form, projeto=projeto, titulo='Editar E-mail de Cliente')
-
-@app.route('/emails/<int:email_id>/remover', methods=['POST'])
-@login_required
-def remover_email_cliente(email_id):
-    """Remove (desativa) e-mail de cliente"""
-    email_cliente = EmailCliente.query.get_or_404(email_id)
-    projeto_id = email_cliente.projeto_id
-    
-    try:
-        email_cliente.ativo = False
-        email_cliente.updated_at = brazil_now()
-        db.session.commit()
-        flash('E-mail removido com sucesso!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Erro ao remover e-mail: {str(e)}', 'error')
-    
-    return redirect(url_for('projeto_emails', projeto_id=projeto_id))
 
 # =============================================================================
 # CONFIGURAÇÃO DE E-MAILS (SMTP / RESEND / TEMPLATES)
