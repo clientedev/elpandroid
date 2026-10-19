@@ -15353,3 +15353,29 @@ def api_sync_status():
         }), 200
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/admin/sync-legacy-users', methods=['POST'])
+@csrf.exempt
+def api_sync_legacy_users():
+    """Permite sincronizar os usuários legados importados sob demanda via requisição autenticada"""
+    user = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    is_master_or_admin = (
+        (user and user.is_master) or 
+        (user and user.username == 'admin') or
+        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
+    )
+    if not is_master_or_admin:
+        return jsonify({'success': False, 'error': 'Acesso negado. Apenas administradores podem executar esta ação.'}), 403
+
+    try:
+        from app import sync_imported_legacy_users
+        count = sync_imported_legacy_users()
+        return jsonify({
+            'success': True,
+            'synced_count': count,
+            'message': f'Sincronização concluída com {count} alterações.'
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+

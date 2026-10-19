@@ -482,6 +482,157 @@ def create_default_legendas():
             pass
 
 
+def sync_imported_legacy_users():
+    """Sincroniza os usuários legados importados do banco Railway para garantir que estejam presentes em produção."""
+    try:
+        from models import User
+
+        legacy_users = [
+            {
+                "username": "leopoldo",
+                "email": "leopoldo@elpconsultoria.eng.br",
+                "nome_completo": "José Leopoldo Pugliese",
+                "cargo": "Engenheiro",
+                "is_master": True,
+                "is_aprovador_express": False,
+                "cor_agenda": "#0000FF",
+                "password_hash": "scrypt:32768:8:1$1Vifukw5GNaI6r81$9c49e179a0a0de74b2c8cfe2af45115eff07f4cc9d6df1e6a2fcbceb2170d285812eaf226232dc1e569122715081ec585b18d666d170122a428e03e54e82b2c0",
+                "ativo": True,
+                "primeiro_login": False
+            },
+            {
+                "username": "isadora",
+                "email": "isadora@elpconsultoria.eng.br",
+                "nome_completo": "Isadora Tedesco",
+                "cargo": "Engenheira",
+                "is_master": True,
+                "is_aprovador_express": False,
+                "cor_agenda": "#D4AC0D",
+                "password_hash": "scrypt:32768:8:1$IvzsN8eVRZgioten$36569517773c305e77b0d6e172d54db49277822795132fc6db1e31f599ae9b94a7980b73ebeeb45fa2fb0d2b45372fecbc5f6dd167e968eeacf6016ca993604d",
+                "ativo": True,
+                "primeiro_login": False
+            },
+            {
+                "username": "luciana",
+                "email": "luciana@elpconsultoria.eng.br",
+                "nome_completo": "Luciana Varella",
+                "cargo": "Arquiteta",
+                "is_master": True,
+                "is_aprovador_express": False,
+                "cor_agenda": "#FFA500",
+                "password_hash": "scrypt:32768:8:1$UqICx9J5YsVfR1nT$361bb48093132c5da1e50f82e822f9a4abbbda9685f6be4b6cc43e3cb268ec2ef6805beaa7d9532e55232f38f099289c3b13a0e897df9666c90920d712cd059d",
+                "ativo": True,
+                "primeiro_login": False
+            },
+            {
+                "username": "Desenvolvedor",
+                "email": "carloseduardodorth123@gmail.com",
+                "nome_completo": "carlos eduardo",
+                "cargo": "Desenvolvedor",
+                "is_master": True,
+                "is_aprovador_express": True,
+                "is_developer": True,
+                "cor_agenda": "#0EA5E9",
+                "password_hash": "scrypt:32768:8:1$CUML6aF1h3e10fv9$61691720e2d713798850cb4c62efb083d89188687490384dd91830b7354cf56f4ba8ca481a6f4d148bb559d622f17d09b0b45797db50e0abb37228f2a1a5c51b",
+                "ativo": True,
+                "primeiro_login": False
+            },
+            {
+                "username": "mateus",
+                "email": "mateus@elpconsultoria.eng.br",
+                "nome_completo": "Mateus Almeida",
+                "cargo": "Engenheiro",
+                "is_master": False,
+                "is_aprovador_express": False,
+                "cor_agenda": "#008000",
+                "password_hash": "scrypt:32768:8:1$MBIRrAfe8jlmMHlf$b4250d32260b09773aeb224c1ecb9bc6749c9bda744cd14cfac450bdde3127908aa4c0d187df00e9b6d3ba80b2ca53d89e0cf799cd888529961f924fbfbeac39",
+                "ativo": True,
+                "primeiro_login": False
+            },
+            {
+                "username": "teste33",
+                "email": "admin@teste.com",
+                "nome_completo": "teste",
+                "cargo": "Desenvolvedor",
+                "is_master": False,
+                "is_aprovador_express": False,
+                "cor_agenda": "#0EA5E9",
+                "password_hash": "scrypt:32768:8:1$I9v94CBoYpAF2ioL$6608b15e71e58eed7bf964b5a3903838a45974d19529761fd01fa3446a4ad1905c01873fd4c47606253ac5acf7006dee282b8aa0f69e32ae774de44b196eb1ad",
+                "ativo": True,
+                "primeiro_login": False
+            },
+            {
+                "username": "Teste Isa",
+                "email": "isa.tedesco@gmail.com",
+                "nome_completo": "Isadora Teste",
+                "cargo": "Engenheira",
+                "is_master": False,
+                "is_aprovador_express": False,
+                "cor_agenda": "#0EA5E9",
+                "password_hash": "scrypt:32768:8:1$x53OWZHe072L683x$de2d069376b339b8778e5ff87f08b2530186cb336f7036e6fcb128fb843c805a420a21ac292b5b52ac5a168c910f6cfa61e0bc75febb20a777159246eab2de02",
+                "ativo": True,
+                "primeiro_login": False
+            }
+        ]
+
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+
+        synced_count = 0
+        for udata in legacy_users:
+            user = User.query.filter(
+                (User.username == udata["username"]) | (User.email == udata["email"])
+            ).first()
+
+            if not user:
+                new_u = User(
+                    username=udata["username"],
+                    email=udata["email"],
+                    password_hash=udata["password_hash"],
+                    nome_completo=udata["nome_completo"],
+                    cargo=udata["cargo"],
+                    is_master=udata["is_master"],
+                    is_aprovador_express=udata["is_aprovador_express"],
+                    is_developer=udata.get("is_developer", False),
+                    cor_agenda=udata["cor_agenda"],
+                    ativo=udata["ativo"],
+                    primeiro_login=udata.get("primeiro_login", False)
+                )
+                db.session.add(new_u)
+                synced_count += 1
+                logging.info(f"✅ Usuário importado criado: {udata['username']} ({udata['email']})")
+            else:
+                updated = False
+                if not user.cargo:
+                    user.cargo = udata["cargo"]
+                    updated = True
+                if not user.cor_agenda:
+                    user.cor_agenda = udata["cor_agenda"]
+                    updated = True
+                if udata["is_master"] and not user.is_master:
+                    user.is_master = True
+                    updated = True
+                if udata["is_aprovador_express"] and not user.is_aprovador_express:
+                    user.is_aprovador_express = True
+                    updated = True
+                if updated:
+                    synced_count += 1
+                    logging.info(f"✅ Usuário atualizado: {user.username}")
+
+        db.session.commit()
+        logging.info(f"🎉 Sincronização de usuários legados finalizada: {synced_count} alterações.")
+        return synced_count
+    except Exception as e:
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        logging.error(f"❌ Erro ao sincronizar usuários legados: {e}")
+        return 0
+
+
 # Initialize database in a separate function for Railway optimization
 def init_database():
     """Initialize database tables and default data"""
@@ -505,6 +656,9 @@ def init_database():
 
             # Ensure uuid and audit columns exist in relatorios table
             ensure_relatorios_uuid_columns()
+
+            # Ensure imported legacy users exist
+            sync_imported_legacy_users()
     except Exception as e:
         logging.error(f"Database initialization error: {e}")
 
@@ -573,6 +727,7 @@ if os.environ.get("RAILWAY_ENVIRONMENT") or (os.environ.get("DATABASE_URL") and 
             create_default_checklists()
             create_default_legendas()
             ensure_relatorios_uuid_columns()
+            sync_imported_legacy_users()
 
             # Test reports route functionality
             logging.info("🧪 Testing reports functionality...")
