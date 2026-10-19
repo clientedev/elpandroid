@@ -536,36 +536,62 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                     onPress={() => setSelectedDayStr(cell.dateStr)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[
-                      styles.dayNumberText,
-                      !cell.isCurrentMonth && styles.dayNumberTextOutside,
-                      cell.isToday && !cell.isSelected && styles.dayNumberTextToday,
-                      cell.isSelected && styles.dayNumberTextSelected,
+                    <View style={[
+                      styles.dayNumberBadge,
+                      cell.isToday && !cell.isSelected && styles.dayNumberBadgeToday,
+                      cell.isSelected && styles.dayNumberBadgeSelected,
                     ]}>
-                      {cell.dayNum}
-                    </Text>
+                      <Text style={[
+                        styles.dayNumberText,
+                        !cell.isCurrentMonth && styles.dayNumberTextOutside,
+                        cell.isToday && !cell.isSelected && styles.dayNumberTextToday,
+                        cell.isSelected && styles.dayNumberTextSelected,
+                      ]}>
+                        {cell.dayNum}
+                      </Text>
+                    </View>
 
-                    {/* Visit Indicator Dots */}
+                    {/* Exibição dos Agendamentos Dentro do Dia */}
                     {hasVisits ? (
-                      <View style={styles.dotsRow}>
-                        {cell.visits.slice(0, 3).map((v, i) => {
-                          const dotTheme = getTeamTheme(v.responsavel_nome);
+                      <View style={styles.cellVisitsContainer}>
+                        {cell.visits.slice(0, 2).map((v, i) => {
+                          const teamTheme = getTeamTheme(v.responsavel_nome);
+                          const title = v.projeto_nome || v.projeto_outros || 'Visita';
+                          const dateObj = new Date(v.data_inicio);
+                          const timeStr = !isNaN(dateObj.getTime())
+                            ? dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                            : '';
+
                           return (
                             <View 
                               key={`${v.id}_${i}`} 
                               style={[
-                                styles.visitDot, 
-                                { backgroundColor: cell.isSelected ? '#FFFFFF' : dotTheme.bg }
-                              ]} 
-                            />
+                                styles.cellVisitPill, 
+                                { backgroundColor: cell.isSelected ? 'rgba(255, 255, 255, 0.3)' : teamTheme.bg }
+                              ]}
+                            >
+                              <Text 
+                                style={[
+                                  styles.cellVisitText,
+                                  { color: cell.isSelected ? '#FFFFFF' : teamTheme.text }
+                                ]}
+                                numberOfLines={1}
+                              >
+                                {timeStr ? `${timeStr} ` : ''}{title}
+                              </Text>
+                            </View>
                           );
                         })}
-                        {cell.visits.length > 3 && (
-                          <View style={[styles.visitDotPlus, cell.isSelected && { backgroundColor: '#FFFFFF' }]} />
+                        {cell.visits.length > 2 && (
+                          <View style={styles.cellMoreContainer}>
+                            <Text style={[styles.cellMoreText, cell.isSelected && { color: '#FFFFFF' }]}>
+                              +{cell.visits.length - 2} mais
+                            </Text>
+                          </View>
                         )}
                       </View>
                     ) : (
-                      <View style={{ height: 6 }} />
+                      <View style={styles.cellEmptySpacer} />
                     )}
                   </TouchableOpacity>
                 );
@@ -988,18 +1014,25 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: `${100 / 7}%`,
-    height: 48,
+    minHeight: 68,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 10,
-    marginVertical: 2,
-    paddingVertical: 2,
+    justifyContent: 'flex-start',
+    borderRadius: 8,
+    marginVertical: 1,
+    paddingVertical: 3,
+    paddingHorizontal: 1,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    backgroundColor: '#FAFAFA',
   },
   dayCellOutside: {
     opacity: 0.35,
+    backgroundColor: 'transparent',
+    borderColor: 'transparent',
   },
   dayCellSelected: {
     backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -1011,40 +1044,68 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
     backgroundColor: 'rgba(37, 99, 235, 0.05)',
   },
+  dayNumberBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  dayNumberBadgeToday: {
+    backgroundColor: Colors.primary,
+  },
+  dayNumberBadgeSelected: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
   dayNumberText: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: Colors.text,
   },
   dayNumberTextOutside: {
     color: '#94A3B8',
   },
   dayNumberTextToday: {
-    color: Colors.primary,
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
   dayNumberTextSelected: {
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
-  dotsRow: {
-    flexDirection: 'row',
+  cellVisitsContainer: {
+    width: '100%',
+    paddingHorizontal: 1,
+    gap: 2,
+  },
+  cellVisitPill: {
+    borderRadius: 3,
+    paddingHorizontal: 2,
+    paddingVertical: 1.5,
+    marginVertical: 0.5,
+    overflow: 'hidden',
+  },
+  cellVisitText: {
+    fontSize: 8,
+    fontWeight: '700',
+    textAlign: 'center',
+    letterSpacing: -0.2,
+  },
+  cellMoreContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    height: 6,
-    marginTop: 2,
+    paddingVertical: 0.5,
   },
-  visitDot: {
-    width: 4,
+  cellMoreText: {
+    fontSize: 7.5,
+    fontWeight: '800',
+    color: '#475569',
+    textAlign: 'center',
+    lineHeight: 9,
+  },
+  cellEmptySpacer: {
     height: 4,
-    borderRadius: 2,
-  },
-  visitDotPlus: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: '#64748B',
   },
   selectedDayHeader: {
     flexDirection: 'row',
