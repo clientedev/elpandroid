@@ -2494,7 +2494,8 @@ def register():
             cargo=form.cargo.data,
             telefone=form.telefone.data,
             password_hash=generate_password_hash(form.password.data),
-            is_master=form.is_master.data
+            is_master=form.is_master.data,
+            is_aprovador_express=bool(getattr(form, 'is_aprovador_express', None) and form.is_aprovador_express.data)
         )
 
         try:
@@ -3393,6 +3394,10 @@ def user_edit(user_id):
         user.cargo = form.cargo.data
         user.telefone = form.telefone.data
         user.is_master = form.is_master.data
+        if hasattr(form, 'is_aprovador_express'):
+            user.is_aprovador_express = form.is_aprovador_express.data
+        if hasattr(form, 'cor_agenda') and form.cor_agenda.data:
+            user.cor_agenda = form.cor_agenda.data
         user.ativo = form.ativo.data
 
         if form.password.data:
@@ -9034,9 +9039,14 @@ def get_location():
 @app.route('/reports/approval-dashboard')
 @login_required
 def reports_approval_dashboard():
-    """Dashboard for report approvals - only for master users"""
-    if not current_user.is_master:
-        flash('Acesso negado. Apenas usuários master podem acessar o painel de aprovação.', 'error')
+    """Dashboard for report approvals - master, admin and express approvers"""
+    can_access = (
+        current_user.is_master or 
+        current_user.username == 'admin' or 
+        getattr(current_user, 'is_aprovador_express', False)
+    )
+    if not can_access:
+        flash('Acesso negado. Apenas administradores, usuários master ou aprovadores podem acessar o painel de aprovação.', 'error')
         return redirect(url_for('index'))
 
     # Get reports awaiting approval
@@ -9049,9 +9059,6 @@ def reports_approval_dashboard():
 @login_required
 def report_approve(report_id):
     """Approve or reject a report (supports both Relatorio and RelatorioExpress)"""
-    if not current_user.is_master:
-        return jsonify({'success': False, 'message': 'Acesso negado.'})
-
     is_express = False
     relatorio = Relatorio.query.get(report_id)
     if not relatorio:
@@ -9060,6 +9067,15 @@ def report_approve(report_id):
             is_express = True
         else:
             return jsonify({'success': False, 'message': 'Relatório não encontrado.'}), 404
+
+    can_approve = (
+        current_user.is_master or 
+        current_user.username == 'admin' or 
+        (is_express and getattr(current_user, 'is_aprovador_express', False)) or
+        (not is_express and relatorio.projeto_id and current_user_is_aprovador(relatorio.projeto_id))
+    )
+    if not can_approve:
+        return jsonify({'success': False, 'message': 'Acesso negado. Você não tem permissão para aprovar este relatório.'})
 
     data = request.get_json(silent=True) or request.form or {}
     action = data.get('action')
@@ -12211,19 +12227,24 @@ def get_aprovador_global():
 
 def current_user_is_aprovador_global():
     """
-    Verifica se o usuário atual é o Aprovador Global
+    Verifica se o usuário atual é o Aprovador Global ou Administrador
     
-    IMPORTANTE: Apenas o Aprovador Global tem permissão, não usuários Master.
-    Esta verificação é exclusiva para ações críticas de gerenciamento de aprovadores.
+    Permissão total concedida para:
+    - Usuário admin principal ('admin') ou usuários Master
+    - Usuário definido como Aprovador Global
     
     Returns:
-        Boolean - True se o usuário atual for o Aprovador Global, False caso contrário
+        Boolean - True se o usuário tiver permissão, False caso contrário
     """
     if not current_user or not current_user.is_authenticated:
         return False
     
+    # O usuário admin ou qualquer usuário master tem permissão total para gerenciar aprovadores e express
+    if current_user.username == 'admin' or getattr(current_user, 'is_master', False):
+        return True
+    
     aprovador_global = get_aprovador_global()
-    return aprovador_global and aprovador_global.aprovador_id == current_user.id
+    return bool(aprovador_global and aprovador_global.aprovador_id == current_user.id)
 
 # ==================== ADMIN: Aprovadores Padrão ====================
 

@@ -96,14 +96,39 @@
                                 {{ form.is_master(class="form-check-input") }}
                                 {{ form.is_master.label(class="form-check-label") }}
                                 <small class="form-text text-muted d-block">
-                                    Usuários master podem editar relatórios finalizados e gerenciar outros usuários.
+                                    Usuários master podem gerenciar usuários, obras e aprovações no sistema.
                                 </small>
                             </div>
                         </div>
-                        
-                        {% if user %}
+
                         <div class="col-md-6">
                             <div class="mb-3 form-check">
+                                {{ form.is_aprovador_express(class="form-check-input") }}
+                                {{ form.is_aprovador_express.label(class="form-check-label") }}
+                                <small class="form-text text-muted d-block">
+                                    Permite aprovar e rejeitar Relatórios Express no painel e no aplicativo.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                {{ form.cor_agenda.label(class="form-label") }}
+                                <div class="input-group">
+                                    {{ form.cor_agenda(class="form-control", id="corAgendaInput", placeholder="#0EA5E9") }}
+                                    <input type="color" class="form-control form-control-color" id="corAgendaPicker" 
+                                           value="{{ user.cor_agenda if (user and user.cor_agenda) else '#0EA5E9' }}" 
+                                           onchange="document.getElementById('corAgendaInput').value = this.value">
+                                </div>
+                                <small class="form-text text-muted">Cor usada para destacar o usuário na agenda e visitas.</small>
+                            </div>
+                        </div>
+
+                        {% if user %}
+                        <div class="col-md-6">
+                            <div class="mb-3 form-check mt-md-4">
                                 {{ form.ativo(class="form-check-input") }}
                                 {{ form.ativo.label(class="form-check-label") }}
                                 <small class="form-text text-muted d-block">

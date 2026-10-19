@@ -92,7 +92,7 @@
                                                class="btn btn-sm btn-info text-white">
                                                 <i class="fas fa-eye"></i> Ver
                                             </a>
-                                            {% if current_user.is_master %}
+                                            {% if current_user.is_master or current_user.username == 'admin' or current_user.is_aprovador_express %}
                                             <button type="button" 
                                                     class="btn btn-sm btn-success"
                                                     onclick="approveReport({{ exp.id }})">

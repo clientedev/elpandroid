@@ -35,6 +35,7 @@ class RegisterForm(FlaskForm):
     password = PasswordField('Senha', validators=[DataRequired(), Length(min=6)])
     password2 = PasswordField('Confirmar Senha', validators=[DataRequired(), EqualTo('password')])
     is_master = BooleanField('Usuário Master')
+    is_aprovador_express = BooleanField('Aprovador de Relatório Express')
 
 class UserForm(FlaskForm):
     username = StringField('Usuário', validators=[DataRequired(), Length(min=4, max=25)])
@@ -42,7 +43,9 @@ class UserForm(FlaskForm):
     nome_completo = StringField('Nome Completo', validators=[DataRequired(), Length(max=200)])
     cargo = StringField('Cargo', validators=[Length(max=100)])
     telefone = StringField('Telefone', validators=[Length(max=20)])
+    cor_agenda = StringField('Cor na Agenda (HEX)', validators=[Optional(), Length(max=7)])
     is_master = BooleanField('Usuário Master')
+    is_aprovador_express = BooleanField('Aprovador de Relatório Express')
     ativo = BooleanField('Ativo', default=True)
     password = PasswordField('Nova Senha (deixe em branco para manter atual)', validators=[Optional(), Length(min=6)])
     password2 = PasswordField('Confirmar Nova Senha', validators=[EqualTo('password')])

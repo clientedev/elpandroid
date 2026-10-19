@@ -79,6 +79,9 @@
                                             {% else %}
                                                 <span class="badge bg-secondary">Usuário</span>
                                             {% endif %}
+                                            {% if user.is_aprovador_express %}
+                                                <span class="badge bg-warning text-dark"><i class="fas fa-bolt"></i> Express</span>
+                                            {% endif %}
                                         </td>
                                         <td>
                                             {% if user.ativo %}
@@ -112,6 +115,9 @@
                                             <span class="badge bg-danger">Master</span>
                                         {% else %}
                                             <span class="badge bg-secondary">Usuário</span>
+                                        {% endif %}
+                                        {% if user.is_aprovador_express %}
+                                            <span class="badge bg-warning text-dark"><i class="fas fa-bolt"></i> Express</span>
                                         {% endif %}
                                         {% if user.ativo %}
                                             <span class="badge bg-success">Ativo</span>
