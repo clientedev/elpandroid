@@ -186,18 +186,48 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     loadReports();
   }, [loadReports]);
 
-  // Autosave contínuo para Relatório Express com persistência de Fotos e Dados Técnicos
+  // Autosave contínuo para Relatório Express: assim que abrir e preencher qualquer dado, entra como Rascunho no SQLite
   useEffect(() => {
     if (!modalVisible) return;
-    if (!obraNome.trim() && !obraConstrutora.trim() && !observacoes.trim() && !techElementosBase.trim() && attachedPhotos.length === 0) {
-      return;
-    }
+
+    // Detecta se o usuário inseriu qualquer dado, foto ou checklist
+    const hasAnyContent = Boolean(
+      obraNome.trim() || 
+      obraConstrutora.trim() || 
+      obraEndereco.trim() || 
+      observacoes.trim() || 
+      acompanhantes.trim() ||
+      techElementosBase.trim() ||
+      techChapiscoColante.trim() ||
+      techChapiscoAlvenaria.trim() ||
+      techArgamassaEmboco.trim() ||
+      techFormaAplicacaoArgamassa.trim() ||
+      techAcabamentosRevestimento.trim() ||
+      techAcabamentoPeitoris.trim() ||
+      techAcabamentoMuretas.trim() ||
+      techDefinicaoFrisosCor.trim() ||
+      techDefinicaoFaceInferiorAbas.trim() ||
+      techObservacoesFachada.trim() ||
+      techOutrasObservacoes.trim() ||
+      (checklist && checklist.some(c => c.checked || (c.observacao && c.observacao.trim()))) ||
+      attachedPhotos.length > 0
+    );
+
+    if (!hasAnyContent) return;
 
     const timer = setTimeout(async () => {
       try {
         setIsAutoSaving(true);
+
+        // Garante ID estável para este rascunho
+        let targetId = editingReportId;
+        if (!targetId) {
+          targetId = Date.now();
+          setEditingReportId(targetId);
+        }
+
         const draftPayload = {
-          editingReportId,
+          editingReportId: targetId,
           titulo,
           numero,
           dataVisita,
@@ -223,75 +253,79 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         };
         await AsyncStorage.setItem('@elp_express_report_draft', JSON.stringify(draftPayload));
 
-        // Se for edição de relatório existente, sincroniza alterações e fotos diretamente no SQLite
-        if (editingReportId) {
-          const techInfoJson = JSON.stringify({
-            elementos_construtivos_base: techElementosBase.trim(),
-            especificacao_chapisco_colante: techChapiscoColante.trim(),
-            especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
-            especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
-            forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
-            acabamentos_revestimento: techAcabamentosRevestimento.trim(),
-            acabamento_peitoris: techAcabamentoPeitoris.trim(),
-            acabamento_muretas: techAcabamentoMuretas.trim(),
-            definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
-            definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
-            observacoes_projeto_fachada: techObservacoesFachada.trim(),
-            outras_observacoes: techOutrasObservacoes.trim(),
-          });
+        const techInfoJson = JSON.stringify({
+          elementos_construtivos_base: techElementosBase.trim(),
+          especificacao_chapisco_colante: techChapiscoColante.trim(),
+          especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+          especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+          forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+          acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+          acabamento_peitoris: techAcabamentoPeitoris.trim(),
+          acabamento_muretas: techAcabamentoMuretas.trim(),
+          definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+          definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+          observacoes_projeto_fachada: techObservacoesFachada.trim(),
+          outras_observacoes: techOutrasObservacoes.trim(),
+        });
 
-          const expDraft: RelatorioExpress = {
-            id: editingReportId,
-            numero: numero || 'EXP-0000',
-            titulo: titulo || `Relatório Express ${numero || 'EXP-0000'}`,
-            autor_id: user?.id || 1,
-            autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
-            data_relatorio: dataVisita,
-            obra_nome: obraNome.trim(),
-            obra_endereco: obraEndereco.trim(),
-            obra_construtora: obraConstrutora.trim(),
-            acompanhantes: acompanhantes.trim(),
-            informacoes_tecnicas: techInfoJson,
-            checklist_data: JSON.stringify(checklist),
-            observacoes_finais: observacoes.trim(),
-            status: 'em_andamento',
-            sync_status: 'pending',
-            fotos_count: attachedPhotos.length,
+        const expDraft: RelatorioExpress = {
+          id: targetId,
+          numero: numero || 'EXP-0000',
+          titulo: (!titulo || titulo.trim() === 'Relatório Express' || titulo.startsWith('Relatório Express EXP-'))
+            ? `Relatório Express ${numero || 'EXP-0000'}`
+            : titulo.trim(),
+          autor_id: user?.id || 1,
+          autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
+          data_relatorio: dataVisita || new Date().toISOString().split('T')[0],
+          obra_nome: obraNome.trim() || 'Rascunho de Obra',
+          obra_endereco: obraEndereco.trim(),
+          obra_construtora: obraConstrutora.trim(),
+          acompanhantes: acompanhantes.trim(),
+          informacoes_tecnicas: techInfoJson,
+          checklist_data: JSON.stringify(checklist),
+          observacoes_finais: observacoes.trim(),
+          status: 'Rascunho',
+          sync_status: 'pending',
+          fotos_count: attachedPhotos.length,
+        };
+
+        // Salva imediatamente no SQLite local para aparecer na lista como Rascunho
+        await saveLocalRelatorioExpress(expDraft, 'pending');
+
+        for (let i = 0; i < attachedPhotos.length; i++) {
+          const ap = attachedPhotos[i];
+          const fotoObj: FotoRelatorioExpress = {
+            id: ap.id || (Date.now() + i + 1),
+            relatorio_express_id: targetId,
+            uri_local: ap.uri,
+            base64: ap.base64,
+            local: ap.local || obraNome.trim(),
+            titulo: `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
+            legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
+            anotacoes_dados: ap.anotacoes_dados,
+            ordem: i,
+            sync_status: 'pending'
           };
-          await saveLocalRelatorioExpress(expDraft, 'pending');
-
-          for (let i = 0; i < attachedPhotos.length; i++) {
-            const ap = attachedPhotos[i];
-            const fotoObj: FotoRelatorioExpress = {
-              id: ap.id || (Date.now() + i + 1),
-              relatorio_express_id: editingReportId,
-              uri_local: ap.uri,
-              base64: ap.base64,
-              local: ap.local || obraNome.trim(),
-              titulo: `Foto ${i + 1} - ${obraNome.trim()}`,
-              legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
-              anotacoes_dados: ap.anotacoes_dados,
-              ordem: i,
-              sync_status: 'pending'
-            };
-            await saveLocalFotoExpress(fotoObj, 'pending');
-          }
+          await saveLocalFotoExpress(fotoObj, 'pending');
         }
 
         setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+
+        // Atualiza a lista na tela principal em segundo plano
+        loadReports();
       } catch (errDraft) {
-        console.warn('[Express] Erro no autosave:', errDraft);
+        console.warn('[Express] Erro no autosave de rascunho:', errDraft);
       } finally {
         setIsAutoSaving(false);
       }
-    }, 1500);
+    }, 1200);
 
     return () => clearTimeout(timer);
   }, [
     modalVisible, editingReportId, titulo, numero, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, observacoes,
     techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa,
     techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor,
-    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist, attachedPhotos
+    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist, attachedPhotos, loadReports
   ]);
 
   async function handleClearDraft() {
@@ -388,6 +422,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setAttachedPhotos(loadedPhotosFromDraft);
     setEditingReportId(null);
     setModalVisible(true);
+  }
+
+  function handleCloseModal() {
+    setModalVisible(false);
+    loadReports();
   }
 
   async function handleDuplicateReport(original: RelatorioExpress) {
@@ -857,21 +896,23 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setShowLegendModal(false);
   }
 
-  async function handleCreateExpress(status: 'em_andamento' | 'Aguardando Aprovação' = 'Aguardando Aprovação') {
-    if (!obraNome.trim()) {
-      Alert.alert('Atenção', 'Informe o nome da obra.');
-      return;
-    }
-
-    // Regra Crítica: Legenda de Fotos é Obrigatória para envio à aprovação (mesma sistemática do comum)
-    if (status === 'Aguardando Aprovação' && attachedPhotos.length > 0) {
-      const fotoSemLegenda = attachedPhotos.findIndex(f => !f.legenda || !f.legenda.trim());
-      if (fotoSemLegenda !== -1) {
-        Alert.alert(
-          'Legenda Obrigatória',
-          `A foto #${fotoSemLegenda + 1} está sem legenda técnica. Todas as fotos devem possuir legenda antes do envio para aprovação.`
-        );
+  async function handleCreateExpress(status: 'em_andamento' | 'Rascunho' | 'Aguardando Aprovação' = 'Aguardando Aprovação') {
+    if (status === 'Aguardando Aprovação') {
+      if (!obraNome.trim()) {
+        Alert.alert('Atenção', 'Informe o nome da obra para enviar para aprovação.');
         return;
+      }
+
+      // Regra Crítica: Legenda de Fotos é Obrigatória para envio à aprovação (mesma sistemática do comum)
+      if (attachedPhotos.length > 0) {
+        const fotoSemLegenda = attachedPhotos.findIndex(f => !f.legenda || !f.legenda.trim());
+        if (fotoSemLegenda !== -1) {
+          Alert.alert(
+            'Legenda Obrigatória',
+            `A foto #${fotoSemLegenda + 1} está sem legenda técnica. Todas as fotos devem possuir legenda antes do envio para aprovação.`
+          );
+          return;
+        }
       }
     }
 
@@ -958,14 +999,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         autor_id: user?.id || 1,
         autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
         data_relatorio: dataVisita,
-        obra_nome: obraNome.trim(),
+        obra_nome: obraNome.trim() || 'Rascunho de Obra',
         obra_endereco: obraEndereco.trim(),
         obra_construtora: obraConstrutora.trim(),
         acompanhantes: acompanhantes.trim(),
         informacoes_tecnicas: techInfoJson,
         checklist_data: checklistJson,
         observacoes_finais: observacoes.trim(),
-        status: status,
+        status: status === 'Aguardando Aprovação' ? 'Aguardando Aprovação' : 'Rascunho',
         sync_status: 'pending',
         fotos_count: savedFotosList.length,
       };
@@ -1082,83 +1123,95 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
             </TouchableOpacity>
           </View>
         }
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.card} 
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true })}
-          >
-            <View style={styles.cardHeader}>
-              <View style={styles.badgeRow}>
-                <View style={styles.expBadge}>
-                  <Text style={styles.expBadgeText}>{item.numero}</Text>
-                </View>
-                <Text style={styles.dateText}>
-                  {item.data_relatorio ? new Date(item.data_relatorio).toLocaleDateString('pt-BR') : ''}
-                </Text>
-              </View>
-              <SyncStatusBadge status={item.sync_status} />
-            </View>
+        renderItem={({ item }) => {
+          const isDraft = item.status === 'Rascunho' || item.status === 'em_andamento' || item.status === 'Em preenchimento';
+          const displayStatus = isDraft ? 'Rascunho' : item.status;
 
-            <Text style={styles.obraTitle}>{item.titulo || `Relatório Express ${item.numero}`}</Text>
-            <Text style={styles.construtoraText}>
-              {item.obra_nome}{item.obra_construtora ? ` • ${item.obra_construtora}` : ''}
-            </Text>
-
-            {/* Dica / Faixa de Toque para Visualização */}
-            <View style={styles.cardViewHintRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                <Ionicons name="eye-outline" size={13} color="#0284C7" />
-                <Text style={styles.cardViewHintText}>Toque para visualizar detalhes completos</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={13} color="#0284C7" />
-            </View>
-
-            {item.observacoes_finais ? (
-              <Text style={styles.obsText} numberOfLines={2}>
-                {item.observacoes_finais}
-              </Text>
-            ) : null}
-
-            {item.fotos && item.fotos.length > 0 && (() => {
-              const f0 = item.fotos[0];
-              const thumbUri = f0.base64
-                ? (f0.base64.startsWith('data:') ? f0.base64 : `data:image/jpeg;base64,${f0.base64}`)
-                : (f0.uri_local || f0.url);
-              return (
-                <View style={styles.cardPhotoRow}>
-                  {thumbUri ? (
-                    <Image 
-                      source={{ uri: thumbUri }} 
-                      style={styles.cardPhotoThumb} 
-                    />
-                  ) : (
-                    <View style={[styles.cardPhotoThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' }]}>
-                      <Ionicons name="image-outline" size={20} color="#94A3B8" />
-                    </View>
-                  )}
-                  <View style={{ flex: 1, justifyContent: 'center', marginLeft: 10 }}>
-                    <Text style={styles.photoCountLabel}>📷 {item.fotos.length} foto(s) anexada(s)</Text>
-                    <Text style={styles.photoDescLabel} numberOfLines={1}>{f0.legenda || 'Registro fotográfico express'}</Text>
+          return (
+            <TouchableOpacity 
+              style={styles.card} 
+              activeOpacity={0.85}
+              onPress={() => {
+                if (isDraft) {
+                  handleEditReport(item);
+                } else {
+                  navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true });
+                }
+              }}
+            >
+              <View style={styles.cardHeader}>
+                <View style={styles.badgeRow}>
+                  <View style={styles.expBadge}>
+                    <Text style={styles.expBadgeText}>{item.numero}</Text>
                   </View>
+                  <Text style={styles.dateText}>
+                    {item.data_relatorio ? new Date(item.data_relatorio).toLocaleDateString('pt-BR') : ''}
+                  </Text>
                 </View>
-              );
-            })()}
-
-            <View style={styles.cardFooter}>
-              <View style={[
-                styles.statusPill,
-                item.status === 'Aprovado' ? styles.statusApproved : 
-                item.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusDraft
-              ]}>
-                <Text style={[
-                  styles.statusPillText,
-                  item.status === 'Aprovado' ? { color: '#065F46' } :
-                  item.status === 'Aguardando Aprovação' ? { color: '#92400E' } : { color: '#475569' }
-                ]}>
-                  {item.status}
-                </Text>
+                <SyncStatusBadge status={item.sync_status} />
               </View>
+
+              <Text style={styles.obraTitle}>{item.titulo || `Relatório Express ${item.numero}`}</Text>
+              <Text style={styles.construtoraText}>
+                {item.obra_nome}{item.obra_construtora ? ` • ${item.obra_construtora}` : ''}
+              </Text>
+
+              {/* Dica / Faixa de Toque para Visualização ou Edição */}
+              <View style={styles.cardViewHintRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <Ionicons name={isDraft ? "create-outline" : "eye-outline"} size={13} color="#0284C7" />
+                  <Text style={styles.cardViewHintText}>
+                    {isDraft ? "Toque para continuar editando o rascunho" : "Toque para visualizar detalhes completos"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={13} color="#0284C7" />
+              </View>
+
+              {item.observacoes_finais ? (
+                <Text style={styles.obsText} numberOfLines={2}>
+                  {item.observacoes_finais}
+                </Text>
+              ) : null}
+
+              {item.fotos && item.fotos.length > 0 && (() => {
+                const f0 = item.fotos[0];
+                const thumbUri = f0.base64
+                  ? (f0.base64.startsWith('data:') ? f0.base64 : `data:image/jpeg;base64,${f0.base64}`)
+                  : (f0.uri_local || f0.url);
+                return (
+                  <View style={styles.cardPhotoRow}>
+                    {thumbUri ? (
+                      <Image 
+                        source={{ uri: thumbUri }} 
+                        style={styles.cardPhotoThumb} 
+                      />
+                    ) : (
+                      <View style={[styles.cardPhotoThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' }]}>
+                        <Ionicons name="image-outline" size={20} color="#94A3B8" />
+                      </View>
+                    )}
+                    <View style={{ flex: 1, justifyContent: 'center', marginLeft: 10 }}>
+                      <Text style={styles.photoCountLabel}>📷 {item.fotos.length} foto(s) anexada(s)</Text>
+                      <Text style={styles.photoDescLabel} numberOfLines={1}>{f0.legenda || 'Registro fotográfico express'}</Text>
+                    </View>
+                  </View>
+                );
+              })()}
+
+              <View style={styles.cardFooter}>
+                <View style={[
+                  styles.statusPill,
+                  item.status === 'Aprovado' ? styles.statusApproved : 
+                  item.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusDraft
+                ]}>
+                  <Text style={[
+                    styles.statusPillText,
+                    item.status === 'Aprovado' ? { color: '#065F46' } :
+                    item.status === 'Aguardando Aprovação' ? { color: '#92400E' } : { color: '#B45309' }
+                  ]}>
+                    {displayStatus === 'Rascunho' ? '✏️ Rascunho' : displayStatus}
+                  </Text>
+                </View>
 
               <View style={styles.cardActionsRow}>
                 {/* Botão Visualizar Sempre Visível */}
@@ -1236,7 +1289,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               </View>
             </View>
           </TouchableOpacity>
-        )}
+        );
+      }}
       />
 
       {/* Modal Form: Relatório Express com Paridade ao Relatório Normal */}
@@ -1248,7 +1302,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 <Ionicons name="flash" size={20} color="#059669" />
                 <Text style={styles.modalTitle}>{editingReportId ? `Editar ${numero}` : 'Novo Relatório Express'}</Text>
               </View>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
+              <TouchableOpacity onPress={handleCloseModal}>
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
