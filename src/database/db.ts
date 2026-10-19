@@ -95,12 +95,15 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
     await db.execAsync('ALTER TABLE fotos_relatorio ADD COLUMN relatorio_uuid TEXT;');
   } catch {}
 
-  // Migration: ensure base64 and local exist in fotos_relatorio_express
+  // Migration: ensure base64, local and anotacoes_dados exist in fotos_relatorio_express
   try {
     await db.execAsync('ALTER TABLE fotos_relatorio_express ADD COLUMN base64 TEXT;');
   } catch {}
   try {
     await db.execAsync('ALTER TABLE fotos_relatorio_express ADD COLUMN local TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE fotos_relatorio_express ADD COLUMN anotacoes_dados TEXT;');
   } catch {}
 
   // Migration: ensure uuid and audit columns exist in relatorios
@@ -955,7 +958,11 @@ export async function deleteLocalFoto(id: number): Promise<void> {
 export async function getNextExpressReportNumber(): Promise<string> {
   const db = await getDatabase();
   const rows = await db.getAllAsync<{ numero: string; titulo?: string }>('SELECT numero, titulo FROM relatorios_express');
-  let maxSeq = 0;
+  if (!rows || rows.length === 0) {
+    return 'EXP-0000';
+  }
+
+  let maxSeq = -1;
   for (const row of rows) {
     const candidateStrings = [row.numero, row.titulo].filter(Boolean) as string[];
     for (const raw of candidateStrings) {
@@ -995,6 +1002,11 @@ export async function getNextExpressReportNumber(): Promise<string> {
       }
     }
   }
+
+  if (maxSeq < 0) {
+    return 'EXP-0000';
+  }
+
   const nextSeq = maxSeq + 1;
   return `EXP-${String(nextSeq).padStart(4, '0')}`;
 }
@@ -1015,9 +1027,13 @@ export async function getLocalRelatoriosExpress(): Promise<RelatorioExpress[]> {
   }
 }
 
-export async function getLocalRelatorioExpressById(id: number): Promise<RelatorioExpress | null> {
+export async function getLocalRelatorioExpressById(id: number | string): Promise<RelatorioExpress | null> {
   const db = await getDatabase();
-  return await db.getFirstAsync<RelatorioExpress>('SELECT * FROM relatorios_express WHERE id = ?', [id]);
+  const numId = Number(id);
+  return await db.getFirstAsync<RelatorioExpress>(
+    'SELECT * FROM relatorios_express WHERE id = ? OR id = ? LIMIT 1',
+    [numId, String(id)]
+  );
 }
 
 export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
@@ -1056,11 +1072,12 @@ export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus:
   );
 }
 
-export async function getLocalFotosExpress(relatorioExpressId: number): Promise<FotoRelatorioExpress[]> {
+export async function getLocalFotosExpress(relatorioExpressId: number | string): Promise<FotoRelatorioExpress[]> {
   const db = await getDatabase();
+  const numId = Number(relatorioExpressId);
   return await db.getAllAsync<FotoRelatorioExpress>(
-    'SELECT * FROM fotos_relatorio_express WHERE relatorio_express_id = ? ORDER BY ordem ASC, id ASC',
-    [relatorioExpressId]
+    'SELECT * FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ? ORDER BY ordem ASC, id ASC',
+    [numId, String(relatorioExpressId)]
   );
 }
 
@@ -1068,12 +1085,12 @@ export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 
   const db = await getDatabase();
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio_express (
-      id, relatorio_express_id, url, filename, uri_local, titulo, legenda, descricao, local, base64, ordem, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, relatorio_express_id, url, filename, uri_local, titulo, legenda, descricao, local, base64, anotacoes_dados, ordem, sync_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       f.id, f.relatorio_express_id, f.url || '', f.filename || '', f.uri_local || '',
       f.titulo || '', f.legenda || '', f.descricao || '', f.local || '', f.base64 || '',
-      f.ordem || 0, syncStatus
+      f.anotacoes_dados || '', f.ordem || 0, syncStatus
     ]
   );
 }
@@ -1083,10 +1100,12 @@ export async function deleteLocalFotoExpress(id: number): Promise<void> {
   await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [id]);
 }
 
-export async function deleteLocalRelatorioExpress(id: number): Promise<void> {
+export async function deleteLocalRelatorioExpress(id: number | string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ?', [id]);
-  await db.runAsync('DELETE FROM relatorios_express WHERE id = ?', [id]);
+  const numId = Number(id);
+  await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?;', [numId, String(id)]);
+  await db.runAsync('DELETE FROM relatorios_express WHERE id = ? OR id = ?;', [numId, String(id)]);
+  await db.runAsync('DELETE FROM sync_queue WHERE entity_type = "relatorio_express" AND (entity_id = ? OR entity_id = ?);', [numId, String(id)]);
 }
 
 export async function updateLocalRelatorioExpressStatus(

@@ -18,10 +18,12 @@ from models import RelatorioExpress, FotoRelatorioExpress, User, ChecklistPadrao
 logger = logging.getLogger(__name__)
 
 def generate_express_number():
-    """Gera o próximo número sequencial para Relatório Express (iniciando em EXP-0001)"""
+    """Gera o próximo número sequencial para Relatório Express (iniciando em EXP-0000)"""
     try:
         reports = RelatorioExpress.query.all()
-        max_seq = 0
+        if not reports:
+            return "EXP-0000"
+        max_seq = -1
         for r in reports:
             if not r.numero:
                 continue
@@ -33,7 +35,7 @@ def generate_express_number():
                 if v > max_seq:
                     max_seq = v
                 continue
-            # 2. Formato padrão: EXP-NNNN (ex: EXP-0001)
+            # 2. Formato padrão: EXP-NNNN (ex: EXP-0000)
             m_std = re.match(r'^EXP-(\d+)$', num_str, re.IGNORECASE)
             if m_std:
                 v = int(m_std.group(1))
@@ -49,10 +51,12 @@ def generate_express_number():
                 v = int(m_end.group(1))
                 if v < 1900 and v > max_seq:
                     max_seq = v
+        if max_seq < 0:
+            return "EXP-0000"
         return f"EXP-{max_seq + 1:04d}"
     except Exception as e:
         logger.warning(f"Erro ao gerar número express: {e}")
-        return "EXP-0001"
+        return "EXP-0000"
 
 
 @app.route('/relatorios-express')
@@ -849,6 +853,8 @@ def autosave_express_report_api():
                             foto.legenda = foto_info['caption']
                         if 'local' in foto_info:
                             foto.local = foto_info['local']
+                        if 'anotacoes_dados' in foto_info:
+                            foto.anotacoes_dados = foto_info['anotacoes_dados']
                         if 'ordem' in foto_info:
                             foto.ordem = foto_info['ordem']
                         

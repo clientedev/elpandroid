@@ -12,7 +12,7 @@ import { PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
   getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue, deleteLocalRelatorio,
   saveBatchChecklistProgressoObra, getNextReportNumberForProject, getDatabase,
-  getLocalRelatorioExpressById, getLocalFotosExpress, updateLocalRelatorioExpressStatus
+  getLocalRelatorioExpressById, getLocalFotosExpress, updateLocalRelatorioExpressStatus, deleteLocalRelatorioExpress
 } from '../../database/db';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
 import { apiClient } from '../../services/api';
@@ -43,9 +43,11 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
 
   async function loadReport() {
     try {
-      let r = await getLocalRelatorioById(reportId);
-      let isExpress = false;
-      if (!r) {
+      const isRouteExpress = Boolean(route.params?.isExpress);
+      let r: any = null;
+      let isExpress = isRouteExpress;
+
+      if (isRouteExpress) {
         const exp = await getLocalRelatorioExpressById(reportId);
         if (exp) {
           isExpress = true;
@@ -64,15 +66,49 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
             sync_status: exp.sync_status as any,
             fotos_count: exp.fotos_count || 0,
             observacoes_finais: exp.observacoes_finais,
+            informacoes_tecnicas: exp.informacoes_tecnicas,
             checklist_data: exp.checklist_data,
             acompanhantes: exp.acompanhantes,
             is_express: true,
-          } as any;
+          };
         }
       }
+
+      if (!r) {
+        r = await getLocalRelatorioById(reportId);
+      }
+
+      if (!r && !isExpress) {
+        const exp = await getLocalRelatorioExpressById(reportId);
+        if (exp) {
+          isExpress = true;
+          r = {
+            id: exp.id,
+            numero: exp.numero,
+            titulo: exp.titulo || `Relatório Express ${exp.numero}`,
+            projeto_id: 0,
+            projeto_nome: exp.obra_nome || 'Obra Express',
+            projeto_construtora: exp.obra_construtora,
+            projeto_endereco: exp.obra_endereco,
+            autor_id: exp.autor_id || 1,
+            autor_nome: exp.autor_nome || 'Fiscal Técnico',
+            data_relatorio: exp.data_relatorio,
+            status: exp.status as any,
+            sync_status: exp.sync_status as any,
+            fotos_count: exp.fotos_count || 0,
+            observacoes_finais: exp.observacoes_finais,
+            informacoes_tecnicas: exp.informacoes_tecnicas,
+            checklist_data: exp.checklist_data,
+            acompanhantes: exp.acompanhantes,
+            is_express: true,
+          };
+        }
+      }
+
       setRelatorio(r);
-      let f = await getLocalFotos(reportId, r?.uuid);
-      if ((!f || f.length === 0) && (isExpress || (r as any)?.is_express)) {
+
+      let f: any[] = [];
+      if (isExpress || (r as any)?.is_express) {
         const expFotos = await getLocalFotosExpress(reportId);
         f = (expFotos || []).map(ef => ({
           id: ef.id,
@@ -83,9 +119,12 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           titulo: ef.titulo,
           legenda: ef.legenda,
           ordem: ef.ordem,
+          anotacoes_dados: ef.anotacoes_dados,
         }));
+      } else {
+        f = (await getLocalFotos(reportId, r?.uuid)) || [];
       }
-      setFotos(f || []);
+      setFotos(f);
     } catch (e) {
       console.warn('Erro ao carregar relatório:', e);
     }
@@ -310,8 +349,11 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
   }
 
   async function handleDeleteReport() {
-    if (!relatorio || !isMasterOrAdmin) {
-      Alert.alert('Acesso Negado', 'Apenas usuários Master ou Administradores têm permissão para excluir relatórios.');
+    const isExpress = Boolean((relatorio as any)?.is_express || route.params?.isExpress);
+    const canDelete = isMasterOrAdmin || isAuthor || isExpress;
+
+    if (!relatorio || !canDelete) {
+      Alert.alert('Acesso Negado', 'Você não tem permissão para excluir este relatório.');
       return;
     }
 
@@ -326,13 +368,24 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           onPress: async () => {
             try {
               setApproving(true);
-              await deleteLocalRelatorio(relatorio.id);
-              if (isOnline) {
-                await apiClient.axios.delete(`/api/relatorios/${relatorio.id}`, {
-                  data: { user_id: user?.id, is_master: true }
-                }).catch(() => null);
+              if (isExpress) {
+                await deleteLocalRelatorioExpress(relatorio.id);
+                if (isOnline) {
+                  await apiClient.axios.delete(`/api/relatorios-express/${relatorio.id}`, {
+                    data: { user_id: user?.id, is_master: isMasterOrAdmin }
+                  }).catch(() => null);
+                } else {
+                  await addToSyncQueue('relatorio_express', relatorio.id, 'delete', `/api/relatorios-express/${relatorio.id}`, 'DELETE', { user_id: user?.id, is_master: isMasterOrAdmin });
+                }
               } else {
-                await addToSyncQueue('relatorio', relatorio.id, 'delete', `/api/relatorios/${relatorio.id}`, 'DELETE', { user_id: user?.id, is_master: true });
+                await deleteLocalRelatorio(relatorio.id);
+                if (isOnline) {
+                  await apiClient.axios.delete(`/api/relatorios/${relatorio.id}`, {
+                    data: { user_id: user?.id, is_master: true }
+                  }).catch(() => null);
+                } else {
+                  await addToSyncQueue('relatorio', relatorio.id, 'delete', `/api/relatorios/${relatorio.id}`, 'DELETE', { user_id: user?.id, is_master: true });
+                }
               }
               Alert.alert('Sucesso', 'Relatório excluído com sucesso.');
               navigation.goBack();
@@ -702,7 +755,9 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                   <View style={styles.photoImageContainer}>
                     {(() => {
                       let resolvedUri: string | null = null;
-                      if (item.uri_local) {
+                      if (item.base64) {
+                        resolvedUri = item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`;
+                      } else if (item.uri_local) {
                         if (item.uri_local.startsWith('file://') || item.uri_local.startsWith('content://') || item.uri_local.startsWith('http')) {
                           resolvedUri = item.uri_local;
                         } else if (item.uri_local.startsWith('/')) {
@@ -710,8 +765,6 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
                         } else {
                           resolvedUri = item.uri_local;
                         }
-                      } else if (item.base64) {
-                        resolvedUri = item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`;
                       } else if (item.url) {
                         if (item.url.startsWith('http://') || item.url.startsWith('https://')) {
                           resolvedUri = item.url;

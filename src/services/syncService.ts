@@ -166,7 +166,7 @@ class SyncService {
           }
 
           // Enrich report payload with local photos and convert them to base64 if needed
-          if (item.entity_type === 'relatorio') {
+          if (item.entity_type === 'relatorio' && item.method !== 'DELETE') {
             try {
               const fotos = await getLocalFotos(item.entity_id);
               if (fotos && fotos.length > 0) {
@@ -193,7 +193,7 @@ class SyncService {
             }
           }
 
-          if (item.entity_type === 'relatorio_express') {
+          if (item.entity_type === 'relatorio_express' && item.method !== 'DELETE') {
             try {
               const fotosExp = await getLocalFotosExpress(item.entity_id);
               if (fotosExp && fotosExp.length > 0) {

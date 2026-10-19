@@ -2845,8 +2845,8 @@ def api_get_photo(foto_id):
 def get_apk_info():
     """Retorna informações atualizadas sobre o arquivo APK e versão"""
     import json
-    app_version = "1.0.36"
-    version_code = 36
+    app_version = "1.0.37"
+    version_code = 37
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
@@ -13044,9 +13044,9 @@ def get_app_version_info():
         os.environ.get('RAILWAY_GIT_COMMIT_SHA') or 
         _SERVER_BOOT_TIME
     )
-    current_v = '1.0.36'
-    current_vc = 36
-    release_notes = 'Atualização v1.0.34: Correção da indexação do Relatório Express para iniciar em EXP-0001 sem saltos de ano; revisão e unificação do fluxo de aprovação dos relatórios express no app e portal web; ações de edição e reenvio de relatórios express; geração de PDF e envio de e-mails em aprovações.'
+    current_v = '1.0.37'
+    current_vc = 37
+    release_notes = 'Atualização v1.0.37: Sistemática completa de fotos no Relatório Express idêntica ao relatório padrão, com anotações gráficas (setas/círculos), legendas técnicas predefinidas, validação de legenda obrigatória, autosave contínuo em tempo real com fotos e sincronização aprimorada.'
     try:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         candidates = [
@@ -14218,12 +14218,24 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
     for idx, f_data in enumerate(fotos_data):
         if not f_data or not isinstance(f_data, dict):
             continue
+        anotacoes_raw = f_data.get('anotacoes_dados')
+        anotacoes_obj = None
+        if anotacoes_raw:
+            if isinstance(anotacoes_raw, str):
+                try:
+                    anotacoes_obj = json.loads(anotacoes_raw)
+                except Exception:
+                    anotacoes_obj = anotacoes_raw
+            else:
+                anotacoes_obj = anotacoes_raw
+
         foto = FotoRelatorioExpress(
             relatorio_express_id=rel_exp_id,
             titulo=f_data.get('titulo') or f"Foto Express {idx+1}",
             legenda=f_data.get('legenda') or '',
             descricao=f_data.get('descricao') or '',
             local=f_data.get('local') or '',
+            anotacoes_dados=anotacoes_obj,
             ordem=f_data.get('ordem', idx)
         )
         b64_str = (
@@ -14299,7 +14311,7 @@ def api_relatorios_express_sync():
                             from routes_express import generate_express_number
                             numero = generate_express_number()
                         except Exception:
-                            count = RelatorioExpress.query.count() + 1
+                            count = RelatorioExpress.query.count()
                             numero = f"EXP-{count:04d}"
 
             if existing:
@@ -14310,7 +14322,7 @@ def api_relatorios_express_sync():
                         from routes_express import generate_express_number
                         numero = generate_express_number()
                     except Exception:
-                        count = RelatorioExpress.query.count() + 1
+                        count = RelatorioExpress.query.count()
                         numero = f"EXP-{count:04d}"
 
                 rel = RelatorioExpress(
@@ -14457,6 +14469,7 @@ def api_relatorios_express_sync():
                     'legenda': f.legenda or '',
                     'descricao': f.descricao or '',
                     'local': f.local or '',
+                    'anotacoes_dados': f.anotacoes_dados,
                     'ordem': f.ordem or 0
                 })
 
@@ -14482,6 +14495,25 @@ def api_relatorios_express_sync():
     except Exception as e:
         current_app.logger.error(f"Erro ao listar relatorios express: {e}")
         return jsonify([]), 200
+
+@app.route('/api/relatorios-express/<int:report_id>', methods=['DELETE', 'POST'])
+@csrf.exempt
+def api_relatorios_express_delete(report_id):
+    """Exclui relatório express e suas fotos do banco de dados"""
+    try:
+        rel = RelatorioExpress.query.get(report_id)
+        if not rel:
+            return jsonify({'success': True, 'message': 'Relatório express já não existia'}), 200
+
+        # Excluir fotos associadas
+        FotoRelatorioExpress.query.filter_by(relatorio_express_id=report_id).delete()
+        db.session.delete(rel)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Relatório express excluído com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erro ao excluir relatório express {report_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 # ==============================================================================
 # USER MANAGEMENT API (EXCLUSIVO PARA ADMIN / MASTER)

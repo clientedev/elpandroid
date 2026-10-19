@@ -173,6 +173,9 @@ CREATE TABLE IF NOT EXISTS fotos_relatorio_express (
   titulo TEXT,
   legenda TEXT,
   descricao TEXT,
+  local TEXT,
+  base64 TEXT,
+  anotacoes_dados TEXT,
   ordem INTEGER DEFAULT 0,
   sync_status TEXT DEFAULT 'synced'
 );

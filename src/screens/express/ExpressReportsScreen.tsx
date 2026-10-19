@@ -10,17 +10,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
+import { PhotoEditorModal, PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
   getLocalRelatoriosExpress, saveLocalRelatorioExpress, 
   getLocalFotosExpress, saveLocalFotoExpress, addToSyncQueue,
-  getNextExpressReportNumber, getLocalVisitantes, updateLocalRelatorioExpressStatus
+  getNextExpressReportNumber, getLocalVisitantes, updateLocalRelatorioExpressStatus,
+  deleteLocalRelatorioExpress, deleteLocalFotoExpress, getDatabase, getLocalLegendas
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { generateReportPDF } from '../../services/pdfService';
+import { apiClient } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio, Visitante, Relatorio } from '../../types';
+import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio, Visitante, Relatorio, LegendaPredefinida } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+
+export interface AttachedExpressPhoto {
+  id?: number;
+  uri: string;
+  base64?: string;
+  filename?: string;
+  legenda?: string;
+  anotacoes_dados?: string;
+  local?: string;
+}
 
 export interface ChecklistItemState {
   id: number;
@@ -70,8 +83,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const canApprove = isMasterOrAdmin || hasApproverPrivilege;
 
   // Form state:
-  const [titulo, setTitulo] = useState('Relatório Express EXP-0001');
-  const [numero, setNumero] = useState('EXP-0001');
+  const [titulo, setTitulo] = useState('Relatório Express EXP-0000');
+  const [numero, setNumero] = useState('EXP-0000');
   const [dataVisita, setDataVisita] = useState(new Date().toISOString().split('T')[0]);
   const [obraConstrutora, setObraConstrutora] = useState('');
   const [obraNome, setObraNome] = useState('');
@@ -99,8 +112,21 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   // Visitantes cadastrados para sugestão com 1 toque
   const [visitantesCadastrados, setVisitantesCadastrados] = useState<Visitante[]>([]);
 
-  // Fotos anexadas
-  const [attachedPhotos, setAttachedPhotos] = useState<{ uri: string; base64?: string; filename?: string }[]>([]);
+  // Fotos anexadas com suporte a edição, anotações e legendas técnicas
+  const [attachedPhotos, setAttachedPhotos] = useState<AttachedExpressPhoto[]>([]);
+  const isProcessingPhotoRef = React.useRef(false);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  // Modal de Edição Gráfica de Fotos (Canvas com setas, círculos e texto)
+  const [showEditorModal, setShowEditorModal] = useState(false);
+  const [editingPhotoIndex, setEditingPhotoIndex] = useState<number | null>(null);
+
+  // Modal de Legendas Predefinidas
+  const [showLegendModal, setShowLegendModal] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [legendas, setLegendas] = useState<LegendaPredefinida[]>([]);
+  const [legendSearchText, setLegendSearchText] = useState('');
+  const [selectedLegendCategory, setSelectedLegendCategory] = useState<string>('Todas');
 
   // Toggles de Sanfonas
   const [showTechInfo, setShowTechInfo] = useState(false);
@@ -108,7 +134,30 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   const [loadingGps, setLoadingGps] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string | null>(null);
+
+  // Carrega legendas predefinidas do SQLite
+  useEffect(() => {
+    getLocalLegendas().then(l => {
+      if (l && l.length > 0) setLegendas(l);
+    }).catch(() => null);
+  }, []);
+
+  const legendCategories = React.useMemo(() => {
+    const cats = Array.from(new Set(legendas.map(l => l.categoria).filter(Boolean))) as string[];
+    return ['Todas', ...cats];
+  }, [legendas]);
+
+  const filteredLegendas = React.useMemo(() => {
+    return legendas.filter(l => {
+      const matchCat = selectedLegendCategory === 'Todas' || l.categoria === selectedLegendCategory;
+      const matchSearch = !legendSearchText.trim() || 
+        l.texto.toLowerCase().includes(legendSearchText.toLowerCase()) ||
+        (l.categoria && l.categoria.toLowerCase().includes(legendSearchText.toLowerCase()));
+      return matchCat && matchSearch;
+    });
+  }, [legendas, selectedLegendCategory, legendSearchText]);
 
   const loadReports = useCallback(async () => {
     try {
@@ -137,13 +186,20 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     loadReports();
   }, [loadReports]);
 
-  // Autosave contínuo para Relatório Express
+  // Autosave contínuo para Relatório Express com persistência de Fotos e Dados Técnicos
   useEffect(() => {
     if (!modalVisible) return;
-    const timer = setTimeout(() => {
-      if (obraNome.trim() || obraConstrutora.trim() || observacoes.trim() || techElementosBase.trim()) {
+    if (!obraNome.trim() && !obraConstrutora.trim() && !observacoes.trim() && !techElementosBase.trim() && attachedPhotos.length === 0) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsAutoSaving(true);
         const draftPayload = {
+          editingReportId,
           titulo,
+          numero,
           dataVisita,
           obraConstrutora,
           obraNome,
@@ -163,29 +219,127 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           techObservacoesFachada,
           techOutrasObservacoes,
           checklist,
+          attachedPhotos,
         };
-        AsyncStorage.setItem('@elp_express_report_draft', JSON.stringify(draftPayload))
-          .then(() => {
-            setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-          })
-          .catch(() => null);
+        await AsyncStorage.setItem('@elp_express_report_draft', JSON.stringify(draftPayload));
+
+        // Se for edição de relatório existente, sincroniza alterações e fotos diretamente no SQLite
+        if (editingReportId) {
+          const techInfoJson = JSON.stringify({
+            elementos_construtivos_base: techElementosBase.trim(),
+            especificacao_chapisco_colante: techChapiscoColante.trim(),
+            especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+            especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+            forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+            acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+            acabamento_peitoris: techAcabamentoPeitoris.trim(),
+            acabamento_muretas: techAcabamentoMuretas.trim(),
+            definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+            definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+            observacoes_projeto_fachada: techObservacoesFachada.trim(),
+            outras_observacoes: techOutrasObservacoes.trim(),
+          });
+
+          const expDraft: RelatorioExpress = {
+            id: editingReportId,
+            numero: numero || 'EXP-0000',
+            titulo: titulo || `Relatório Express ${numero || 'EXP-0000'}`,
+            autor_id: user?.id || 1,
+            autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
+            data_relatorio: dataVisita,
+            obra_nome: obraNome.trim(),
+            obra_endereco: obraEndereco.trim(),
+            obra_construtora: obraConstrutora.trim(),
+            acompanhantes: acompanhantes.trim(),
+            informacoes_tecnicas: techInfoJson,
+            checklist_data: JSON.stringify(checklist),
+            observacoes_finais: observacoes.trim(),
+            status: 'em_andamento',
+            sync_status: 'pending',
+            fotos_count: attachedPhotos.length,
+          };
+          await saveLocalRelatorioExpress(expDraft, 'pending');
+
+          for (let i = 0; i < attachedPhotos.length; i++) {
+            const ap = attachedPhotos[i];
+            const fotoObj: FotoRelatorioExpress = {
+              id: ap.id || (Date.now() + i + 1),
+              relatorio_express_id: editingReportId,
+              uri_local: ap.uri,
+              base64: ap.base64,
+              local: ap.local || obraNome.trim(),
+              titulo: `Foto ${i + 1} - ${obraNome.trim()}`,
+              legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
+              anotacoes_dados: ap.anotacoes_dados,
+              ordem: i,
+              sync_status: 'pending'
+            };
+            await saveLocalFotoExpress(fotoObj, 'pending');
+          }
+        }
+
+        setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+      } catch (errDraft) {
+        console.warn('[Express] Erro no autosave:', errDraft);
+      } finally {
+        setIsAutoSaving(false);
       }
-    }, 800);
+    }, 1500);
+
     return () => clearTimeout(timer);
   }, [
-    modalVisible, titulo, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, observacoes,
+    modalVisible, editingReportId, titulo, numero, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, observacoes,
     techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa,
     techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor,
-    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist
+    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist, attachedPhotos
   ]);
 
+  async function handleClearDraft() {
+    Alert.alert(
+      'Limpar Rascunho',
+      'Deseja limpar todos os dados e fotos deste rascunho express?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, Limpar',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
+            setObraNome('');
+            setObraConstrutora('');
+            setObraEndereco('');
+            setAcompanhantes('');
+            setObservacoes('');
+            setTechElementosBase('');
+            setTechChapiscoColante('');
+            setTechChapiscoAlvenaria('');
+            setTechArgamassaEmboco('');
+            setTechFormaAplicacaoArgamassa('');
+            setTechAcabamentosRevestimento('');
+            setTechAcabamentoPeitoris('');
+            setTechAcabamentoMuretas('');
+            setTechDefinicaoFrisosCor('');
+            setTechDefinicaoFaceInferiorAbas('');
+            setTechObservacoesFachada('');
+            setTechOutrasObservacoes('');
+            setChecklist(DEFAULT_CHECKLIST);
+            setAttachedPhotos([]);
+            setLastAutoSaveTime(null);
+          }
+        }
+      ]
+    );
+  }
+
   async function handleOpenNew() {
-    let nextNum = 'EXP-0001';
+    let nextNum = 'EXP-0000';
     try {
       nextNum = await getNextExpressReportNumber();
     } catch (e) {
       console.warn('Erro ao calcular próximo EXP:', e);
     }
+
+    let loadedPhotosFromDraft: AttachedExpressPhoto[] = [];
 
     try {
       const draftStr = await AsyncStorage.getItem('@elp_express_report_draft');
@@ -215,6 +369,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         } else {
           setChecklist(DEFAULT_CHECKLIST);
         }
+
+        if (d.attachedPhotos && Array.isArray(d.attachedPhotos)) {
+          loadedPhotosFromDraft = d.attachedPhotos;
+        }
+
         setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
       } else {
         setChecklist(DEFAULT_CHECKLIST);
@@ -226,13 +385,13 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setTitulo(`Relatório Express ${nextNum}`);
     setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
-    setAttachedPhotos([]);
+    setAttachedPhotos(loadedPhotosFromDraft);
     setEditingReportId(null);
     setModalVisible(true);
   }
 
   async function handleDuplicateReport(original: RelatorioExpress) {
-    let nextNum = 'EXP-0001';
+    let nextNum = 'EXP-0000';
     try {
       nextNum = await getNextExpressReportNumber();
     } catch {}
@@ -288,7 +447,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   async function handleEditReport(item: RelatorioExpress) {
     setEditingReportId(item.id);
-    const itemNum = item.numero || 'EXP-0001';
+    const itemNum = item.numero || 'EXP-0000';
     setTitulo(item.titulo || `Relatório Express ${itemNum}`);
     setNumero(itemNum);
     setDataVisita(item.data_relatorio ? item.data_relatorio.split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -348,13 +507,18 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       setChecklist(DEFAULT_CHECKLIST);
     }
 
-    // Carregar fotos do relatório
+    // Carregar fotos do relatório com legendas e anotações técnicas
     try {
       const fotosDb = await getLocalFotosExpress(item.id);
       if (fotosDb && fotosDb.length > 0) {
         setAttachedPhotos(fotosDb.map(f => ({
+          id: f.id,
           uri: f.uri_local || f.url || '',
           base64: f.base64,
+          filename: f.filename,
+          legenda: f.legenda || '',
+          anotacoes_dados: f.anotacoes_dados,
+          local: f.local || item.obra_nome || '',
         })));
       } else {
         setAttachedPhotos([]);
@@ -501,6 +665,39 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     }
   }
 
+  async function handleDeleteExpress(item: RelatorioExpress) {
+    Alert.alert(
+      'Excluir Relatório Express',
+      `Deseja realmente excluir permanentemente o relatório ${item.numero} (${item.obra_nome || 'Sem obra'})? Esta ação não pode ser desfeita.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sim, Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await deleteLocalRelatorioExpress(item.id);
+              if (isOnline) {
+                await apiClient.axios.delete(`/api/relatorios-express/${item.id}`, {
+                  data: { user_id: user?.id, is_master: isMasterOrAdmin }
+                }).catch(() => null);
+              } else {
+                await addToSyncQueue('relatorio_express', item.id, 'delete', `/api/relatorios-express/${item.id}`, 'DELETE', { user_id: user?.id, is_master: isMasterOrAdmin });
+              }
+              await loadReports();
+              Alert.alert('Sucesso', `Relatório Express ${item.numero} excluído.`);
+            } catch (e: any) {
+              Alert.alert('Erro', e.message || 'Falha ao excluir relatório express.');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  }
+
   // Captura Real de GPS do Dispositivo
   async function handleCaptureGpsAddress() {
     setLoadingGps(true);
@@ -566,29 +763,116 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   }
 
   async function handleAddPhotoCamera() {
-    const projName = obraNome.trim() || 'Obra_Express';
-    const photo = await takePhoto(projName);
-    if (photo) {
-      setAttachedPhotos(prev => [...prev, photo]);
+    if (isProcessingPhotoRef.current) return;
+    isProcessingPhotoRef.current = true;
+    setIsProcessingPhoto(true);
+    try {
+      const projName = obraNome.trim() || 'Obra_Express';
+      const photo = await takePhoto(projName);
+      if (photo) {
+        setAttachedPhotos(prev => [
+          ...prev,
+          {
+            uri: photo.uri,
+            base64: photo.base64,
+            filename: photo.filename,
+            legenda: '',
+            anotacoes_dados: undefined,
+            local: obraNome.trim() || 'Fachada',
+          }
+        ]);
+      }
+    } catch (errCam) {
+      console.warn('[Express] Erro ao capturar foto da câmera:', errCam);
+    } finally {
+      isProcessingPhotoRef.current = false;
+      setIsProcessingPhoto(false);
     }
   }
 
   async function handleAddPhotoGallery() {
-    const projName = obraNome.trim() || 'Obra_Express';
-    const photo = await pickImage(projName);
-    if (photo) {
-      setAttachedPhotos(prev => [...prev, photo]);
+    if (isProcessingPhotoRef.current) return;
+    isProcessingPhotoRef.current = true;
+    setIsProcessingPhoto(true);
+    try {
+      const projName = obraNome.trim() || 'Obra_Express';
+      const photo = await pickImage(projName);
+      if (photo) {
+        setAttachedPhotos(prev => [
+          ...prev,
+          {
+            uri: photo.uri,
+            base64: photo.base64,
+            filename: photo.filename,
+            legenda: '',
+            anotacoes_dados: undefined,
+            local: obraNome.trim() || 'Fachada',
+          }
+        ]);
+      }
+    } catch (errGal) {
+      console.warn('[Express] Erro ao selecionar foto da galeria:', errGal);
+    } finally {
+      isProcessingPhotoRef.current = false;
+      setIsProcessingPhoto(false);
     }
   }
 
-  function handleRemovePhoto(index: number) {
+  async function handleRemovePhoto(index: number) {
+    const target = attachedPhotos[index];
+    if (target?.id) {
+      await deleteLocalFotoExpress(target.id).catch(() => null);
+    }
     setAttachedPhotos(prev => prev.filter((_, idx) => idx !== index));
+  }
+
+  function handleSavePhotoAnnotations(json: string) {
+    if (editingPhotoIndex !== null) {
+      setAttachedPhotos(prev => {
+        const updated = [...prev];
+        if (updated[editingPhotoIndex]) {
+          updated[editingPhotoIndex] = {
+            ...updated[editingPhotoIndex],
+            anotacoes_dados: json,
+          };
+        }
+        return updated;
+      });
+    }
+  }
+
+  function handleSelectLegenda(legendaTexto: string) {
+    if (selectedPhotoIndex !== null) {
+      setAttachedPhotos(prev => {
+        const updated = [...prev];
+        if (updated[selectedPhotoIndex]) {
+          updated[selectedPhotoIndex] = {
+            ...updated[selectedPhotoIndex],
+            legenda: legendaTexto,
+          };
+        }
+        return updated;
+      });
+    }
+    setShowLegendModal(false);
   }
 
   async function handleCreateExpress(status: 'em_andamento' | 'Aguardando Aprovação' = 'Aguardando Aprovação') {
     if (!obraNome.trim()) {
       Alert.alert('Atenção', 'Informe o nome da obra.');
       return;
+    }
+
+    // Regra Crítica: Legenda de Fotos é Obrigatória para envio à aprovação (mesma sistemática do comum)
+    if (status === 'Aguardando Aprovação' && attachedPhotos.length > 0) {
+      const fotoSemLegenda = attachedPhotos.findIndex(f => !f.legenda || !f.legenda.trim());
+      if (fotoSemLegenda !== -1) {
+        Alert.alert(
+          'Legenda Obrigatória',
+          `A foto #${fotoSemLegenda + 1} está sem legenda técnica. Todas as fotos devem possuir legenda antes do envio para aprovação.`
+        );
+        return;
+      }
     }
 
     setLoading(true);
@@ -621,7 +905,17 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       const techInfoJson = JSON.stringify(techInfoPayload);
       const checklistJson = JSON.stringify(checklist);
 
-      // Salva fotos anexadas
+      // Se for edição, limpa fotos antigas deste relatório express localmente antes de regravar
+      if (editingReportId) {
+        try {
+          const db = await getDatabase();
+          await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?;', [editingReportId, String(editingReportId)]);
+        } catch (delFotosErr) {
+          console.warn('Erro ao limpar fotos antigas do relatório express:', delFotosErr);
+        }
+      }
+
+      // Salva fotos anexadas com legenda e dados de anotação
       const savedFotosList: any[] = [];
       for (let i = 0; i < attachedPhotos.length; i++) {
         const ap = attachedPhotos[i];
@@ -631,24 +925,28 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         }
 
         const fotoObj: FotoRelatorioExpress = {
-          id: Date.now() + i + 1,
+          id: ap.id || (Date.now() + i + 1),
           relatorio_express_id: expId,
           uri_local: ap.uri,
           base64: b64,
-          local: obraNome.trim(),
+          local: ap.local || obraNome.trim(),
           titulo: `Foto ${i + 1} - ${obraNome.trim()}`,
-          legenda: observacoes || 'Registro Fotográfico Express',
+          legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
+          anotacoes_dados: ap.anotacoes_dados,
           ordem: i,
           sync_status: 'pending'
         };
         await saveLocalFotoExpress(fotoObj, 'pending');
 
         savedFotosList.push({
+          id: fotoObj.id,
           uri_local: ap.uri,
           base64: b64,
           imagem_base64: b64,
-          titulo: `Foto ${i + 1} - ${obraNome.trim()}`,
-          legenda: observacoes || 'Registro Fotográfico Express',
+          titulo: fotoObj.titulo,
+          legenda: fotoObj.legenda,
+          local: fotoObj.local,
+          anotacoes_dados: ap.anotacoes_dados,
           ordem: i
         });
       }
@@ -686,10 +984,9 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         }
       );
 
-      // Limpa rascunho após submissão de sucesso
-      if (status === 'Aguardando Aprovação') {
-        AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
-      }
+      // Limpa rascunho após salvar com sucesso
+      await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
+      setLastAutoSaveTime(null);
 
       if (isOnline) triggerSync();
 
@@ -781,7 +1078,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
             </Text>
             <TouchableOpacity style={styles.createBtn} onPress={handleOpenNew}>
               <Ionicons name="add-circle" size={18} color="#FFFFFF" />
-              <Text style={styles.createBtnText}>Criar Relatório EXP-0001</Text>
+              <Text style={styles.createBtnText}>Criar Relatório EXP-0000</Text>
             </TouchableOpacity>
           </View>
         }
@@ -789,7 +1086,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           <TouchableOpacity 
             style={styles.card} 
             activeOpacity={0.85}
-            onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id })}
+            onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true })}
           >
             <View style={styles.cardHeader}>
               <View style={styles.badgeRow}>
@@ -823,18 +1120,30 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               </Text>
             ) : null}
 
-            {item.fotos && item.fotos.length > 0 && (
-              <View style={styles.cardPhotoRow}>
-                <Image 
-                  source={{ uri: item.fotos[0].uri_local || item.fotos[0].url }} 
-                  style={styles.cardPhotoThumb} 
-                />
-                <View style={{ flex: 1, justifyContent: 'center', marginLeft: 10 }}>
-                  <Text style={styles.photoCountLabel}>📷 {item.fotos.length} foto(s) anexada(s)</Text>
-                  <Text style={styles.photoDescLabel} numberOfLines={1}>{item.fotos[0].legenda || 'Registro fotográfico express'}</Text>
+            {item.fotos && item.fotos.length > 0 && (() => {
+              const f0 = item.fotos[0];
+              const thumbUri = f0.base64
+                ? (f0.base64.startsWith('data:') ? f0.base64 : `data:image/jpeg;base64,${f0.base64}`)
+                : (f0.uri_local || f0.url);
+              return (
+                <View style={styles.cardPhotoRow}>
+                  {thumbUri ? (
+                    <Image 
+                      source={{ uri: thumbUri }} 
+                      style={styles.cardPhotoThumb} 
+                    />
+                  ) : (
+                    <View style={[styles.cardPhotoThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' }]}>
+                      <Ionicons name="image-outline" size={20} color="#94A3B8" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1, justifyContent: 'center', marginLeft: 10 }}>
+                    <Text style={styles.photoCountLabel}>📷 {item.fotos.length} foto(s) anexada(s)</Text>
+                    <Text style={styles.photoDescLabel} numberOfLines={1}>{f0.legenda || 'Registro fotográfico express'}</Text>
+                  </View>
                 </View>
-              </View>
-            )}
+              );
+            })()}
 
             <View style={styles.cardFooter}>
               <View style={[
@@ -855,7 +1164,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 {/* Botão Visualizar Sempre Visível */}
                 <TouchableOpacity 
                   style={styles.viewBtn} 
-                  onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id })}
+                  onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true })}
                 >
                   <Ionicons name="eye-outline" size={13} color="#0284C7" />
                   <Text style={styles.viewBtnText}>Visualizar</Text>
@@ -916,6 +1225,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                   <Ionicons name="download-outline" size={16} color={Colors.primary} />
                   <Text style={styles.pdfBtnText}>PDF</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.cardDeleteBtn} 
+                  onPress={() => handleDeleteExpress(item)}
+                >
+                  <Ionicons name="trash-outline" size={13} color="#DC2626" />
+                  <Text style={styles.cardDeleteBtnText}>Excluir</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
@@ -936,12 +1253,33 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               </TouchableOpacity>
             </View>
 
-            {lastAutoSaveTime && (
-              <View style={styles.draftAutoSaveBar}>
-                <Ionicons name="checkmark-circle" size={12} color="#16A34A" />
-                <Text style={styles.draftAutoSaveText}>Salvo automaticamente às {lastAutoSaveTime}</Text>
+            {/* Barra de Status do AutoSave em Tempo Real */}
+            <View style={styles.autoSaveBar}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                {isAutoSaving ? (
+                  <>
+                    <ActivityIndicator size="small" color="#0284C7" />
+                    <Text style={[styles.autoSaveText, { color: '#0284C7' }]}>Salvando alterações...</Text>
+                  </>
+                ) : lastAutoSaveTime ? (
+                  <>
+                    <Ionicons name="cloud-done" size={16} color="#16A34A" />
+                    <Text style={styles.autoSaveText}>Salvo automaticamente às {lastAutoSaveTime}</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="cloud-outline" size={16} color="#94A3B8" />
+                    <Text style={[styles.autoSaveText, { color: '#94A3B8' }]}>AutoSave ativo</Text>
+                  </>
+                )}
               </View>
-            )}
+              {!editingReportId && (
+                <TouchableOpacity onPress={handleClearDraft} style={styles.clearDraftBtn}>
+                  <Ionicons name="trash-bin-outline" size={13} color="#EF4444" />
+                  <Text style={styles.clearDraftBtnText}>Limpar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
               {/* 1. Título */}
@@ -1269,43 +1607,112 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 />
               </View>
 
-              {/* 11. Captura de Fotos (com Salvamento em Pasta e Galeria) */}
+              {/* 11. Galeria de Fotos do Laudo Express (Idêntico ao Relatório Normal) */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>11. Captura de Fotos da Obra</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text style={styles.label}>11. Galeria de Fotos do Laudo ({attachedPhotos.length})</Text>
+                  <Text style={styles.photoCountText}>Capacidade: {attachedPhotos.length} / 200 fotos</Text>
+                </View>
+
+                {/* Barra Fixa de 56px de altura para Captura Rápida (Câmera e Galeria) */}
+                <View style={styles.stickyPhotoBar}>
                   <TouchableOpacity 
-                    style={styles.photoActionBtn} 
+                    style={[styles.cameraBigBtn, isProcessingPhoto && { opacity: 0.6 }]} 
                     onPress={handleAddPhotoCamera}
+                    disabled={isProcessingPhoto}
                   >
-                    <Ionicons name="camera" size={18} color="#FFFFFF" />
-                    <Text style={styles.photoActionText}>Câmera</Text>
+                    <Ionicons name="camera" size={22} color="#FFFFFF" />
+                    <Text style={styles.cameraBigBtnText}>{isProcessingPhoto ? 'Processando...' : 'Câmera'}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity 
-                    style={[styles.photoActionBtn, { backgroundColor: '#0F172A' }]}
+                    style={[styles.galleryBigBtn, isProcessingPhoto && { opacity: 0.6 }]} 
                     onPress={handleAddPhotoGallery}
+                    disabled={isProcessingPhoto}
                   >
-                    <Ionicons name="images" size={18} color="#FFFFFF" />
-                    <Text style={styles.photoActionText}>Galeria</Text>
+                    <Ionicons name="images" size={22} color="#FFFFFF" />
+                    <Text style={styles.galleryBigBtnText}>{isProcessingPhoto ? 'Processando...' : 'Galeria'}</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* Grid de fotos anexadas */}
-                {attachedPhotos.length > 0 && (
-                  <View style={styles.photosGrid}>
-                    {attachedPhotos.map((p, idx) => (
-                      <View key={idx} style={styles.photoThumbWrap}>
-                        <Image source={{ uri: p.uri }} style={styles.modalPhotoThumb} />
-                        <TouchableOpacity 
-                          style={styles.removePhotoBtn}
-                          onPress={() => handleRemovePhoto(idx)}
-                        >
-                          <Ionicons name="close-circle" size={20} color="#DC2626" />
-                        </TouchableOpacity>
+                {/* Lista de Cards de Fotos no Padrão do Relatório Comum */}
+                {attachedPhotos.map((item, index) => {
+                  const resolvedUri = (item.uri && item.uri.startsWith('file://'))
+                    ? item.uri
+                    : (item.base64
+                        ? (item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`)
+                        : item.uri);
+
+                  return (
+                    <View key={`${item.id || index}_${item.uri || index}`} style={styles.photoCard}>
+                      <View style={styles.thumbWrapper}>
+                        {resolvedUri ? (
+                          <Image source={{ uri: resolvedUri }} style={styles.thumb} resizeMode="cover" />
+                        ) : (
+                          <View style={styles.thumbFallback}>
+                            <Ionicons name="camera-outline" size={24} color="#94A3B8" />
+                          </View>
+                        )}
+                        <PhotoAnnotationOverlay annotationsJson={item.anotacoes_dados} />
                       </View>
-                    ))}
-                  </View>
-                )}
+
+                      <View style={styles.photoInfo}>
+                        <View style={styles.photoTopRow}>
+                          <Text style={styles.photoNum}>Foto #{index + 1}</Text>
+                          <TouchableOpacity onPress={() => handleRemovePhoto(index)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Legenda Obrigatória com indicação visual */}
+                        <View style={{ marginBottom: 6 }}>
+                          <Text style={[styles.legendaLabel, !item.legenda && { color: '#DC2626' }]}>
+                            Legenda Técnica {!item.legenda ? '(Obrigatória *)' : '✓'}
+                          </Text>
+                          <TextInput
+                            style={[styles.legendaInput, !item.legenda && styles.legendaInputMissing]}
+                            placeholder="Digite a legenda da patologia..."
+                            placeholderTextColor="#94A3B8"
+                            value={item.legenda || ''}
+                            onChangeText={txt => {
+                              setAttachedPhotos(prev => {
+                                const updated = [...prev];
+                                if (updated[index]) {
+                                  updated[index] = { ...updated[index], legenda: txt };
+                                }
+                                return updated;
+                              });
+                            }}
+                          />
+                        </View>
+
+                        <View style={styles.photoActionRow}>
+                          <TouchableOpacity 
+                            style={styles.editShapesBtn}
+                            onPress={() => {
+                              setEditingPhotoIndex(index);
+                              setShowEditorModal(true);
+                            }}
+                          >
+                            <Ionicons name="brush-outline" size={14} color="#7C3AED" />
+                            <Text style={styles.editShapesText}>Editar (Setas/Círculos)</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity 
+                            style={styles.predefBtn}
+                            onPress={() => {
+                              setSelectedPhotoIndex(index);
+                              setShowLegendModal(true);
+                            }}
+                          >
+                            <Ionicons name="list-outline" size={14} color={Colors.primary} />
+                            <Text style={styles.predefText}>Legenda Padrão</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
 
               {/* Botões Inferiores: Salvar Rascunho, Enviar Aprovação e Aprovar */}
@@ -1346,6 +1753,94 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 </TouchableOpacity>
               </View>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal do Editor de Fotos (Anotações com Setas, Círculos, etc.) */}
+      <PhotoEditorModal
+        visible={showEditorModal}
+        photoUri={editingPhotoIndex !== null && attachedPhotos[editingPhotoIndex] ? (attachedPhotos[editingPhotoIndex].uri || null) : null}
+        base64={editingPhotoIndex !== null && attachedPhotos[editingPhotoIndex] ? attachedPhotos[editingPhotoIndex].base64 : undefined}
+        initialAnnotations={editingPhotoIndex !== null && attachedPhotos[editingPhotoIndex] ? attachedPhotos[editingPhotoIndex].anotacoes_dados : undefined}
+        onClose={() => {
+          setShowEditorModal(false);
+          setEditingPhotoIndex(null);
+        }}
+        onSave={handleSavePhotoAnnotations}
+      />
+
+      {/* Legendas Predefinidas Modal com Filtro de Categorias e Pesquisa */}
+      <Modal visible={showLegendModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxHeight: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Legendas Predefinidas</Text>
+                <Text style={{ fontSize: 12, color: Colors.textMuted }}>Filtre por categoria ou pesquise o termo</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowLegendModal(false)}>
+                <Ionicons name="close" size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Barra de Pesquisa de Legendas */}
+            <View style={styles.legendSearchBox}>
+              <Ionicons name="search" size={18} color="#64748B" />
+              <TextInput
+                style={styles.legendSearchInput}
+                placeholder="Pesquisar legendas técnicas..."
+                value={legendSearchText}
+                onChangeText={setLegendSearchText}
+                placeholderTextColor="#94A3B8"
+              />
+              {legendSearchText.length > 0 && (
+                <TouchableOpacity onPress={() => setLegendSearchText('')}>
+                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Chips de Categorias Horizontal */}
+            <View style={{ marginBottom: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.legendCategoryScroll}>
+                {legendCategories.map(cat => {
+                  const isActive = selectedLegendCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[styles.legendCategoryChip, isActive && styles.legendCategoryChipActive]}
+                      onPress={() => setSelectedLegendCategory(cat)}
+                    >
+                      <Text style={[styles.legendCategoryChipText, isActive && styles.legendCategoryChipTextActive]}>
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <FlatList
+              data={filteredLegendas}
+              keyExtractor={item => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={styles.legendItem}
+                  onPress={() => handleSelectLegenda(item.texto)}
+                >
+                  <View style={styles.legendCategoryBadge}>
+                    <Text style={styles.legendCategoryText}>{item.categoria}</Text>
+                  </View>
+                  <Text style={styles.legendItemText}>{item.texto}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text style={{ color: Colors.textMuted, fontSize: 14 }}>Nenhuma legenda encontrada para esta categoria ou busca.</Text>
+                </View>
+              }
+            />
           </View>
         </View>
       </Modal>
@@ -1573,6 +2068,31 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   modalTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  autoSaveBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  autoSaveText: { fontSize: 11.5, color: '#15803D', fontWeight: '600' },
+  clearDraftBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  clearDraftBtnText: { fontSize: 11, fontWeight: '700', color: '#EF4444' },
   draftAutoSaveBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1703,6 +2223,179 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: '#334155',
   },
+  stickyPhotoBar: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  cameraBigBtn: {
+    flex: 1,
+    height: 52,
+    backgroundColor: '#0284C7',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadows.sm,
+  },
+  cameraBigBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  galleryBigBtn: {
+    flex: 1,
+    height: 52,
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    ...Shadows.sm,
+  },
+  galleryBigBtnText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  photoCountText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  photoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  thumbWrapper: {
+    width: 86,
+    height: 86,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#E2E8F0',
+  },
+  thumbFallback: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  thumb: { width: '100%', height: '100%', borderRadius: 8 },
+  photoInfo: { flex: 1, marginLeft: 12 },
+  photoTopRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  photoNum: { fontSize: 13, fontWeight: 'bold', color: Colors.text },
+  legendaLabel: { fontSize: 11, fontWeight: '600', color: '#475569', marginBottom: 2 },
+  legendaInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    height: 36,
+    fontSize: 12,
+  },
+  legendaInputMissing: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  photoActionRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 6,
+  },
+  editShapesBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(124, 58, 237, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.25)',
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
+  editShapesText: { fontSize: 11, color: '#7C3AED', fontWeight: '600' },
+  predefBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.25)',
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    justifyContent: 'center',
+  },
+  predefText: { fontSize: 11, color: Colors.primary, fontWeight: '600' },
+  legendSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 10,
+  },
+  legendSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.text,
+    marginLeft: 8,
+    paddingVertical: 0,
+  },
+  legendCategoryScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  legendCategoryChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  legendCategoryChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  legendCategoryChipText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  legendCategoryChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  legendCategoryBadge: {
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 10,
+  },
+  legendCategoryText: { fontSize: 11, color: '#0369A1', fontWeight: 'bold' },
+  legendItemText: { fontSize: 13, color: Colors.text, flex: 1 },
   photoActionBtn: {
     flex: 1,
     backgroundColor: '#2563EB',
@@ -1861,4 +2554,16 @@ const styles = StyleSheet.create({
     borderColor: '#BAE6FD',
   },
   viewBtnText: { fontSize: 11, fontWeight: '700', color: '#0284C7' },
+  cardDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  cardDeleteBtnText: { fontSize: 11, fontWeight: '700', color: '#DC2626' },
 });
