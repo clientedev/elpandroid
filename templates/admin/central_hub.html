@@ -481,13 +481,36 @@ body {
                                             <label class="form-label fw-bold small">Porta SMTP</label>
                                             <input type="number" class="form-control" id="email_porta_smtp" value="{{ email_config.porta_smtp if email_config else 587 }}">
                                         </div>
+                                        <div class="col-md-12">
+                                            <label class="form-label fw-bold small">Chave de API do Resend (RESEND_API_KEY)</label>
+                                            <div class="input-group">
+                                                <input type="password" class="form-control" id="resend_api_key" placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxx" value="{{ resend_api_key_masked }}">
+                                                <button class="btn btn-outline-secondary" type="button" onclick="toggleResendApiKeyVisibility()">
+                                                    <i class="fas fa-eye" id="toggleResendKeyIcon"></i>
+                                                </button>
+                                            </div>
+                                            <div class="form-text">
+                                                {% if resend_api_key_configured %}
+                                                    <span class="text-success"><i class="fas fa-check-circle me-1"></i>Chave de API ativa. Para alterar, digite uma nova chave e clique em "Salvar Parâmetros".</span>
+                                                {% else %}
+                                                    <span class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Nenhuma chave configurada. Obtenha sua chave no painel da <a href="https://resend.com/api-keys" target="_blank">Resend.com</a> e cole aqui.</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                         <div class="col-12">
                                             <div class="p-3 bg-light border rounded-3 d-flex align-items-center justify-content-between">
                                                 <div>
                                                     <div class="fw-bold small text-dark"><i class="fas fa-shield-alt text-success me-1"></i>Armazenamento Seguro de Credenciais</div>
-                                                    <div class="text-muted small">As credenciais do provedor (API Key e Senhas) residem com segurança nas variáveis de ambiente do servidor Railway, isoladas do APK nativo.</div>
+                                                    <div class="text-muted small">As credenciais do provedor (API Key Resend) são aplicadas diretamente no ambiente seguro do servidor para despacho imediato de laudos técnicos.</div>
                                                 </div>
-                                                <span class="badge bg-success-subtle text-success border border-success-subtle">SEGURO</span>
+                                                <div class="d-flex gap-2">
+                                                    <a href="{{ url_for('configuracao_email_list') }}" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="fas fa-cog me-1"></i>Configurações SMTP
+                                                    </a>
+                                                    <a href="{{ url_for('admin_emails') }}" class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-users me-1"></i>E-mails por Obra
+                                                    </a>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1311,6 +1334,19 @@ function executarDisparoTesteEmail() {
     });
 }
 
+function toggleResendApiKeyVisibility() {
+    var input = document.getElementById('resend_api_key');
+    var icon = document.getElementById('toggleResendKeyIcon');
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        if (icon) icon.className = 'fas fa-eye';
+    }
+}
+
 function salvarConfiguracaoEmail() {
     var payload = {
         nome_remetente: document.getElementById('email_nome_remetente').value,
@@ -1318,7 +1354,8 @@ function salvarConfiguracaoEmail() {
         servidor_smtp: document.getElementById('email_servidor_smtp').value,
         porta_smtp: parseInt(document.getElementById('email_porta_smtp').value) || 587,
         template_assunto: document.getElementById('template_assunto').value,
-        template_corpo: document.getElementById('template_corpo').value
+        template_corpo: document.getElementById('template_corpo').value,
+        resend_api_key: document.getElementById('resend_api_key') ? document.getElementById('resend_api_key').value : ''
     };
     
     fetch('/admin/central/email/salvar-config', {
@@ -1332,7 +1369,7 @@ function salvarConfiguracaoEmail() {
     .then(function(res) { return res.json(); })
     .then(function(data) {
         if (data.success) {
-            alert('Configurações de e-mail salvas com sucesso!');
+            alert('Configurações de e-mail e Resend salvas com sucesso!');
         } else {
             alert('Erro ao salvar: ' + (data.error || 'Erro no servidor'));
         }
@@ -1412,5 +1449,17 @@ function executarCompilacaoRealApk() {
 function sincronizarDadosComServidor() {
     window.location.reload();
 }
+
+// Ativar aba correspondente quando URL contiver hash (ex: #tab-email)
+document.addEventListener('DOMContentLoaded', function() {
+    var hash = window.location.hash;
+    if (hash) {
+        var triggerEl = document.querySelector('button[data-bs-target="' + hash + '"]') || document.getElementById(hash.replace('#', '') + '-btn');
+        if (triggerEl) {
+            var tab = new bootstrap.Tab(triggerEl);
+            tab.show();
+        }
+    }
+});
 </script>
 {% endblock %}

@@ -371,8 +371,14 @@ class ReportApprovalEmailService:
         Retorna o resultado real do envio.
         """
         try:
+            import email_service_unified
+            return email_service_unified.get_email_service().send_approval_email(relatorio, pdf_path)
+        except Exception as e:
+            current_app.logger.warning(f"Delegando para envio local por aviso em email_service_unified: {e}")
+
+        try:
             current_app.logger.info(f"\n{'='*70}")
-            current_app.logger.info(f"📧 INICIANDO ENVIO DE EMAIL - RELATÓRIO {relatorio.numero}")
+            current_app.logger.info(f"📧 INICIANDO ENVIO DE EMAIL (LOCAL RESEND) - RELATÓRIO {relatorio.numero}")
             current_app.logger.info(f"{'='*70}")
             
             recipients = self._get_recipients_for_report(relatorio)

@@ -24,14 +24,35 @@ class UnifiedReportEmailService:
     """Serviço centralizado de envio de emails para relatórios"""
     
     def __init__(self):
-        # API key vem das variáveis de ambiente
-        self.api_key = os.getenv('RESEND_API_KEY', '')
-        self.from_email = os.getenv('RESEND_FROM_EMAIL', 'relatorios@elpconsultoria.eng.br')
         self.resend_endpoint = "https://api.resend.com/emails"
+        self.reload_config()
+    
+    def reload_config(self):
+        """Recarrega configurações do ambiente e do banco de dados"""
+        self.api_key = os.getenv('RESEND_API_KEY', '').strip()
+        self.from_email = os.getenv('RESEND_FROM_EMAIL', 'relatorios@elpconsultoria.eng.br').strip()
+        self.from_name = "ELP Consultoria & Engenharia"
         
-        logger.info(f"📧 Serviço Unified de Email inicializado")
-        logger.info(f"📮 De: {self.from_email}")
-        logger.info(f"🔑 API KEY: {self.api_key[:15]}...")
+        try:
+            from models import ConfiguracaoEmail
+            config = ConfiguracaoEmail.query.filter_by(ativo=True).first()
+            if config:
+                if config.email_remetente:
+                    self.from_email = config.email_remetente.strip()
+                if config.nome_remetente:
+                    self.from_name = config.nome_remetente.strip()
+        except Exception as e:
+            logger.debug(f"ConfiguracaoEmail fallback: {e}")
+            
+        key_preview = f"{self.api_key[:10]}..." if self.api_key else "(não configurada)"
+        logger.info(f"📧 Serviço Unified de Email carregado | De: {self.sender_formatted} | API Key: {key_preview}")
+        
+    @property
+    def sender_formatted(self):
+        """Retorna remetente formatado: Nome <email@dominio.com>"""
+        if self.from_name and '<' not in self.from_email:
+            return f"{self.from_name} <{self.from_email}>"
+        return self.from_email
     
     def _find_email_by_name(self, nome):
         """
@@ -560,8 +581,13 @@ class UnifiedReportEmailService:
                 corpo_html = self._build_html_body(destinatario_nome, obra_nome, getattr(relatorio, 'data_aprovacao', None), relatorio)
                 
                 # A API do Resend suporta enviar array de emails diretamente no "to"
+                self.reload_config()
+                if not self.api_key:
+                    logger.error("❌ RESEND_API_KEY não configurada no servidor.")
+                    return {'success': False, 'enviados': 0, 'total': len(recipients), 'erros': ['RESEND_API_KEY não configurada']}
+
                 payload = {
-                    "from": self.from_email,
+                    "from": self.sender_formatted,
                     "to": valid_recipients,
                     "subject": assunto,
                     "html": corpo_html,
@@ -578,7 +604,7 @@ class UnifiedReportEmailService:
                     "Content-Type": "application/json"
                 }
                 
-                logger.info(f"   Enviando via Resend API (Batch TO)...")
+                logger.info(f"   Enviando via Resend API para {len(valid_recipients)} destinatários de '{self.sender_formatted}'...")
                 
                 # POST para Resend
                 response = requests.post(
@@ -588,15 +614,20 @@ class UnifiedReportEmailService:
                     timeout=45
                 )
                 
-                if response.status_code == 200:
+                if 200 <= response.status_code < 300:
                     response_data = response.json()
                     email_id = response_data.get('id', 'N/A')
                     enviados = len(valid_recipients)  # Todos no lote foram aceitos
-                    logger.info(f"✅ Email em lote enviado com sucesso! ID: {email_id}")
+                    logger.info(f"✅ Email em lote enviado com sucesso via Resend! ID: {email_id}")
                 else:
-                    erro = f"HTTP {response.status_code}: {response.text[:100]}"
-                    erros.append(f"Erro Master: {erro}")
-                    logger.error(f"❌ Erro ao enviar email em lote: {erro}")
+                    try:
+                        err_json = response.json()
+                        err_msg = err_json.get('message') or err_json.get('error') or response.text[:200]
+                    except Exception:
+                        err_msg = response.text[:200]
+                    erro = f"HTTP {response.status_code}: {err_msg}"
+                    erros.append(f"Erro Resend: {erro}")
+                    logger.error(f"❌ Erro ao enviar email em lote via Resend: {erro}")
             
             except Exception as e:
                 erro = f"{type(e).__name__}: {str(e)}"
@@ -684,8 +715,12 @@ class UnifiedReportEmailService:
 </html>"""
 
         try:
+            self.reload_config()
+            if not self.api_key:
+                return {'success': False, 'error': 'RESEND_API_KEY não configurada no servidor. Por favor, insira a chave da API Resend.'}
+
             payload = {
-                "from": self.from_email,
+                "from": self.sender_formatted,
                 "to": [to_email.strip().lower()],
                 "subject": subject,
                 "html": html
@@ -695,12 +730,17 @@ class UnifiedReportEmailService:
                 "Content-Type": "application/json"
             }
             response = requests.post(self.resend_endpoint, json=payload, headers=headers, timeout=30)
-            if response.status_code == 200:
+            if 200 <= response.status_code < 300:
                 res_data = response.json()
-                logger.info(f"✅ E-mail de teste enviado para {to_email} com sucesso (ID: {res_data.get('id')})")
-                return {'success': True, 'message': 'E-mail de teste enviado com sucesso!', 'id': res_data.get('id')}
+                logger.info(f"✅ E-mail de teste enviado para {to_email} com sucesso via Resend (ID: {res_data.get('id')})")
+                return {'success': True, 'message': 'E-mail de teste enviado com sucesso via Resend!', 'id': res_data.get('id')}
             else:
-                return {'success': False, 'error': f"HTTP {response.status_code}: {response.text}"}
+                try:
+                    err_json = response.json()
+                    err_msg = err_json.get('message') or err_json.get('error') or response.text
+                except Exception:
+                    err_msg = response.text
+                return {'success': False, 'error': f"Resend HTTP {response.status_code}: {err_msg}"}
         except Exception as e:
             logger.error(f"Erro no envio de teste: {e}")
             return {'success': False, 'error': str(e)}

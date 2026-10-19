@@ -49,13 +49,32 @@ class EmailServiceRelatorio:
 
             response = requests.post(self.api_url, headers=headers, json=payload, timeout=30)
 
-            if response.status_code == 200:
+            if 200 <= response.status_code < 300:
                 print(f"✅ E-mail do relatório {relatorio_id} enviado com sucesso para {destinatarios}")
                 return True
             else:
-                print(f"❌ Erro ao enviar e-mail (HTTP {response.status_code}): {response.text}")
+                print(f"❌ Erro ao enviar e-mail via Resend (HTTP {response.status_code}): {response.text}")
                 return False
 
         except Exception as e:
-            print(f"💥 Erro inesperado ao enviar e-mail: {e}")
+            print(f"💥 Erro inesperado ao enviar e-mail via Resend: {e}")
             return False
+
+def get_configuracao_ativa():
+    """Retorna a configuração de e-mail ativa no sistema"""
+    try:
+        from models import ConfiguracaoEmail
+        return ConfiguracaoEmail.query.filter_by(ativo=True).first()
+    except Exception as e:
+        print(f"Aviso ao buscar configuração ativa de e-mail: {e}")
+        return None
+
+def buscar_emails_projeto(projeto_id):
+    """Busca e-mails de clientes ativos de um projeto para recebimento de relatórios"""
+    try:
+        from models import EmailCliente
+        return EmailCliente.query.filter_by(projeto_id=projeto_id, ativo=True).all()
+    except Exception as e:
+        print(f"Aviso ao buscar e-mails do projeto: {e}")
+        return []
+

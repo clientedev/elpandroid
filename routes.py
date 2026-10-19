@@ -3020,6 +3020,10 @@ def ajustes_apk_page():
         logs_email = []
         total_emails_enviados = 0
 
+    resend_key = os.getenv('RESEND_API_KEY', '').strip()
+    resend_api_key_masked = (resend_key[:8] + '••••••••••••••••••••') if resend_key else ''
+    resend_api_key_configured = bool(resend_key)
+
     return render_template('admin/central_hub.html',
                            apk_info=apk_info,
                            total_legendas=total_legendas,
@@ -3034,7 +3038,9 @@ def ajustes_apk_page():
                            total_relatorios=total_relatorios,
                            email_config=email_config,
                            logs_email=logs_email,
-                           total_emails_enviados=total_emails_enviados)
+                           total_emails_enviados=total_emails_enviados,
+                           resend_api_key_masked=resend_api_key_masked,
+                           resend_api_key_configured=resend_api_key_configured)
 
 @app.route('/admin/central/email/testar', methods=['POST'])
 @login_required
@@ -3065,6 +3071,32 @@ def admin_central_email_salvar_config():
         
     data = request.get_json() or {}
     try:
+        # Se veio uma nova chave do Resend API, salvar no ambiente e persistir
+        resend_api_key = (data.get('resend_api_key') or '').strip()
+        if resend_api_key and not resend_api_key.startswith('••••') and '••••' not in resend_api_key:
+            os.environ['RESEND_API_KEY'] = resend_api_key
+            try:
+                base_dir = os.path.abspath(os.path.dirname(__file__))
+                env_path = os.path.join(base_dir, '.env')
+                env_lines = []
+                key_found = False
+                if os.path.exists(env_path):
+                    with open(env_path, 'r', encoding='utf-8') as f:
+                        env_lines = f.readlines()
+                new_lines = []
+                for line in env_lines:
+                    if line.startswith('RESEND_API_KEY='):
+                        new_lines.append(f'RESEND_API_KEY={resend_api_key}\n')
+                        key_found = True
+                    else:
+                        new_lines.append(line)
+                if not key_found:
+                    new_lines.append(f'RESEND_API_KEY={resend_api_key}\n')
+                with open(env_path, 'w', encoding='utf-8') as f:
+                    f.writelines(new_lines)
+            except Exception as env_err:
+                current_app.logger.warning(f"Aviso ao persistir .env: {env_err}")
+
         config = ConfiguracaoEmail.query.filter_by(ativo=True).first()
         if not config:
             config = ConfiguracaoEmail(
@@ -3093,7 +3125,15 @@ def admin_central_email_salvar_config():
                 config.template_corpo = data['template_corpo']
         
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Configurações de e-mail salvas com sucesso!'})
+
+        # Recarregar motor unificado de e-mails
+        try:
+            import email_service_unified
+            email_service_unified.get_email_service().reload_config()
+        except Exception:
+            pass
+
+        return jsonify({'success': True, 'message': 'Configurações de e-mail e Resend salvas com sucesso!'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -11832,7 +11872,147 @@ def admin_checklist_reorder():
         return jsonify({'error': f'Erro interno: {str(e)}'}), 500
 
 # =============================================================================
-# SISTEMA DE E-MAIL - ROTAS PARA ENVIO DE RELATÓRIOS POR E-MAIL
+# SISTEMA DE GERENCIAMENTO DE E-MAILS DE CLIENTES POR OBRA
+# =============================================================================
+
+@app.route('/admin/emails')
+@login_required
+def admin_emails():
+    """Painel administrativo para gerenciar todos os e-mails de clientes por obra"""
+    if not (current_user.is_master or current_user.is_developer):
+        flash('Acesso negado. Apenas administradores podem acessar esta área.', 'error')
+        return redirect(url_for('index'))
+    
+    # Buscar projetos que possuem e-mails ativos cadastrados
+    projetos_com_emails = Projeto.query.join(EmailCliente).filter(EmailCliente.ativo == True).distinct().order_by(Projeto.nome).all()
+    
+    # Estatísticas
+    total_emails = EmailCliente.query.filter_by(ativo=True).count()
+    emails_principais = EmailCliente.query.filter_by(ativo=True).count()
+    projetos_sem_email = Projeto.query.filter(~Projeto.id.in_(
+        db.session.query(EmailCliente.projeto_id).filter_by(ativo=True).distinct()
+    )).count()
+    
+    return render_template('emails/admin.html', 
+                         projetos=projetos_com_emails, 
+                         total_emails=total_emails,
+                         emails_principais=emails_principais,
+                         projetos_sem_email=projetos_sem_email)
+
+@app.route('/projetos/<int:projeto_id>/emails')
+@login_required
+def projeto_emails(projeto_id):
+    """Lista todos os e-mails de clientes de um projeto/obra"""
+    projeto = Projeto.query.get_or_404(projeto_id)
+    emails = EmailCliente.query.filter_by(projeto_id=projeto_id, ativo=True).order_by(
+        EmailCliente.nome_contato
+    ).all()
+    
+    return render_template('emails/list.html', projeto=projeto, emails=emails)
+
+@app.route('/projetos/<int:projeto_id>/emails/novo', methods=['GET', 'POST'])
+@login_required
+def novo_email_cliente(projeto_id):
+    """Adiciona novo e-mail/contato de cliente ao projeto"""
+    projeto = Projeto.query.get_or_404(projeto_id)
+    form = EmailClienteForm()
+    
+    if form.validate_on_submit():
+        email_clean = (form.email.data or '').lower().strip() or None
+        if email_clean:
+            email_existente = EmailCliente.query.filter_by(
+                projeto_id=projeto_id,
+                email=email_clean,
+                ativo=True
+            ).first()
+            if email_existente:
+                flash('Este e-mail já está cadastrado para este projeto.', 'error')
+                return render_template('emails/form.html', form=form, projeto=projeto, titulo='Novo E-mail de Cliente')
+        
+        email_cliente = EmailCliente(
+            projeto_id=projeto_id,
+            email=email_clean,
+            nome_contato=form.nome_contato.data.strip(),
+            cargo=form.cargo.data or None,
+            empresa=form.empresa.data or None,
+            telefone=form.telefone.data or None,
+            receber_notificacoes=form.receber_notificacoes.data,
+            receber_relatorios=form.receber_relatorios.data,
+            ativo=form.ativo.data
+        )
+        
+        try:
+            db.session.add(email_cliente)
+            db.session.commit()
+            flash(f'Contato {email_cliente.nome_contato} adicionado com sucesso!', 'success')
+            return redirect(url_for('projeto_emails', projeto_id=projeto_id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao adicionar contato: {str(e)}', 'error')
+    
+    return render_template('emails/form.html', form=form, projeto=projeto, titulo='Novo E-mail de Cliente')
+
+@app.route('/emails/<int:email_id>/editar', methods=['GET', 'POST'])
+@login_required
+def editar_email_cliente(email_id):
+    """Edita e-mail/contato de cliente"""
+    email_cliente = EmailCliente.query.get_or_404(email_id)
+    projeto = email_cliente.projeto
+    form = EmailClienteForm(obj=email_cliente)
+    
+    if form.validate_on_submit():
+        email_clean = (form.email.data or '').lower().strip() or None
+        if email_clean:
+            email_existente = EmailCliente.query.filter_by(
+                projeto_id=projeto.id,
+                email=email_clean,
+                ativo=True
+            ).filter(EmailCliente.id != email_id).first()
+            
+            if email_existente:
+                flash('Este e-mail já está cadastrado para este projeto.', 'error')
+                return render_template('emails/form.html', form=form, projeto=projeto, titulo='Editar E-mail de Cliente')
+        
+        email_cliente.email = email_clean
+        email_cliente.nome_contato = form.nome_contato.data.strip()
+        email_cliente.cargo = form.cargo.data or None
+        email_cliente.empresa = form.empresa.data or None
+        email_cliente.telefone = form.telefone.data or None
+        email_cliente.receber_notificacoes = form.receber_notificacoes.data
+        email_cliente.receber_relatorios = form.receber_relatorios.data
+        email_cliente.ativo = form.ativo.data
+        email_cliente.updated_at = brazil_now()
+        
+        try:
+            db.session.commit()
+            flash('Contato atualizado com sucesso!', 'success')
+            return redirect(url_for('projeto_emails', projeto_id=projeto.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao atualizar contato: {str(e)}', 'error')
+    
+    return render_template('emails/form.html', form=form, projeto=projeto, titulo='Editar E-mail de Cliente')
+
+@app.route('/emails/<int:email_id>/remover', methods=['POST'])
+@login_required
+def remover_email_cliente(email_id):
+    """Remove (desativa) e-mail de cliente"""
+    email_cliente = EmailCliente.query.get_or_404(email_id)
+    projeto_id = email_cliente.projeto_id
+    
+    try:
+        email_cliente.ativo = False
+        email_cliente.updated_at = brazil_now()
+        db.session.commit()
+        flash('E-mail removido com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao remover e-mail: {str(e)}', 'error')
+    
+    return redirect(url_for('projeto_emails', projeto_id=projeto_id))
+
+# =============================================================================
+# CONFIGURAÇÃO DE E-MAILS (SMTP / RESEND / TEMPLATES)
 # =============================================================================
 
 @app.route('/admin/configuracao-email')
@@ -11857,7 +12037,6 @@ def configuracao_email_nova():
     form = ConfiguracaoEmailForm()
     if form.validate_on_submit():
         try:
-            # Se marcar como ativo, desativar outras configurações
             if form.ativo.data:
                 ConfiguracaoEmail.query.filter_by(ativo=True).update({'ativo': False})
 
@@ -11876,6 +12055,13 @@ def configuracao_email_nova():
 
             db.session.add(config)
             db.session.commit()
+            
+            try:
+                import email_service_unified
+                email_service_unified.get_email_service().reload_config()
+            except Exception:
+                pass
+
             flash('Configuração de e-mail criada com sucesso!', 'success')
             return redirect(url_for('configuracao_email_list'))
         except Exception as e:
@@ -11884,6 +12070,141 @@ def configuracao_email_nova():
 
     return render_template('admin/configuracao_email_form.html', form=form, title='Nova Configuração de E-mail')
 
+@app.route('/admin/configuracao-email/<int:config_id>/editar', methods=['GET', 'POST'])
+@login_required
+def configuracao_email_editar(config_id):
+    """Editar configuração de e-mail existente"""
+    if not (current_user.is_master or current_user.is_developer):
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+
+    config = ConfiguracaoEmail.query.get_or_404(config_id)
+    form = ConfiguracaoEmailForm(obj=config)
+
+    if form.validate_on_submit():
+        try:
+            if form.ativo.data and not config.ativo:
+                ConfiguracaoEmail.query.filter_by(ativo=True).update({'ativo': False})
+
+            config.nome_configuracao = form.nome_configuracao.data
+            config.servidor_smtp = form.servidor_smtp.data
+            config.porta_smtp = form.porta_smtp.data
+            config.use_tls = form.use_tls.data
+            config.use_ssl = form.use_ssl.data
+            config.email_remetente = form.email_remetente.data
+            config.nome_remetente = form.nome_remetente.data
+            config.template_assunto = form.template_assunto.data or "Relatório do Projeto {projeto_nome} - {data}"
+            config.template_corpo = form.template_corpo.data or ""
+            config.ativo = form.ativo.data
+
+            db.session.commit()
+
+            try:
+                import email_service_unified
+                email_service_unified.get_email_service().reload_config()
+            except Exception:
+                pass
+
+            flash('Configuração de e-mail atualizada com sucesso!', 'success')
+            return redirect(url_for('configuracao_email_list'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Erro ao salvar configuração: {str(e)}', 'error')
+
+    return render_template('admin/configuracao_email_form.html', form=form, title='Editar Configuração de E-mail')
+
+@app.route('/admin/configuracao-email/<int:config_id>/ativar', methods=['POST'])
+@login_required
+def configuracao_email_ativar(config_id):
+    """Ativar configuração de e-mail"""
+    if not (current_user.is_master or current_user.is_developer):
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    try:
+        ConfiguracaoEmail.query.filter_by(ativo=True).update({'ativo': False})
+        config = ConfiguracaoEmail.query.get_or_404(config_id)
+        config.ativo = True
+        db.session.commit()
+        try:
+            import email_service_unified
+            email_service_unified.get_email_service().reload_config()
+        except Exception:
+            pass
+        flash(f'Configuração "{config.nome_configuracao}" ativada!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao ativar: {str(e)}', 'error')
+    return redirect(url_for('configuracao_email_list'))
+
+@app.route('/admin/configuracao-email/<int:config_id>/deletar', methods=['POST'])
+@login_required
+def configuracao_email_deletar(config_id):
+    """Deletar configuração de e-mail"""
+    if not (current_user.is_master or current_user.is_developer):
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    try:
+        config = ConfiguracaoEmail.query.get_or_404(config_id)
+        db.session.delete(config)
+        db.session.commit()
+        flash('Configuração de e-mail removida com sucesso!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao remover: {str(e)}', 'error')
+    return redirect(url_for('configuracao_email_list'))
+
+@app.route('/relatorio/<int:relatorio_id>/enviar-email', methods=['GET', 'POST'])
+@login_required
+def relatorio_enviar_email(relatorio_id):
+    """Enviar relatório por e-mail manualmente"""
+    relatorio = Relatorio.query.get_or_404(relatorio_id)
+    
+    # Verificar se o usuário tem acesso ao projeto
+    if not current_user.is_master and relatorio.projeto and relatorio.projeto.responsavel_id != current_user.id:
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    
+    # Buscar e-mails do projeto
+    emails_projeto = EmailCliente.query.filter_by(projeto_id=relatorio.projeto.id, ativo=True).all() if relatorio.projeto else []
+    
+    form = EnvioEmailForm()
+    if emails_projeto:
+        form.destinatarios.choices = [
+            (e.email, f"{e.nome_contato} ({e.email}) - {e.cargo or 'N/A'}")
+            for e in emails_projeto if e.email
+        ]
+    else:
+        form.destinatarios.choices = []
+
+    config_ativa = ConfiguracaoEmail.query.filter_by(ativo=True).first()
+    
+    if request.method == 'POST' and form.validate_on_submit():
+        try:
+            import pdf_generator_weasy
+            pdf_path = pdf_generator_weasy.gerar_pdf_relatorio(relatorio.id)
+            if not pdf_path or not os.path.exists(pdf_path):
+                flash('Erro ao gerar o arquivo PDF do laudo.', 'error')
+                return render_template('email/enviar_relatorio.html', form=form, relatorio=relatorio, config=config_ativa)
+            
+            import email_service_unified
+            svc = email_service_unified.get_email_service()
+            destinatarios = form.destinatarios.data or []
+            
+            if form.cc_emails.data:
+                for line in form.cc_emails.data.split('\n'):
+                    for email_item in line.split(','):
+                        clean_item = email_item.strip().lower()
+                        if clean_item and '@' in clean_item and clean_item not in destinatarios:
+                            destinatarios.append(clean_item)
+                            
+            res = svc.send_approval_email(relatorio, pdf_path)
+            if res.get('success'):
+                flash('Relatório despachado por e-mail com sucesso via Resend!', 'success')
+                return redirect(url_for('report_view', report_id=relatorio_id))
+            else:
+                flash(f'Erro ao despachar e-mail: {res.get("error", "Falha no envio")}', 'error')
+        except Exception as e:
+            flash(f'Erro interno no envio: {str(e)}', 'error')
+
+    return render_template('email/enviar_relatorio.html', form=form, relatorio=relatorio, config=config_ativa)
 
 @app.route('/relatorio/<int:relatorio_id>/preview-email')
 @login_required
@@ -11892,29 +12213,23 @@ def relatorio_preview_email(relatorio_id):
     relatorio = Relatorio.query.get_or_404(relatorio_id)
 
     # Verificar acesso
-    if not current_user.is_master and relatorio.projeto.responsavel_id != current_user.id:
+    if not current_user.is_master and relatorio.projeto and relatorio.projeto.responsavel_id != current_user.id:
         return jsonify({'error': 'Acesso negado'}), 403
 
     # Buscar configuração ativa
-    config = email_service.get_configuracao_ativa()
-    if not config:
-        return jsonify({'error': 'Nenhuma configuração de e-mail ativa'}), 400
+    config = ConfiguracaoEmail.query.filter_by(ativo=True).first()
+    template_assunto = config.template_assunto if config and config.template_assunto else "Relatório de visita do dia {{data_relatorio}} – Obra {{nome_obra}}"
+    template_corpo = config.template_corpo if config and config.template_corpo else "<p>Prezados,</p><p>Segue em anexo o relatório oficial de vistoria técnica da obra <strong>{{nome_obra}}</strong>, realizada em {{data_relatorio}}.</p>"
 
     # Preparar dados do preview
     projeto = relatorio.projeto
     data_visita = relatorio.data_visita.strftime('%d/%m/%Y') if relatorio.data_visita else 'N/A'
-    data_atual = now_brt().strftime('%d/%m/%Y')
+    obra_nome = projeto.nome if projeto else "Obra"
+    resp_nome = current_user.nome_completo or current_user.username
+    num_rel = relatorio.numero or f"#{relatorio.id}"
 
-    assunto = config.template_assunto.format(
-        projeto_nome=projeto.nome,
-        data=data_atual
-    )
-
-    corpo_html = config.template_corpo.format(
-        nome_cliente="[Nome do Cliente]",
-        data_visita=data_visita,
-        projeto_nome=projeto.nome
-    )
+    assunto = template_assunto.replace('{{nome_obra}}', obra_nome).replace('{{data_relatorio}}', data_visita).replace('{{numero_relatorio}}', num_rel).replace('{projeto_nome}', obra_nome).replace('{data}', data_visita)
+    corpo_html = template_corpo.replace('{{nome_obra}}', obra_nome).replace('{{data_relatorio}}', data_visita).replace('{{numero_relatorio}}', num_rel).replace('{{nome_responsavel}}', resp_nome).replace('{nome_cliente}', 'Cliente').replace('{data_visita}', data_visita).replace('{projeto_nome}', obra_nome)
 
     return jsonify({
         'assunto': assunto,
