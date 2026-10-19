@@ -312,7 +312,7 @@ class UnifiedReportEmailService:
             return {'emails': [], 'por_tipo': {}, 'total': 0}
     
     def _build_html_body(self, destinatario_nome, obra_nome, data_aprovacao, relatorio=None):
-        """Cria HTML do email com styling profissional e texto customizado"""
+        """Cria HTML do email com substituição de variáveis dinâmicas e fallback profissional"""
         if not data_aprovacao:
             data_aprovacao = datetime.now()
         
@@ -321,20 +321,90 @@ class UnifiedReportEmailService:
         # Identificar autor do preenchimento para contato
         contato_nome = "Equipe ELP"
         contato_email = "contato@elpconsultoria.eng.br"
+        numero_relatorio = "N/A"
+        status_relatorio = "Aprovado"
+        observacoes = ""
+        link_relatorio = "#"
         
         try:
             if relatorio:
+                numero_relatorio = str(getattr(relatorio, 'numero', 'N/A') or 'N/A')
+                status_relatorio = str(getattr(relatorio, 'status', 'Aprovado') or 'Aprovado')
+                observacoes = str(getattr(relatorio, 'observacoes', '') or getattr(relatorio, 'descricao', '') or '')
+                r_id = getattr(relatorio, 'id', None)
+                if r_id:
+                    link_relatorio = f"https://obraflowandroid-production.up.railway.app/relatorio/{r_id}"
+
                 autor = getattr(relatorio, 'autor', None)
                 if not autor and hasattr(relatorio, 'autor_id'):
                     from models import User
                     autor = User.query.get(relatorio.autor_id)
                 
                 if autor:
-                    contato_nome = getattr(autor, 'nome_completo', 'Autor')
-                    contato_email = getattr(autor, 'email', '')
+                    contato_nome = getattr(autor, 'nome_completo', None) or getattr(autor, 'username', 'Autor')
+                    contato_email = getattr(autor, 'email', 'contato@elpconsultoria.eng.br')
         except Exception as e:
-            logger.warning(f"Erro ao obter autor para contato: {e}")
+            logger.warning(f"Erro ao obter dados do relatório para template: {e}")
 
+        # 1. Tentar carregar modelo customizado ativo de ConfiguracaoEmail
+        try:
+            from models import ConfiguracaoEmail
+            config_email = ConfiguracaoEmail.query.filter_by(ativo=True).first()
+            if config_email and config_email.template_corpo and len(config_email.template_corpo.strip()) > 20:
+                tpl = config_email.template_corpo
+                # Substituir variáveis dinâmicas {{...}} e {...}
+                replacements = {
+                    '{{nome_responsavel}}': contato_nome,
+                    '{nome_responsavel}': contato_nome,
+                    '{nome_cliente}': destinatario_nome or 'Prezados',
+                    '{{nome_obra}}': obra_nome or 'Obra',
+                    '{projeto_nome}': obra_nome or 'Obra',
+                    '{{numero_relatorio}}': numero_relatorio,
+                    '{numero_relatorio}': numero_relatorio,
+                    '{{data_relatorio}}': data_str,
+                    '{data_visita}': data_str,
+                    '{data}': data_str,
+                    '{{status_relatorio}}': status_relatorio,
+                    '{{observacoes}}': observacoes,
+                    '{{link_relatorio}}': link_relatorio,
+                }
+                for var_tag, var_val in replacements.items():
+                    tpl = tpl.replace(var_tag, var_val)
+                
+                # Se não contiver tags HTML completas, envelopar com estrutura profissional
+                if '<html' not in tpl.lower():
+                    tpl = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f8fafc; margin: 0; padding: 24px; color: #1e293b; }}
+        .email-container {{ max-width: 620px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }}
+        .email-header {{ background: #0f172a; padding: 24px 28px; color: #ffffff; border-bottom: 3px solid #2563eb; }}
+        .email-body {{ padding: 28px; line-height: 1.6; font-size: 15px; color: #334155; }}
+        .email-footer {{ background: #f8fafc; padding: 18px 28px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #ffffff;">ELP Consultoria & Engenharia</h2>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: #94a3b8;">Laudos Técnicos e Acompanhamento de Obras</p>
+        </div>
+        <div class="email-body">
+            {tpl}
+        </div>
+        <div class="email-footer">
+            <p style="margin: 0;">Este é um comunicado oficial gerado pelo sistema <strong>ELP ObraFlow</strong>.</p>
+        </div>
+    </div>
+</body>
+</html>"""
+                return tpl
+        except Exception as tpl_err:
+            logger.debug(f"Aviso ao renderizar template customizado: {tpl_err}")
+
+        # 2. Fallback padrão profissional
         html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -342,37 +412,53 @@ class UnifiedReportEmailService:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * {{ margin: 0; padding: 0; }}
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }}
-        .wrapper {{ background: #f5f5f5; padding: 20px 0; }}
-        .container {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-top: 4px solid #333; }}
-        .header {{ background: #ffffff; color: #333; padding: 30px 20px 10px; border-bottom: 2px solid #f0f0f0; }}
-        .header h1 {{ font-size: 24px; margin-bottom: 5px; font-weight: 500; }}
-        .content {{ padding: 30px 20px; line-height: 1.6; color: #444; }}
-        .content p {{ margin-bottom: 15px; }}
-        .highlight {{ color: #222; font-weight: 600; }}
-        .footer {{ background: #fafafa; padding: 20px; font-size: 13px; text-align: center; color: #666; border-top: 1px solid #eee; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #f8fafc; }}
+        .wrapper {{ background: #f8fafc; padding: 24px 12px; }}
+        .container {{ max-width: 620px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0; }}
+        .header {{ background: #0f172a; color: #ffffff; padding: 28px 24px 20px; border-bottom: 4px solid #2563eb; }}
+        .header h1 {{ font-size: 22px; margin-bottom: 4px; font-weight: 800; color: #ffffff; }}
+        .header p {{ font-size: 13px; color: #94a3b8; }}
+        .content {{ padding: 28px 24px; line-height: 1.6; color: #334155; font-size: 15px; }}
+        .content p {{ margin-bottom: 16px; }}
+        .highlight {{ color: #0f172a; font-weight: 700; }}
+        .card-details {{ background: #f1f5f9; border-radius: 8px; padding: 16px; margin: 20px 0; border-left: 4px solid #2563eb; }}
+        .card-details div {{ margin-bottom: 6px; font-size: 14px; }}
+        .card-details div:last-child {{ margin-bottom: 0; }}
+        .footer {{ background: #f8fafc; padding: 20px; font-size: 13px; text-align: center; color: #64748b; border-top: 1px solid #e2e8f0; }}
     </style>
 </head>
 <body>
     <div class="wrapper">
         <div class="container">
             <div class="header">
-                <h1>Relatório de Obra</h1>
+                <h1>ELP Consultoria & Engenharia</h1>
+                <p>Relatório Técnico Oficial de Vistoria de Obra</p>
             </div>
             
             <div class="content">
                 <p>Prezados,</p>
                 
-                <p>Segue em anexo o relatório de visita da obra <span class="highlight">{obra_nome}</span>.</p>
+                <p>Segue em anexo o relatório oficial de vistoria técnica da obra <span class="highlight">{obra_nome}</span>.</p>
                 
-                <p>Para esclarecimentos, entre em contato com <strong>{contato_nome}</strong> através do e-mail <a href="mailto:{contato_email}" style="color: #0056b3; text-decoration: none;">{contato_email}</a>.</p>
+                <div class="card-details">
+                    <div><strong>Empreendimento:</strong> {obra_nome}</div>
+                    <div><strong>Relatório:</strong> {numero_relatorio}</div>
+                    <div><strong>Data da Vistoria:</strong> {data_str}</div>
+                    <div><strong>Responsável Técnico:</strong> {contato_nome}</div>
+                    <div><strong>Situação:</strong> <span style="color: #059669; font-weight: 700;">{status_relatorio}</span></div>
+                </div>
+
+                <p>Para esclarecimentos técnicos ou dúvidas sobre as observações apontadas, favor contatar o responsável através do e-mail <a href="mailto:{contato_email}" style="color: #2563eb; font-weight: 600; text-decoration: none;">{contato_email}</a>.</p>
                 
-                <p style="margin-top: 30px;">Atenciosamente,<br/>
-                <strong>ELP Consultoria</strong></p>
+                <p style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                    Atenciosamente,<br/>
+                    <strong>ELP Consultoria e Engenharia</strong><br/>
+                    <span style="font-size: 13px; color: #64748b;">Engenharia Civil, Diagnósticos & Fachadas</span>
+                </p>
             </div>
             
             <div class="footer">
-                <p>Este é um e-mail automático do sistema de relatório elp</p>
+                <p>Este é um e-mail automático gerado pelo sistema <strong>ELP ObraFlow</strong>.</p>
             </div>
         </div>
     </div>
@@ -434,6 +520,19 @@ class UnifiedReportEmailService:
                 
             assunto = f"Relatório de visita do dia {data_visita_str} – Obra {obra_nome}"
             
+            # Anti-duplicação: verificar se este relatório já foi enviado com sucesso
+            try:
+                from models import LogEnvioEmail
+                r_id = getattr(relatorio, 'id', None)
+                if r_id and str(r_id).isdigit():
+                    if hasattr(relatorio, 'projeto_id'):
+                        existing_log = LogEnvioEmail.query.filter_by(relatorio_id=int(r_id), status='enviado').first()
+                        if existing_log:
+                            logger.info(f"ℹ️ [Anti-Duplicação] E-mail para relatório #{r_id} já foi enviado em {existing_log.data_envio}. Ignorando disparo duplicado.")
+                            return {'success': True, 'enviados': 0, 'total': len(recipients), 'duplicado': True, 'erros': []}
+            except Exception as dedup_err:
+                logger.debug(f"Aviso na verificação de anti-duplicação: {dedup_err}")
+
             # Enviar para TODOS os destinatários numa única chamada (usando array no campo "to")
             enviados = 0
             erros = []
@@ -504,6 +603,32 @@ class UnifiedReportEmailService:
                 erros.append(f"Exceção Batch: {erro}")
                 logger.error(f"❌ Exceção ao enviar email em lote: {erro}", exc_info=True)
             
+            # Registrar log no banco de dados para auditoria, histórico e reprocessamento
+            try:
+                from models import LogEnvioEmail, brazil_now
+                from app import db
+                
+                p_id = getattr(relatorio, 'projeto_id', None)
+                r_id = getattr(relatorio, 'id', None)
+                u_id = getattr(relatorio, 'autor_id', None) or getattr(relatorio, 'aprovador_id', None) or 1
+                
+                if p_id and r_id and str(p_id).isdigit() and str(r_id).isdigit():
+                    log_entry = LogEnvioEmail(
+                        projeto_id=int(p_id),
+                        relatorio_id=int(r_id),
+                        usuario_id=int(u_id) if u_id and str(u_id).isdigit() else 1,
+                        destinatarios=json.dumps(valid_recipients if 'valid_recipients' in locals() else list(recipients)),
+                        assunto=assunto,
+                        status='enviado' if enviados > 0 else 'falhou',
+                        erro_detalhes="; ".join(erros) if erros else None,
+                        data_envio=brazil_now()
+                    )
+                    db.session.add(log_entry)
+                    db.session.commit()
+                    logger.info(f"💾 Log de envio registrado com sucesso (ID #{log_entry.id})")
+            except Exception as log_err:
+                logger.debug(f"Aviso ao registrar LogEnvioEmail: {log_err}")
+
             # Resultado final
             resultado = {
                 'success': enviados > 0,
@@ -528,6 +653,58 @@ class UnifiedReportEmailService:
             logger.error(f"❌ ERRO CRÍTICO ao enviar emails: {e}", exc_info=True)
             return {'success': False, 'enviados': 0, 'total': 0, 'erros': [str(e)]}
 
+    def send_test_email(self, to_email, custom_subject=None, custom_html=None):
+        """Envia e-mail de teste seguro sem alterar relatórios"""
+        if not to_email or '@' not in to_email:
+            return {'success': False, 'error': 'E-mail de destino inválido'}
+            
+        subject = custom_subject or "[TESTE] ELP ObraFlow - Validação do Serviço de E-mail"
+        now_str = datetime.now().strftime('%d/%m/%Y às %H:%M:%S')
+        html = custom_html or f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; background: #f8fafc; margin: 0;">
+    <div style="max-width: 580px; margin: 0 auto; background: #ffffff; padding: 28px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+        <div style="border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 18px;">
+            <h2 style="color: #0f172a; margin: 0; font-size: 20px;">ELP Consultoria & Engenharia</h2>
+            <span style="font-size: 13px; color: #64748b;">Central Inteligente do Aplicativo Android</span>
+        </div>
+        <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 14px 16px; border-radius: 6px; margin: 18px 0;">
+            <strong style="color: #065f46; font-size: 15px;">Teste de Comunicação Executado com Sucesso!</strong>
+            <p style="color: #047857; margin: 4px 0 0 0; font-size: 13px;">As configurações de remetente, chave de API e infraestrutura estão 100% operacionais.</p>
+        </div>
+        <p style="color: #334155; font-size: 14px; line-height: 1.5;">Este teste foi disparado sob autorização pelo painel administrativo. Nenhum laudo ou fluxo de aprovação foi alterado.</p>
+        <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 6px; font-size: 13px; color: #475569;">
+            <div><strong>Destinatário de Teste:</strong> {to_email}</div>
+            <div><strong>Data do Disparo:</strong> {now_str}</div>
+            <div><strong>Remetente Oficial:</strong> {self.from_email}</div>
+        </div>
+    </div>
+</body>
+</html>"""
+
+        try:
+            payload = {
+                "from": self.from_email,
+                "to": [to_email.strip().lower()],
+                "subject": subject,
+                "html": html
+            }
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            response = requests.post(self.resend_endpoint, json=payload, headers=headers, timeout=30)
+            if response.status_code == 200:
+                res_data = response.json()
+                logger.info(f"✅ E-mail de teste enviado para {to_email} com sucesso (ID: {res_data.get('id')})")
+                return {'success': True, 'message': 'E-mail de teste enviado com sucesso!', 'id': res_data.get('id')}
+            else:
+                return {'success': False, 'error': f"HTTP {response.status_code}: {response.text}"}
+        except Exception as e:
+            logger.error(f"Erro no envio de teste: {e}")
+            return {'success': False, 'error': str(e)}
+
 
 # Singleton global
 _email_service = None
@@ -537,3 +714,4 @@ def get_email_service():
     if _email_service is None:
         _email_service = UnifiedReportEmailService()
     return _email_service
+

@@ -121,6 +121,12 @@
                     </li>
 
                     <li class="nav-item">
+                        <a class="nav-link text-white fw-bold" href="{{ url_for('ajustes_apk_page') }}">
+                            <i class="fas fa-microchip text-primary me-1"></i> Central do APK
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
                         <a class="nav-link text-success fw-bold" href="{{ url_for('download_official_apk') }}">
                             <i class="fab fa-android me-1"></i> Baixar APK
                         </a>
@@ -137,12 +143,17 @@
                     <!-- Ajustes do APK -->
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="ajustesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-sliders-h me-1"></i> Ajustes do APK
+                            <i class="fas fa-sliders-h me-1"></i> Módulos do APK
                         </a>
                         <ul class="dropdown-menu shadow border-0" aria-labelledby="ajustesDropdown">
                             <li>
-                                <a class="dropdown-item fw-bold" href="{{ url_for('ajustes_apk_page') }}">
-                                    <i class="fas fa-cogs text-primary me-2"></i>Todos os Ajustes do APK
+                                <a class="dropdown-item fw-bold text-primary" href="{{ url_for('ajustes_apk_page') }}">
+                                    <i class="fas fa-microchip text-primary me-2"></i>Central Inteligente do APK
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('ajustes_apk_page') }}#tab-email">
+                                    <i class="fas fa-envelope-open-text text-warning me-2"></i>Gerenciamento de E-mails
                                 </a>
                             </li>
                             {% if current_user.is_master %}

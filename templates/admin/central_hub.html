@@ -1,0 +1,1416 @@
+{% extends "base.html" %}
+
+{% block title %}Central Inteligente do Aplicativo Android - ELP Consultoria{% endblock %}
+
+{% block extra_head %}
+<style>
+:root {
+    --primary-blue: #2563eb;
+    --primary-dark: #0f172a;
+    --accent-cyan: #06b6d4;
+    --surface-card: #ffffff;
+    --border-subtle: #e2e8f0;
+    --bg-app: #f8fafc;
+}
+
+body {
+    background-color: var(--bg-app);
+}
+
+/* Sidebar e Abas da Central */
+.central-container {
+    padding: 1.5rem 1rem;
+}
+
+.hub-nav-pills {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid var(--border-subtle);
+    padding: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+.hub-nav-pills .nav-link {
+    color: #475569;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 10px 16px;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: none;
+    margin-bottom: 4px;
+}
+
+.hub-nav-pills .nav-link:hover {
+    background: #f1f5f9;
+    color: var(--primary-blue);
+}
+
+.hub-nav-pills .nav-link.active {
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.hub-nav-pills .nav-link.active i {
+    color: #ffffff !important;
+}
+
+.hub-nav-pills .nav-link.tab-highlight {
+    border-left: 4px solid #f59e0b;
+}
+
+/* Cards e Módulos */
+.module-card {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+}
+
+.module-card:hover {
+    box-shadow: 0 6px 18px rgba(0,0,0,0.05);
+}
+
+.module-header {
+    background: #ffffff;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.module-body {
+    padding: 24px;
+}
+
+/* Badges e Categorização */
+.badge-cat-a {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.badge-cat-b {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.badge-cat-c {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+/* Stat Cards */
+.stat-box {
+    background: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.02);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.stat-val {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+}
+
+.stat-lbl {
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* Custom Table Styles */
+.table-custom {
+    font-size: 0.88rem;
+}
+.table-custom th {
+    background-color: #f8fafc;
+    color: #475569;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    border-bottom: 2px solid #e2e8f0;
+}
+.table-custom td {
+    vertical-align: middle;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid central-container">
+    <!-- Header Principal da Central -->
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center pb-3 mb-4 border-bottom gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary fw-bold"><i class="fas fa-microchip me-1"></i>CENTRAL INTELIGENTE</span>
+                <span class="badge bg-success fw-bold"><i class="fas fa-check-circle me-1"></i>PRODUÇÃO OPERACIONAL</span>
+                <span class="badge bg-dark fw-bold" id="badgeVersaoCentral">APK v{{ apk_info.version if apk_info else '1.0.37' }} (BUILD {{ apk_info.version_code if apk_info else '37' }})</span>
+            </div>
+            <h1 class="h3 fw-bold text-dark mb-0">
+                <i class="fab fa-android text-success me-2"></i>Central de Gerenciamento do Aplicativo Android
+            </h1>
+            <p class="text-muted small mb-0 mt-1">
+                Central de parametrização dinâmica, inteligência de negócio, auditoria, motor de e-mails e orquestrador de versões do aplicativo.
+            </p>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-primary fw-bold btn-sm" onclick="sincronizarDadosComServidor()">
+                <i class="fas fa-sync-alt me-1"></i> Atualizar Dados
+            </button>
+            <a href="{{ url_for('download_official_apk') }}" class="btn btn-outline-success fw-bold btn-sm">
+                <i class="fas fa-download me-1"></i> Baixar ELP.apk
+            </a>
+            <button class="btn btn-primary fw-bold btn-sm shadow-sm" onclick="abrirModalAtualizarApk()">
+                <i class="fas fa-rocket me-1"></i> Atualizar APK Oficial
+            </button>
+        </div>
+    </div>
+
+    <!-- Layout em Grid: Menu de Módulos (Sidebar) + Conteúdo Dinâmico -->
+    <div class="row g-4">
+        <!-- Coluna Esquerda: Navegação dos Módulos -->
+        <div class="col-lg-3 col-xl-2">
+            <div class="hub-nav-pills nav flex-column nav-pills sticky-top" style="top: 20px; z-index: 100;" id="v-pills-tab" role="tablist">
+                <button class="nav-link active" id="tab-overview-btn" data-bs-toggle="pill" data-bs-target="#tab-overview" type="button" role="tab">
+                    <i class="fas fa-tachometer-alt"></i> Visão Geral
+                </button>
+                <button class="nav-link tab-highlight" id="tab-email-btn" data-bs-toggle="pill" data-bs-target="#tab-email" type="button" role="tab">
+                    <i class="fas fa-envelope-open-text text-warning"></i> Gerenciar E-mails
+                </button>
+                <button class="nav-link" id="tab-screens-btn" data-bs-toggle="pill" data-bs-target="#tab-screens" type="button" role="tab">
+                    <i class="fas fa-mobile-alt text-primary"></i> Editor do APK
+                </button>
+                <button class="nav-link" id="tab-actions-btn" data-bs-toggle="pill" data-bs-target="#tab-actions" type="button" role="tab">
+                    <i class="fas fa-sliders-h text-info"></i> Botões & Ações
+                </button>
+                <button class="nav-link" id="tab-reports-btn" data-bs-toggle="pill" data-bs-target="#tab-reports" type="button" role="tab">
+                    <i class="fas fa-file-invoice text-success"></i> Relatórios & Laudos
+                </button>
+                <button class="nav-link" id="tab-projects-btn" data-bs-toggle="pill" data-bs-target="#tab-projects" type="button" role="tab">
+                    <i class="fas fa-building text-secondary"></i> Obras & Canteiros
+                </button>
+                <button class="nav-link" id="tab-users-btn" data-bs-toggle="pill" data-bs-target="#tab-users" type="button" role="tab">
+                    <i class="fas fa-users-cog text-danger"></i> Usuários & Cargos
+                </button>
+                <button class="nav-link" id="tab-rules-btn" data-bs-toggle="pill" data-bs-target="#tab-rules" type="button" role="tab">
+                    <i class="fas fa-user-check text-purple"></i> Regras & Aprovações
+                </button>
+                <button class="nav-link" id="tab-forms-btn" data-bs-toggle="pill" data-bs-target="#tab-forms" type="button" role="tab">
+                    <i class="fas fa-tasks text-warning"></i> Formulários & Legendas
+                </button>
+                <button class="nav-link" id="tab-sync-btn" data-bs-toggle="pill" data-bs-target="#tab-sync" type="button" role="tab">
+                    <i class="fas fa-cloud-upload-alt text-teal"></i> Diagnóstico Offline
+                </button>
+                <button class="nav-link text-success fw-bold" id="tab-version-btn" data-bs-toggle="pill" data-bs-target="#tab-version" type="button" role="tab">
+                    <i class="fas fa-code-branch"></i> Versões & Compilar
+                </button>
+            </div>
+        </div>
+
+        <!-- Coluna Direita: Conteúdo das Abas -->
+        <div class="col-lg-9 col-xl-10">
+            <div class="tab-content" id="v-pills-tabContent">
+                
+                <!-- ========================================== -->
+                <!-- MÓDULO 1: VISÃO GERAL DO SISTEMA           -->
+                <!-- ========================================== -->
+                <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+                    <!-- Cards de Estatísticas -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-6 col-xl-3">
+                            <div class="stat-box">
+                                <div class="stat-icon bg-primary-subtle text-primary">
+                                    <i class="fab fa-android"></i>
+                                </div>
+                                <div>
+                                    <div class="stat-val">{{ apk_info.version if apk_info else '1.0.37' }}</div>
+                                    <div class="stat-lbl">Versão Oficial (Build {{ apk_info.version_code if apk_info else '37' }})</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-xl-3">
+                            <div class="stat-box">
+                                <div class="stat-icon bg-success-subtle text-success">
+                                    <i class="fas fa-building"></i>
+                                </div>
+                                <div>
+                                    <div class="stat-val">{{ total_projetos if total_projetos is defined else 'Ativas' }}</div>
+                                    <div class="stat-lbl">Obras Cadastradas</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-xl-3">
+                            <div class="stat-box">
+                                <div class="stat-icon bg-info-subtle text-info">
+                                    <i class="fas fa-file-alt"></i>
+                                </div>
+                                <div>
+                                    <div class="stat-val">{{ total_relatorios if total_relatorios is defined else 'Ativos' }}</div>
+                                    <div class="stat-lbl">Relatórios Emitidos</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-xl-3">
+                            <div class="stat-box">
+                                <div class="stat-icon bg-warning-subtle text-warning">
+                                    <i class="fas fa-envelope"></i>
+                                </div>
+                                <div>
+                                    <div class="stat-val">{{ total_emails_enviados if total_emails_enviados is defined else '100%' }}</div>
+                                    <div class="stat-lbl">Entregas de E-mail</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Categorização dos Recursos -->
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <h5 class="fw-bold mb-1"><i class="fas fa-layer-group text-primary me-2"></i>Matriz de Recursos & Nível de Configuração</h5>
+                                <p class="text-muted small mb-0">Classificação oficial das capacidades do sistema conforme a regra de estabilidade operacional.</p>
+                            </div>
+                            <span class="badge bg-light text-dark border">DIRETRIZ ARQUITETURAL</span>
+                        </div>
+                        <div class="module-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-custom table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Categoria</th>
+                                            <th>Nível de Dinamismo</th>
+                                            <th>Capacidades Permitidas</th>
+                                            <th>Ação no APK</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><span class="badge-cat-a">CATEGORIA A</span></td>
+                                            <td><strong>Dinâmico no Painel</strong></td>
+                                            <td>Ordem de blocos da Dashboard, visibilidade condicional por cargo, textos de boas-vindas, banner de página exclusiva, dados institucionais e cores dos relatórios PDF.</td>
+                                            <td><span class="badge bg-success-subtle text-success">Sem recompilar (Instantâneo)</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge-cat-b">CATEGORIA B</span></td>
+                                            <td><strong>Servidor & Regras de Dados</strong></td>
+                                            <td>Legendas técnicas e patologias, checklist de canteiro, matriz de e-mails por obra, regras de aprovação por engenheiro e usuários.</td>
+                                            <td><span class="badge bg-primary-subtle text-primary">Sincronizado via SQLite</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><span class="badge-cat-c">CATEGORIA C</span></td>
+                                            <td><strong>Código-Fonte & Compilação</strong></td>
+                                            <td>Novos módulos nativos, alteração profunda no SQLite local, telas adicionais no React Native ou permissões do AndroidManifest.</td>
+                                            <td><span class="badge bg-danger-subtle text-danger">Requer "Atualizar APK"</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resumo dos Serviços Integrados -->
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="p-3 bg-white border rounded-3 h-100 shadow-sm">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-wifi text-success fs-5"></i>
+                                    <h6 class="fw-bold mb-0">Motor 100% Offline</h6>
+                                </div>
+                                <p class="text-muted small mb-2">Preenchimento de laudos, fotos com anotações e auto-save protegidos em SQLite local (`obraflow.db`).</p>
+                                <span class="badge bg-success">OPERACIONAL</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-white border rounded-3 h-100 shadow-sm">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-paper-plane text-primary fs-5"></i>
+                                    <h6 class="fw-bold mb-0">Serviço de E-mails Unificado</h6>
+                                </div>
+                                <p class="text-muted small mb-2">Despacho centralizado via Resend API / SMTP com proteção persistente contra duplicidade no sync offline.</p>
+                                <span class="badge bg-primary">RESEND API ATIVA</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 bg-white border rounded-3 h-100 shadow-sm">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <i class="fas fa-file-pdf text-danger fs-5"></i>
+                                    <h6 class="fw-bold mb-0">Gerador de Laudos PDF</h6>
+                                </div>
+                                <p class="text-muted small mb-2">WeasyPrint com paginação fotográfica oficial (2 fotos na capa, 4 por página, carimbo técnico e legendas).</p>
+                                <span class="badge bg-danger">MOTOR ATIVO</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 6: GERENCIAMENTO DE E-MAILS (MÓDULO PRIORITÁRIO)  -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-email" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header" style="background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);">
+                            <div>
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="badge bg-warning text-dark fw-bold"><i class="fas fa-star me-1"></i>PRIORIDADE MÁXIMA</span>
+                                    <span class="badge bg-primary">SEÇÃO 8 DO REQUISITO</span>
+                                </div>
+                                <h4 class="fw-bold text-dark mb-0">
+                                    <i class="fas fa-envelope-open-text text-primary me-2"></i>Central de Gerenciamento de E-mails
+                                </h4>
+                                <p class="text-muted small mb-0 mt-1">
+                                    Controle absoluto de remetente, servidor, modelos de texto com variáveis, regras de destinatários por obra e histórico seguro.
+                                </p>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm fw-bold" onclick="abrirModalTesteEmail()">
+                                    <i class="fas fa-vial me-1"></i> Enviar E-mail de Teste
+                                </button>
+                                <button class="btn btn-primary btn-sm fw-bold shadow-sm" onclick="salvarConfiguracaoEmail()">
+                                    <i class="fas fa-save me-1"></i> Salvar Parâmetros
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Sub-Abas do Módulo de E-mail -->
+                        <div class="module-body p-0">
+                            <ul class="nav nav-tabs px-3 pt-3 bg-light border-bottom" id="emailSubTabs" role="tablist">
+                                <li class="nav-item">
+                                    <button class="nav-link active fw-bold small" id="sub-email-provedor-tab" data-bs-toggle="tab" data-bs-target="#sub-email-provedor" type="button">
+                                        <i class="fas fa-server me-1"></i> 8.1. Serviço & Provedor
+                                    </button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link fw-bold small" id="sub-email-destinatarios-tab" data-bs-toggle="tab" data-bs-target="#sub-email-destinatarios" type="button">
+                                        <i class="fas fa-users me-1"></i> 8.2. Destinatários & Obra
+                                    </button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link fw-bold small" id="sub-email-regras-tab" data-bs-toggle="tab" data-bs-target="#sub-email-regras" type="button">
+                                        <i class="fas fa-bolt me-1"></i> 8.3. Regras & Anti-Duplicação
+                                    </button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link fw-bold small" id="sub-email-modelos-tab" data-bs-toggle="tab" data-bs-target="#sub-email-modelos" type="button">
+                                        <i class="fas fa-pen-nib me-1"></i> 8.4. Editor de Modelos
+                                    </button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link fw-bold small" id="sub-email-anexos-tab" data-bs-toggle="tab" data-bs-target="#sub-email-anexos" type="button">
+                                        <i class="fas fa-paperclip me-1"></i> 8.5. Anexos PDF
+                                    </button>
+                                </li>
+                                <li class="nav-item">
+                                    <button class="nav-link fw-bold small" id="sub-email-fila-tab" data-bs-toggle="tab" data-bs-target="#sub-email-fila" type="button">
+                                        <i class="fas fa-history me-1"></i> 8.6. Fila & Histórico
+                                    </button>
+                                </li>
+                            </ul>
+
+                            <div class="tab-content p-4" id="emailSubTabsContent">
+                                <!-- 8.1. Configuração do Serviço de Envio -->
+                                <div class="tab-pane fade show active" id="sub-email-provedor">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold small">Nome do Remetente Exibido</label>
+                                            <input type="text" class="form-control" id="email_nome_remetente" value="{{ email_config.nome_remetente if email_config else 'ELP Consultoria & Engenharia' }}">
+                                            <div class="form-text">Nome que aparecerá no campo "De:" para os clientes e engenheiros.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold small">E-mail do Remetente Oficial</label>
+                                            <input type="email" class="form-control" id="email_endereco_remetente" value="{{ email_config.email_remetente if email_config else 'relatorios@elpconsultoria.eng.br' }}">
+                                            <div class="form-text">Endereço de envio oficial validado no domínio DNS.</div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold small">Provedor de Entrega Ativo</label>
+                                            <select class="form-select" id="email_provedor_tipo">
+                                                <option value="resend" selected>Resend API (Recomendado - 99.9% Entrega)</option>
+                                                <option value="smtp">Servidor SMTP Próprio</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label fw-bold small">Servidor SMTP (quando aplicável)</label>
+                                            <input type="text" class="form-control" id="email_servidor_smtp" value="{{ email_config.servidor_smtp if email_config else 'smtp.resend.com' }}">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label fw-bold small">Porta SMTP</label>
+                                            <input type="number" class="form-control" id="email_porta_smtp" value="{{ email_config.porta_smtp if email_config else 587 }}">
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="p-3 bg-light border rounded-3 d-flex align-items-center justify-content-between">
+                                                <div>
+                                                    <div class="fw-bold small text-dark"><i class="fas fa-shield-alt text-success me-1"></i>Armazenamento Seguro de Credenciais</div>
+                                                    <div class="text-muted small">As credenciais do provedor (API Key e Senhas) residem com segurança nas variáveis de ambiente do servidor Railway, isoladas do APK nativo.</div>
+                                                </div>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle">SEGURO</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 8.2. Destinatários por Obra e Cópias -->
+                                <div class="tab-pane fade" id="sub-email-destinatarios">
+                                    <div class="alert alert-info border-0 shadow-sm d-flex align-items-center gap-3 small mb-3">
+                                        <i class="fas fa-info-circle fs-4 text-info"></i>
+                                        <div>
+                                            <strong>Matriz de Destinatários do Relatório:</strong> O motor unificado coleta automaticamente o autor do laudo, o engenheiro aprovador, os acompanhantes e os contatos cadastrados na obra.
+                                        </div>
+                                    </div>
+                                    <div class="row g-3 mb-4">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold small">Cópia Administrativa Fixa (CC)</label>
+                                            <input type="text" class="form-control" id="email_cc_fixo" value="leopoldo@elpconsultoria.eng.br">
+                                            <div class="form-text">Recebe cópia de todos os laudos homologados para compliance.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold small">Cópia Oculta (BCC - Opcional)</label>
+                                            <input type="text" class="form-control" id="email_bcc_fixo" placeholder="auditoria@elpconsultoria.eng.br">
+                                            <div class="form-text">E-mails separados por vírgula para arquivamento silencioso.</div>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="fw-bold text-dark mb-2"><i class="fas fa-building text-primary me-2"></i>Contatos de Clientes por Obra (`EmailCliente`)</h6>
+                                    <div class="table-responsive bg-white border rounded-3">
+                                        <table class="table table-custom mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Obra / Empreendimento</th>
+                                                    <th>Contato Cadastrado</th>
+                                                    <th>E-mail do Cliente</th>
+                                                    <th>Departamento</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% if projetos %}
+                                                    {% for p in projetos[:6] %}
+                                                    <tr>
+                                                        <td><strong>{{ p.nome }}</strong></td>
+                                                        <td>{{ p.responsavel.nome_completo if p.responsavel else 'Engenharia' }}</td>
+                                                        <td><code>{{ p.responsavel.email if p.responsavel else 'contato@obra.com.br' }}</code></td>
+                                                        <td><span class="badge bg-secondary">Fiscalização</span></td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <tr>
+                                                        <td colspan="4" class="text-center text-muted py-3">Nenhuma obra cadastrada.</td>
+                                                    </tr>
+                                                {% endif %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- 8.3. Regras de Disparo & Prevenção de Duplicidade -->
+                                <div class="tab-pane fade" id="sub-email-regras">
+                                    <div class="row g-4">
+                                        <div class="col-md-6">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="fas fa-bell text-warning me-2"></i>Eventos que Disparam E-mail</h6>
+                                            <div class="form-check form-switch mb-3">
+                                                <input class="form-check-input" type="checkbox" id="gatilho_aprovacao" checked>
+                                                <label class="form-check-label fw-semibold" for="gatilho_aprovacao">Após Aprovação do Relatório (Homologação Técnica)</label>
+                                                <div class="text-muted small">Dispara automaticamente assim que o aprovador carimba o laudo.</div>
+                                            </div>
+                                            <div class="form-check form-switch mb-3">
+                                                <input class="form-check-input" type="checkbox" id="gatilho_reprovacao" checked>
+                                                <label class="form-check-label fw-semibold" for="gatilho_reprovacao">Após Rejeição / Solicitação de Correções</label>
+                                                <div class="text-muted small">Notifica o vistoriador para complementar informações e fotos.</div>
+                                            </div>
+                                            <div class="form-check form-switch mb-3">
+                                                <input class="form-check-input" type="checkbox" id="gatilho_sync">
+                                                <label class="form-check-label fw-semibold" for="gatilho_sync">Imediatamente ao Sincronizar Relatório Rascunho</label>
+                                                <div class="text-muted small">Desativado por padrão (e-mails são disparados somente após homologação).</div>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <h6 class="fw-bold text-dark mb-3"><i class="fas fa-shield-alt text-success me-2"></i>Proteção Contra Disparos Duplicados (Offline Sync)</h6>
+                                            <div class="p-3 bg-light border rounded-3 mb-3">
+                                                <div class="d-flex align-items-center gap-2 mb-2 text-success fw-bold small">
+                                                    <i class="fas fa-check-circle"></i> Deduplicação Transacional Ativa
+                                                </div>
+                                                <p class="text-muted small mb-0">
+                                                    Quando aparelhos em campo reconectam à internet, retransmissões do mesmo laudo são interceptadas pelo identificador único (`relatorio_id`). Se já houver um registro de sucesso no `LogEnvioEmail`, o disparo é silenciado.
+                                                </p>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center p-2 bg-white border rounded-2 small">
+                                                <span>Tentativas Máximas com Espera Progressiva:</span>
+                                                <strong>3 retries</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 8.4. Editor de Modelos de E-mail com Variáveis -->
+                                <div class="tab-pane fade" id="sub-email-modelos">
+                                    <div class="row g-4">
+                                        <div class="col-lg-7">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold small">Modelo do Assunto do E-mail</label>
+                                                <input type="text" class="form-control" id="template_assunto" value="{{ email_config.template_assunto if email_config else 'Relatório de visita do dia {{data_relatorio}} – Obra {{nome_obra}}' }}">
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold small">Conteúdo do Corpo da Mensagem (HTML ou Texto)</label>
+                                                <textarea class="form-control font-monospace" id="template_corpo" rows="10" style="font-size: 13px;">{{ email_config.template_corpo if email_config else '<p>Prezados,</p><p>Segue em anexo o relatório oficial de vistoria técnica da obra <strong>{{nome_obra}}</strong>, realizada em {{data_relatorio}} pelo engenheiro <strong>{{nome_responsavel}}</strong>.</p><p>Relatório nº: <strong>{{numero_relatorio}}</strong> | Status: <span style="color: #059669; font-weight: bold;">{{status_relatorio}}</span></p><p>Em caso de dúvidas técnicas sobre os apontamentos de vistoria, favor entrar em contato diretamente com nossa equipe.</p><p>Atenciosamente,<br><strong>ELP Consultoria e Engenharia</strong></p>' }}</textarea>
+                                            </div>
+
+                                            <div class="d-flex gap-2">
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="inserirTagNoModelo('{{nome_obra}}')">+ {{nome_obra}}</button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="inserirTagNoModelo('{{numero_relatorio}}')">+ {{numero_relatorio}}</button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="inserirTagNoModelo('{{data_relatorio}}')">+ {{data_relatorio}}</button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="inserirTagNoModelo('{{nome_responsavel}}')">+ {{nome_responsavel}}</button>
+                                                <button class="btn btn-outline-secondary btn-sm" onclick="inserirTagNoModelo('{{status_relatorio}}')">+ {{status_relatorio}}</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-lg-5">
+                                            <label class="form-label fw-bold small"><i class="fas fa-eye text-primary me-1"></i>Pré-visualização Instantânea do E-mail</label>
+                                            <div class="p-3 bg-white border rounded-3 shadow-sm" style="min-height: 280px; font-size: 13px;" id="preview_email_box">
+                                                <div class="border-bottom pb-2 mb-2">
+                                                    <span class="text-muted small">Assunto:</span> <strong id="preview_assunto_txt">Relatório de visita do dia 19/10/26 – Obra Residencial Horizon</strong>
+                                                </div>
+                                                <div id="preview_corpo_box">
+                                                    <p>Prezados,</p>
+                                                    <p>Segue em anexo o relatório oficial de vistoria técnica da obra <strong>Residencial Horizon</strong>, realizada em 19/10/2026 pelo engenheiro <strong>Gabriel Eduardo</strong>.</p>
+                                                    <p>Relatório nº: <strong>RDO-042/2026</strong> | Status: <span style="color: #059669; font-weight: bold;">Aprovado</span></p>
+                                                    <p>Atenciosamente,<br><strong>ELP Consultoria e Engenharia</strong></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 8.5. Anexos PDF -->
+                                <div class="tab-pane fade" id="sub-email-anexos">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold small">Padrão de Nome do Arquivo PDF Anexado</label>
+                                            <input type="text" class="form-control" id="pdf_nome_padrao" value="Laudo_Tecnico_{{numero_relatorio}}_{{nome_obra}}.pdf">
+                                            <div class="form-text">Nome atribuído ao arquivo PDF anexado automaticamente.</div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label fw-bold small">Versão do Documento</label>
+                                            <select class="form-select" id="pdf_versao_anexo">
+                                                <option value="completo" selected>Laudo Técnico Completo com Fotos e Legendas</option>
+                                                <option value="resumido">Laudo Técnico Resumido (Sem anotações fotográficas)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="form-check form-switch mb-2">
+                                                <input class="form-check-input" type="checkbox" id="pdf_incluir_assinaturas" checked>
+                                                <label class="form-check-label fw-semibold" for="pdf_incluir_assinaturas">Incluir Carimbo e Assinatura Técnica do Engenheiro Homologador</label>
+                                            </div>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="pdf_incluir_anotacoes" checked>
+                                                <label class="form-check-label fw-semibold" for="pdf_incluir_anotacoes">Renderizar Anotações Vetoriais (Círculos, Setas e Destaques nas Fotos)</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 8.6. Fila & Histórico de E-mails com Reprocessamento -->
+                                <div class="tab-pane fade" id="sub-email-fila">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div>
+                                            <h6 class="fw-bold text-dark mb-0"><i class="fas fa-list-alt text-primary me-2"></i>Registro de Entregas & Logs de Disparo</h6>
+                                            <span class="text-muted small">Rastreamento de envios para clientes, engenheiros e auditoria.</span>
+                                        </div>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="recarregarLogsEmail()">
+                                            <i class="fas fa-sync-alt me-1"></i> Atualizar Fila
+                                        </button>
+                                    </div>
+
+                                    <div class="table-responsive bg-white border rounded-3">
+                                        <table class="table table-custom table-hover mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Data/Hora</th>
+                                                    <th>Obra</th>
+                                                    <th>Relatório</th>
+                                                    <th>Destinatários</th>
+                                                    <th>Status</th>
+                                                    <th>Ação</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="tabelaLogsEmailBody">
+                                                {% if logs_email %}
+                                                    {% for log in logs_email %}
+                                                    <tr>
+                                                        <td><small class="text-muted">{{ log.data_envio.strftime('%d/%m/%Y %H:%M') if log.data_envio else 'Recente' }}</small></td>
+                                                        <td><strong>{{ log.projeto.nome if log.projeto else 'Obra' }}</strong></td>
+                                                        <td><code>#{{ log.relatorio_id }}</code></td>
+                                                        <td><span class="badge bg-light text-dark border">{{ log.destinatarios[:45] }}...</span></td>
+                                                        <td>
+                                                            {% if log.status == 'enviado' %}
+                                                                <span class="badge bg-success-subtle text-success border border-success-subtle">ENVIADO</span>
+                                                            {% elif log.status == 'falhou' %}
+                                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">FALHA</span>
+                                                            {% else %}
+                                                                <span class="badge bg-warning-subtle text-warning border border-warning-subtle">PENDENTE</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if log.status == 'falhou' %}
+                                                                <button class="btn btn-sm btn-outline-danger" onclick="reprocessarEmailLog({{ log.id }})">
+                                                                    <i class="fas fa-redo"></i>
+                                                                </button>
+                                                            {% else %}
+                                                                <span class="text-muted small"><i class="fas fa-check text-success"></i></span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <tr>
+                                                        <td colspan="6" class="text-center text-muted py-4">Nenhum registro de disparo pendente na fila.</td>
+                                                    </tr>
+                                                {% endif %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 7: EDITOR VISUAL DO APK & SERVER-DRIVEN UI       -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-screens" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <span class="badge badge-cat-a mb-1">CATEGORIA A • SERVER-DRIVEN UI</span>
+                                <h4 class="fw-bold text-dark mb-0">
+                                    <i class="fas fa-mobile-alt text-primary me-2"></i>Construtor & Editor Visual das Telas do APK
+                                </h4>
+                                <p class="text-muted small mb-0 mt-1">
+                                    Orquestre a árvore de blocos, altere textos dos botões, configure visibilidade condicional e pré-visualize no celular em tempo real.
+                                </p>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a href="{{ url_for('admin_apk_screen_editor') }}" class="btn btn-primary btn-sm fw-bold shadow-sm">
+                                    <i class="fas fa-external-link-alt me-1"></i> Abrir Editor em Tela Cheia
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="module-body">
+                            <div class="row g-4 align-items-center">
+                                <div class="col-lg-6">
+                                    <h5 class="fw-bold text-dark mb-2">Como o APK Consome Esta Central?</h5>
+                                    <p class="text-muted small mb-3">
+                                        O aplicativo Android nativo possui o serviço <code>screenConfigService.ts</code> que sincroniza com <code>/api/apk/screen-configs</code> ao iniciar ou reconectar à internet.
+                                    </p>
+                                    <ul class="list-group list-group-flush small mb-3">
+                                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                            <span><strong>Painel Principal (Dashboard):</strong> Hero, Badges, Indicadores e Ações Rápidas</span>
+                                            <span class="badge bg-success">Configurável</span>
+                                        </li>
+                                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                            <span><strong>Aba de Relatórios:</strong> Filtros de páginas exclusivas e banners</span>
+                                            <span class="badge bg-success">Configurável</span>
+                                        </li>
+                                        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                            <span><strong>Formatação dos Laudos (PDF):</strong> Cores e quantidade de fotos</span>
+                                            <span class="badge bg-success">Configurável</span>
+                                        </li>
+                                    </ul>
+                                    <a href="{{ url_for('admin_apk_screen_editor') }}" class="btn btn-outline-primary btn-sm fw-bold">
+                                        <i class="fas fa-sliders-h me-1"></i> Acessar Árvore de Blocos do APK
+                                    </a>
+                                </div>
+                                <div class="col-lg-6 text-center">
+                                    <div class="p-3 bg-light rounded-3 border d-inline-block">
+                                        <img src="{{ url_for('static', filename='img/apk_qr.png') }}" alt="QR Code APK" style="max-width: 140px;" class="rounded" onerror="this.src='/apk-qr.png'">
+                                        <div class="small fw-bold text-dark mt-2">ELP Android Oficial</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 8: BOTÕES & AÇÕES (REGRA SE/ENTÃO)                -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-actions" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <span class="badge badge-cat-a mb-1">CATEGORIA A • MOTOR DE AÇÕES</span>
+                                <h4 class="fw-bold text-dark mb-0">
+                                    <i class="fas fa-sliders-h text-info me-2"></i>Editor de Botões & Ações Condicionais
+                                </h4>
+                                <p class="text-muted small mb-0 mt-1">
+                                    Defina o comportamento operacional dos botões no aplicativo baseado em regras lógicas condicionais.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="module-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-custom table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Identificador</th>
+                                            <th>Nome do Botão</th>
+                                            <th>Tela</th>
+                                            <th>Regra Condicional (SE -> ENTÃO)</th>
+                                            <th>Comportamento Offline</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><code>btn_novo_relatorio</code></td>
+                                            <td><strong>Novo Relatório</strong></td>
+                                            <td>Dashboard</td>
+                                            <td><span class="text-primary fw-semibold">SE</span> usuário autenticado <span class="text-success fw-semibold">ENTÃO</span> abrir formulário de vistoria</td>
+                                            <td><span class="badge bg-success">Permitido (Salva no SQLite)</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>btn_homologar_laudo</code></td>
+                                            <td><strong>Aprovar & Carimbar</strong></td>
+                                            <td>Detalhe do Laudo</td>
+                                            <td><span class="text-primary fw-semibold">SE</span> usuário for Aprovador/Master <span class="text-success fw-semibold">ENTÃO</span> aplicar carimbo técnico</td>
+                                            <td><span class="badge bg-success">Enfileira na sync_queue</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>btn_relatorio_express</code></td>
+                                            <td><strong>Relatório Express</strong></td>
+                                            <td>Dashboard / Ações</td>
+                                            <td><span class="text-primary fw-semibold">SE</span> vistoria rápida selecionada <span class="text-success fw-semibold">ENTÃO</span> abrir câmera e anotações</td>
+                                            <td><span class="badge bg-success">100% Offline (AutoSave)</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>btn_agendar_visita</code></td>
+                                            <td><strong>Agendar Visita</strong></td>
+                                            <td>Dashboard / Visitas</td>
+                                            <td><span class="text-primary fw-semibold">SE</span> obra selecionada <span class="text-success fw-semibold">ENTÃO</span> salvar cronograma de inspeção</td>
+                                            <td><span class="badge bg-success">Permitido (Fila Offline)</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 4: RELATÓRIOS & LAUDOS TÉCNICOS                   -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-reports" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <h4 class="fw-bold text-dark mb-0"><i class="fas fa-file-invoice text-success me-2"></i>Relatórios & Vistorias Realizadas</h4>
+                                <p class="text-muted small mb-0 mt-1">Acompanhamento dos laudos gerados pelo aplicativo em campo (RDO Completo e Express).</p>
+                            </div>
+                        </div>
+                        <div class="module-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-custom table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Número</th>
+                                            <th>Obra</th>
+                                            <th>Tipo</th>
+                                            <th>Data Vistoria</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if relatorios_recentes %}
+                                            {% for r in relatorios_recentes %}
+                                            <tr>
+                                                <td><strong>{{ r.numero or 'RDO' }}</strong></td>
+                                                <td>{{ r.projeto.nome if r.projeto else (r.obra_nome if hasattr(r, 'obra_nome') else 'Obra') }}</td>
+                                                <td><span class="badge bg-light text-dark border">{{ 'Express' if hasattr(r, 'obra_nome') else 'Comum (RDO)' }}</span></td>
+                                                <td>{{ r.data_visita.strftime('%d/%m/%Y') if hasattr(r, 'data_visita') and r.data_visita and hasattr(r.data_visita, 'strftime') else 'Recente' }}</td>
+                                                <td>
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle">{{ r.status or 'Aprovado' }}</span>
+                                                </td>
+                                                <td>
+                                                    <a href="/relatorio/{{ r.id }}/pdf" target="_blank" class="btn btn-sm btn-outline-danger" title="Visualizar PDF">
+                                                        <i class="fas fa-file-pdf"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="6" class="text-center text-muted py-4">Nenhum relatório recente encontrado.</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 3: OBRAS & CANTEIROS                              -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-projects" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <h4 class="fw-bold text-dark mb-0"><i class="fas fa-building text-primary me-2"></i>Gestão de Obras & Canteiros</h4>
+                                <p class="text-muted small mb-0 mt-1">Empreendimentos cadastrados para vistoria no aplicativo.</p>
+                            </div>
+                        </div>
+                        <div class="module-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-custom table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome da Obra</th>
+                                            <th>Cliente</th>
+                                            <th>Responsável Técnico</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if projetos %}
+                                            {% for p in projetos %}
+                                            <tr>
+                                                <td><strong>{{ p.nome }}</strong></td>
+                                                <td>{{ p.cliente or 'ELP Engenharia' }}</td>
+                                                <td>{{ p.responsavel.nome_completo if p.responsavel else 'Engenheiro Designado' }}</td>
+                                                <td><span class="badge bg-success">Ativa</span></td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">Nenhuma obra cadastrada.</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 2: USUÁRIOS & PERMISSÕES                          -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-users" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <h4 class="fw-bold text-dark mb-0"><i class="fas fa-users-cog text-danger me-2"></i>Usuários & Permissões do Sistema</h4>
+                                <p class="text-muted small mb-0 mt-1">Gerencie os acessos ao aplicativo móvel e privilégios de aprovação técnica.</p>
+                            </div>
+                        </div>
+                        <div class="module-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-custom table-hover mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>E-mail</th>
+                                            <th>Cargo</th>
+                                            <th>Permissões no APK</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if users %}
+                                            {% for u in users %}
+                                            <tr>
+                                                <td><strong>{{ u.nome_completo or u.username }}</strong></td>
+                                                <td><code>{{ u.email }}</code></td>
+                                                <td><span class="badge bg-secondary">{{ u.cargo or 'Vistoriador' }}</span></td>
+                                                <td>
+                                                    {% if u.is_master %}
+                                                        <span class="badge bg-danger"><i class="fas fa-crown me-1"></i>MASTER</span>
+                                                    {% endif %}
+                                                    {% if u.is_aprovador_express %}
+                                                        <span class="badge bg-primary"><i class="fas fa-stamp me-1"></i>APROVADOR EXPRESS</span>
+                                                    {% endif %}
+                                                    {% if not u.is_master and not u.is_aprovador_express %}
+                                                        <span class="badge bg-light text-dark border">Vistoriador de Campo</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="4" class="text-center text-muted py-4">Nenhum usuário cadastrado.</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 5: REGRAS DE NEGÓCIO & APROVAÇÕES                 -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-rules" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <h4 class="fw-bold text-dark mb-0"><i class="fas fa-user-check text-success me-2"></i>Regras de Homologação & Aprovadores</h4>
+                                <p class="text-muted small mb-0 mt-1">Configuração de aprovadores padrão e temporários para os laudos emitidos.</p>
+                            </div>
+                            <a href="{{ url_for('admin_aprovadores_padrao') }}" class="btn btn-outline-primary btn-sm fw-bold">
+                                <i class="fas fa-cog me-1"></i> Gerenciar Aprovadores
+                            </a>
+                        </div>
+                        <div class="module-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="p-3 bg-light border rounded-3">
+                                        <div class="small text-muted mb-1">Aprovador Global Atual:</div>
+                                        <h5 class="fw-bold text-dark mb-0">{{ aprovador_global_nome if aprovador_global_nome else 'Leopoldo' }}</h5>
+                                        <div class="small text-success mt-2"><i class="fas fa-check-circle me-1"></i>Ativo para homologação de laudos</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 bg-light border rounded-3">
+                                        <div class="small text-muted mb-1">Regra de Carimbo Técnico:</div>
+                                        <h6 class="fw-bold text-dark mb-1">Assinatura Obrigatória</h6>
+                                        <p class="text-muted small mb-0">Laudos homologados geram PDF final assinado e disparam automaticamente o e-mail oficial aos clientes.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 8: FORMULÁRIOS & LEGENDAS                         -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-forms" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <span class="badge badge-cat-b mb-1">CATEGORIA B • DADOS DO SERVIDOR</span>
+                                <h4 class="fw-bold text-dark mb-0"><i class="fas fa-tags text-info me-2"></i>Legendas Técnicas & Checklist de Canteiro</h4>
+                                <p class="text-muted small mb-0 mt-1">Itens consumidos pelo editor de fotos e formulários do aplicativo Android.</p>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <a href="{{ url_for('admin_legendas') }}" class="btn btn-outline-info btn-sm fw-bold">
+                                    <i class="fas fa-tags me-1"></i> Legendas ({{ total_legendas }})
+                                </a>
+                                <a href="{{ url_for('admin_checklist_padrao') }}" class="btn btn-outline-warning btn-sm fw-bold">
+                                    <i class="fas fa-tasks me-1"></i> Checklist ({{ total_checklist }})
+                                </a>
+                            </div>
+                        </div>
+                        <div class="module-body">
+                            <p class="text-muted small mb-0">
+                                Todas as legendas técnicas pré-definidas cadastradas aqui aparecem diretamente no modal seletor de legendas da câmera do aplicativo, tanto no RDO Comum quanto no Relatório Express.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 9: DIAGNÓSTICO OFFLINE & SINCRONIZAÇÃO            -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-sync" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header">
+                            <div>
+                                <h4 class="fw-bold text-dark mb-0"><i class="fas fa-cloud-upload-alt text-primary me-2"></i>Central de Diagnóstico Offline & Sincronização</h4>
+                                <p class="text-muted small mb-0 mt-1">Monitor da integridade da fila `sync_queue` e sincronização bidirecional.</p>
+                            </div>
+                        </div>
+                        <div class="module-body">
+                            <div class="alert alert-success border-0 shadow-sm d-flex align-items-center gap-3">
+                                <i class="fas fa-shield-alt fs-2 text-success"></i>
+                                <div>
+                                    <h6 class="fw-bold mb-1">Protocolo de Idempotência Ativo</h6>
+                                    <p class="mb-0 small">
+                                        O aplicativo em campo opera 100% offline. Requisições repetidas decorrentes de quedas de rede não duplicam laudos nem geram e-mails repetidos.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ======================================================== -->
+                <!-- MÓDULO 10: VERSÕES & BOTÃO "ATUALIZAR APK"              -->
+                <!-- ======================================================== -->
+                <div class="tab-pane fade" id="tab-version" role="tabpanel">
+                    <div class="module-card mb-4">
+                        <div class="module-header" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);">
+                            <div>
+                                <span class="badge bg-success fw-bold mb-1">BUILD & PIPELINE OFICIAL</span>
+                                <h4 class="fw-bold text-dark mb-0">
+                                    <i class="fas fa-rocket text-success me-2"></i>Compilação & Atualização Oficial do APK
+                                </h4>
+                                <p class="text-muted small mb-0 mt-1">
+                                    Quando uma modificação exigir código-fonte novo (Categoria C), acione o fluxo real de compilação em 1 clique.
+                                </p>
+                            </div>
+                            <button class="btn btn-success fw-bold btn-lg shadow-sm" onclick="abrirModalAtualizarApk()">
+                                <i class="fas fa-hammer me-1"></i> Atualizar APK
+                            </button>
+                        </div>
+                        <div class="module-body">
+                            <div class="row g-3 align-items-center mb-4">
+                                <div class="col-md-6">
+                                    <div class="p-3 bg-light border rounded-3">
+                                        <div class="small text-muted">Versão Ativa Atual:</div>
+                                        <h4 class="fw-bold text-dark mb-0">v{{ apk_info.version if apk_info else '1.0.37' }}</h4>
+                                        <div class="small text-muted">Version Code: {{ apk_info.version_code if apk_info else '37' }}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="p-3 bg-light border rounded-3">
+                                        <div class="small text-muted">Tamanho do Executável:</div>
+                                        <h4 class="fw-bold text-dark mb-0">{{ apk_info.size if apk_info else '37.2 MB' }}</h4>
+                                        <div class="small text-muted">Arquivo: <code>ELP.apk</code></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="fw-bold text-dark mb-2">Etapas Automatizadas do Botão "Atualizar APK":</h6>
+                            <ol class="small text-muted ps-3 mb-0">
+                                <li class="mb-1">Validação pré-build das alterações administrativas.</li>
+                                <li class="mb-1">Incremento automático do código de versão semântica (`version.json`, `app.json`, `build.gradle`).</li>
+                                <li class="mb-1">Compilação nativa Android Release via <code>gradlew.bat assembleRelease</code>.</li>
+                                <li class="mb-1">Cópia do binário final para <code>ELP.apk</code> e distribuição na nuvem.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 1: ENVIAR E-MAIL DE TESTE (SEM ALTERAR RELATÓRIOS) -->
+<!-- ======================================================== -->
+<div class="modal fade" id="modalTesteEmail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold text-dark">
+                    <i class="fas fa-vial text-primary me-2"></i>Enviar E-mail de Teste
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted small mb-3">
+                    Dispara uma mensagem de teste para o e-mail informado para validar o remetente oficial e as credenciais. <strong>Nenhum laudo ou fluxo de aprovação é alterado.</strong>
+                </p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Destinatário Autorizado</label>
+                    <input type="email" class="form-control" id="modal_teste_email_dest" value="{{ current_user.email if current_user.email else '' }}" placeholder="exemplo@elpconsultoria.eng.br">
+                </div>
+                <div id="teste_email_feedback" class="small mt-2" style="display:none;"></div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btnDispararTesteEmail" onclick="executarDisparoTesteEmail()">
+                    <i class="fas fa-paper-plane me-1"></i> Disparar Teste
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 2: ATUALIZAR APK (BUILD NATIVO REAL)               -->
+<!-- ======================================================== -->
+<div class="modal fade" id="modalAtualizarApk" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="fas fa-rocket me-2"></i>Publicar & Atualizar APK
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="badge bg-secondary">VERSÃO ATUAL: v{{ apk_info.version if apk_info else '1.0.37' }}</span>
+                    <i class="fas fa-arrow-right text-muted"></i>
+                    <span class="badge bg-success" id="modalProximaVersaoBadge">NOVA VERSÃO: v1.0.38</span>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">Notas da Versão (Changelog do APK)</label>
+                    <textarea class="form-control" id="modal_apk_notes" rows="3" placeholder="Ex: Central inteligente do APK, novos templates de e-mail e melhorias no motor offline."></textarea>
+                </div>
+                <div id="modal_apk_progresso_box" style="display:none;" class="p-3 bg-light border rounded-3 mb-2">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <div class="spinner-border spinner-border-sm text-success" role="status"></div>
+                        <span class="fw-bold small text-dark" id="modal_apk_status_txt">Iniciando compilação Gradle...</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 60%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btnModalApkCancelar">Cancelar</button>
+                <button type="button" class="btn btn-success fw-bold" id="btnConfirmarAtualizarApk" onclick="executarCompilacaoRealApk()">
+                    <i class="fas fa-hammer me-1"></i> Iniciar Compilação
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Deep linking das abas por Hash na URL
+document.addEventListener("DOMContentLoaded", function() {
+    var hash = window.location.hash;
+    if (hash) {
+        var triggerEl = document.querySelector('button[data-bs-target="' + hash + '"]');
+        if (triggerEl) {
+            var tab = new bootstrap.Tab(triggerEl);
+            tab.show();
+        }
+    }
+    
+    // Atualizar preview do template ao digitar
+    var tplCorpo = document.getElementById('template_corpo');
+    if (tplCorpo) {
+        tplCorpo.addEventListener('input', atualizarPreviewAoVivo);
+    }
+    var tplAssunto = document.getElementById('template_assunto');
+    if (tplAssunto) {
+        tplAssunto.addEventListener('input', atualizarPreviewAoVivo);
+    }
+});
+
+function atualizarPreviewAoVivo() {
+    var assunto = document.getElementById('template_assunto').value;
+    var corpo = document.getElementById('template_corpo').value;
+    
+    // Substituir tags
+    var replacements = {
+        '{{nome_obra}}': 'Residencial Horizon',
+        '{{numero_relatorio}}': 'RDO-042/2026',
+        '{{data_relatorio}}': '19/10/2026',
+        '{{nome_responsavel}}': 'Gabriel Eduardo',
+        '{{status_relatorio}}': 'Aprovado'
+    };
+    
+    for (var k in replacements) {
+        assunto = assunto.replaceAll(k, replacements[k]);
+        corpo = corpo.replaceAll(k, replacements[k]);
+    }
+    
+    document.getElementById('preview_assunto_txt').innerText = assunto;
+    document.getElementById('preview_corpo_box').innerHTML = corpo;
+}
+
+function inserirTagNoModelo(tag) {
+    var textarea = document.getElementById('template_corpo');
+    if (textarea) {
+        textarea.value += ' ' + tag;
+        atualizarPreviewAoVivo();
+    }
+}
+
+function abrirModalTesteEmail() {
+    var modal = new bootstrap.Modal(document.getElementById('modalTesteEmail'));
+    modal.show();
+}
+
+function executarDisparoTesteEmail() {
+    var email = document.getElementById('modal_teste_email_dest').value;
+    var btn = document.getElementById('btnDispararTesteEmail');
+    var feedback = document.getElementById('teste_email_feedback');
+    
+    if (!email || email.indexOf('@') === -1) {
+        alert('Por favor, informe um endereço de e-mail válido.');
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Enviando...';
+    feedback.style.display = 'none';
+    
+    fetch('/admin/central/email/testar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        },
+        body: JSON.stringify({ email: email })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Disparar Teste';
+        feedback.style.display = 'block';
+        if (data.success) {
+            feedback.className = 'small mt-2 alert alert-success p-2';
+            feedback.innerHTML = '<i class="fas fa-check-circle me-1"></i> E-mail de teste enviado com sucesso para ' + email + '!';
+        } else {
+            feedback.className = 'small mt-2 alert alert-danger p-2';
+            feedback.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Falha: ' + (data.error || 'Erro desconhecido');
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i> Disparar Teste';
+        feedback.style.display = 'block';
+        feedback.className = 'small mt-2 alert alert-danger p-2';
+        feedback.innerHTML = 'Erro de conexão ao enviar teste: ' + err.message;
+    });
+}
+
+function salvarConfiguracaoEmail() {
+    var payload = {
+        nome_remetente: document.getElementById('email_nome_remetente').value,
+        email_remetente: document.getElementById('email_endereco_remetente').value,
+        servidor_smtp: document.getElementById('email_servidor_smtp').value,
+        porta_smtp: parseInt(document.getElementById('email_porta_smtp').value) || 587,
+        template_assunto: document.getElementById('template_assunto').value,
+        template_corpo: document.getElementById('template_corpo').value
+    };
+    
+    fetch('/admin/central/email/salvar-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('Configurações de e-mail salvas com sucesso!');
+        } else {
+            alert('Erro ao salvar: ' + (data.error || 'Erro no servidor'));
+        }
+    })
+    .catch(function(err) {
+        alert('Erro ao comunicar com o servidor: ' + err.message);
+    });
+}
+
+function reprocessarEmailLog(logId) {
+    if (!confirm('Deseja reenviar este e-mail? O sistema evitará duplicações desnecessárias.')) return;
+    
+    fetch('/admin/central/email/reprocessar/' + logId, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('E-mail reprocessado com sucesso!');
+            window.location.reload();
+        } else {
+            alert('Falha ao reprocessar: ' + (data.error || 'Erro desconhecido'));
+        }
+    });
+}
+
+function abrirModalAtualizarApk() {
+    var modal = new bootstrap.Modal(document.getElementById('modalAtualizarApk'));
+    modal.show();
+}
+
+function executarCompilacaoRealApk() {
+    var notes = document.getElementById('modal_apk_notes').value;
+    var btn = document.getElementById('btnConfirmarAtualizarApk');
+    var cancelBtn = document.getElementById('btnModalApkCancelar');
+    var progressBox = document.getElementById('modal_apk_progresso_box');
+    var statusTxt = document.getElementById('modal_apk_status_txt');
+    
+    btn.disabled = true;
+    cancelBtn.disabled = true;
+    progressBox.style.display = 'block';
+    statusTxt.innerText = 'Compilando APK nativo (assembleRelease)...';
+    
+    fetch('/admin/apk/publicar-atualizacao', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+        },
+        body: JSON.stringify({ notes: notes })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            statusTxt.innerText = 'APK compilado e publicado com sucesso (v' + data.new_version + ')!';
+            setTimeout(function() {
+                window.location.reload();
+            }, 2000);
+        } else {
+            btn.disabled = false;
+            cancelBtn.disabled = false;
+            progressBox.style.display = 'none';
+            alert('Erro durante a compilação: ' + (data.error || 'Falha no build Gradle'));
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        cancelBtn.disabled = false;
+        progressBox.style.display = 'none';
+        alert('Erro ao acionar pipeline de compilação: ' + err.message);
+    });
+}
+
+function sincronizarDadosComServidor() {
+    window.location.reload();
+}
+</script>
+{% endblock %}

@@ -2947,15 +2947,18 @@ def painel_apk():
                            stats=stats)
 
 @app.route('/admin/ajustes-apk')
+@app.route('/admin/central')
+@app.route('/admin/central-inteligente')
 @login_required
 def ajustes_apk_page():
-    """Página dedicada aos ajustes que influenciam diretamente no APK"""
+    """Central Inteligente de Gerenciamento do Aplicativo Android (Server-Driven UI, E-mails, Obras e Build)"""
     apk_info = get_apk_info()
     try:
         total_legendas = LegendaPredefinida.query.filter_by(ativo=True).count()
         total_checklist = ChecklistPadrao.query.count()
         aprovador_global = AprovadorPadrao.query.filter_by(is_global=True, ativo=True).first()
-        aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Não definido"
+        aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Leopoldo"
+        
         try:
             from models import Visitante
             visitantes_list = Visitante.query.filter_by(ativo=True).order_by(Visitante.nome.asc()).all()
@@ -2963,21 +2966,147 @@ def ajustes_apk_page():
         except Exception:
             visitantes_list = []
             total_visitantes = 0
+            
+        # Obras, Usuários e Relatórios
+        projetos = Projeto.query.order_by(Projeto.nome.asc()).all()
+        total_projetos = len(projetos)
+        users = User.query.order_by(User.nome_completo.asc()).all()
+        relatorios_recentes = Relatorio.query.order_by(Relatorio.created_at.desc()).limit(15).all()
+        total_relatorios = Relatorio.query.count()
+        
+        # Configurações de E-mail e Logs
+        email_config = ConfiguracaoEmail.query.filter_by(ativo=True).first()
+        try:
+            logs_email = LogEnvioEmail.query.order_by(LogEnvioEmail.data_envio.desc()).limit(30).all()
+            total_emails_enviados = LogEnvioEmail.query.filter_by(status='enviado').count()
+        except Exception:
+            logs_email = []
+            total_emails_enviados = 0
+
     except Exception as e:
-        print(f"Erro ao carregar métricas de ajustes do APK: {e}")
+        print(f"Erro ao carregar dados da Central Inteligente: {e}")
         total_legendas = 0
         total_checklist = 0
-        aprovador_global_nome = "Não definido"
+        aprovador_global_nome = "Leopoldo"
         visitantes_list = []
         total_visitantes = 0
+        projetos = []
+        total_projetos = 0
+        users = []
+        relatorios_recentes = []
+        total_relatorios = 0
+        email_config = None
+        logs_email = []
+        total_emails_enviados = 0
 
-    return render_template('admin/ajustes_apk.html',
+    return render_template('admin/central_hub.html',
                            apk_info=apk_info,
                            total_legendas=total_legendas,
                            total_checklist=total_checklist,
                            aprovador_global_nome=aprovador_global_nome,
                            visitantes=visitantes_list,
-                           total_visitantes=total_visitantes)
+                           total_visitantes=total_visitantes,
+                           projetos=projetos,
+                           total_projetos=total_projetos,
+                           users=users,
+                           relatorios_recentes=relatorios_recentes,
+                           total_relatorios=total_relatorios,
+                           email_config=email_config,
+                           logs_email=logs_email,
+                           total_emails_enviados=total_emails_enviados)
+
+@app.route('/admin/central/email/testar', methods=['POST'])
+@login_required
+def admin_central_email_testar():
+    """Dispara um e-mail de teste seguro sem alterar nenhum laudo ou fluxo de aprovação"""
+    if not (current_user.is_master or current_user.is_developer):
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+    
+    data = request.get_json() or {}
+    email_dest = (data.get('email') or '').strip()
+    if not email_dest or '@' not in email_dest:
+        return jsonify({'success': False, 'error': 'E-mail de destino inválido'}), 400
+        
+    try:
+        import email_service_unified
+        svc = email_service_unified.get_email_service()
+        res = svc.send_test_email(email_dest)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/central/email/salvar-config', methods=['POST'])
+@login_required
+def admin_central_email_salvar_config():
+    """Salva parâmetros gerais de envio e templates da Central de E-mails"""
+    if not (current_user.is_master or current_user.is_developer):
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+        
+    data = request.get_json() or {}
+    try:
+        config = ConfiguracaoEmail.query.filter_by(ativo=True).first()
+        if not config:
+            config = ConfiguracaoEmail(
+                nome_configuracao="Configuração Padrão Resend",
+                servidor_smtp=data.get('servidor_smtp', 'smtp.resend.com'),
+                porta_smtp=int(data.get('porta_smtp', 587)),
+                email_remetente=data.get('email_remetente', 'relatorios@elpconsultoria.eng.br'),
+                nome_remetente=data.get('nome_remetente', 'ELP Consultoria & Engenharia'),
+                template_assunto=data.get('template_assunto', 'Relatório de visita do dia {{data_relatorio}} – Obra {{nome_obra}}'),
+                template_corpo=data.get('template_corpo', ''),
+                ativo=True
+            )
+            db.session.add(config)
+        else:
+            if 'nome_remetente' in data:
+                config.nome_remetente = data['nome_remetente']
+            if 'email_remetente' in data:
+                config.email_remetente = data['email_remetente']
+            if 'servidor_smtp' in data:
+                config.servidor_smtp = data['servidor_smtp']
+            if 'porta_smtp' in data:
+                config.porta_smtp = int(data['porta_smtp'])
+            if 'template_assunto' in data:
+                config.template_assunto = data['template_assunto']
+            if 'template_corpo' in data:
+                config.template_corpo = data['template_corpo']
+        
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Configurações de e-mail salvas com sucesso!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/admin/central/email/reprocessar/<int:log_id>', methods=['POST'])
+@login_required
+def admin_central_email_reprocessar(log_id):
+    """Reprocessa um e-mail que falhou anteriormente sem duplicar laudos já entregues"""
+    if not (current_user.is_master or current_user.is_developer):
+        return jsonify({'success': False, 'error': 'Acesso negado'}), 403
+        
+    try:
+        log_entry = LogEnvioEmail.query.get_or_404(log_id)
+        relatorio = Relatorio.query.get(log_entry.relatorio_id)
+        if not relatorio:
+            return jsonify({'success': False, 'error': 'Relatório correspondente não encontrado'}), 404
+            
+        import pdf_generator_weasy
+        pdf_path = pdf_generator_weasy.gerar_pdf_relatorio(relatorio.id)
+        if not pdf_path or not os.path.exists(pdf_path):
+            return jsonify({'success': False, 'error': 'Falha ao regerar PDF para envio'}), 500
+            
+        import email_service_unified
+        svc = email_service_unified.get_email_service()
+        # Enviar
+        res = svc.send_approval_email(relatorio, pdf_path)
+        if res.get('success'):
+            log_entry.status = 'enviado'
+            log_entry.erro_detalhes = None
+            log_entry.data_envio = brazil_now()
+            db.session.commit()
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/admin/apk/editor-telas', methods=['GET'])
 @login_required
