@@ -97,14 +97,20 @@ try:
     login_manager.init_app(app)
     csrf.init_app(app)
 
-    # Configure CORS for geolocation and API calls
-    # Restringir origins para segurança - permitir apenas domínios conhecidos
+    # Configure CORS for geolocation and API calls (including Railway backend and mobile APK communication)
     import re
     allowed_origins = [
         "https://elpconsultoria.pro",
         re.compile(r"https://.*\.elpconsultoria\.pro"),  # Subdomínios
+        "https://elpandroid-production.up.railway.app",
+        re.compile(r"https://.*\.up\.railway\.app"),
+        re.compile(r"https://.*\.railway\.app"),
         "http://localhost:5000",
-        "http://127.0.0.1:5000"
+        "http://127.0.0.1:5000",
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost:19006",
+        "http://127.0.0.1:19006"
     ]
 
     # Se estiver no ambiente Replit, adicionar domínio Replit
@@ -115,7 +121,7 @@ try:
     CORS(app, 
          supports_credentials=True, 
          resources={
-             r"/api/*": {"origins": allowed_origins},
+             r"/api/*": {"origins": "*"},
              r"/save_location": {"origins": allowed_origins}
          })
 

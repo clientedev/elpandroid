@@ -292,10 +292,19 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         // Salva imediatamente no SQLite local para aparecer na lista como Rascunho
         await saveLocalRelatorioExpress(expDraft, 'pending');
 
+        // Limpa fotos anteriores do rascunho temporário para evitar duplicação a cada ciclo de autosave
+        const db = await getDatabase();
+        await db.runAsync(
+          'DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?;',
+          [targetId, String(targetId)]
+        );
+
         for (let i = 0; i < attachedPhotos.length; i++) {
           const ap = attachedPhotos[i];
+          const photoId = ap.id || (Date.now() + i + 1);
+          ap.id = photoId; // Fixa o ID no objeto para os próximos ciclos de autosave
           const fotoObj: FotoRelatorioExpress = {
-            id: ap.id || (Date.now() + i + 1),
+            id: photoId,
             relatorio_express_id: targetId,
             uri_local: ap.uri,
             base64: ap.base64,

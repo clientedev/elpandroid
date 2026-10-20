@@ -33,8 +33,13 @@ class ApiClient {
       if (this.currentMobileUser) {
         if (this.currentMobileUser.id) config.headers['X-User-Id'] = String(this.currentMobileUser.id);
         if (this.currentMobileUser.username) config.headers['X-Username'] = this.currentMobileUser.username;
-        if (this.currentMobileUser.is_master || this.currentMobileUser.username?.toLowerCase() === 'admin') {
+        const isMaster = this.currentMobileUser.is_master || this.currentMobileUser.username?.toLowerCase() === 'admin';
+        const isDev = this.currentMobileUser.is_developer || this.currentMobileUser.cargo?.toLowerCase() === 'desenvolvedor' || this.currentMobileUser.username?.toLowerCase() === 'desenvolvedor';
+        if (isMaster || isDev) {
           config.headers['X-Is-Master'] = 'true';
+        }
+        if (isDev) {
+          config.headers['X-Is-Developer'] = 'true';
         }
       }
       return config;
@@ -106,6 +111,45 @@ class ApiClient {
 
   put<T = any>(url: string, data?: any, config?: any): Promise<any> {
     return this.instance.put<T>(url, data, config);
+  }
+
+  async testConnection(): Promise<{
+    success: boolean;
+    latencyMs: number;
+    message: string;
+    server?: string;
+    timestamp?: string;
+    databaseConnected?: boolean;
+    apkVersion?: string;
+  }> {
+    const start = Date.now();
+    try {
+      const res = await this.instance.get('/api/ping', { timeout: 8000 });
+      const latencyMs = Date.now() - start;
+      if (res.status === 200 && res.data) {
+        return {
+          success: true,
+          latencyMs,
+          message: res.data.message || 'Comunicação com o site funcionando!',
+          server: res.data.server || 'Railway',
+          timestamp: res.data.timestamp,
+          databaseConnected: res.data.database_connected,
+          apkVersion: res.data.apk_version,
+        };
+      }
+      return {
+        success: false,
+        latencyMs,
+        message: `Servidor retornou HTTP ${res.status}`,
+      };
+    } catch (err: any) {
+      const latencyMs = Date.now() - start;
+      return {
+        success: false,
+        latencyMs,
+        message: err.message || 'Falha ao conectar com o site.',
+      };
+    }
   }
 
   delete<T = any>(url: string, config?: any): Promise<any> {

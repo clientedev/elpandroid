@@ -4,6 +4,7 @@ export interface User {
   email: string;
   nome_completo?: string;
   is_master?: boolean;
+  is_developer?: boolean;
   is_aprovador_express?: boolean;
   cargo?: string;
   telefone?: string;

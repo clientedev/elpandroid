@@ -38,9 +38,9 @@ class User(UserMixin, db.Model):
     
     @property
     def is_aprovador(self):
-        """Propriedade para verificar se usuário é aprovador - conforme especificação do documento"""
+        """Propriedade para verificar se usuário é aprovador - desenvolvedor e master têm aprovação plena"""
         try:
-            if self.is_master:
+            if self.is_master or self.is_developer or (self.cargo and self.cargo.lower() == 'desenvolvedor') or (self.username and self.username.lower() in ['admin', 'desenvolvedor']):
                 return True
                 
             # Importar aqui para evitar circular import
@@ -48,6 +48,21 @@ class User(UserMixin, db.Model):
             return current_user_is_aprovador()
         except Exception:
             return False
+
+    @property
+    def is_admin_or_dev(self):
+        """Retorna True se o usuário for Master, Administrador ou Desenvolvedor (acesso total irrestrito)"""
+        return bool(
+            self.is_master or 
+            self.is_developer or 
+            (self.cargo and self.cargo.lower() in ['desenvolvedor', 'admin', 'master']) or
+            (self.username and self.username.lower() in ['admin', 'master', 'desenvolvedor'])
+        )
+
+    @property
+    def can_view_all_users(self):
+        """Desenvolvedores e Masters enxergam tudo que cada usuário vê e tem acesso"""
+        return self.is_admin_or_dev
 
 class UserEmailConfig(db.Model):
     """Configuração de e-mail por usuário para envio de relatórios"""

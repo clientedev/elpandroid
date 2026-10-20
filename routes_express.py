@@ -807,6 +807,27 @@ def autosave_express_report_api():
                         
                         imagem_hash = hashlib.sha256(imagem_data).hexdigest()
                         
+                        existing_foto = FotoRelatorioExpress.query.filter_by(
+                            relatorio_express_id=relatorio_id,
+                            imagem_hash=imagem_hash
+                        ).first()
+                        if existing_foto:
+                            if 'caption' in foto_info:
+                                existing_foto.legenda = foto_info['caption']
+                            if 'local' in foto_info:
+                                existing_foto.local = foto_info['local']
+                            imagens_resultado.append({
+                                'id': existing_foto.id,
+                                'temp_id': temp_id,
+                                'url': existing_foto.url,
+                                'legenda': existing_foto.legenda
+                            })
+                            try:
+                                os.remove(temp_filepath)
+                            except:
+                                pass
+                            continue
+                        
                         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S%f')
                         filename = f"express_{relatorio_id}_{timestamp}.{extension}"
                         upload_folder = app.config.get('UPLOAD_FOLDER', 'uploads')

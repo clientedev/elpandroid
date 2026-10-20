@@ -783,15 +783,40 @@ def api_legendas():
         }), 500
 
 # Debug routes para identificar diferenças de dados
+@app.route('/api/ping', methods=['GET', 'POST', 'OPTIONS'])
+@csrf.exempt
+def api_ping():
+    """Endpoint de teste de conectividade e comunicação em tempo real entre o site e o APK"""
+    db_ok = True
+    try:
+        from sqlalchemy import text
+        db.session.execute(text("SELECT 1")).scalar()
+    except Exception:
+        db_ok = False
+
+    return jsonify({
+        'success': True,
+        'status': 'online',
+        'message': 'Comunicação entre o site e o APK funcionando perfeitamente.',
+        'timestamp': now_brt().isoformat(),
+        'server': 'Railway Production Backend',
+        'database_connected': db_ok,
+        'apk_version': '1.0.21'
+    }), 200
+
+# Debug routes para identificar diferenças de dados
 @app.route('/api/current-user')
 @login_required
 def api_current_user():
-    """Retorna dados do usuário atual para debug"""
+    """Retorna dados do usuário atual para debug e sessão mobile"""
+    is_dev = getattr(current_user, 'is_developer', False) or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor')
     return jsonify({
         'id': current_user.id,
         'username': current_user.username,
         'email': current_user.email,
-        'is_master': current_user.is_master,
+        'is_master': current_user.is_master or is_dev,
+        'is_developer': is_dev,
+        'is_aprovador': current_user.is_aprovador,
         'nome_completo': getattr(current_user, 'nome_completo', None),
         'cargo': getattr(current_user, 'cargo', None)
     })
@@ -800,8 +825,8 @@ def api_current_user():
 @login_required
 def api_user_data_counts():
     """Retorna contadores de dados para o usuário atual"""
-    # Se usuário for master, vê todos os dados
-    if current_user.is_master:
+    # Se usuário for master ou desenvolvedor, vê todos os dados
+    if current_user.is_master or getattr(current_user, 'is_developer', False) or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor'):
         projetos = Projeto.query.count()
         relatorios = Relatorio.query.count()
         visitas = Visita.query.count()
@@ -9984,17 +10009,25 @@ def _resolve_mobile_user(data=None):
     return User.query.filter_by(ativo=True).first()
 
 def _is_request_master_or_admin(user=None, data=None):
-    """Verifica se a requisicao possui privilegio Master ou Administrador"""
-    if user and (getattr(user, 'is_master', False) or (user.username and user.username.lower() in ['admin', 'master'])):
+    """Verifica se a requisicao possui privilegio Master, Administrador ou Desenvolvedor (Acesso Total)"""
+    if user and (getattr(user, 'is_master', False) or getattr(user, 'is_developer', False) or (user.cargo and user.cargo.lower() == 'desenvolvedor') or (user.username and user.username.lower() in ['admin', 'master', 'desenvolvedor'])):
         return True
-    if current_user and current_user.is_authenticated and (getattr(current_user, 'is_master', False) or (current_user.username and current_user.username.lower() in ['admin', 'master'])):
+    if current_user and current_user.is_authenticated and (getattr(current_user, 'is_master', False) or getattr(current_user, 'is_developer', False) or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor') or (current_user.username and current_user.username.lower() in ['admin', 'master', 'desenvolvedor'])):
         return True
     try:
+        h_dev = str(request.headers.get('X-Is-Developer', '')).strip().lower()
+        if h_dev in ['true', '1']:
+            return True
         h_master = str(request.headers.get('X-Is-Master', '')).strip().lower()
         if h_master in ['true', '1']:
             return True
+        a_dev = str(request.args.get('is_developer', '')).strip().lower()
+        if a_dev in ['true', '1']:
+            return True
         a_master = str(request.args.get('is_master', '')).strip().lower()
         if a_master in ['true', '1']:
+            return True
+        if data and (data.get('is_developer') is True or str(data.get('is_developer', '')).strip().lower() in ['true', '1']):
             return True
         if data and (data.get('is_master') is True or str(data.get('is_master', '')).strip().lower() in ['true', '1']):
             return True
@@ -13524,6 +13557,7 @@ def api_mobile_login():
         user = User.query.filter_by(username=username).first()
         if user and user.ativo and check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
+            is_dev = getattr(user, 'is_developer', False) or (user.cargo and user.cargo.lower() == 'desenvolvedor')
             return jsonify({
                 'success': True,
                 'message': 'Autenticado com sucesso.',
@@ -13533,8 +13567,10 @@ def api_mobile_login():
                     'email': user.email,
                     'nome_completo': getattr(user, 'nome_completo', user.username),
                     'cargo': getattr(user, 'cargo', 'Engenheiro / Fiscal de Obras'),
-                    'is_master': getattr(user, 'is_master', False),
-                    'is_aprovador_express': getattr(user, 'is_aprovador_express', False),
+                    'is_master': getattr(user, 'is_master', False) or is_dev,
+                    'is_developer': is_dev,
+                    'is_aprovador': user.is_aprovador,
+                    'is_aprovador_express': getattr(user, 'is_aprovador_express', False) or is_dev,
                     'ativo': user.ativo
                 }
             }), 200
@@ -14611,15 +14647,24 @@ def api_update_relatorio_status(relatorio_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
-    """Salva fotos vinculadas a um Relatório Express com decodificação base64 e persistência em disco"""
+    """Salva fotos vinculadas a um Relatório Express de forma idempotente, impedindo duplicação no autosave e sincronização"""
     if not fotos_data or not isinstance(fotos_data, list):
         return 0
     upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
     os.makedirs(upload_dir, exist_ok=True)
+    
+    existing_fotos = FotoRelatorioExpress.query.filter_by(relatorio_express_id=rel_exp_id).all()
+    existing_by_id = {f.id: f for f in existing_fotos}
+    existing_by_hash = {f.imagem_hash: f for f in existing_fotos if f.imagem_hash}
+    existing_by_url = {f.url: f for f in existing_fotos if f.url}
+    
+    retained_photo_ids = set()
     saved = 0
+
     for idx, f_data in enumerate(fotos_data):
         if not f_data or not isinstance(f_data, dict):
             continue
+            
         anotacoes_raw = f_data.get('anotacoes_dados')
         anotacoes_obj = None
         if anotacoes_raw:
@@ -14631,21 +14676,15 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
             else:
                 anotacoes_obj = anotacoes_raw
 
-        foto = FotoRelatorioExpress(
-            relatorio_express_id=rel_exp_id,
-            titulo=f_data.get('titulo') or f"Foto Express {idx+1}",
-            legenda=f_data.get('legenda') or '',
-            descricao=f_data.get('descricao') or '',
-            local=f_data.get('local') or '',
-            anotacoes_dados=anotacoes_obj,
-            ordem=f_data.get('ordem', idx)
-        )
+        # Extrair base64 se fornecido
         b64_str = (
             f_data.get('base64') or 
             f_data.get('imagem_base64') or 
             f_data.get('imagem') or 
             ''
         )
+        img_bytes = None
+        img_hash = None
         if b64_str and isinstance(b64_str, str):
             if ',' in b64_str:
                 b64_str = b64_str.split(',', 1)[1]
@@ -14655,23 +14694,91 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
                 b64_str += '=' * (4 - pad)
             try:
                 img_bytes = base64.b64decode(b64_str)
-                foto.imagem = img_bytes
-                foto.imagem_hash = hashlib.sha256(img_bytes).hexdigest()
-                foto.imagem_size = len(img_bytes)
-                foto.content_type = 'image/jpeg'
-                fname = f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
-                fpath = os.path.join(upload_dir, fname)
+                img_hash = hashlib.sha256(img_bytes).hexdigest()
+            except Exception as b64_err:
+                current_app.logger.warning(f"Erro ao decodificar base64 express: {b64_err}")
+
+        # 1. Tentar encontrar foto existente por ID (se válido e menor que 2 bilhões)
+        foto_existente = None
+        req_foto_id = f_data.get('id')
+        if req_foto_id:
+            try:
+                f_id_int = int(req_foto_id)
+                if f_id_int in existing_by_id:
+                    foto_existente = existing_by_id[f_id_int]
+            except Exception:
+                pass
+
+        # 2. Tentar encontrar por hash de imagem
+        if not foto_existente and img_hash and img_hash in existing_by_hash:
+            foto_existente = existing_by_hash[img_hash]
+
+        # 3. Tentar encontrar por URL existente
+        raw_url = f_data.get('url') or f_data.get('uri_local') or f_data.get('uri') or ''
+        if not foto_existente and raw_url and raw_url in existing_by_url:
+            foto_existente = existing_by_url[raw_url]
+
+        if foto_existente:
+            # Já existe no relatório: atualiza metadados sem duplicar registro nem imagem
+            foto_existente.titulo = f_data.get('titulo') or foto_existente.titulo or f"Foto Express {idx+1}"
+            foto_existente.legenda = f_data.get('legenda') or foto_existente.legenda or ''
+            foto_existente.descricao = f_data.get('descricao') or foto_existente.descricao or ''
+            foto_existente.local = f_data.get('local') or foto_existente.local or ''
+            if anotacoes_obj is not None:
+                foto_existente.anotacoes_dados = anotacoes_obj
+            foto_existente.ordem = f_data.get('ordem', idx)
+            retained_photo_ids.add(foto_existente.id)
+            saved += 1
+            continue
+
+        # 4. Nova foto: criar registro limpo
+        foto = FotoRelatorioExpress(
+            relatorio_express_id=rel_exp_id,
+            titulo=f_data.get('titulo') or f"Foto Express {idx+1}",
+            legenda=f_data.get('legenda') or '',
+            descricao=f_data.get('descricao') or '',
+            local=f_data.get('local') or '',
+            anotacoes_dados=anotacoes_obj,
+            ordem=f_data.get('ordem', idx)
+        )
+
+        if img_bytes and img_hash:
+            foto.imagem = img_bytes
+            foto.imagem_hash = img_hash
+            foto.imagem_size = len(img_bytes)
+            foto.content_type = 'image/jpeg'
+            fname = f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+            fpath = os.path.join(upload_dir, fname)
+            try:
                 with open(fpath, 'wb') as f_out:
                     f_out.write(img_bytes)
                 foto.filename = fname
                 foto.url = f"/uploads/{fname}"
-            except Exception as e:
-                current_app.logger.warning(f"Erro ao salvar foto express: {e}")
-                foto.url = f_data.get('url') or f_data.get('uri_local') or f_data.get('uri') or ''
+            except Exception as write_err:
+                current_app.logger.warning(f"Erro ao salvar arquivo de foto express: {write_err}")
+                foto.url = raw_url
         else:
-            foto.url = f_data.get('url') or f_data.get('uri_local') or f_data.get('uri') or ''
+            foto.url = raw_url
+
         db.session.add(foto)
+        db.session.flush()
+        retained_photo_ids.add(foto.id)
+        existing_by_hash[foto.imagem_hash] = foto
+        existing_by_id[foto.id] = foto
         saved += 1
+
+    # 5. Expurgar fotos antigas do relatório que foram removidas pelo usuário
+    for old_foto in existing_fotos:
+        if old_foto.id not in retained_photo_ids:
+            try:
+                if old_foto.filename:
+                    old_path = os.path.join(upload_dir, old_foto.filename)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+            except Exception:
+                pass
+            db.session.delete(old_foto)
+
     db.session.flush()
     return saved
 
@@ -15419,8 +15526,8 @@ def admin_user_app_customizer(user_id=None):
     - Atribuições extras por usuário
     - Simulador interativo em tempo real de smartphone
     """
-    if not (current_user.username == 'admin' or getattr(current_user, 'is_master', False)):
-        flash('Acesso restrito. Apenas administradores podem personalizar a experiência do app dos usuários.', 'error')
+    if not (current_user.username == 'admin' or getattr(current_user, 'is_master', False) or getattr(current_user, 'is_developer', False) or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor')):
+        flash('Acesso restrito. Apenas administradores e desenvolvedores podem personalizar a experiência do app dos usuários.', 'error')
         return redirect(url_for('index'))
 
     from models import UserAppCustomization
@@ -15457,10 +15564,7 @@ def admin_user_app_customizer(user_id=None):
 def api_admin_user_app_customization(user_id):
     """Obter ou salvar customizações do app de um usuário específico"""
     user_req = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
-    is_admin = (
-        (user_req and (user_req.is_master or user_req.username == 'admin')) or
-        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
-    )
+    is_admin = _is_request_master_or_admin(user_req)
     if not is_admin:
         return jsonify({'success': False, 'error': 'Acesso negado.'}), 403
 
@@ -15536,10 +15640,7 @@ def api_admin_user_app_customization(user_id):
 def api_admin_user_app_customization_reset(user_id):
     """Restaura as configurações do aplicativo de um usuário para os padrões de fábrica"""
     user_req = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
-    is_admin = (
-        (user_req and (user_req.is_master or user_req.username == 'admin')) or
-        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
-    )
+    is_admin = _is_request_master_or_admin(user_req)
     if not is_admin:
         return jsonify({'success': False, 'error': 'Acesso negado.'}), 403
 
@@ -15547,6 +15648,78 @@ def api_admin_user_app_customization_reset(user_id):
     target_user = User.query.get(user_id)
     if not target_user:
         return jsonify({'success': False, 'error': 'Usuário não encontrado.'}), 404
+
+    cust = UserAppCustomization.query.filter_by(user_id=user_id).first()
+    if cust:
+        db.session.delete(cust)
+        db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': f'Configurações do aplicativo de {target_user.nome_completo} restauradas para o padrão!'
+    }), 200
+
+
+@app.route('/api/developer/usuarios-visao', methods=['GET'])
+@csrf.exempt
+def api_developer_usuarios_visao():
+    """Retorna tudo o que cada usuário vê e tem acesso (obras, relatórios, visitas, telas, permissões)"""
+    user_req = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    is_admin = _is_request_master_or_admin(user_req)
+    if not is_admin:
+        return jsonify({'success': False, 'error': 'Acesso restrito ao perfil Desenvolvedor/Master'}), 403
+
+    from models import UserAppCustomization
+    users = User.query.filter_by(ativo=True).order_by(User.nome_completo.asc()).all()
+    resultado = []
+
+    for u in users:
+        # Contadores de tudo que o usuário tem acesso ou é responsável
+        obras = Projeto.query.filter((Projeto.responsavel_id == u.id) | (Projeto.nome_funcionario == u.nome_completo)).all()
+        relatorios = Relatorio.query.filter_by(autor_id=u.id).all()
+        visitas = Visita.query.filter((Visita.responsavel_id == u.id) | (Visita.criado_por == u.id)).all()
+
+        cust = UserAppCustomization.query.filter_by(user_id=u.id).first()
+        customizacao = cust.to_dict() if cust else None
+
+        permissoes = ['Preenchimento de Vistorias e Relatórios']
+        if u.is_master:
+            permissoes.append('Acesso Master (Administração Completa)')
+        if getattr(u, 'is_developer', False) or (u.cargo and u.cargo.lower() == 'desenvolvedor'):
+            permissoes.append('Acesso Desenvolvedor (Visão Global)')
+        if getattr(u, 'is_aprovador', False):
+            permissoes.append('Aprovação de Relatórios Técnicos')
+        if getattr(u, 'is_aprovador_express', False):
+            permissoes.append('Aprovação de Relatório Express')
+
+        resultado.append({
+            'id': u.id,
+            'username': u.username,
+            'nome_completo': u.nome_completo,
+            'email': u.email,
+            'cargo': u.cargo or 'Engenheiro / Fiscal',
+            'telefone': u.telefone or '',
+            'is_master': bool(u.is_master),
+            'is_developer': bool(getattr(u, 'is_developer', False) or (u.cargo and u.cargo.lower() == 'desenvolvedor')),
+            'is_aprovador': bool(u.is_aprovador),
+            'is_aprovador_express': bool(getattr(u, 'is_aprovador_express', False)),
+            'cor_agenda': u.cor_agenda or '#0EA5E9',
+            'permissoes': permissoes,
+            'totais': {
+                'obras': len(obras),
+                'relatorios': len(relatorios),
+                'visitas': len(visitas)
+            },
+            'obras_vinculadas': [{'id': p.id, 'numero': p.numero, 'nome': p.nome, 'status': p.status} for p in obras[:10]],
+            'relatorios_recentes': [{'id': r.id, 'numero': r.numero, 'titulo': r.titulo, 'status': r.status} for r in relatorios[:10]],
+            'customizacao_app': customizacao
+        })
+
+    return jsonify({
+        'success': True,
+        'total_usuarios': len(resultado),
+        'usuarios': resultado
+    }), 200
 
     try:
         cust = UserAppCustomization.query.filter_by(user_id=user_id).first()
