@@ -64,7 +64,8 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
       result = result.filter(r =>
         (r.titulo && r.titulo.toLowerCase().includes(q)) ||
         (r.numero && r.numero.toLowerCase().includes(q)) ||
-        (r.projeto_nome && r.projeto_nome.toLowerCase().includes(q))
+        (r.projeto_nome && r.projeto_nome.toLowerCase().includes(q)) ||
+        (r.autor_nome && r.autor_nome.toLowerCase().includes(q))
       );
     }
 
@@ -389,6 +390,14 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
               <Text style={styles.cardTitle} numberOfLines={2}>
                 {item.titulo || 'Relatório de Visita'}
               </Text>
+
+              {/* Criador do Relatório */}
+              <View style={styles.cardAuthorRow}>
+                <Ionicons name="person-circle-outline" size={13.5} color="#64748B" />
+                <Text style={styles.cardAuthorText} numberOfLines={1}>
+                  Criado por: <Text style={styles.cardAuthorName}>{item.autor_nome || 'Responsável'}</Text>
+                </Text>
+              </View>
               
               {/* Rodapé do Card: Obra e Indicadores */}
               <View style={styles.cardBottomRow}>
@@ -569,7 +578,22 @@ const styles = StyleSheet.create({
     fontWeight: '700', 
     color: '#0F172A', 
     lineHeight: 19,
+    marginBottom: 5,
+  },
+  cardAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
     marginBottom: 8,
+  },
+  cardAuthorText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '400',
+  },
+  cardAuthorName: {
+    fontWeight: '600',
+    color: '#334155',
   },
   cardBottomRow: {
     flexDirection: 'row',

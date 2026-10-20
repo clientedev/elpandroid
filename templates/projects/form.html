@@ -149,9 +149,11 @@
                     </div>
 
                     <div class="mb-3">
-                        {{ form.responsavel_id.label(class="form-label") }}
-                        {{ form.responsavel_id(class="form-select" + (" is-invalid" if form.responsavel_id.errors else
-                        "")) }}
+                        {{ form.responsavel_id.label(class="form-label fw-bold") }}
+                        {{ form.responsavel_id(class="form-select" + (" is-invalid" if form.responsavel_id.errors else "")) }}
+                        <small class="text-muted d-block mt-1">
+                            <i class="fas fa-link text-primary me-1"></i>Ao escolher o responsável, ele será linkado automaticamente ao seu e-mail corporativo.
+                        </small>
                         {% for error in form.responsavel_id.errors %}
                         <div class="invalid-feedback">{{ error }}</div>
                         {% endfor %}
@@ -159,8 +161,8 @@
 
                     <!-- Seção de Contatos da Obra -->
                     <div class="card mt-3">
-                        <div class="card-header">
-                            <i class="bi bi-people"></i> Contatos da Obra
+                        <div class="card-header fw-bold">
+                            <i class="bi bi-people me-1"></i> Contatos da Obra
                         </div>
                         <div class="card-body">
 
@@ -244,6 +246,12 @@
                                 <i class="bi bi-person-plus"></i> Adicionar Contato
                             </button>
                         </div>
+                    </div>
+
+                    <!-- 6. Tipo da Obra -->
+                    <div class="mb-3 mt-3">
+                        <label class="form-label fw-bold">Tipo da Obra</label>
+                        {{ form.tipo_obra(class="form-select") }}
                     </div>
 
                     <!-- Seção de Categorias da Obra - Item 16 -->

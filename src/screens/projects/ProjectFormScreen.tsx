@@ -1,18 +1,35 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
-  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator 
+  View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, Modal 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
-import { saveLocalProjeto, addToSyncQueue, getNextProjectNumber } from '../../database/db';
+import { 
+  saveLocalProjeto, 
+  addToSyncQueue, 
+  getNextProjectNumber, 
+  getLocalUsers, 
+  getLocalChecklistTemplate 
+} from '../../database/db';
 import { ensureProjectFolders } from '../../services/appFilesService';
 import { apiClient } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { Projeto } from '../../types';
-import { Colors } from '../../theme/colors';
+import { Projeto, User, ContatoObraItem, ChecklistCustomItem } from '../../types';
+import { Colors, Shadows } from '../../theme/colors';
 import * as Location from 'expo-location';
+
+const CARGO_OPCOES = [
+  'Engenheiro/a',
+  'Arquiteto/a',
+  'Analista',
+  'Assistente',
+  'Encarregado',
+  'Mestre',
+  'Estagiário/a',
+  'Outro'
+];
 
 const TIPOS_OBRA_OPCOES = [
   'Edifício Residencial Multifamiliar',
@@ -34,19 +51,9 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   const isSavingRef = useRef(false);
   const hasSavedRef = useRef(false);
 
-  // 1º Campo: Construtora (em estrito atendimento à regra do manual)
-  const [construtora, setConstrutora] = useState(existingProject?.construtora || '');
-
-  // 2º Campo: Nome da Obra e Número de Identificação (Regra OBRA-0001 em diante)
+  // ================= 1. NOME DA OBRA =================
   const [nome, setNome] = useState(existingProject?.nome || '');
   const [numero, setNumero] = useState(existingProject?.numero || 'OBRA-0001');
-
-  // CEP e Autocomplete de Endereço
-  const [cep, setCep] = useState('');
-  const [loadingCep, setLoadingCep] = useState(false);
-  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([]);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const streetSearchTimeout = useRef<any>(null);
 
   useEffect(() => {
     if (!existingProject) {
@@ -58,33 +65,58 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     }
   }, [existingProject]);
 
-  // 3º Campo: Tipo de Obra
+  // ================= 2. CONSTRUTORA =================
+  const [construtora, setConstrutora] = useState(existingProject?.construtora || '');
+
+  // ================= 3. ENDEREÇO =================
+  const [endereco, setEndereco] = useState(existingProject?.endereco || '');
+  const [cep, setCep] = useState('');
+  const [latitude, setLatitude] = useState<number | undefined>(existingProject?.latitude);
+  const [longitude, setLongitude] = useState<number | undefined>(existingProject?.longitude);
+  const [loadingCep, setLoadingCep] = useState(false);
+  const [loadingGps, setLoadingGps] = useState(false);
+  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const streetSearchTimeout = useRef<any>(null);
+
+  // ================= 4. RESPONSÁVEL (AUTO LINK COM EMAIL) =================
+  const [users, setUsers] = useState<User[]>([]);
+  const [responsavelId, setResponsavelId] = useState<number>(
+    existingProject?.responsavel_id || user?.id || 1
+  );
+  const [funcionario, setFuncionario] = useState(
+    existingProject?.nome_funcionario || (user as any)?.nome_completo || user?.username || 'Responsável'
+  );
+  const [emailPrincipal, setEmailPrincipal] = useState(
+    existingProject?.email_principal || user?.email || ''
+  );
+  const [showResponsavelModal, setShowResponsavelModal] = useState(false);
+
+  // ================= 5. CONTATOS DA OBRA =================
+  const [contatos, setContatos] = useState<ContatoObraItem[]>(
+    existingProject?.contatos || []
+  );
+  const [showContatoModal, setShowContatoModal] = useState(false);
+  const [editingContatoIndex, setEditingContatoIndex] = useState<number | null>(null);
+  const [contatoNome, setContatoNome] = useState('');
+  const [contatoCargo, setContatoCargo] = useState('Engenheiro/a');
+  const [contatoCargoCustom, setContatoCargoCustom] = useState('');
+  const [contatoEmpresa, setContatoEmpresa] = useState('');
+  const [contatoEmail, setContatoEmail] = useState('');
+  const [contatoTelefone, setContatoTelefone] = useState('');
+  const [showCargoPicker, setShowCargoPicker] = useState(false);
+
+  // ================= 6. TIPO DA OBRA =================
   const [tipoObra, setTipoObra] = useState(existingProject?.tipo_obra || 'Edifício Residencial Multifamiliar');
   const [showTipoObraPicker, setShowTipoObraPicker] = useState(false);
 
-  // 4º Campo: Funcionário Responsável
-  const [funcionario, setFuncionario] = useState(
-    existingProject?.nome_funcionario || (user as any)?.nome_completo || user?.username || 'Gabriel Eduardo'
-  );
-
-  // 5º Campo: E-mail Principal da Obra
-  const [emailPrincipal, setEmailPrincipal] = useState(existingProject?.email_principal || user?.email || '');
-
-  // 6º Campo: Numeração Inicial de Relatórios
+  // ================= 7. NUMERAÇÃO INICIAL DOS RELATÓRIOS & STATUS =================
   const [numeracaoInicial, setNumeracaoInicial] = useState<string>(
     existingProject?.numeracao_inicial ? existingProject.numeracao_inicial.toString() : '1'
   );
-
-  // 7º Campo: Endereço e Geolocalização GPS
-  const [endereco, setEndereco] = useState(existingProject?.endereco || '');
-  const [latitude, setLatitude] = useState<number | undefined>(existingProject?.latitude);
-  const [longitude, setLongitude] = useState<number | undefined>(existingProject?.longitude);
-  const [loadingGps, setLoadingGps] = useState(false);
-
-  // Status da Obra
   const [status, setStatus] = useState(existingProject?.status || 'Ativo');
 
-  // 8º Campo: Especificações Técnicas de Fachada (Sanfona Colapsável Roxa #6f42c1)
+  // ================= 8. INFORMAÇÕES TÉCNICAS =================
   const [accordionOpen, setAccordionOpen] = useState(false);
   const [elementosBase, setElementosBase] = useState(existingProject?.elementos_construtivos_base || '');
   const [chapiscoColante, setChapiscoColante] = useState(existingProject?.especificacao_chapisco_colante || '');
@@ -99,7 +131,52 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   const [observacoesFachada, setObservacoesFachada] = useState(existingProject?.observacoes_projeto_fachada || '');
   const [outrasObs, setOutrasObs] = useState(existingProject?.outras_observacoes || '');
 
+  // ================= 9. CHECKLIST =================
+  const [checklistItems, setChecklistItems] = useState<ChecklistCustomItem[]>([]);
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
+  const [newChecklistText, setNewChecklistText] = useState('');
+
   const [loading, setLoading] = useState(false);
+
+  // Carregar Usuários e Checklist Padrão
+  useEffect(() => {
+    getLocalUsers().then(us => {
+      setUsers(us);
+      if (!existingProject && us.length > 0) {
+        const found = us.find(u => u.id === user?.id) || us[0];
+        setResponsavelId(found.id);
+        setFuncionario(found.nome_completo || found.username);
+        setEmailPrincipal(found.email || '');
+      } else if (existingProject && us.length > 0) {
+        const found = us.find(u => u.id === existingProject.responsavel_id);
+        if (found) {
+          setEmailPrincipal(found.email || '');
+          setFuncionario(found.nome_completo || found.username);
+        }
+      }
+    }).catch(err => console.warn('Erro ao carregar usuários:', err));
+
+    getLocalChecklistTemplate().then(items => {
+      if (existingProject?.checklist_data) {
+        try {
+          const parsed = JSON.parse(existingProject.checklist_data);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setChecklistItems(parsed);
+            return;
+          }
+        } catch (e) {}
+      }
+      setChecklistItems(items);
+    }).catch(err => console.warn('Erro ao carregar checklist:', err));
+  }, [existingProject, user]);
+
+  // Ao selecionar responsável, linkar automaticamente ao seu e-mail e nome
+  const handleSelectResponsavel = (u: User) => {
+    setResponsavelId(u.id);
+    setFuncionario(u.nome_completo || u.username);
+    setEmailPrincipal(u.email || '');
+    setShowResponsavelModal(false);
+  };
 
   // ================= AUTOSAVE EM TEMPO REAL =================
   const saveDraftImmediately = useCallback(async () => {
@@ -119,7 +196,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         latitude: latitude,
         longitude: longitude,
         nome_funcionario: funcionario.trim(),
-        responsavel_id: existingProject?.responsavel_id || user?.id || 1,
+        responsavel_id: responsavelId,
         email_principal: emailPrincipal.trim(),
         numeracao_inicial: isNaN(numInicialParsed) ? 1 : numInicialParsed,
         status: status,
@@ -135,6 +212,8 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         definicao_face_inferior_abas: faceInferiorAbas.trim(),
         observacoes_projeto_fachada: observacoesFachada.trim(),
         outras_observacoes: outrasObs.trim(),
+        contatos: contatos,
+        checklist_data: JSON.stringify(checklistItems),
         sync_status: 'pending',
       };
 
@@ -173,13 +252,14 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     }
   }, [
     projectId, numero, nome, construtora, tipoObra, endereco, latitude, longitude,
-    funcionario, emailPrincipal, numeracaoInicial, status, elementosBase,
-    chapiscoColante, chapiscoAlvenaria, argamassaEmboco, formaAplicacao,
-    acabamentosRevestimento, peitoris, muretas, frisosCor, faceInferiorAbas,
-    observacoesFachada, outrasObs, existingProject, user, isOnline
+    funcionario, responsavelId, emailPrincipal, numeracaoInicial, status,
+    elementosBase, chapiscoColante, chapiscoAlvenaria, argamassaEmboco,
+    formaAplicacao, acabamentosRevestimento, peitoris, muretas, frisosCor,
+    faceInferiorAbas, observacoesFachada, outrasObs, contatos, checklistItems,
+    existingProject, isOnline
   ]);
 
-  // Debounced AutoSave a cada alteração em qualquer campo da obra (1500ms)
+  // Debounced AutoSave (1500ms)
   useEffect(() => {
     if (!nome.trim() && !construtora.trim()) return;
     const timer = setTimeout(() => {
@@ -187,14 +267,14 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     }, 1500);
     return () => clearTimeout(timer);
   }, [
-    nome, construtora, tipoObra, funcionario, emailPrincipal, numeracaoInicial,
-    endereco, latitude, longitude, status, elementosBase, chapiscoColante,
-    chapiscoAlvenaria, argamassaEmboco, formaAplicacao, acabamentosRevestimento,
-    peitoris, muretas, frisosCor, faceInferiorAbas, observacoesFachada, outrasObs,
-    saveDraftImmediately
+    nome, construtora, tipoObra, funcionario, responsavelId, emailPrincipal,
+    numeracaoInicial, endereco, latitude, longitude, status, elementosBase,
+    chapiscoColante, chapiscoAlvenaria, argamassaEmboco, formaAplicacao,
+    acabamentosRevestimento, peitoris, muretas, frisosCor, faceInferiorAbas,
+    observacoesFachada, outrasObs, contatos, checklistItems, saveDraftImmediately
   ]);
 
-  // Forçar salvamento e atualização sempre que voltar de janela (seja deslizando o dedo ou botão voltar)
+  // Forçar salvamento ao sair da tela
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
       if (hasSavedRef.current) return;
@@ -244,7 +324,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       const fullAddr = parts.join(', ');
       setEndereco(fullAddr);
 
-      // Tenta geocodificar coordenadas
       try {
         const query = `${res.logradouro || ''}, ${res.localidade || ''}, ${res.uf || ''}, Brasil`;
         const geocode = await Location.geocodeAsync(query);
@@ -255,7 +334,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       } catch (geoErr) {
         console.warn('Geocodificação CEP aviso:', geoErr);
       }
-    } catch (err: any) {
+    } catch {
       Alert.alert('Erro ao Buscar CEP', 'Falha na conexão com o serviço de busca de CEP.');
     } finally {
       setLoadingCep(false);
@@ -298,7 +377,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     setStreetSuggestions([]);
   }
 
-  // Captura de GPS de hardware de alta precisão do dispositivo móvel + Geocodificação Reversa para endereço
   async function handleCapturarGps() {
     setLoadingGps(true);
     try {
@@ -330,29 +408,15 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         if (reverseGeocode && reverseGeocode.length > 0) {
           const item = reverseGeocode[0];
           const parts: string[] = [];
-
           const logradouro = item.street || item.name || '';
           const num = item.streetNumber || '';
-          if (logradouro) {
-            parts.push(num ? `${logradouro}, ${num}` : logradouro);
-          }
-
-          if (item.district || item.subregion) {
-            parts.push(item.district || item.subregion || '');
-          }
-
+          if (logradouro) parts.push(num ? `${logradouro}, ${num}` : logradouro);
+          if (item.district || item.subregion) parts.push(item.district || item.subregion || '');
           const cidade = item.city || item.subregion || '';
           const uf = item.region || '';
-          if (cidade && uf) {
-            parts.push(`${cidade} - ${uf}`);
-          } else if (cidade || uf) {
-            parts.push(cidade || uf);
-          }
-
-          if (item.postalCode) {
-            parts.push(`CEP ${item.postalCode}`);
-          }
-
+          if (cidade && uf) parts.push(`${cidade} - ${uf}`);
+          else if (cidade || uf) parts.push(cidade || uf);
+          if (item.postalCode) parts.push(`CEP ${item.postalCode}`);
           resolvedAddress = parts.filter(Boolean).join(', ');
         }
       } catch (revErr) {
@@ -363,40 +427,115 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         setEndereco(resolvedAddress);
         Alert.alert(
           'Localização do Dispositivo Obtida',
-          `Endereço identificado com sucesso pelo GPS do dispositivo:\n\n${resolvedAddress}\n\nCoordenadas do Dispositivo:\nLat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`
+          `Endereço identificado com sucesso pelo GPS do dispositivo:\n\n${resolvedAddress}\n\nCoordenadas:\nLat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`
         );
       } else {
         const fallbackCoord = `Lat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`;
-        if (!endereco.trim()) {
-          setEndereco(fallbackCoord);
-        }
-        Alert.alert(
-          'GPS do Dispositivo Capturado',
-          `Coordenadas de alta precisão do hardware obtidas:\n${fallbackCoord}\n(Você pode complementar o nome da rua manualmente).`
-        );
+        if (!endereco.trim()) setEndereco(fallbackCoord);
+        Alert.alert('GPS Capturado', `Coordenadas obtidas:\n${fallbackCoord}`);
       }
-    } catch (err: any) {
-      console.warn('[GPS] Falha ao capturar localização:', err);
-      Alert.alert(
-        'Falha no GPS',
-        'Não foi possível obter a localização do dispositivo no momento. Verifique se o GPS (Localização) do aparelho está ativado.'
-      );
+    } catch {
+      Alert.alert('Falha no GPS', 'Não foi possível obter a localização do dispositivo no momento.');
     } finally {
       setLoadingGps(false);
     }
   }
 
-  async function handleSave() {
-    if (!construtora.trim()) {
-      Alert.alert('Campo Obrigatório', 'Por favor, informe o Nome da Construtora (1º campo da tela).');
+  // ================= MODAL CONTATOS DA OBRA =================
+  const handleOpenAddContato = () => {
+    setEditingContatoIndex(null);
+    setContatoNome('');
+    setContatoCargo('Engenheiro/a');
+    setContatoCargoCustom('');
+    setContatoEmpresa(construtora || '');
+    setContatoEmail('');
+    setContatoTelefone('');
+    setShowContatoModal(true);
+  };
+
+  const handleEditContato = (idx: number) => {
+    const c = contatos[idx];
+    setEditingContatoIndex(idx);
+    setContatoNome(c.nome);
+    if (CARGO_OPCOES.includes(c.cargo)) {
+      setContatoCargo(c.cargo);
+      setContatoCargoCustom('');
+    } else {
+      setContatoCargo('Outro');
+      setContatoCargoCustom(c.cargo);
+    }
+    setContatoEmpresa(c.empresa || '');
+    setContatoEmail(c.email || '');
+    setContatoTelefone(c.telefone || '');
+    setShowContatoModal(true);
+  };
+
+  const handleSaveContato = () => {
+    if (!contatoNome.trim()) {
+      Alert.alert('Nome Obrigatório', 'Informe o nome do contato.');
       return;
     }
+    const finalCargo = contatoCargo === 'Outro' 
+      ? (contatoCargoCustom.trim() || 'Outro') 
+      : contatoCargo;
+
+    const newContato: ContatoObraItem = {
+      nome: contatoNome.trim(),
+      cargo: finalCargo,
+      empresa: contatoEmpresa.trim(),
+      email: contatoEmail.trim(),
+      telefone: contatoTelefone.trim(),
+    };
+
+    if (editingContatoIndex !== null) {
+      const updated = [...contatos];
+      updated[editingContatoIndex] = newContato;
+      setContatos(updated);
+    } else {
+      setContatos([...contatos, newContato]);
+    }
+    setShowContatoModal(false);
+  };
+
+  const handleRemoveContato = (idx: number) => {
+    Alert.alert('Remover Contato', 'Deseja remover este contato da obra?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { 
+        text: 'Remover', 
+        style: 'destructive', 
+        onPress: () => {
+          setContatos(contatos.filter((_, i) => i !== idx));
+        }
+      }
+    ]);
+  };
+
+  // ================= MODAL CHECKLIST PERSONALIZADO =================
+  const handleAddCustomChecklistItem = () => {
+    if (!newChecklistText.trim()) return;
+    const newItem: ChecklistCustomItem = {
+      id: Date.now(),
+      item: newChecklistText.trim(),
+      texto: newChecklistText.trim(),
+      ordem: checklistItems.length + 1,
+      ativo: true
+    };
+    setChecklistItems([...checklistItems, newItem]);
+    setNewChecklistText('');
+  };
+
+  const handleRemoveChecklistItem = (id: number) => {
+    setChecklistItems(checklistItems.filter(item => item.id !== id));
+  };
+
+  // ================= SALVAMENTO FINAL =================
+  async function handleSave() {
     if (!nome.trim()) {
       Alert.alert('Campo Obrigatório', 'Por favor, informe o Nome da Obra.');
       return;
     }
-    if (!emailPrincipal.trim()) {
-      Alert.alert('Campo Obrigatório', 'Por favor, informe o E-mail Principal para Envio de Relatórios.');
+    if (!construtora.trim()) {
+      Alert.alert('Campo Obrigatório', 'Por favor, informe o Nome da Construtora.');
       return;
     }
 
@@ -415,7 +554,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         latitude: latitude,
         longitude: longitude,
         nome_funcionario: funcionario.trim(),
-        responsavel_id: existingProject?.responsavel_id || user?.id || 1,
+        responsavel_id: responsavelId,
         email_principal: emailPrincipal.trim(),
         numeracao_inicial: numInicialParsed,
         status: status,
@@ -431,6 +570,8 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         definicao_face_inferior_abas: faceInferiorAbas.trim(),
         observacoes_projeto_fachada: observacoesFachada.trim(),
         outras_observacoes: outrasObs.trim(),
+        contatos: contatos,
+        checklist_data: JSON.stringify(checklistItems),
         sync_status: 'pending',
       };
 
@@ -461,6 +602,8 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       setLoading(false);
     }
   }
+
+  const selectedUserObj = users.find(u => u.id === responsavelId);
 
   return (
     <View style={styles.container}>
@@ -496,9 +639,27 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Identificação Geral da Obra</Text>
 
-          {/* 1. Nome da Construtora (1º Campo Oficial) */}
+          {/* ================= 1. NOME DA OBRA ================= */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>1. Nome da Construtora *</Text>
+            <Text style={styles.label}>1. Nome da Obra *</Text>
+            <TextInput 
+              style={styles.input} 
+              placeholder="Ex: Residencial Alphaville Horizon" 
+              placeholderTextColor="#94A3B8"
+              value={nome} 
+              onChangeText={setNome} 
+            />
+            <View style={styles.codeRow}>
+              <Text style={styles.codeRowLabel}>Código Identificador:</Text>
+              <View style={styles.codeBadge}>
+                <Text style={styles.codeBadgeText}>{numero}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ================= 2. CONSTRUTORA ================= */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>2. Construtora *</Text>
             <TextInput 
               style={styles.input} 
               placeholder="Ex: Construtora Silva & Costa S/A" 
@@ -508,105 +669,9 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
             />
           </View>
 
-          {/* 2. Nome da Obra e Código de Identificação */}
+          {/* ================= 3. ENDEREÇO ================= */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>2. Nome da Obra *</Text>
-            <TextInput 
-              style={styles.input} 
-              placeholder="Ex: Residencial Alphaville Horizon" 
-              placeholderTextColor="#94A3B8"
-              value={nome} 
-              onChangeText={setNome} 
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Código / Número de Identificação *</Text>
-            <TextInput 
-              style={[styles.input, styles.readOnlyInput]} 
-              value={numero} 
-              placeholder="OBRA-0001"
-              placeholderTextColor="#94A3B8"
-              onChangeText={setNumero} 
-            />
-            <Text style={styles.hintText}>
-              Regra de indexação: Sequencial automático OBRA-0001 em diante.
-            </Text>
-          </View>
-
-          {/* 3. Tipo de Obra */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>3. Tipo de Obra</Text>
-            <TouchableOpacity 
-              style={styles.dropdownBtn}
-              onPress={() => setShowTipoObraPicker(!showTipoObraPicker)}
-            >
-              <Text style={styles.dropdownBtnText}>{tipoObra}</Text>
-              <Ionicons name={showTipoObraPicker ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
-            </TouchableOpacity>
-
-            {showTipoObraPicker && (
-              <View style={styles.dropdownList}>
-                {TIPOS_OBRA_OPCOES.map((op) => (
-                  <TouchableOpacity
-                    key={op}
-                    style={[styles.dropdownItem, tipoObra === op && styles.dropdownItemActive]}
-                    onPress={() => {
-                      setTipoObra(op);
-                      setShowTipoObraPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.dropdownItemText, tipoObra === op && styles.dropdownItemTextActive]}>
-                      {op}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* 4. Funcionário Responsável */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>4. Engenheiro / Coordenador Responsável</Text>
-            <TextInput 
-              style={styles.input} 
-              value={funcionario} 
-              onChangeText={setFuncionario} 
-            />
-          </View>
-
-          {/* 5. E-mail Principal da Obra */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>5. E-mail Principal da Obra *</Text>
-            <TextInput 
-              style={styles.input} 
-              keyboardType="email-address" 
-              autoCapitalize="none"
-              placeholder="engenharia@obra.com.br"
-              placeholderTextColor="#94A3B8"
-              value={emailPrincipal} 
-              onChangeText={setEmailPrincipal} 
-            />
-          </View>
-
-          {/* 6. Numeração Inicial de Relatórios */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>6. Numeração Inicial de Relatórios</Text>
-            <TextInput 
-              style={styles.input} 
-              keyboardType="numeric"
-              placeholder="1"
-              value={numeracaoInicial} 
-              onChangeText={setNumeracaoInicial} 
-            />
-            <Text style={styles.hintText}>
-              Se a obra já emitia relatórios antes do sistema, defina aqui o número de partida.
-            </Text>
-          </View>
-
-          {/* 7. Endereço Completo e Geolocalização */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>7. Endereço Completo e Localização</Text>
+            <Text style={styles.label}>3. Endereço</Text>
 
             {/* Busca por CEP */}
             <Text style={[styles.label, { fontSize: 12, color: '#64748B', marginTop: 4 }]}>
@@ -638,14 +703,14 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
               </TouchableOpacity>
             </View>
 
-            {/* Nome da Rua / Endereço com Autocomplete */}
-            <Text style={[styles.label, { fontSize: 12, color: '#64748B', marginTop: 4 }]}>
-              Logradouro / Rua (sugestões em lista ao digitar) ou GPS:
+            {/* Logradouro com Autocomplete ou GPS */}
+            <Text style={[styles.label, { fontSize: 12, color: '#64748B', marginTop: 6 }]}>
+              Logradouro Completo / Captura GPS:
             </Text>
             <View style={styles.addressRow}>
               <TextInput 
                 style={[styles.input, { flex: 1 }]} 
-                placeholder="Digite a rua (busca automática) ou endereço completo" 
+                placeholder="Digite a rua ou capture pelo GPS" 
                 placeholderTextColor="#94A3B8"
                 value={endereco} 
                 onChangeText={handleSearchStreet} 
@@ -666,7 +731,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
               </TouchableOpacity>
             </View>
 
-            {/* Sugestões do Dropdown da Rua */}
+            {/* Sugestões de Rua */}
             {loadingSuggestions && (
               <View style={styles.suggestionLoading}>
                 <ActivityIndicator size="small" color="#0284C7" />
@@ -695,14 +760,167 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
               <View style={styles.coordinatesTag}>
                 <Ionicons name="shield-checkmark" size={14} color="#0369A1" />
                 <Text style={styles.coordinatesText}>
-                  GPS do Dispositivo (Alta Precisão) • Lat: {latitude.toFixed(6)} | Lon: {longitude.toFixed(6)}
+                  GPS • Lat: {latitude.toFixed(6)} | Lon: {longitude.toFixed(6)}
                 </Text>
               </View>
             ) : null}
           </View>
+
+          {/* ================= 4. RESPONSÁVEL (AUTO LINKADO AO EMAIL) ================= */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>4. Responsável *</Text>
+            <TouchableOpacity 
+              style={styles.responsavelPickerBtn}
+              onPress={() => setShowResponsavelModal(true)}
+              activeOpacity={0.7}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.responsavelNameText}>
+                  {selectedUserObj ? (selectedUserObj.nome_completo || selectedUserObj.username) : funcionario}
+                </Text>
+                <Text style={styles.responsavelRoleText}>
+                  {selectedUserObj?.cargo || 'Responsável Técnico'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#64748B" />
+            </TouchableOpacity>
+
+            {/* Email linkado automaticamente (não precisa campo separado) */}
+            <View style={styles.linkedEmailBox}>
+              <Ionicons name="mail" size={14} color="#2563EB" />
+              <Text style={styles.linkedEmailText}>
+                E-mail vinculado automaticamente: <Text style={{ fontWeight: 'bold' }}>{emailPrincipal || 'Não configurado'}</Text>
+              </Text>
+            </View>
+          </View>
+
+          {/* ================= 5. CONTATOS DA OBRA ================= */}
+          <View style={styles.inputGroup}>
+            <View style={styles.contatosHeaderRow}>
+              <Text style={styles.label}>5. Contatos da Obra</Text>
+              <TouchableOpacity 
+                style={styles.addContatoBtn}
+                onPress={handleOpenAddContato}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="person-add-outline" size={14} color="#FFFFFF" />
+                <Text style={styles.addContatoBtnText}>Adicionar Contato</Text>
+              </TouchableOpacity>
+            </View>
+
+            {contatos.length === 0 ? (
+              <View style={styles.contatosEmptyBox}>
+                <Ionicons name="people-outline" size={24} color="#94A3B8" />
+                <Text style={styles.contatosEmptyText}>
+                  Nenhum contato específico cadastrado para esta obra.
+                </Text>
+              </View>
+            ) : (
+              contatos.map((cont, idx) => (
+                <View key={idx} style={styles.contatoCard}>
+                  <View style={styles.contatoCardTop}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.contatoName}>{cont.nome}</Text>
+                      <View style={styles.contatoCargoBadge}>
+                        <Text style={styles.contatoCargoText}>{cont.cargo}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TouchableOpacity 
+                        onPress={() => handleEditContato(idx)} 
+                        style={styles.contatoIconBtn}
+                      >
+                        <Ionicons name="create-outline" size={16} color="#2563EB" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={() => handleRemoveContato(idx)} 
+                        style={[styles.contatoIconBtn, { backgroundColor: '#FEE2E2' }]}
+                      >
+                        <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {cont.empresa ? (
+                    <Text style={styles.contatoDetail}>🏢 Empresa: {cont.empresa}</Text>
+                  ) : null}
+                  {cont.email ? (
+                    <Text style={styles.contatoDetail}>✉️ E-mail: {cont.email}</Text>
+                  ) : null}
+                  {cont.telefone ? (
+                    <Text style={styles.contatoDetail}>📞 Tel: {cont.telefone}</Text>
+                  ) : null}
+                </View>
+              ))
+            )}
+          </View>
+
+          {/* ================= 6. TIPO DA OBRA ================= */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>6. Tipo da Obra</Text>
+            <TouchableOpacity 
+              style={styles.dropdownBtn}
+              onPress={() => setShowTipoObraPicker(!showTipoObraPicker)}
+            >
+              <Text style={styles.dropdownBtnText}>{tipoObra}</Text>
+              <Ionicons name={showTipoObraPicker ? "chevron-up" : "chevron-down"} size={18} color="#64748B" />
+            </TouchableOpacity>
+
+            {showTipoObraPicker && (
+              <View style={styles.dropdownList}>
+                {TIPOS_OBRA_OPCOES.map((op) => (
+                  <TouchableOpacity
+                    key={op}
+                    style={[styles.dropdownItem, tipoObra === op && styles.dropdownItemActive]}
+                    onPress={() => {
+                      setTipoObra(op);
+                      setShowTipoObraPicker(false);
+                    }}
+                  >
+                    <Text style={[styles.dropdownItemText, tipoObra === op && styles.dropdownItemTextActive]}>
+                      {op}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* ================= 7. NUMERAÇÃO INICIAL DOS RELATÓRIOS ================= */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>7. Numeração Inicial dos Relatórios</Text>
+            <TextInput 
+              style={styles.input} 
+              keyboardType="numeric"
+              placeholder="1"
+              value={numeracaoInicial} 
+              onChangeText={setNumeracaoInicial} 
+            />
+            <Text style={styles.hintText}>
+              Primeiro número sequencial dos relatórios técnicos desta obra.
+            </Text>
+          </View>
+
+          {/* Status da Obra */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Status Atual da Obra</Text>
+            <View style={styles.statusChipsRow}>
+              {(['Ativo', 'Não Iniciado', 'Pausado', 'Concluído'] as const).map(st => (
+                <TouchableOpacity
+                  key={st}
+                  style={[styles.statusChip, status === st && styles.statusChipActive]}
+                  onPress={() => setStatus(st)}
+                >
+                  <Text style={[styles.statusChipText, status === st && styles.statusChipTextActive]}>
+                    {st}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
-        {/* 8. Especificações Técnicas de Fachada (Sanfona Colapsável Roxa #6f42c1 - Seção 15.5) */}
+        {/* ================= 8. INFORMAÇÕES TÉCNICAS ================= */}
         <View style={styles.purpleAccordionSection}>
           <TouchableOpacity 
             style={styles.purpleAccordionHeader}
@@ -712,7 +930,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Ionicons name="layers" size={20} color="#FFFFFF" />
               <Text style={styles.purpleAccordionTitle}>
-                8. Especificações Técnicas de Fachada
+                8. Informações Técnicas (Fachada & Alvenaria)
               </Text>
             </View>
             <Ionicons 
@@ -850,7 +1068,40 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
           )}
         </View>
 
-        {/* 9. Disposição Estrita dos Botões no Rodapé: Esquerda: Cancelar | Direita: Salvar Obra (Seção 15.5) */}
+        {/* ================= 9. CHECKLIST ================= */}
+        <View style={styles.checklistSection}>
+          <View style={styles.checklistHeaderRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <Ionicons name="checkbox-outline" size={20} color="#2563EB" />
+              <Text style={styles.checklistTitle}>9. Checklist da Obra</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.customChecklistBtn}
+              onPress={() => setShowChecklistModal(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="options" size={14} color="#FFFFFF" />
+              <Text style={styles.customChecklistBtnText}>Checklist Personalizado</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.checklistSubtitle}>
+            Itens padrão configurados aplicáveis a esta obra ({checklistItems.length} etapas):
+          </Text>
+
+          <View style={styles.checklistCardList}>
+            {checklistItems.map((item, index) => (
+              <View key={item.id || index} style={styles.checklistItemRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#10B981" />
+                <Text style={styles.checklistItemText}>
+                  {index + 1}. {item.item || item.texto}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Botões Rodapé: Cancelar | Salvar Obra */}
         <View style={styles.footerButtonsRow}>
           <TouchableOpacity 
             style={styles.btnCancel}
@@ -878,6 +1129,219 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ================= MODAL DE SELEÇÃO DE RESPONSÁVEL ================= */}
+      <Modal visible={showResponsavelModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Selecionar Responsável Técnico</Text>
+              <TouchableOpacity onPress={() => setShowResponsavelModal(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 350 }}>
+              {users.map(u => (
+                <TouchableOpacity
+                  key={u.id}
+                  style={[styles.userOptionCard, responsavelId === u.id && styles.userOptionCardActive]}
+                  onPress={() => handleSelectResponsavel(u)}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.userNameOption, responsavelId === u.id && styles.userOptionTextActive]}>
+                      {u.nome_completo || u.username}
+                    </Text>
+                    <Text style={styles.userRoleOption}>
+                      {u.cargo || 'Equipe Técnica'} • {u.email}
+                    </Text>
+                  </View>
+                  {responsavelId === u.id && (
+                    <Ionicons name="checkmark-circle" size={20} color="#2563EB" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL ADICIONAR / EDITAR CONTATO DA OBRA ================= */}
+      <Modal visible={showContatoModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingContatoIndex !== null ? 'Editar Contato da Obra' : 'Adicionar Contato da Obra'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowContatoModal(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }}>
+              {/* Nome */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Nome do Contato *</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="Ex: Carlos Eduardo" 
+                  value={contatoNome} 
+                  onChangeText={setContatoNome} 
+                />
+              </View>
+
+              {/* Cargo Dropdown */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Cargo *</Text>
+                <TouchableOpacity 
+                  style={styles.dropdownBtn}
+                  onPress={() => setShowCargoPicker(!showCargoPicker)}
+                >
+                  <Text style={styles.dropdownBtnText}>{contatoCargo}</Text>
+                  <Ionicons name={showCargoPicker ? "chevron-up" : "chevron-down"} size={16} color="#64748B" />
+                </TouchableOpacity>
+
+                {showCargoPicker && (
+                  <View style={styles.dropdownList}>
+                    {CARGO_OPCOES.map(c => (
+                      <TouchableOpacity
+                        key={c}
+                        style={[styles.dropdownItem, contatoCargo === c && styles.dropdownItemActive]}
+                        onPress={() => {
+                          setContatoCargo(c);
+                          setShowCargoPicker(false);
+                        }}
+                      >
+                        <Text style={[styles.dropdownItemText, contatoCargo === c && styles.dropdownItemTextActive]}>
+                          {c}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {contatoCargo === 'Outro' && (
+                  <TextInput 
+                    style={[styles.input, { marginTop: 8 }]} 
+                    placeholder="Digite o cargo específico" 
+                    value={contatoCargoCustom} 
+                    onChangeText={setContatoCargoCustom} 
+                  />
+                )}
+              </View>
+
+              {/* Empresa */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Empresa</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="Ex: Construtora ou Subempreiteira" 
+                  value={contatoEmpresa} 
+                  onChangeText={setContatoEmpresa} 
+                />
+              </View>
+
+              {/* Email (opcional) */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>E-mail (opcional)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="contato@empresa.com.br" 
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  value={contatoEmail} 
+                  onChangeText={setContatoEmail} 
+                />
+              </View>
+
+              {/* Telefone (opcional) */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Telefone (opcional)</Text>
+                <TextInput 
+                  style={styles.input} 
+                  placeholder="(11) 99999-9999" 
+                  keyboardType="phone-pad"
+                  value={contatoTelefone} 
+                  onChangeText={setContatoTelefone} 
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalBtnRow}>
+              <TouchableOpacity 
+                style={styles.btnModalCancel}
+                onPress={() => setShowContatoModal(false)}
+              >
+                <Text style={styles.btnModalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.btnModalSave}
+                onPress={handleSaveContato}
+              >
+                <Text style={styles.btnModalSaveText}>Salvar Contato</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= MODAL CHECKLIST PERSONALIZADO ================= */}
+      <Modal visible={showChecklistModal} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Personalizar Checklist da Obra</Text>
+              <TouchableOpacity onPress={() => setShowChecklistModal(false)}>
+                <Ionicons name="close" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Adicione etapas específicas ou remova itens que não se aplicam a esta obra:
+            </Text>
+
+            {/* Adicionar Novo Item */}
+            <View style={styles.addChecklistRow}>
+              <TextInput 
+                style={[styles.input, { flex: 1 }]} 
+                placeholder="Nova etapa do checklist..." 
+                value={newChecklistText} 
+                onChangeText={setNewChecklistText} 
+              />
+              <TouchableOpacity 
+                style={styles.addChecklistActionBtn}
+                onPress={handleAddCustomChecklistItem}
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Lista com Opção de Remover */}
+            <ScrollView style={{ maxHeight: 280 }}>
+              {checklistItems.map((item, idx) => (
+                <View key={item.id || idx} style={styles.customChecklistItemRow}>
+                  <Text style={styles.customChecklistIndex}>{idx + 1}.</Text>
+                  <Text style={styles.customChecklistText}>{item.item || item.texto}</Text>
+                  <TouchableOpacity 
+                    onPress={() => handleRemoveChecklistItem(item.id)}
+                    style={styles.deleteChecklistBtn}
+                  >
+                    <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.btnModalSave, { marginTop: 14 }]}
+              onPress={() => setShowChecklistModal(false)}
+            >
+              <Text style={styles.btnModalSaveText}>Concluir Personalização</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -890,6 +1354,21 @@ const styles = StyleSheet.create({
   scroll: {
     padding: 16,
   },
+  autoSaveBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DCFCE7',
+    gap: 8,
+  },
+  autoSaveText: {
+    fontSize: 12,
+    color: '#16A34A',
+    fontWeight: '500',
+  },
   section: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -897,6 +1376,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
+    ...Shadows.sm,
   },
   sectionTitle: {
     fontSize: 16,
@@ -926,10 +1406,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0F172A',
   },
-  readOnlyInput: {
-    backgroundColor: '#F1F5F9',
-    color: '#64748B',
-  },
   textArea: {
     height: 64,
     textAlignVertical: 'top',
@@ -939,6 +1415,218 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     marginTop: 4,
+  },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 6,
+  },
+  codeRowLabel: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  codeBadge: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  codeBadgeText: {
+    color: '#2563EB',
+    fontWeight: 'bold',
+    fontSize: 11,
+  },
+  cepRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  cepBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 8,
+    gap: 6,
+  },
+  cepBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  gpsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#059669',
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 8,
+    gap: 6,
+  },
+  gpsBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  suggestionLoading: {
+    paddingVertical: 6,
+  },
+  suggestionsContainer: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 8,
+    maxHeight: 140,
+    marginTop: 6,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: 8,
+  },
+  suggestionText: {
+    fontSize: 12,
+    color: '#1E293B',
+    flex: 1,
+  },
+  coordinatesTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 8,
+    gap: 6,
+  },
+  coordinatesText: {
+    fontSize: 11,
+    color: '#0369A1',
+    fontWeight: '600',
+  },
+  responsavelPickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  responsavelNameText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  responsavelRoleText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  linkedEmailBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginTop: 6,
+    gap: 6,
+  },
+  linkedEmailText: {
+    fontSize: 12,
+    color: '#1D4ED8',
+  },
+  contatosHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  addContatoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    gap: 4,
+  },
+  addContatoBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  contatosEmptyBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    gap: 6,
+  },
+  contatosEmptyText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  contatoCard: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 8,
+    gap: 3,
+  },
+  contatoCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  contatoName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  contatoCargoBadge: {
+    backgroundColor: '#E0E7FF',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 2,
+  },
+  contatoCargoText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#4338CA',
+  },
+  contatoDetail: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  contatoIconBtn: {
+    backgroundColor: '#EFF6FF',
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dropdownBtn: {
     flexDirection: 'row',
@@ -962,10 +1650,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 4,
     overflow: 'hidden',
+    ...Shadows.sm,
   },
   dropdownItem: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
@@ -977,175 +1666,278 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   dropdownItemTextActive: {
+    color: '#2563EB',
     fontWeight: 'bold',
-    color: Colors.primary,
   },
-  autoSaveBar: {
+  statusChipsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
-    backgroundColor: '#F0FDF4',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#DCFCE7',
+    marginTop: 4,
   },
-  autoSaveText: {
+  statusChip: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  statusChipActive: {
+    backgroundColor: '#059669',
+    borderColor: '#047857',
+  },
+  statusChipText: {
     fontSize: 12,
-    color: '#16A34A',
+    color: '#475569',
     fontWeight: '500',
   },
-  cepRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cepBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 14,
-    height: 44,
-    borderRadius: 8,
-  },
-  cepBtnText: {
+  statusChipTextActive: {
     color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 12,
   },
-  suggestionsContainer: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#93C5FD',
-    borderRadius: 8,
-    marginTop: 4,
-    maxHeight: 180,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 999,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    gap: 8,
-  },
-  suggestionText: {
-    fontSize: 12,
-    color: '#1E293B',
-    flex: 1,
-  },
-  suggestionLoading: {
-    padding: 10,
-    alignItems: 'center',
-  },
-  addressRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  gpsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 14,
-    height: 44,
-    borderRadius: 8,
-  },
-  gpsBtnText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
-  coordinatesTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#E0F2FE',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-    marginTop: 6,
-  },
-  coordinatesText: {
-    fontSize: 11,
-    color: '#0369A1',
-    fontWeight: '600',
-  },
-
-  // Sanfona Colapsável Roxa (#6f42c1)
   purpleAccordionSection: {
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#6f42c1',
     backgroundColor: '#FFFFFF',
-    marginBottom: 20,
+    borderRadius: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#6f42c1',
     overflow: 'hidden',
+    ...Shadows.sm,
   },
   purpleAccordionHeader: {
     backgroundColor: '#6f42c1',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   purpleAccordionTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
     color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   purpleAccordionBody: {
     padding: 16,
+    backgroundColor: '#FAF5FF',
   },
-
-  // Disposição dos Botões de Ação no Rodapé: Esquerda Cancelar / Direita Salvar Obra
+  checklistSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    ...Shadows.sm,
+  },
+  checklistHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFF6FF',
+    paddingBottom: 8,
+    marginBottom: 6,
+  },
+  checklistTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#1E40AF',
+  },
+  customChecklistBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    gap: 4,
+  },
+  customChecklistBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checklistSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 10,
+  },
+  checklistCardList: {
+    gap: 6,
+  },
+  checklistItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 6,
+    padding: 8,
+    gap: 8,
+  },
+  checklistItemText: {
+    fontSize: 13,
+    color: '#1E293B',
+    flex: 1,
+  },
   footerButtonsRow: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
   },
   btnCancel: {
     flex: 1,
     height: 48,
     borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#94A3B8',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnCancelText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#475569',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#64748B',
   },
   btnSave: {
-    flex: 1,
+    flex: 2,
     height: 48,
     borderRadius: 10,
     backgroundColor: Colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
+    ...Shadows.md,
   },
   btnSaveDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   btnSaveText: {
     fontSize: 15,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 18,
+    ...Shadows.lg,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 12,
+  },
+  userOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    borderRadius: 8,
+  },
+  userOptionCardActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  userNameOption: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  userRoleOption: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  userOptionTextActive: {
+    color: '#2563EB',
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  btnModalCancel: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnModalCancelText: {
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  btnModalSave: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnModalSaveText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+  },
+  addChecklistRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  addChecklistActionBtn: {
+    backgroundColor: '#10B981',
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customChecklistItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: 8,
+  },
+  customChecklistIndex: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#64748B',
+    width: 22,
+  },
+  customChecklistText: {
+    fontSize: 13,
+    color: '#1E293B',
+    flex: 1,
+  },
+  deleteChecklistBtn: {
+    padding: 6,
   },
 });

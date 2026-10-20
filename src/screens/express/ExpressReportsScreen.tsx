@@ -1164,6 +1164,12 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               <Text style={styles.construtoraText}>
                 {item.obra_nome}{item.obra_construtora ? ` • ${item.obra_construtora}` : ''}
               </Text>
+              <View style={styles.cardAuthorRow}>
+                <Ionicons name="person-circle-outline" size={13.5} color="#64748B" />
+                <Text style={styles.cardAuthorText} numberOfLines={1}>
+                  Criado por: <Text style={styles.cardAuthorName}>{item.autor_nome || 'Fiscal Técnico'}</Text>
+                </Text>
+              </View>
 
               {/* Dica / Faixa de Toque para Visualização ou Edição */}
               <View style={styles.cardViewHintRow}>
@@ -2012,7 +2018,22 @@ const styles = StyleSheet.create({
   expBadgeText: { fontSize: 12, fontWeight: '700', color: '#059669' },
   dateText: { fontSize: 12, color: Colors.textMuted },
   obraTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginBottom: 2 },
-  construtoraText: { fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
+  construtoraText: { fontSize: 13, color: Colors.textSecondary, marginBottom: 4 },
+  cardAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4.5,
+    marginBottom: 8,
+  },
+  cardAuthorText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '400',
+  },
+  cardAuthorName: {
+    fontWeight: '600',
+    color: '#334155',
+  },
   obsText: { fontSize: 12, color: Colors.textSecondary, marginBottom: 10, fontStyle: 'italic' },
   cardPhotoRow: {
     flexDirection: 'row',

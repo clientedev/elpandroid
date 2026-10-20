@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl 
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, ScrollView 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
-import { getLocalProjetos, getLocalRelatorios } from '../../database/db';
-import { Projeto, Relatorio } from '../../types';
+import { getLocalProjetos, getLocalRelatorios, getLocalUsers } from '../../database/db';
+import { Projeto, Relatorio, User } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
 // Reference coordinate for SP / default position if user location unavailable
@@ -30,14 +30,84 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [filteredProjetos, setFilteredProjetos] = useState<Projeto[]>([]);
   const [relatoriosCounts, setRelatoriosCounts] = useState<{ [projId: number]: number }>({});
+  const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'Ativo' | 'Não Iniciado' | 'Pausado' | 'Concluído' | 'Todos'>('Ativo');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Estados de Busca Avançada (Status, Tipo de Obra, Construtora, Funcionário, Responsável)
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [filterTipo, setFilterTipo] = useState('');
+  const [filterConstrutora, setFilterConstrutora] = useState('');
+  const [filterFuncionario, setFilterFuncionario] = useState('');
+  const [filterResponsavel, setFilterResponsavel] = useState('');
+
+  const filterList = useCallback((
+    data: Projeto[],
+    text: string,
+    statusTab: string,
+    fTipo: string,
+    fConstrutora: string,
+    fFuncionario: string,
+    fResponsavel: string,
+    uList: User[]
+  ) => {
+    let result = data;
+
+    // Filtro por Status
+    if (statusTab !== 'Todos') {
+      result = result.filter(p => {
+        if (statusTab === 'Ativo') return p.status === 'Ativo' || !p.status;
+        if (statusTab === 'Não Iniciado') return p.status === 'Não Iniciado';
+        if (statusTab === 'Pausado') return p.status === 'Pausado';
+        if (statusTab === 'Concluído') return p.status === 'Concluído';
+        return true;
+      });
+    }
+
+    // Busca Avançada: Tipo de Obra
+    if (fTipo) {
+      result = result.filter(p => (p.tipo_obra || '').trim().toLowerCase() === fTipo.trim().toLowerCase());
+    }
+
+    // Busca Avançada: Construtora
+    if (fConstrutora) {
+      result = result.filter(p => (p.construtora || '').trim().toLowerCase() === fConstrutora.trim().toLowerCase());
+    }
+
+    // Busca Avançada: Funcionário
+    if (fFuncionario) {
+      result = result.filter(p => (p.nome_funcionario || '').trim().toLowerCase() === fFuncionario.trim().toLowerCase());
+    }
+
+    // Busca Avançada: Responsável
+    if (fResponsavel) {
+      result = result.filter(p => {
+        const respUser = uList.find(u => u.id === p.responsavel_id);
+        const respNome = respUser ? (respUser.nome_completo || respUser.username) : p.nome_funcionario;
+        return (respNome || '').trim().toLowerCase() === fResponsavel.trim().toLowerCase();
+      });
+    }
+
+    // Busca Rápida por Texto
+    if (text.trim()) {
+      const q = text.toLowerCase();
+      result = result.filter(p => 
+        p.nome.toLowerCase().includes(q) ||
+        p.numero.toLowerCase().includes(q) ||
+        p.construtora.toLowerCase().includes(q) ||
+        (p.endereco && p.endereco.toLowerCase().includes(q))
+      );
+    }
+    setFilteredProjetos(result);
+  }, []);
 
   const loadProjetos = useCallback(async () => {
     try {
       const data = await getLocalProjetos();
       const allRels = await getLocalRelatorios();
+      const localUsers = await getLocalUsers().catch(() => []);
+      setUsers(localUsers);
       
       const counts: { [projId: number]: number } = {};
       for (const r of allRels) {
@@ -53,11 +123,11 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
       });
 
       setProjetos(sortedByGps);
-      filterList(sortedByGps, search, selectedStatus);
+      filterList(sortedByGps, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers);
     } catch (e) {
       console.warn('Erro ao carregar projetos:', e);
     }
-  }, [search, selectedStatus]);
+  }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -67,37 +137,22 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     return unsubscribe;
   }, [navigation, loadProjetos]);
 
-  function filterList(data: Projeto[], text: string, status: string) {
-    let result = data;
-    if (status !== 'Todos') {
-      result = result.filter(p => {
-        if (status === 'Ativo') return p.status === 'Ativo' || !p.status;
-        if (status === 'Não Iniciado') return p.status === 'Não Iniciado';
-        if (status === 'Pausado') return p.status === 'Pausado';
-        if (status === 'Concluído') return p.status === 'Concluído';
-        return true;
-      });
-    }
-    if (text.trim()) {
-      const q = text.toLowerCase();
-      result = result.filter(p => 
-        p.nome.toLowerCase().includes(q) ||
-        p.numero.toLowerCase().includes(q) ||
-        p.construtora.toLowerCase().includes(q) ||
-        (p.endereco && p.endereco.toLowerCase().includes(q))
-      );
-    }
-    setFilteredProjetos(result);
-  }
-
   const handleSearch = (text: string) => {
     setSearch(text);
-    filterList(projetos, text, selectedStatus);
+    filterList(projetos, text, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, users);
   };
 
   const handleStatusFilter = (status: 'Ativo' | 'Não Iniciado' | 'Pausado' | 'Concluído' | 'Todos') => {
     setSelectedStatus(status);
-    filterList(projetos, search, status);
+    filterList(projetos, search, status, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, users);
+  };
+
+  const handleClearAdvancedFilters = () => {
+    setFilterTipo('');
+    setFilterConstrutora('');
+    setFilterFuncionario('');
+    setFilterResponsavel('');
+    filterList(projetos, search, selectedStatus, '', '', '', '', users);
   };
 
   const onRefresh = async () => {
@@ -113,6 +168,20 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     if (selectedStatus === 'Concluído') return 'Obras Concluídas';
     return 'Todas as Obras';
   };
+
+  // Listas distintas para os filtros avançados
+  const tiposUnicos = Array.from(new Set(projetos.map(p => p.tipo_obra).filter(Boolean))).sort();
+  const construtorasUnicas = Array.from(new Set(projetos.map(p => p.construtora).filter(Boolean))).sort();
+  const funcionariosUnicos = Array.from(new Set(projetos.map(p => p.nome_funcionario).filter(Boolean))).sort();
+  const responsaveisUnicos = Array.from(new Set(projetos.map(p => {
+    const u = users.find(usr => usr.id === p.responsavel_id);
+    return u ? (u.nome_completo || u.username) : p.nome_funcionario;
+  }).filter(Boolean))).sort();
+
+  const activeFiltersCount = (filterTipo ? 1 : 0) + 
+                             (filterConstrutora ? 1 : 0) + 
+                             (filterFuncionario ? 1 : 0) + 
+                             (filterResponsavel ? 1 : 0);
 
   return (
     <View style={styles.container}>
@@ -231,23 +300,210 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
         </View>
       </View>
 
-      {/* Barra de Busca Rápida (Seção 15.4) */}
+      {/* Barra de Busca Rápida e Botão Busca Avançada */}
       <View style={styles.searchContainer}>
-        <View style={styles.searchWrapper}>
-          <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="🔍 Digite o nome, número ou construtora da obra..."
-            placeholderTextColor={Colors.textMuted}
-            value={search}
-            onChangeText={handleSearch}
-          />
-          {search ? (
-            <TouchableOpacity onPress={() => handleSearch('')}>
-              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
-          ) : null}
+        <View style={styles.searchRow}>
+          <View style={styles.searchWrapper}>
+            <Ionicons name="search-outline" size={18} color={Colors.textSecondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="🔍 Nome, número ou construtora..."
+              placeholderTextColor={Colors.textMuted}
+              value={search}
+              onChangeText={handleSearch}
+            />
+            {search ? (
+              <TouchableOpacity onPress={() => handleSearch('')}>
+                <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.advancedSearchBtn, (showAdvanced || activeFiltersCount > 0) && styles.advancedSearchBtnActive]}
+            onPress={() => setShowAdvanced(!showAdvanced)}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={showAdvanced ? "chevron-up" : "filter"} 
+              size={15} 
+              color={showAdvanced || activeFiltersCount > 0 ? "#FFFFFF" : "#2563EB"} 
+            />
+            <Text style={[styles.advancedSearchBtnText, (showAdvanced || activeFiltersCount > 0) && styles.advancedSearchBtnTextActive]}>
+              Busca Avançada
+            </Text>
+            {activeFiltersCount > 0 && (
+              <View style={styles.activeFilterBadge}>
+                <Text style={styles.activeFilterBadgeText}>{activeFiltersCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
+
+        {/* Painel Colapsável de Filtros Avançados */}
+        {showAdvanced && (
+          <View style={styles.advancedFilterPanel}>
+            <View style={styles.advHeaderRow}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="options-outline" size={16} color="#2563EB" />
+                <Text style={styles.advPanelTitle}>Filtros Avançados da Obra</Text>
+              </View>
+              {activeFiltersCount > 0 && (
+                <TouchableOpacity onPress={handleClearAdvancedFilters} style={styles.clearFiltersBtn}>
+                  <Ionicons name="trash-outline" size={13} color="#DC2626" />
+                  <Text style={styles.clearFiltersBtnText}>Limpar Filtros</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* 1. Filtro por Status */}
+            <View style={styles.filterSection}>
+              <Text style={styles.filterSectionLabel}>Status da Obra:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                {(['Todos', 'Ativo', 'Não Iniciado', 'Pausado', 'Concluído'] as const).map(st => (
+                  <TouchableOpacity
+                    key={st}
+                    style={[styles.chipBtn, selectedStatus === st && styles.chipBtnActive]}
+                    onPress={() => handleStatusFilter(st)}
+                  >
+                    <Text style={[styles.chipText, selectedStatus === st && styles.chipTextActive]}>{st}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* 2. Filtro por Tipo de Obra */}
+            {tiposUnicos.length > 0 && (
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionLabel}>Tipo de Obra:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                  <TouchableOpacity
+                    style={[styles.chipBtn, !filterTipo && styles.chipBtnActive]}
+                    onPress={() => {
+                      setFilterTipo('');
+                      filterList(projetos, search, selectedStatus, '', filterConstrutora, filterFuncionario, filterResponsavel, users);
+                    }}
+                  >
+                    <Text style={[styles.chipText, !filterTipo && styles.chipTextActive]}>Todos os Tipos</Text>
+                  </TouchableOpacity>
+                  {tiposUnicos.map(tp => (
+                    <TouchableOpacity
+                      key={tp}
+                      style={[styles.chipBtn, filterTipo === tp && styles.chipBtnActive]}
+                      onPress={() => {
+                        const newVal = filterTipo === tp ? '' : tp;
+                        setFilterTipo(newVal);
+                        filterList(projetos, search, selectedStatus, newVal, filterConstrutora, filterFuncionario, filterResponsavel, users);
+                      }}
+                    >
+                      <Text style={[styles.chipText, filterTipo === tp && styles.chipTextActive]}>{tp}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* 3. Filtro por Construtora */}
+            {construtorasUnicas.length > 0 && (
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionLabel}>Construtora:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                  <TouchableOpacity
+                    style={[styles.chipBtn, !filterConstrutora && styles.chipBtnActive]}
+                    onPress={() => {
+                      setFilterConstrutora('');
+                      filterList(projetos, search, selectedStatus, filterTipo, '', filterFuncionario, filterResponsavel, users);
+                    }}
+                  >
+                    <Text style={[styles.chipText, !filterConstrutora && styles.chipTextActive]}>Todas Construtoras</Text>
+                  </TouchableOpacity>
+                  {construtorasUnicas.map(c => (
+                    <TouchableOpacity
+                      key={c}
+                      style={[styles.chipBtn, filterConstrutora === c && styles.chipBtnActive]}
+                      onPress={() => {
+                        const newVal = filterConstrutora === c ? '' : c;
+                        setFilterConstrutora(newVal);
+                        filterList(projetos, search, selectedStatus, filterTipo, newVal, filterFuncionario, filterResponsavel, users);
+                      }}
+                    >
+                      <Text style={[styles.chipText, filterConstrutora === c && styles.chipTextActive]}>{c}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* 4. Filtro por Funcionário */}
+            {funcionariosUnicos.length > 0 && (
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionLabel}>Funcionário:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                  <TouchableOpacity
+                    style={[styles.chipBtn, !filterFuncionario && styles.chipBtnActive]}
+                    onPress={() => {
+                      setFilterFuncionario('');
+                      filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, '', filterResponsavel, users);
+                    }}
+                  >
+                    <Text style={[styles.chipText, !filterFuncionario && styles.chipTextActive]}>Todos Funcionários</Text>
+                  </TouchableOpacity>
+                  {funcionariosUnicos.map(func => (
+                    <TouchableOpacity
+                      key={func}
+                      style={[styles.chipBtn, filterFuncionario === func && styles.chipBtnActive]}
+                      onPress={() => {
+                        const newVal = filterFuncionario === func ? '' : func;
+                        setFilterFuncionario(newVal);
+                        filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, newVal, filterResponsavel, users);
+                      }}
+                    >
+                      <Text style={[styles.chipText, filterFuncionario === func && styles.chipTextActive]}>{func}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* 5. Filtro por Responsável */}
+            {responsaveisUnicos.length > 0 && (
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionLabel}>Responsável Técnico:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
+                  <TouchableOpacity
+                    style={[styles.chipBtn, !filterResponsavel && styles.chipBtnActive]}
+                    onPress={() => {
+                      setFilterResponsavel('');
+                      filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, '', users);
+                    }}
+                  >
+                    <Text style={[styles.chipText, !filterResponsavel && styles.chipTextActive]}>Todos Responsáveis</Text>
+                  </TouchableOpacity>
+                  {responsaveisUnicos.map(resp => (
+                    <TouchableOpacity
+                      key={resp}
+                      style={[styles.chipBtn, filterResponsavel === resp && styles.chipBtnActive]}
+                      onPress={() => {
+                        const newVal = filterResponsavel === resp ? '' : resp;
+                        setFilterResponsavel(newVal);
+                        filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, newVal, users);
+                      }}
+                    >
+                      <Text style={[styles.chipText, filterResponsavel === resp && styles.chipTextActive]}>{resp}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Contador de Obras Encontradas */}
+            <View style={styles.advFooterRow}>
+              <Text style={styles.advCountText}>
+                {filteredProjetos.length} obra(s) encontrada(s) com os filtros atuais
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       {/* Grid de Cards de Obras (Design Clicável - Seção 15.4) */}
@@ -363,7 +619,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   searchWrapper: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
@@ -378,6 +640,125 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: Colors.text,
+  },
+  advancedSearchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    gap: 6,
+  },
+  advancedSearchBtnActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
+  },
+  advancedSearchBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  advancedSearchBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  activeFilterBadge: {
+    backgroundColor: '#EF4444',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeFilterBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  advancedFilterPanel: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+    ...Shadows.sm,
+  },
+  advHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  advPanelTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  clearFiltersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  clearFiltersBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#DC2626',
+  },
+  filterSection: {
+    gap: 4,
+  },
+  filterSectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  chipsScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  chipBtn: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chipBtnActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#1D4ED8',
+  },
+  chipText: {
+    fontSize: 12,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  advFooterRow: {
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    alignItems: 'center',
+  },
+  advCountText: {
+    fontSize: 11,
+    color: '#059669',
+    fontWeight: '600',
   },
   gridTabsContainer: {
     paddingHorizontal: 16,

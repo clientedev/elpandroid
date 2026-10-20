@@ -350,20 +350,9 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                 <Ionicons name="trending-up" size={18} color="#2563EB" />
                 <Text style={styles.sectionTitle}>{statsCfg?.title || 'Indicadores Principais'}</Text>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <TouchableOpacity 
-                  style={styles.customizeStatsBtn}
-                  onPress={() => setShowConfigModal(true)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="create-outline" size={13} color="#2563EB" />
-                  <Text style={styles.customizeStatsText}>Editar</Text>
-                </TouchableOpacity>
-
-                <View style={styles.onlinePill}>
-                  <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-                  <Text style={styles.onlinePillText}>{isOnline ? 'Online' : 'Offline'}</Text>
-                </View>
+              <View style={styles.onlinePill}>
+                <View style={[styles.dot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+                <Text style={styles.onlinePillText}>{isOnline ? 'Online' : 'Offline'}</Text>
               </View>
             </View>
 

@@ -57,6 +57,14 @@ class ProjetoForm(FlaskForm):
     longitude = HiddenField()
     construtora = StringField('Construtora', validators=[DataRequired(), Length(max=200)])
     responsavel_id = SelectField('Responsável', coerce=int, validators=[DataRequired()])
+    tipo_obra = SelectField('Tipo da Obra', choices=[
+        ('Edifício Residencial Multifamiliar', 'Edifício Residencial Multifamiliar'),
+        ('Edifício Comercial', 'Edifício Comercial'),
+        ('Edifício Misto (Comercial / Residencial)', 'Edifício Misto (Comercial / Residencial)'),
+        ('Retrofit / Restauração de Fachada', 'Retrofit / Restauração de Fachada'),
+        ('Galpão Industrial / Logístico', 'Galpão Industrial / Logístico'),
+        ('Outro', 'Outro')
+    ], default='Edifício Residencial Multifamiliar')
     numeracao_inicial = IntegerField('Numeração Inicial dos Relatórios', validators=[Optional(), NumberRange(min=1)], default=1)
     status = SelectField('Status', choices=[
         ('Não iniciado', 'Não iniciado'),

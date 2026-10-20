@@ -46,8 +46,19 @@ export interface Projeto {
   definicao_face_inferior_abas?: string;
   observacoes_projeto_fachada?: string;
   outras_observacoes?: string;
+  contatos?: ContatoObraItem[];
+  checklist_data?: string;
   sync_status?: 'synced' | 'pending' | 'error';
   local_updated_at?: string;
+}
+
+export interface ContatoObraItem {
+  id?: number;
+  nome: string;
+  cargo: string;
+  empresa?: string;
+  email?: string;
+  telefone?: string;
 }
 
 export interface CategoriaObra {
@@ -241,6 +252,7 @@ export interface ChecklistItemTemplate {
 export interface ChecklistCustomItem {
   id: number;
   item: string;
+  texto?: string;
   ordem: number;
   ativo?: boolean;
 }

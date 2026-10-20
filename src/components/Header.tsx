@@ -156,11 +156,28 @@ export const Header: React.FC<HeaderProps> = ({
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
         ) : (
-          <Image 
-            source={require('../../assets/logo.png')} 
-            style={styles.headerLogo} 
-            resizeMode="contain" 
-          />
+          <TouchableOpacity 
+            onPress={() => {
+              try {
+                navigation.navigate('DashboardTab');
+              } catch (e) {
+                try {
+                  (navigation as any).navigate('Dashboard');
+                } catch (err) {
+                  console.warn('Erro ao navegar para Início:', err);
+                }
+              }
+            }}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Voltar para a página Início"
+          >
+            <Image 
+              source={require('../../assets/logo.png')} 
+              style={styles.headerLogo} 
+              resizeMode="contain" 
+            />
+          </TouchableOpacity>
         )}
         <View style={{ flex: 1 }}>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>

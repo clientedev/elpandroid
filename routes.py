@@ -6184,12 +6184,17 @@ def project_new():
                         else:
                             print(f"❌ GEOCODING: Não foi possível converter o endereço")
 
-                projeto.tipo_obra = 'Geral'  # Default value since field was removed
+                projeto.tipo_obra = form.tipo_obra.data if hasattr(form, 'tipo_obra') and form.tipo_obra.data else (request.form.get('tipo_obra') or 'Edifício Residencial Multifamiliar')
                 projeto.construtora = form.construtora.data
-                projeto.nome_funcionario = contatos[0].get('nome', '') if contatos else ''  # Primeiro contato como funcionário padrão
                 projeto.responsavel_id = form.responsavel_id.data
-                projeto.email_principal = contatos[0].get('email', '') if contatos else ''  # Primeiro contato como email padrão
-                projeto.status = form.status.data
+                # Vincular automaticamente o email do responsável escolhido
+                responsavel_user = User.query.get(projeto.responsavel_id)
+                if responsavel_user:
+                    projeto.email_principal = responsavel_user.email or (contatos[0].get('email', '') if contatos else '')
+                    projeto.nome_funcionario = responsavel_user.nome_completo or responsavel_user.username
+                else:
+                    projeto.email_principal = contatos[0].get('email', '') if contatos else ''
+                    projeto.nome_funcionario = contatos[0].get('nome', '') if contatos else ''
                 projeto.status = form.status.data
                 projeto.numeracao_inicial = form.numeracao_inicial.data or 1
 
@@ -6406,9 +6411,15 @@ def project_edit(project_id):
                     else:
                         print(f"❌ GEOCODING: Não foi possível converter o endereço")
 
-            project.tipo_obra = 'Geral'  # Default value since field was removed
+            project.tipo_obra = form.tipo_obra.data if hasattr(form, 'tipo_obra') and form.tipo_obra.data else (request.form.get('tipo_obra') or project.tipo_obra or 'Edifício Residencial Multifamiliar')
             project.construtora = form.construtora.data
             project.responsavel_id = form.responsavel_id.data
+            responsavel_user = User.query.get(project.responsavel_id)
+            if responsavel_user:
+                if responsavel_user.email:
+                    project.email_principal = responsavel_user.email
+                if responsavel_user.nome_completo:
+                    project.nome_funcionario = responsavel_user.nome_completo
             project.status = form.status.data
             project.numeracao_inicial = form.numeracao_inicial.data or 1
 
