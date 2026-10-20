@@ -83,6 +83,11 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
   const [formLoading, setFormLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Hierarchy Modal State (Arrastável / Reordenável)
+  const [hierarchyModalVisible, setHierarchyModalVisible] = useState(false);
+  const [rolesOrder, setRolesOrder] = useState<TipoAcesso[]>(['admin', 'master', 'aprovador', 'funcionario', 'visualizador']);
+  const [savingHierarchy, setSavingHierarchy] = useState(false);
+
   // Form Fields
   const [formNome, setFormNome] = useState('');
   const [formUsername, setFormUsername] = useState('');
@@ -97,6 +102,47 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
   const isMasterOrAdmin = Boolean(
     currentUser?.is_master || currentUser?.username === 'admin'
   );
+
+  const fetchHierarchy = useCallback(async () => {
+    if (!isOnline) return;
+    try {
+      const res = await apiClient.axios.get('/api/admin/roles-hierarchy', {
+        params: { user_id: currentUser?.id, username: currentUser?.username }
+      });
+      if (res.data?.hierarchy && Array.isArray(res.data.hierarchy)) {
+        // Enforce admin at index 0 (comanda tudo)
+        const order = res.data.hierarchy.filter((r: string) => r !== 'admin');
+        setRolesOrder(['admin', ...order]);
+      }
+    } catch {}
+  }, [isOnline, currentUser]);
+
+  const moveRoleInHierarchy = (fromIdx: number, delta: number) => {
+    const toIdx = fromIdx + delta;
+    if (toIdx < 1 || toIdx >= rolesOrder.length) return;
+    const newOrder = [...rolesOrder];
+    const item = newOrder[fromIdx];
+    newOrder[fromIdx] = newOrder[toIdx];
+    newOrder[toIdx] = item;
+    setRolesOrder(newOrder);
+  };
+
+  const handleSaveHierarchy = async () => {
+    setSavingHierarchy(true);
+    try {
+      await apiClient.axios.post('/api/admin/roles-hierarchy', {
+        hierarchy: rolesOrder,
+        user_id: currentUser?.id,
+        username: currentUser?.username,
+      });
+      Alert.alert('Sucesso', 'Hierarquia de funções atualizada com sucesso! O Administrador Geral permanece no comando absoluto.');
+      setHierarchyModalVisible(false);
+    } catch (err: any) {
+      Alert.alert('Erro', err.response?.data?.error || 'Erro ao salvar hierarquia de funções.');
+    } finally {
+      setSavingHierarchy(false);
+    }
+  };
 
   const fetchUsers = useCallback(async () => {
     // 1. Carrega imediatamente do SQLite local para resposta instantânea
@@ -139,7 +185,8 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+    fetchHierarchy();
+  }, [fetchUsers, fetchHierarchy]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -393,6 +440,32 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
         </View>
       </View>
 
+      {/* BANNER INTERATIVO: GERENCIAMENTO DE FUNÇÕES ARRASTÁVEL (O ADMIN COMANDA TUDO) */}
+      <TouchableOpacity 
+        style={styles.hierarchyBanner}
+        onPress={() => setHierarchyModalVisible(true)}
+        activeOpacity={0.85}
+      >
+        <View style={styles.hierarchyBannerLeft}>
+          <View style={styles.hierarchyIconCircle}>
+            <Ionicons name="git-network-outline" size={20} color="#7C3AED" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.hierarchyBannerTitleRow}>
+              <Text style={styles.hierarchyBannerTitle}>Gerenciamento de Funções</Text>
+              <View style={styles.adminCommandBadge}>
+                <Ionicons name="shield-checkmark" size={11} color="#7C3AED" />
+                <Text style={styles.adminCommandBadgeText}>ADMIN COMANDA TUDO</Text>
+              </View>
+            </View>
+            <Text style={styles.hierarchyBannerSub}>
+              Arraste e reordene a hierarquia das funções no sistema
+            </Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+      </TouchableOpacity>
+
       {/* Barra de Pesquisa Profissional */}
       <View style={styles.searchWrapper}>
         <View style={styles.searchBox}>
@@ -475,15 +548,28 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
             );
             const roleMeta = ROLES_INFO[tipo] || ROLES_INFO.funcionario;
             const isSelf = currentUser?.id === item.id || currentUser?.username === item.username;
+            const isAdminUser = (item.username === 'admin');
 
             return (
-              <View style={[styles.userCard, item.ativo === false && styles.userCardInactive]}>
+              <View style={[
+                styles.userCard, 
+                isAdminUser && styles.adminUserCard,
+                item.ativo === false && styles.userCardInactive
+              ]}>
                 {/* Header do Card */}
                 <View style={styles.userCardHeader}>
-                  <View style={[styles.userAvatarContainer, { borderColor: roleMeta.color }]}>
-                    <Text style={[styles.userAvatarText, { color: roleMeta.color }]}>
-                      {(item.nome_completo || item.username).substring(0, 2).toUpperCase()}
-                    </Text>
+                  <View style={[
+                    styles.userAvatarContainer, 
+                    { borderColor: isAdminUser ? '#F59E0B' : roleMeta.color },
+                    isAdminUser && { backgroundColor: '#FFFBEB' }
+                  ]}>
+                    {isAdminUser ? (
+                      <Ionicons name="shield-checkmark" size={18} color="#F59E0B" />
+                    ) : (
+                      <Text style={[styles.userAvatarText, { color: roleMeta.color }]}>
+                        {(item.nome_completo || item.username).substring(0, 2).toUpperCase()}
+                      </Text>
+                    )}
                     {/* Indicador de Status Ativo/Inativo */}
                     <View style={[styles.statusDot, { backgroundColor: item.ativo !== false ? '#10B981' : '#94A3B8' }]} />
                   </View>
@@ -493,6 +579,12 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                       <Text style={styles.userName} numberOfLines={1}>
                         {item.nome_completo || item.username}
                       </Text>
+                      {isAdminUser && (
+                        <View style={styles.commanderBadge}>
+                          <Ionicons name="shield-checkmark" size={10} color="#B45309" />
+                          <Text style={styles.commanderBadgeText}>👑 COMANDA TUDO</Text>
+                        </View>
+                      )}
                       {isSelf && (
                         <View style={styles.selfBadge}>
                           <Text style={styles.selfBadgeText}>Você</Text>
@@ -505,7 +597,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                   <View style={[styles.roleBadge, { backgroundColor: roleMeta.bg, borderColor: roleMeta.color }]}>
                     <Ionicons name={roleMeta.icon} size={13} color={roleMeta.color} />
                     <Text style={[styles.roleBadgeText, { color: roleMeta.color }]}>
-                      {roleMeta.label}
+                      {isAdminUser ? 'Super Admin' : roleMeta.label}
                     </Text>
                   </View>
                 </View>
@@ -544,35 +636,42 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                   </TouchableOpacity>
 
                   <View style={styles.secondaryActions}>
-                    <TouchableOpacity 
-                      style={[
-                        styles.statusToggleBtn, 
-                        item.ativo === false ? styles.statusBtnActivate : styles.statusBtnDeactivate
-                      ]}
-                      onPress={() => handleToggleStatus(item)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons 
-                        name={item.ativo === false ? "checkmark-circle-outline" : "ban-outline"} 
-                        size={14} 
-                        color={item.ativo === false ? "#059669" : "#D97706"} 
-                      />
-                      <Text style={[
-                        styles.statusToggleText, 
-                        { color: item.ativo === false ? "#059669" : "#D97706" }
-                      ]}>
-                        {item.ativo === false ? 'Ativar' : 'Desativar'}
-                      </Text>
-                    </TouchableOpacity>
+                    {isAdminUser ? (
+                      <View style={styles.adminImmunePill}>
+                        <Ionicons name="shield-checkmark" size={13} color="#7C3AED" />
+                        <Text style={styles.adminImmunePillText}>Soberano</Text>
+                      </View>
+                    ) : (
+                      <>
+                        <TouchableOpacity 
+                          style={[
+                            styles.statusToggleBtn, 
+                            item.ativo === false ? styles.statusBtnActivate : styles.statusBtnDeactivate
+                          ]}
+                          onPress={() => handleToggleStatus(item)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons 
+                            name={item.ativo === false ? "checkmark-circle-outline" : "ban-outline"} 
+                            size={14} 
+                            color={item.ativo === false ? "#059669" : "#D97706"} 
+                          />
+                          <Text style={[
+                            styles.statusToggleText, 
+                            { color: item.ativo === false ? "#059669" : "#D97706" }
+                          ]}>
+                            {item.ativo === false ? 'Ativar' : 'Desativar'}
+                          </Text>
+                        </TouchableOpacity>
 
-                    {item.username !== 'admin' && (
-                      <TouchableOpacity 
-                        style={styles.deleteUserBtn}
-                        onPress={() => handleDeleteUser(item)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="trash-outline" size={15} color="#EF4444" />
-                      </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.deleteUserBtn}
+                          onPress={() => handleDeleteUser(item)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="trash-outline" size={15} color="#EF4444" />
+                        </TouchableOpacity>
+                      </>
                     )}
                   </View>
                 </View>
@@ -681,15 +780,17 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                 </View>
 
                 <View style={styles.rolesGrid}>
-                  {(Object.keys(ROLES_INFO) as TipoAcesso[]).map((rKey) => {
+                  {rolesOrder.map((rKey) => {
                     const rMeta = ROLES_INFO[rKey];
                     const isSelected = formTipoAcesso === rKey;
+                    const isAdminRole = (rKey === 'admin');
                     return (
                       <TouchableOpacity
                         key={rKey}
                         style={[
                           styles.roleSelectCard,
-                          isSelected && { borderColor: rMeta.color, backgroundColor: rMeta.bg, borderWidth: 1.5 }
+                          isSelected && { borderColor: rMeta.color, backgroundColor: rMeta.bg, borderWidth: 1.5 },
+                          isAdminRole && { borderColor: '#F59E0B' }
                         ]}
                         onPress={() => setFormTipoAcesso(rKey)}
                         activeOpacity={0.8}
@@ -700,9 +801,17 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                             size={18} 
                             color={isSelected ? rMeta.color : "#94A3B8"} 
                           />
-                          <Text style={[styles.roleSelectTitle, isSelected && { color: rMeta.color, fontWeight: 'bold' }]}>
-                            {rMeta.label}
-                          </Text>
+                          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={[styles.roleSelectTitle, isSelected && { color: rMeta.color, fontWeight: 'bold' }]}>
+                              {rMeta.label}
+                            </Text>
+                            {isAdminRole && (
+                              <View style={styles.roleCommanderBadge}>
+                                <Ionicons name="shield-checkmark" size={10} color="#B45309" />
+                                <Text style={styles.roleCommanderBadgeText}>👑 COMANDA TUDO</Text>
+                              </View>
+                            )}
+                          </View>
                         </View>
                         <Text style={styles.roleSelectDesc}>{rMeta.desc}</Text>
                       </TouchableOpacity>
@@ -803,6 +912,129 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                     <Text style={styles.modalSubmitBtnText}>
                       {editingUser ? 'Salvar Alterações' : 'Cadastrar Usuário'}
                     </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: GERENCIAMENTO DE FUNÇÕES & HIERARQUIA ARRASTÁVEL */}
+      <Modal
+        visible={hierarchyModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setHierarchyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Hierarquia de Funções</Text>
+                <Text style={styles.modalSubtitle}>
+                  Gerenciamento arrastável • Ordem de precedência
+                </Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.modalCloseBtn}
+                onPress={() => setHierarchyModalVisible(false)}
+              >
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScroll}>
+              {/* CARD FIXO #1: O ADMIN COMANDA TUDO */}
+              <View style={styles.fixedAdminCard}>
+                <View style={styles.fixedAdminHeader}>
+                  <View style={styles.crownCircle}>
+                    <Ionicons name="shield-checkmark" size={20} color="#F59E0B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <Text style={styles.fixedAdminTitle}>1. Administrador Geral (user: admin)</Text>
+                      <View style={styles.supremeBadge}>
+                        <Text style={styles.supremeBadgeText}>👑 COMANDA TUDO</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.fixedAdminDesc}>
+                      Comanda tudo no sistema. Acesso irrestrito a relatórios, obras, usuários e configurações globais. Não pode ser movido nem rebaixado.
+                    </Text>
+                  </View>
+                  <Ionicons name="lock-closed" size={16} color="#7C3AED" />
+                </View>
+              </View>
+
+              <Text style={styles.hierarchySectionSubtitle}>
+                DEMAIS FUNÇÕES (Reordene a precedência arrastando ou usando as setas):
+              </Text>
+
+              {/* LISTA DE FUNÇÕES REORDENÁVEIS */}
+              {rolesOrder.filter(r => r !== 'admin').map((rKey, subIdx) => {
+                const rMeta = ROLES_INFO[rKey];
+                const posNumber = subIdx + 2;
+                const userCount = users.filter(u => (u.tipo_acesso === rKey || (rKey === 'master' && u.is_master && u.username !== 'admin'))).length;
+                return (
+                  <View key={rKey} style={styles.draggableRoleRow}>
+                    <View style={styles.dragHandleBox}>
+                      <Ionicons name="reorder-three-outline" size={24} color="#64748B" />
+                    </View>
+                    <View style={[styles.posBadge, { backgroundColor: rMeta.color }]}>
+                      <Text style={styles.posBadgeText}>{posNumber}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={styles.draggableRoleTitle}>{rMeta.label}</Text>
+                        <View style={[styles.roleCountPill, { backgroundColor: rMeta.bg }]}>
+                          <Text style={[styles.roleCountPillText, { color: rMeta.color }]}>{userCount} usuários</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.draggableRoleDesc} numberOfLines={2}>{rMeta.desc}</Text>
+                    </View>
+                    <View style={styles.reorderButtonsCol}>
+                      <TouchableOpacity 
+                        style={[styles.arrowBtn, subIdx === 0 && { opacity: 0.3 }]}
+                        onPress={() => moveRoleInHierarchy(subIdx + 1, -1)}
+                        disabled={subIdx === 0}
+                      >
+                        <Ionicons name="chevron-up" size={16} color="#1E293B" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.arrowBtn, subIdx === rolesOrder.length - 2 && { opacity: 0.3 }]}
+                        onPress={() => moveRoleInHierarchy(subIdx + 1, 1)}
+                        disabled={subIdx === rolesOrder.length - 2}
+                      >
+                        <Ionicons name="chevron-down" size={16} color="#1E293B" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            {/* Footer do Modal */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.modalCancelBtn}
+                onPress={() => setHierarchyModalVisible(false)}
+                disabled={savingHierarchy}
+              >
+                <Text style={styles.modalCancelBtnText}>Fechar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.modalSubmitBtn, savingHierarchy && { opacity: 0.7 }, { backgroundColor: '#7C3AED' }]}
+                onPress={handleSaveHierarchy}
+                disabled={savingHierarchy}
+              >
+                {savingHierarchy ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="save-outline" size={18} color="#FFFFFF" />
+                    <Text style={styles.modalSubmitBtnText}>Salvar Hierarquia</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1373,5 +1605,230 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  // Hierarchy Banner
+  hierarchyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderLeftWidth: 4,
+    borderLeftColor: '#7C3AED',
+    ...Shadows.sm,
+  },
+  hierarchyBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  hierarchyIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hierarchyBannerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  hierarchyBannerTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#0F172A',
+  },
+  adminCommandBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: '#DDD6FE',
+  },
+  adminCommandBadgeText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#7C3AED',
+  },
+  hierarchyBannerSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  // Admin user card highlights
+  adminUserCard: {
+    borderColor: '#F59E0B',
+    borderWidth: 1.5,
+    backgroundColor: '#FFFEFA',
+  },
+  commanderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: '#FDE68A',
+  },
+  commanderBadgeText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#B45309',
+  },
+  adminImmunePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  adminImmunePillText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#7C3AED',
+  },
+  roleCommanderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  roleCommanderBadgeText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#B45309',
+  },
+  // Hierarchy Modal Specific Styles
+  fixedAdminCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    marginBottom: 16,
+  },
+  fixedAdminHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  crownCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fixedAdminTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#78350F',
+  },
+  supremeBadge: {
+    backgroundColor: '#1E1B4B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  supremeBadgeText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#F59E0B',
+  },
+  fixedAdminDesc: {
+    fontSize: 11,
+    color: '#92400E',
+    marginTop: 4,
+    lineHeight: 15,
+  },
+  hierarchySectionSubtitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  draggableRoleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+    ...Shadows.sm,
+  },
+  dragHandleBox: {
+    paddingHorizontal: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  posBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  posBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  draggableRoleTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#1E293B',
+  },
+  roleCountPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  roleCountPillText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  draggableRoleDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
+  },
+  reorderButtonsCol: {
+    flexDirection: 'column',
+    gap: 4,
+  },
+  arrowBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

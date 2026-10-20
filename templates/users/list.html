@@ -21,23 +21,23 @@
         </div>
         
         <!-- Busca Simples -->
-        <div class="card mb-4">
+        <div class="card mb-4 shadow-sm border-0">
             <div class="card-body py-3">
                 <form method="GET" action="{{ url_for('users_list') }}">
                     <div class="row g-3 align-items-end">
                         <div class="col-md-10">
-                            <label class="form-label fw-bold">🔍 Busca Rápida</label>
+                            <label class="form-label fw-bold small text-muted text-uppercase">🔍 Busca Rápida</label>
                             <input type="text" class="form-control" name="q" value="{{ request.args.get('q', '') }}" 
                                    placeholder="Digite o nome, usuário ou email...">
                         </div>
                         <div class="col-md-2">
                             <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary">
+                                <button type="submit" class="btn btn-primary w-100 fw-bold">
                                     <i class="fas fa-search me-1"></i>Buscar
                                 </button>
                                 {% if request.args.get('q') %}
                                 <a href="{{ url_for('users_list') }}" class="btn btn-outline-secondary">
-                                    <i class="fas fa-times me-1"></i>Limpar
+                                    <i class="fas fa-times"></i>
                                 </a>
                                 {% endif %}
                             </div>
@@ -46,63 +46,161 @@
                 </form>
             </div>
         </div>
+
+        <!-- SEÇÃO: GERENCIAMENTO DE FUNÇÕES ARRASTÁVEL (O USER ADMIN COMANDA TUDO) -->
+        <div class="card border-0 shadow-sm mb-4 rounded-4 overflow-hidden" id="cardRolesHierarchy">
+            <div class="card-header bg-gradient text-white py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2" style="background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%);">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-warning text-dark px-2 py-1 fw-bold rounded-pill">
+                            <i class="fas fa-crown me-1"></i> ADMIN COMANDA TUDO
+                        </span>
+                        <span class="badge bg-white bg-opacity-25 px-2 py-1 rounded-pill text-white">
+                            <i class="fas fa-arrows-alt me-1"></i> Arrastável (Drag & Drop)
+                        </span>
+                    </div>
+                    <h5 class="card-title mb-0 fw-bold mt-2 text-white">
+                        <i class="fas fa-sitemap me-2 text-warning"></i>Gerenciamento & Hierarquia de Funções
+                    </h5>
+                    <small class="text-white text-opacity-75">
+                        Arraste para reordenar a precedência das funções no sistema. O usuário <strong>admin</strong> comanda tudo e é fixo no topo.
+                    </small>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-light" onclick="toggleRolesCard()">
+                        <i class="fas fa-compress-alt me-1" id="iconToggleRoles"></i> Minimizar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-warning fw-bold shadow-sm" id="btnSaveRolesOrder" onclick="saveRolesHierarchy()">
+                        <i class="fas fa-save me-1"></i> Salvar Hierarquia
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-body p-4 bg-light" id="rolesBodyContainer">
+                
+                <!-- CARD FIXO #1: O USUÁRIO ADMIN COMANDA TUDO (SOBERANO) -->
+                <div class="p-3 mb-3 rounded-4 shadow-sm border border-warning" style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 48px; height: 48px; background: #7C3AED; color: #FFFFFF;">
+                                <i class="fas fa-crown fa-lg text-warning"></i>
+                            </div>
+                            <div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <h6 class="mb-0 fw-bold text-dark fs-6">1. Administrador Geral (user: admin)</h6>
+                                    <span class="badge bg-dark text-warning border border-warning px-2 py-1 rounded-pill fw-bold">
+                                        👑 O USER ADMIN COMANDA TUDO
+                                    </span>
+                                    <span class="badge bg-primary px-2 py-1 rounded-pill">
+                                        Soberano • Acesso Total Irrestrito
+                                    </span>
+                                </div>
+                                <small class="text-muted d-block mt-1">
+                                    Controle absoluto de usuários, aprovação de laudos, criação de obras, ajustes do APK e banco de dados. Fixo no topo e imune a bloqueios ou rebaixamentos.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-secondary rounded-pill px-3 py-2">
+                                <i class="fas fa-lock me-1"></i> Posição Fixa #1
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LISTA DE FUNÇÕES ARRASTÁVEIS -->
+                <p class="small text-muted mb-2 fw-bold text-uppercase">
+                    <i class="fas fa-hand-pointer me-1 text-primary"></i> Demais Níveis de Hierarquia (Arraste ou use as setas para mover):
+                </p>
+
+                <div class="d-flex flex-column gap-2" id="draggableRolesList">
+                    <!-- Itens renderizados dinamicamente via JS com suporte drag & drop e botões táteis -->
+                </div>
+
+                <div id="rolesSaveFeedback" class="alert alert-success d-none mt-3 mb-0 py-2 small fw-bold">
+                    <i class="fas fa-check-circle me-1"></i> Nova hierarquia salva com sucesso!
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="row">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold text-dark">
+                    <i class="fas fa-users-cog me-2 text-primary"></i>Lista de Usuários Cadastrados
+                </h5>
+                <span class="badge bg-light text-dark border px-3 py-2 rounded-pill">
+                    Total: {{ users|length }} usuários
+                </span>
+            </div>
+            <div class="card-body p-0">
                 {% if users %}
-                    <!-- Mobile-first responsive design -->
+                    <!-- Desktop table view -->
                     <div class="d-none d-md-block">
-                        <!-- Desktop table view -->
                         <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
                                     <tr>
-                                        <th>Nome Completo</th>
+                                        <th class="ps-4">Nome Completo</th>
                                         <th>Usuário</th>
                                         <th>Email</th>
                                         <th>Cargo</th>
-                                        <th>Tipo</th>
+                                        <th>Hierarquia / Função</th>
                                         <th>Status</th>
                                         <th>Cadastrado em</th>
-                                        <th>Ações</th>
+                                        <th class="text-end pe-4">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for user in users %}
-                                    <tr>
-                                        <td>{{ user.nome_completo }}</td>
-                                        <td>{{ user.username }}</td>
+                                    <tr {% if user.username == 'admin' %}class="table-warning bg-opacity-25"{% endif %}>
+                                        <td class="ps-4">
+                                            <div class="fw-bold text-dark d-flex align-items-center gap-2">
+                                                {{ user.nome_completo }}
+                                                {% if user.username == 'admin' %}
+                                                    <span class="badge bg-dark text-warning border border-warning" title="O usuário admin comanda tudo">
+                                                        <i class="fas fa-crown text-warning me-1"></i>Comanda Tudo
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                            <small class="text-muted">ID #{{ user.id }}</small>
+                                        </td>
+                                        <td><code>@{{ user.username }}</code></td>
                                         <td>{{ user.email }}</td>
                                         <td>{{ user.cargo or '-' }}</td>
                                         <td>
-                                            {% if user.is_master %}
-                                                <span class="badge bg-danger">Master</span>
+                                            {% if user.username == 'admin' %}
+                                                <span class="badge bg-primary px-2 py-1"><i class="fas fa-shield-alt me-1"></i>Administrador Geral</span>
+                                            {% elif user.is_master %}
+                                                <span class="badge bg-danger px-2 py-1">Master</span>
+                                            {% elif user.is_aprovador_express %}
+                                                <span class="badge bg-warning text-dark px-2 py-1"><i class="fas fa-bolt"></i> Aprovador Express</span>
                                             {% else %}
-                                                <span class="badge bg-secondary">Usuário</span>
-                                            {% endif %}
-                                            {% if user.is_aprovador_express %}
-                                                <span class="badge bg-warning text-dark"><i class="fas fa-bolt"></i> Express</span>
+                                                <span class="badge bg-secondary px-2 py-1">Vistoriador / Campo</span>
                                             {% endif %}
                                         </td>
                                         <td>
-                                            {% if user.ativo %}
+                                            {% if user.username == 'admin' %}
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-bold">
+                                                    <i class="fas fa-check-circle me-1"></i>Sempre Ativo
+                                                </span>
+                                            {% elif user.ativo %}
                                                 <span class="badge bg-success">Ativo</span>
                                             {% else %}
-                                                <span class="badge bg-warning">Inativo</span>
+                                                <span class="badge bg-warning text-dark">Inativo</span>
                                             {% endif %}
                                         </td>
                                         <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
-                                        <td>
-                                            <div class="d-flex gap-1">
+                                        <td class="text-end pe-4">
+                                            <div class="d-inline-flex gap-1">
                                                 <a href="{{ url_for('admin_user_app_customizer', user_id=user.id) }}" class="btn btn-sm btn-outline-info" title="Personalizar Visualização do App">
-                                                    <i class="fas fa-mobile-alt"></i>
+                                                    <i class="fas fa-mobile-alt"></i> App
                                                 </a>
                                                 <a href="{{ url_for('user_edit', user_id=user.id) }}" class="btn btn-sm btn-outline-primary" title="Editar Usuário">
-                                                    <i class="fas fa-edit"></i>
+                                                    <i class="fas fa-edit"></i> Editar
                                                 </a>
                                             </div>
                                         </td>
@@ -114,35 +212,33 @@
                     </div>
                     
                     <!-- Mobile card view -->
-                    <div class="d-md-none">
+                    <div class="d-md-none p-3">
                         {% for user in users %}
-                        <div class="card mb-3">
+                        <div class="card mb-3 border shadow-xs rounded-3 {% if user.username == 'admin' %}border-warning bg-warning bg-opacity-10{% endif %}">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <h6 class="card-title mb-0">{{ user.nome_completo }}</h6>
-                                    <div class="d-flex gap-1">
-                                        {% if user.is_master %}
+                                    <div>
+                                        <h6 class="card-title mb-0 fw-bold">{{ user.nome_completo }}</h6>
+                                        <small class="text-muted">@{{ user.username }}</small>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1 justify-content-end">
+                                        {% if user.username == 'admin' %}
+                                            <span class="badge bg-dark text-warning border border-warning">👑 Comanda Tudo</span>
+                                        {% elif user.is_master %}
                                             <span class="badge bg-danger">Master</span>
                                         {% else %}
-                                            <span class="badge bg-secondary">Usuário</span>
+                                            <span class="badge bg-secondary">Vistoriador</span>
                                         {% endif %}
                                         {% if user.is_aprovador_express %}
                                             <span class="badge bg-warning text-dark"><i class="fas fa-bolt"></i> Express</span>
                                         {% endif %}
-                                        {% if user.ativo %}
-                                            <span class="badge bg-success">Ativo</span>
-                                        {% else %}
-                                            <span class="badge bg-warning">Inativo</span>
-                                        {% endif %}
                                     </div>
                                 </div>
-                                <div class="small text-muted mb-2">
-                                    <div><strong>Usuário:</strong> {{ user.username }}</div>
+                                <div class="small text-muted mb-3">
                                     <div><strong>Email:</strong> {{ user.email }}</div>
                                     <div><strong>Cargo:</strong> {{ user.cargo or '-' }}</div>
-                                    <div><strong>Cadastrado em:</strong> {{ user.created_at.strftime('%d/%m/%Y') }}</div>
                                 </div>
-                                <div class="d-flex justify-content-end gap-2">
+                                <div class="d-flex justify-content-end gap-2 border-top pt-2">
                                     <a href="{{ url_for('admin_user_app_customizer', user_id=user.id) }}" class="btn btn-sm btn-outline-info">
                                         <i class="fas fa-mobile-alt me-1"></i>App
                                     </a>
@@ -168,4 +264,219 @@
         </div>
     </div>
 </div>
+
+<!-- SCRIPTS PARA GERENCIAMENTO ARRASTÁVEL DE FUNÇÕES -->
+<script>
+const ROLES_METADATA = {
+    master: {
+        key: 'master',
+        label: 'Usuário Master',
+        desc: 'Privilégio total em relatórios, aprovação técnica, controle e exclusão de obras',
+        icon: 'fas fa-star',
+        color: '#2563EB',
+        badgeBg: 'bg-primary'
+    },
+    aprovador: {
+        key: 'aprovador',
+        label: 'Engenheiro Aprovador',
+        desc: 'Assinatura e aprovação de laudos técnicos e inspeções express',
+        icon: 'fas fa-award',
+        color: '#059669',
+        badgeBg: 'bg-success'
+    },
+    funcionario: {
+        key: 'funcionario',
+        label: 'Técnico de Campo / Vistoriador',
+        desc: 'Criação de vistorias, anotações fotográficas e relatórios técnicos em campo',
+        icon: 'fas fa-hard-hat',
+        color: '#D97706',
+        badgeBg: 'bg-warning text-dark'
+    },
+    visualizador: {
+        key: 'visualizador',
+        label: 'Visualizador / Cliente',
+        desc: 'Apenas consulta, leitura e download de laudos finalizados em PDF',
+        icon: 'fas fa-eye',
+        color: '#475569',
+        badgeBg: 'bg-secondary'
+    }
+};
+
+// Ordem inicial carregada do backend
+let currentHierarchy = {{ roles_hierarchy|tojson|safe }};
+// Remove o admin da lista arrastável (pois é fixo como #1 comandante)
+let draggableRoles = currentHierarchy.filter(r => r !== 'admin');
+if (draggableRoles.length === 0) {
+    draggableRoles = ['master', 'aprovador', 'funcionario', 'visualizador'];
+}
+
+function renderDraggableRoles() {
+    const container = document.getElementById('draggableRolesList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    draggableRoles.forEach((roleKey, idx) => {
+        const meta = ROLES_METADATA[roleKey] || {
+            key: roleKey,
+            label: roleKey,
+            desc: 'Função do sistema',
+            icon: 'fas fa-user',
+            color: '#3B82F6',
+            badgeBg: 'bg-secondary'
+        };
+
+        const posNumber = idx + 2; // #1 é sempre o Admin
+        const item = document.createElement('div');
+        item.className = 'draggable-role-card p-3 rounded-3 bg-white border shadow-3xs d-flex justify-content-between align-items-center gap-3';
+        item.style.cursor = 'grab';
+        item.draggable = true;
+        item.dataset.index = idx;
+        item.dataset.role = roleKey;
+
+        item.innerHTML = `
+            <div class="d-flex align-items-center gap-3">
+                <div class="drag-handle text-secondary fs-5" title="Clique e arraste para mudar a posição" style="cursor: grab;">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
+                <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-xs" style="width: 36px; height: 36px; background: ${meta.color};">
+                    ${posNumber}
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="fw-bold text-dark">${meta.label}</span>
+                        <span class="badge ${meta.badgeBg} rounded-pill">
+                            <i class="${meta.icon} me-1"></i>Nível #${posNumber}
+                        </span>
+                    </div>
+                    <small class="text-muted d-block">${meta.desc}</small>
+                </div>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary" onclick="moveRole(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Mover para cima">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="moveRole(${idx}, 1)" ${idx === draggableRoles.length - 1 ? 'disabled' : ''} title="Mover para baixo">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+        `;
+
+        // Eventos HTML5 Drag and Drop
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('dragenter', handleDragEnter);
+        item.addEventListener('dragleave', handleDragLeave);
+        item.addEventListener('drop', handleDrop);
+        item.addEventListener('dragend', handleDragEnd);
+
+        container.appendChild(item);
+    });
+}
+
+let dragSrcEl = null;
+
+function handleDragStart(e) {
+    dragSrcEl = this;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', this.dataset.index);
+    this.classList.add('border-primary', 'bg-light');
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDragEnter() {
+    this.classList.add('border-primary');
+}
+
+function handleDragLeave() {
+    this.classList.remove('border-primary');
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) e.stopPropagation();
+    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+    const toIndex = parseInt(this.dataset.index, 10);
+
+    if (fromIndex !== toIndex) {
+        const movedItem = draggableRoles.splice(fromIndex, 1)[0];
+        draggableRoles.splice(toIndex, 0, movedItem);
+        renderDraggableRoles();
+    }
+    return false;
+}
+
+function handleDragEnd() {
+    document.querySelectorAll('.draggable-role-card').forEach(c => {
+        c.classList.remove('border-primary', 'bg-light');
+    });
+}
+
+function moveRole(idx, delta) {
+    const targetIdx = idx + delta;
+    if (targetIdx < 0 || targetIdx >= draggableRoles.length) return;
+    const temp = draggableRoles[idx];
+    draggableRoles[idx] = draggableRoles[targetIdx];
+    draggableRoles[targetIdx] = temp;
+    renderDraggableRoles();
+}
+
+function toggleRolesCard() {
+    const body = document.getElementById('rolesBodyContainer');
+    const icon = document.getElementById('iconToggleRoles');
+    if (body.classList.contains('d-none')) {
+        body.classList.remove('d-none');
+        icon.className = 'fas fa-compress-alt me-1';
+    } else {
+        body.classList.add('d-none');
+        icon.className = 'fas fa-expand-alt me-1';
+    }
+}
+
+async function saveRolesHierarchy() {
+    const btn = document.getElementById('btnSaveRolesOrder');
+    const feedback = document.getElementById('rolesSaveFeedback');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Salvando...';
+
+    // O admin é sempre o #1 comandante
+    const finalHierarchy = ['admin', ...draggableRoles];
+
+    try {
+        const res = await fetch('/api/admin/roles-hierarchy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ hierarchy: finalHierarchy })
+        });
+        const data = await res.json();
+        if (data.success) {
+            feedback.className = 'alert alert-success mt-3 mb-0 py-2 small fw-bold';
+            feedback.innerHTML = '<i class="fas fa-check-circle me-1"></i> Hierarquia salva com sucesso! O Administrador Geral permanece no comando absoluto.';
+            feedback.classList.remove('d-none');
+            setTimeout(() => {
+                feedback.classList.add('d-none');
+            }, 4000);
+        } else {
+            alert(data.error || 'Erro ao salvar hierarquia.');
+        }
+    } catch (err) {
+        alert('Erro de comunicação ao salvar a hierarquia de funções.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+// Inicializar na carga da página
+document.addEventListener('DOMContentLoaded', () => {
+    renderDraggableRoles();
+});
+</script>
 {% endblock %}
+

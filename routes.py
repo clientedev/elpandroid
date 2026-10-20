@@ -3385,17 +3385,41 @@ def apk_qr_code():
 @app.route('/users')
 @login_required
 def users_list():
-    if not current_user.is_master:
+    if not (current_user.is_master or current_user.username == 'admin' or getattr(current_user, 'is_developer', False)):
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
 
-    users = User.query.all()
-    return render_template('users/list.html', users=users)
+    q = request.args.get('q', '').strip()
+    if q:
+        users = User.query.filter(
+            (User.nome_completo.ilike(f'%{q}%')) |
+            (User.username.ilike(f'%{q}%')) |
+            (User.email.ilike(f'%{q}%')) |
+            (User.cargo.ilike(f'%{q}%'))
+        ).order_by(User.nome_completo.asc()).all()
+    else:
+        users = User.query.order_by(User.nome_completo.asc()).all()
+
+    from models import ApkScreenConfig
+    cfg = ApkScreenConfig.query.filter_by(screen_key='roles_hierarchy').first()
+    roles_hierarchy = ['admin', 'master', 'aprovador', 'funcionario', 'visualizador']
+    if cfg:
+        try:
+            parsed = json.loads(cfg.config_json)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                roles_hierarchy = parsed
+        except Exception:
+            pass
+    if 'admin' in roles_hierarchy:
+        roles_hierarchy.remove('admin')
+    roles_hierarchy.insert(0, 'admin')
+
+    return render_template('users/list.html', users=users, roles_hierarchy=roles_hierarchy)
 
 @app.route('/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @login_required
 def user_edit(user_id):
-    if not current_user.is_master:
+    if not (current_user.is_master or current_user.username == 'admin' or getattr(current_user, 'is_developer', False)):
         flash('Acesso negado.', 'error')
         return redirect(url_for('index'))
 
@@ -3420,12 +3444,20 @@ def user_edit(user_id):
         user.nome_completo = form.nome_completo.data
         user.cargo = form.cargo.data
         user.telefone = form.telefone.data
-        user.is_master = form.is_master.data
-        if hasattr(form, 'is_aprovador_express'):
-            user.is_aprovador_express = form.is_aprovador_express.data
+        
+        # O usuário admin comanda tudo e nunca pode ser rebaixado ou desativado
+        if user.username == 'admin':
+            user.is_master = True
+            user.ativo = True
+            user.is_aprovador_express = True
+        else:
+            user.is_master = form.is_master.data
+            user.ativo = form.ativo.data
+            if hasattr(form, 'is_aprovador_express'):
+                user.is_aprovador_express = form.is_aprovador_express.data
+
         if hasattr(form, 'cor_agenda') and form.cor_agenda.data:
             user.cor_agenda = form.cor_agenda.data
-        user.ativo = form.ativo.data
 
         if form.password.data:
             user.password_hash = generate_password_hash(form.password.data)
@@ -15208,14 +15240,17 @@ def api_users_detail(user_id):
                 target_user.telefone = (data['telefone'] or '').strip()
 
             if 'ativo' in data:
-                if target_user.username == 'admin' and not data['ativo']:
-                    pass
+                if target_user.username == 'admin':
+                    target_user.ativo = True
                 else:
                     target_user.ativo = bool(data['ativo'])
 
             tipo_acesso = data.get('tipo_acesso')
             if tipo_acesso:
-                if tipo_acesso in ['admin', 'master']:
+                if target_user.username == 'admin':
+                    target_user.is_master = True
+                    target_user.is_aprovador_express = True
+                elif tipo_acesso in ['admin', 'master']:
                     target_user.is_master = True
                     target_user.is_aprovador_express = True
                 elif tipo_acesso == 'aprovador':
@@ -15226,13 +15261,25 @@ def api_users_detail(user_id):
                     target_user.is_aprovador_express = False
 
             if 'is_master' in data:
-                target_user.is_master = bool(data['is_master'])
+                if target_user.username == 'admin':
+                    target_user.is_master = True
+                else:
+                    target_user.is_master = bool(data['is_master'])
 
             if 'is_aprovador_express' in data:
-                target_user.is_aprovador_express = bool(data['is_aprovador_express'])
+                if target_user.username == 'admin':
+                    target_user.is_aprovador_express = True
+                else:
+                    target_user.is_aprovador_express = bool(data['is_aprovador_express'])
 
             if data.get('password'):
                 target_user.password_hash = generate_password_hash(data['password'])
+
+            # Garantia absoluta: o usuário admin comanda tudo e é sempre master e ativo
+            if target_user.username == 'admin':
+                target_user.is_master = True
+                target_user.ativo = True
+                target_user.is_aprovador_express = True
 
             db.session.commit()
             return jsonify({
@@ -15265,6 +15312,84 @@ def api_users_detail(user_id):
         'is_aprovador_express': target_user.is_aprovador_express,
         'ativo': target_user.ativo
     }), 200
+
+
+# ==============================================================================
+# HIERARQUIA E GERENCIAMENTO DE FUNÇÕES ARRASTÁVEL (ADMIN COMANDA TUDO)
+# ==============================================================================
+@app.route('/api/admin/roles-hierarchy', methods=['GET', 'POST'])
+@csrf.exempt
+def api_admin_roles_hierarchy():
+    """
+    Endpoint para gerenciamento arrastável da ordem e hierarquia de funções.
+    O usuário 'admin' é o comandante supremo ('comanda tudo') e permanece sempre no topo.
+    """
+    user_req = _resolve_mobile_user(request.get_json(silent=True) if request.is_json else None)
+    is_master_or_admin = (
+        (user_req and (user_req.is_master or user_req.username == 'admin')) or
+        (current_user and current_user.is_authenticated and (current_user.is_master or current_user.username == 'admin'))
+    )
+    if not is_master_or_admin:
+        return jsonify({'success': False, 'error': 'Acesso restrito ao Administrador Geral.'}), 403
+
+    from models import ApkScreenConfig
+    default_order = ['admin', 'master', 'aprovador', 'funcionario', 'visualizador']
+    
+    cfg = ApkScreenConfig.query.filter_by(screen_key='roles_hierarchy').first()
+
+    if request.method == 'GET':
+        hierarchy = default_order[:]
+        if cfg:
+            try:
+                parsed = json.loads(cfg.config_json)
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    hierarchy = parsed
+            except Exception:
+                pass
+        # Garantir que 'admin' é sempre o primeiro (comanda tudo)
+        if 'admin' in hierarchy:
+            hierarchy.remove('admin')
+        hierarchy.insert(0, 'admin')
+        
+        return jsonify({
+            'success': True,
+            'hierarchy': hierarchy,
+            'supreme_admin': 'admin',
+            'command_note': 'O usuário admin comanda tudo no sistema (Soberano).'
+        }), 200
+
+    # POST (Salvar nova ordem arrastada)
+    try:
+        data = request.get_json(silent=True) or request.form or {}
+        new_order = data.get('hierarchy') or []
+        if isinstance(new_order, list):
+            # Garante que 'admin' seja sempre o comandante do topo
+            if 'admin' in new_order:
+                new_order.remove('admin')
+            new_order.insert(0, 'admin')
+
+            # Inclui quaisquer outras funções padrão que não tenham sido enviadas
+            for r in default_order:
+                if r not in new_order:
+                    new_order.append(r)
+
+            if not cfg:
+                cfg = ApkScreenConfig(screen_key='roles_hierarchy', title='Hierarquia de Funções do Sistema')
+                db.session.add(cfg)
+            cfg.config_json = json.dumps(new_order)
+            cfg.updated_at = brazil_now()
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Hierarquia de funções atualizada com sucesso! O Administrador Geral permanece no comando absoluto.',
+                'hierarchy': new_order
+            }), 200
+        return jsonify({'success': False, 'error': 'Formato inválido para hierarquia.'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # --- LEMBRETES ---
 @app.route('/api/lembrete/criar', methods=['POST'])

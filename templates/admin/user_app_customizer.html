@@ -345,106 +345,155 @@
                             </div>
                         </div>
 
-                        <!-- TAB 4: ATRIBUIÇÕES EXTRAS & PERMISSÕES -->
+                        <!-- TAB 4: ATRIBUIÇÕES EXTRAS & GERENCIAMENTO DE FUNÇÕES -->
                         <div class="tab-pane fade" id="tab-permissions" role="tabpanel">
-                            <h5 class="fw-bold mb-3 text-dark">
-                                <i class="fas fa-user-shield me-2 text-danger"></i>Atribuições & Poderes Especiais no Aplicativo
-                            </h5>
-                            <p class="text-muted small">Defina com precisão cirúrgica o que este usuário tem autorização de fazer diretamente pelo celular:</p>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h5 class="fw-bold mb-1 text-dark">
+                                        <i class="fas fa-user-shield me-2 text-danger"></i>Atribuições & Poderes Especiais no Aplicativo
+                                    </h5>
+                                    <p class="text-muted small mb-0">Defina com precisão o que este usuário tem autorização de fazer. Os cartões de funções são arrastáveis.</p>
+                                </div>
+                                <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill">
+                                    <i class="fas fa-arrows-alt me-1"></i> Funções Arrastáveis
+                                </span>
+                            </div>
 
-                            <div class="row g-3 mb-4">
+                            <!-- BANNER DO USUÁRIO ADMIN (COMANDA TUDO) -->
+                            <div id="adminCommanderNotice" class="alert border-0 text-white rounded-3 p-3 mb-4 d-none" style="background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%);">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center text-warning" style="width: 44px; height: 44px; background: rgba(255,255,255,0.15);">
+                                        <i class="fas fa-crown fa-lg"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold fs-6 d-flex align-items-center gap-2 flex-wrap">
+                                            <span>O Usuário ADMIN comanda tudo no sistema</span>
+                                            <span class="badge bg-warning text-dark fw-bold rounded-pill">Soberano • Poder Total</span>
+                                        </div>
+                                        <small class="text-white text-opacity-75 d-block mt-1">
+                                            Como Administrador Geral, este usuário possui autoridade irrestrita para aprovar, emitir, deletar, supervisionar obras e orquestrar todas as configurações. Todas as permissões estão ativas por definição e protegidas contra revogação.
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-4" id="permissionsCardsContainer">
                                 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_aprovar_relatorios" onchange="updatePermission('pode_aprovar_relatorios', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_aprovar_relatorios">
-                                                Aprovador de Relatórios (Master)
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_aprovar_relatorios" onchange="updatePermission('pode_aprovar_relatorios', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_aprovar_relatorios">
+                                                    Aprovador de Relatórios (Master)
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Permite revisar, aprovar e emitir carimbo técnico nos laudos da equipe.</small>
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_aprovar_express" onchange="updatePermission('pode_aprovar_express', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_aprovar_express">
-                                                Aprovador de Relatório Express
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_aprovar_express" onchange="updatePermission('pode_aprovar_express', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_aprovar_express">
+                                                    Aprovador de Relatório Express
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Pode validar vistorias instantâneas de 1 foto enviadas pelos fiscais.</small>
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_criar_express" onchange="updatePermission('pode_criar_express', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_criar_express">
-                                                Pode Criar Relatório Express
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_criar_express" onchange="updatePermission('pode_criar_express', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_criar_express">
+                                                    Pode Criar Relatório Express
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Habilita a criação de vistorias rápidas e upload de fotos no canteiro.</small>
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_excluir_registros" onchange="updatePermission('pode_excluir_registros', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_excluir_registros">
-                                                Pode Excluir Registros e Fotos
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_excluir_registros" onchange="updatePermission('pode_excluir_registros', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_excluir_registros">
+                                                    Pode Excluir Registros e Fotos
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Autoriza deletar relatórios e itens fotográficos sem supervisão.</small>
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_editar_finalizados" onchange="updatePermission('pode_editar_finalizados', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_editar_finalizados">
-                                                Pode Editar Laudos Finalizados
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_editar_finalizados" onchange="updatePermission('pode_editar_finalizados', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_editar_finalizados">
+                                                    Pode Editar Laudos Finalizados
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Permite reabrir laudos já emitidos para correções ou inclusões.</small>
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_gerenciar_obras" onchange="updatePermission('pode_gerenciar_obras', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_gerenciar_obras">
-                                                Gerenciar Canteiros & Obras
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_gerenciar_obras" onchange="updatePermission('pode_gerenciar_obras', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_gerenciar_obras">
+                                                    Gerenciar Canteiros & Obras
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Pode cadastrar novas obras, alterar construtoras e editar dados técnicos.</small>
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_agendar_visitas" onchange="updatePermission('pode_agendar_visitas', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_agendar_visitas">
-                                                Agendamento de Vistorias
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_agendar_visitas" onchange="updatePermission('pode_agendar_visitas', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_agendar_visitas">
+                                                    Agendamento de Vistorias
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Pode marcar novas visitas técnicas no calendário.</small>
                                     </div>
                                 </div>
 
-                                <div class="col-md-6">
-                                    <div class="card h-100 border p-3 rounded-3 shadow-xs">
-                                        <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input fs-5" type="checkbox" id="perm_pode_exportar_pdf" onchange="updatePermission('pode_exportar_pdf', this.checked)">
-                                            <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_exportar_pdf">
-                                                Exportar e Baixar PDFs
-                                            </label>
+                                <div class="col-md-6 draggable-perm-col" draggable="true">
+                                    <div class="card h-100 border p-3 rounded-3 shadow-xs perm-drag-card">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input fs-5" type="checkbox" id="perm_pode_exportar_pdf" onchange="updatePermission('pode_exportar_pdf', this.checked)">
+                                                <label class="form-check-label fw-bold ms-2 text-dark" for="perm_pode_exportar_pdf">
+                                                    Exportar e Baixar PDFs
+                                                </label>
+                                            </div>
+                                            <span class="text-muted perm-drag-handle" style="cursor: grab;" title="Arraste para reordenar"><i class="fas fa-grip-vertical"></i></span>
                                         </div>
                                         <small class="text-muted">Pode gerar os PDFs completos com fotos em alta definição.</small>
                                     </div>
@@ -868,17 +917,79 @@ function loadUserIntoForm(userId) {
     renderTabOrderList(pos.tab_order || ['DashboardTab', 'ExpressTab', 'ReportsTab', 'VisitasTab', 'ProjectsTab']);
     renderQuickActionsOrderList(pos.quick_actions_order || ['novo_relatorio', 'relatorio_express', 'nova_obra', 'agendar_visita', 'lembrete']);
 
-    // 4. Atribuições Extras
-    const atribs = activeConfig.atribuicoes_extras || {};
-    for (const [key, val] of Object.entries(atribs)) {
-        if (key === 'tags_personalizadas') continue;
-        const input = document.getElementById(`perm_${key}`);
-        if (input) input.checked = Boolean(val);
+    // 4. Atribuições Extras & Gerenciamento de Funções
+    const isAdmin = (activeConfig.username === 'admin');
+    const adminBanner = document.getElementById('adminCommanderNotice');
+    if (adminBanner) {
+        if (isAdmin) adminBanner.classList.remove('d-none');
+        else adminBanner.classList.add('d-none');
     }
+
+    const atribs = activeConfig.atribuicoes_extras || {};
+    const permKeys = [
+        'pode_aprovar_relatorios', 'pode_aprovar_express', 'pode_criar_express',
+        'pode_excluir_registros', 'pode_editar_finalizados', 'pode_gerenciar_obras',
+        'pode_agendar_visitas', 'pode_exportar_pdf'
+    ];
+    permKeys.forEach(key => {
+        const input = document.getElementById(`perm_${key}`);
+        if (input) {
+            if (isAdmin) {
+                input.checked = true;
+                input.disabled = true;
+            } else {
+                input.disabled = false;
+                input.checked = Boolean(atribs[key]);
+            }
+        }
+    });
+
     renderTags(atribs.tags_personalizadas || []);
+    setupDraggablePermissions();
 
     // Atualizar Simulação Visual
     renderSimulator();
+}
+
+// Inicializar Drag and Drop nas Funções e Atribuições
+function setupDraggablePermissions() {
+    const container = document.getElementById('permissionsCardsContainer');
+    if (!container) return;
+
+    const cards = container.querySelectorAll('.draggable-perm-col');
+    cards.forEach(card => {
+        card.addEventListener('dragstart', function(e) {
+            window.draggedPermCard = this;
+            e.dataTransfer.effectAllowed = 'move';
+            this.classList.add('opacity-50');
+        });
+
+        card.addEventListener('dragover', function(e) {
+            if (e.preventDefault) e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        });
+
+        card.addEventListener('drop', function(e) {
+            if (e.stopPropagation) e.stopPropagation();
+            if (window.draggedPermCard && window.draggedPermCard !== this) {
+                const allCols = Array.from(container.querySelectorAll('.draggable-perm-col'));
+                const fromIdx = allCols.indexOf(window.draggedPermCard);
+                const toIdx = allCols.indexOf(this);
+                if (fromIdx < toIdx) {
+                    this.after(window.draggedPermCard);
+                } else {
+                    this.before(window.draggedPermCard);
+                }
+            }
+            return false;
+        });
+
+        card.addEventListener('dragend', function() {
+            this.classList.remove('opacity-50');
+            window.draggedPermCard = null;
+        });
+    });
 }
 
 // Renderizar Ordenador de Abas do Rodapé
