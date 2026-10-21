@@ -13,7 +13,8 @@ import {
   closeLocalLembrete, getLocalRelatorioById, getLocalFotos, getActiveDraft,
   migrateLocalFotosRelatorioId, getDatabase, getLocalChecklistTemplate,
   getChecklistProgressoObra, saveBatchChecklistProgressoObra, getLocalRelatorios,
-  updateLocalProjetoInfoTecnica, getNextReportNumberForProject, getLocalVisitantes
+  updateLocalProjetoInfoTecnica, getNextReportNumberForProject, getLocalVisitantes,
+  getLocalProjetoById
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -224,9 +225,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const [techObservacoesFachada, setTechObservacoesFachada] = useState('');
   const [techOutrasObservacoes, setTechOutrasObservacoes] = useState('');
 
-  // Sincroniza informações técnicas com a obra selecionada
+  const lastLoadedProjIdRef = useRef<number | null>(null);
+
+  // Sincroniza informações técnicas com a obra selecionada apenas ao trocar de obra
   useEffect(() => {
-    if (selectedProj) {
+    if (selectedProj && selectedProjectId !== lastLoadedProjIdRef.current) {
+      lastLoadedProjIdRef.current = selectedProjectId;
       setTechElementosBase(selectedProj.elementos_construtivos_base || '');
       setTechChapiscoColante(selectedProj.especificacao_chapisco_colante || '');
       setTechChapiscoAlvenaria(selectedProj.especificacao_chapisco_alvenaria || '');
@@ -240,7 +244,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       setTechObservacoesFachada(selectedProj.observacoes_projeto_fachada || '');
       setTechOutrasObservacoes(selectedProj.outras_observacoes || '');
     }
-  }, [selectedProj]);
+  }, [selectedProj, selectedProjectId]);
 
   const handleSaveTechInfo = useCallback(async () => {
     if (!selectedProjectId) {
@@ -287,6 +291,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       const projNome = proj?.nome || 'Obra';
 
       // 1. Salva informações técnicas da obra no SQLite se houver obra selecionada
+      let techInfoJson: string | undefined = undefined;
       if (selectedProjectId) {
         const infoPayload = {
           elementos_construtivos_base: techElementosBase.trim(),
@@ -302,9 +307,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           observacoes_projeto_fachada: techObservacoesFachada.trim(),
           outras_observacoes: techOutrasObservacoes.trim(),
         };
+        techInfoJson = JSON.stringify(infoPayload);
         await updateLocalProjetoInfoTecnica(selectedProjectId, infoPayload);
         if (isOnline) {
           apiClient.axios.put(`/api/projetos/${selectedProjectId}`, infoPayload).catch(() => null);
+        } else {
+          await addToSyncQueue('projeto', selectedProjectId, 'update', `/api/projetos/${selectedProjectId}`, 'PUT', infoPayload);
         }
       }
 
@@ -323,6 +331,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         data_criacao_local: new Date().toISOString(),
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
+        informacoes_tecnicas: techInfoJson,
         checklist_data: JSON.stringify(checklist),
         acompanhantes: JSON.stringify(acompanhantesList),
         categoria: categoria,
@@ -500,6 +509,27 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         }
       }
 
+      // Adiciona etapas de checklist personalizado cadastradas na própria obra
+      try {
+        const projDb = await getLocalProjetoById(projId);
+        if (projDb?.checklist_data) {
+          const customChecklist = typeof projDb.checklist_data === 'string' ? JSON.parse(projDb.checklist_data) : projDb.checklist_data;
+          if (Array.isArray(customChecklist)) {
+            for (const cItem of customChecklist) {
+              const text = (cItem.item || cItem.etapa || cItem.titulo || '').trim();
+              if (text) {
+                const normKey = text.toLowerCase();
+                if (!uniqueBaseMap.has(normKey)) {
+                  uniqueBaseMap.set(normKey, { id: cItem.id || (uniqueBaseMap.size + 1), item: text, ordem: uniqueBaseMap.size + 1 });
+                }
+              }
+            }
+          }
+        }
+      } catch (cErr) {
+        console.warn('[ReportForm] Erro ao carregar checklist personalizado da obra:', cErr);
+      }
+
       // Adiciona itens que estavam no rascunho anterior e não estão no template
       for (const s of savedChecks) {
         if (!s.item) continue;
@@ -571,6 +601,26 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           setObservacoesFinais(r.observacoes_finais || '');
           setCategoria(r.categoria || 'Geral');
           setLocal(r.local || 'Fachada Principal');
+          if (r.informacoes_tecnicas) {
+            try {
+              const tech = typeof r.informacoes_tecnicas === 'string' ? JSON.parse(r.informacoes_tecnicas) : r.informacoes_tecnicas;
+              if (tech) {
+                lastLoadedProjIdRef.current = r.projeto_id;
+                if (tech.elementos_construtivos_base !== undefined) setTechElementosBase(tech.elementos_construtivos_base || '');
+                if (tech.especificacao_chapisco_colante !== undefined) setTechChapiscoColante(tech.especificacao_chapisco_colante || '');
+                if (tech.especificacao_chapisco_alvenaria !== undefined) setTechChapiscoAlvenaria(tech.especificacao_chapisco_alvenaria || '');
+                if (tech.especificacao_argamassa_emboco !== undefined) setTechArgamassaEmboco(tech.especificacao_argamassa_emboco || '');
+                if (tech.forma_aplicacao_argamassa !== undefined) setTechFormaAplicacaoArgamassa(tech.forma_aplicacao_argamassa || '');
+                if (tech.acabamentos_revestimento !== undefined) setTechAcabamentosRevestimento(tech.acabamentos_revestimento || '');
+                if (tech.acabamento_peitoris !== undefined) setTechAcabamentoPeitoris(tech.acabamento_peitoris || '');
+                if (tech.acabamento_muretas !== undefined) setTechAcabamentoMuretas(tech.acabamento_muretas || '');
+                if (tech.definicao_frisos_cor !== undefined) setTechDefinicaoFrisosCor(tech.definicao_frisos_cor || '');
+                if (tech.definicao_face_inferior_abas !== undefined) setTechDefinicaoFaceInferiorAbas(tech.definicao_face_inferior_abas || '');
+                if (tech.observacoes_projeto_fachada !== undefined) setTechObservacoesFachada(tech.observacoes_projeto_fachada || '');
+                if (tech.outras_observacoes !== undefined) setTechOutrasObservacoes(tech.outras_observacoes || '');
+              }
+            } catch {}
+          }
           if (r.acompanhantes) {
             try {
               const aList = JSON.parse(r.acompanhantes);
@@ -617,30 +667,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       try {
         setIsAutoSaving(true);
         const proj = projetosRef.current.find(p => p.id === selectedProjectId);
-        const draft: Relatorio = {
-          id: currentReportId,
-          uuid: reportUuid,
-          uuid_local: reportUuid,
-          data_criacao_local: new Date().toISOString(),
-          numero: reportNumber,
-          titulo: titulo.trim() || 'Rascunho de Relatório',
-          projeto_id: selectedProjectId,
-          projeto_nome: proj?.nome || 'Obra',
-          visita_id: preSelectedVisitId || null,
-          autor_id: user?.id || 1,
-          autor_nome: user?.nome_completo || user?.username || 'Responsável',
-          data_relatorio: dataVisita,
-          descricao: descricao.trim(),
-          observacoes_finais: observacoesFinais.trim(),
-          checklist_data: JSON.stringify(checklist),
-          acompanhantes: JSON.stringify(acompanhantesList),
-          categoria: categoria,
-          local: local,
-          status: 'em_andamento',
-          sync_status: 'pending',
-        };
 
         // 0. Salva informações técnicas da obra no SQLite se houver obra selecionada
+        let techInfoJson: string | undefined = undefined;
         if (selectedProjectId) {
           const infoPayload = {
             elementos_construtivos_base: techElementosBase.trim(),
@@ -656,11 +685,38 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             observacoes_projeto_fachada: techObservacoesFachada.trim(),
             outras_observacoes: techOutrasObservacoes.trim(),
           };
+          techInfoJson = JSON.stringify(infoPayload);
           await updateLocalProjetoInfoTecnica(selectedProjectId, infoPayload);
           if (isOnline) {
             apiClient.axios.put(`/api/projetos/${selectedProjectId}`, infoPayload).catch(() => null);
+          } else {
+            await addToSyncQueue('projeto', selectedProjectId, 'update', `/api/projetos/${selectedProjectId}`, 'PUT', infoPayload);
           }
         }
+
+        const draft: Relatorio = {
+          id: currentReportId,
+          uuid: reportUuid,
+          uuid_local: reportUuid,
+          data_criacao_local: new Date().toISOString(),
+          numero: reportNumber,
+          titulo: titulo.trim() || 'Rascunho de Relatório',
+          projeto_id: selectedProjectId,
+          projeto_nome: proj?.nome || 'Obra',
+          visita_id: preSelectedVisitId || null,
+          autor_id: user?.id || 1,
+          autor_nome: user?.nome_completo || user?.username || 'Responsável',
+          data_relatorio: dataVisita,
+          descricao: descricao.trim(),
+          observacoes_finais: observacoesFinais.trim(),
+          informacoes_tecnicas: techInfoJson,
+          checklist_data: JSON.stringify(checklist),
+          acompanhantes: JSON.stringify(acompanhantesList),
+          categoria: categoria,
+          local: local,
+          status: 'em_andamento',
+          sync_status: 'pending',
+        };
 
         // 1. Salva SEMPRE no SQLite local primeiro (garantia de persistência offline)
         await saveLocalRelatorio(draft, 'pending');
@@ -964,6 +1020,22 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         setReportNumber(finalReportNumber);
       }
 
+      const techPayload = {
+        elementos_construtivos_base: techElementosBase.trim(),
+        especificacao_chapisco_colante: techChapiscoColante.trim(),
+        especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+        especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+        forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+        acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+        acabamento_peitoris: techAcabamentoPeitoris.trim(),
+        acabamento_muretas: techAcabamentoMuretas.trim(),
+        definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+        definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+        observacoes_projeto_fachada: techObservacoesFachada.trim(),
+        outras_observacoes: techOutrasObservacoes.trim(),
+      };
+      const techInfoJson = JSON.stringify(techPayload);
+
       const relData: Relatorio = {
         id: reportId,
         uuid: reportUuid,
@@ -979,6 +1051,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         data_relatorio: dataVisita,
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
+        informacoes_tecnicas: techInfoJson,
         checklist_data: JSON.stringify(checklist),
         acompanhantes: JSON.stringify(acompanhantesList),
         categoria: categoria,
@@ -1008,20 +1081,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         }
 
         // Salva simultaneamente as informações técnicas da obra preenchidas no formulário
-        updateLocalProjetoInfoTecnica(selectedProjectId, {
-          elementos_construtivos_base: techElementosBase.trim(),
-          especificacao_chapisco_colante: techChapiscoColante.trim(),
-          especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
-          especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
-          forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
-          acabamentos_revestimento: techAcabamentosRevestimento.trim(),
-          acabamento_peitoris: techAcabamentoPeitoris.trim(),
-          acabamento_muretas: techAcabamentoMuretas.trim(),
-          definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
-          definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
-          observacoes_projeto_fachada: techObservacoesFachada.trim(),
-          outras_observacoes: techOutrasObservacoes.trim(),
-        }).catch(err => console.warn('[ReportForm] Erro ao salvar info técnica da obra:', err));
+        await updateLocalProjetoInfoTecnica(selectedProjectId, techPayload).catch(err => console.warn('[ReportForm] Erro ao salvar info técnica da obra:', err));
+        if (isOnline) {
+          apiClient.axios.put(`/api/projetos/${selectedProjectId}`, techPayload).catch(() => null);
+        } else {
+          await addToSyncQueue('projeto', selectedProjectId, 'update', `/api/projetos/${selectedProjectId}`, 'PUT', techPayload);
+        }
       }
 
       // 2. Save all Photos to SQLite

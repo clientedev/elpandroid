@@ -12,7 +12,8 @@ import { PhotoAnnotationOverlay } from '../../components/PhotoEditorModal';
 import { 
   getLocalRelatorioById, getLocalFotos, updateLocalRelatorioStatus, addToSyncQueue, deleteLocalRelatorio,
   saveBatchChecklistProgressoObra, getNextReportNumberForProject, getDatabase,
-  getLocalRelatorioExpressById, getLocalFotosExpress, updateLocalRelatorioExpressStatus, deleteLocalRelatorioExpress
+  getLocalRelatorioExpressById, getLocalFotosExpress, updateLocalRelatorioExpressStatus, deleteLocalRelatorioExpress,
+  getLocalProjetoById
 } from '../../database/db';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
 import { apiClient } from '../../services/api';
@@ -103,6 +104,32 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
             is_express: true,
           };
         }
+      }
+
+      if (r && !r.informacoes_tecnicas && r.projeto_id) {
+        try {
+          const proj = await getLocalProjetoById(r.projeto_id);
+          if (proj) {
+            const techPayload = {
+              elementos_construtivos_base: proj.elementos_construtivos_base || '',
+              especificacao_chapisco_colante: proj.especificacao_chapisco_colante || '',
+              especificacao_chapisco_alvenaria: proj.especificacao_chapisco_alvenaria || '',
+              especificacao_argamassa_emboco: proj.especificacao_argamassa_emboco || '',
+              forma_aplicacao_argamassa: proj.forma_aplicacao_argamassa || '',
+              acabamentos_revestimento: proj.acabamentos_revestimento || '',
+              acabamento_peitoris: proj.acabamento_peitoris || '',
+              acabamento_muretas: proj.acabamento_muretas || '',
+              definicao_frisos_cor: proj.definicao_frisos_cor || '',
+              definicao_face_inferior_abas: proj.definicao_face_inferior_abas || '',
+              observacoes_projeto_fachada: proj.observacoes_projeto_fachada || '',
+              outras_observacoes: proj.outras_observacoes || '',
+            };
+            const hasAnyTech = Object.values(techPayload).some(v => v.trim().length > 0);
+            if (hasAnyTech) {
+              r.informacoes_tecnicas = JSON.stringify(techPayload);
+            }
+          }
+        } catch {}
       }
 
       setRelatorio(r);

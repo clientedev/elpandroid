@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS projetos (
   definicao_face_inferior_abas TEXT,
   observacoes_projeto_fachada TEXT,
   outras_observacoes TEXT,
+  contatos TEXT,
+  checklist_data TEXT,
   sync_status TEXT DEFAULT 'synced',
   local_updated_at TEXT
 );
@@ -116,6 +118,7 @@ CREATE TABLE IF NOT EXISTS relatorios (
   em_edicao_por_id INTEGER,
   em_edicao_por_nome TEXT,
   em_edicao_em TEXT,
+  informacoes_tecnicas TEXT,
   sync_status TEXT DEFAULT 'synced'
 );
 
@@ -186,6 +189,7 @@ CREATE TABLE IF NOT EXISTS contatos (
   email TEXT,
   telefone TEXT,
   empresa TEXT,
+  cargo TEXT,
   projeto_id INTEGER,
   sync_status TEXT DEFAULT 'synced'
 );

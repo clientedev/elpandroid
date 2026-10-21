@@ -5,7 +5,7 @@ import {
   RelatorioExpress, FotoRelatorioExpress, 
   Contato, Lembrete, Notificacao, LegendaPredefinida, 
   SyncQueueItem, User, ChecklistCustomItem, ChecklistProgressoObra,
-  VisitaParticipanteItem
+  VisitaParticipanteItem, ContatoObraItem
 } from '../types';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
@@ -182,6 +182,20 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
     await db.execAsync('ALTER TABLE relatorios_express ADD COLUMN sync_status TEXT DEFAULT "synced";');
   } catch {}
   
+  // Migrations para persistência offline de contatos, checklist e dados técnicos
+  try {
+    await db.execAsync('ALTER TABLE projetos ADD COLUMN contatos TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE projetos ADD COLUMN checklist_data TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE contatos ADD COLUMN cargo TEXT;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE relatorios ADD COLUMN informacoes_tecnicas TEXT;');
+  } catch {}
+  
   // Seed/Sync legendas predefinidas garantindo todas as 12 categorias tecnicas solicitadas
   for (const leg of SEED_LEGENDAS) {
     try {
@@ -259,6 +273,22 @@ export async function getLocalUser(id: number): Promise<User | null> {
 }
 
 // ================= PROJETOS =================
+function formatProjetoRow(p: any): Projeto {
+  if (!p) return p;
+  let parsedContatos: ContatoObraItem[] = [];
+  if (p.contatos) {
+    try {
+      parsedContatos = typeof p.contatos === 'string' ? JSON.parse(p.contatos) : p.contatos;
+    } catch {
+      parsedContatos = [];
+    }
+  }
+  return {
+    ...p,
+    contatos: Array.isArray(parsedContatos) ? parsedContatos : [],
+  };
+}
+
 export async function getLocalProjetos(status?: string): Promise<Projeto[]> {
   const db = await getDatabase();
   let query = 'SELECT * FROM projetos';
@@ -268,7 +298,8 @@ export async function getLocalProjetos(status?: string): Promise<Projeto[]> {
     params.push(status);
   }
   query += ' ORDER BY id DESC';
-  return await db.getAllAsync<Projeto>(query, params);
+  const rows = await db.getAllAsync<any>(query, params);
+  return rows.map(formatProjetoRow);
 }
 
 export async function getNextProjectNumber(): Promise<string> {
@@ -291,11 +322,15 @@ export async function getNextProjectNumber(): Promise<string> {
 
 export async function getLocalProjetoById(id: number): Promise<Projeto | null> {
   const db = await getDatabase();
-  return await db.getFirstAsync<Projeto>('SELECT * FROM projetos WHERE id = ?', [id]);
+  const row = await db.getFirstAsync<any>('SELECT * FROM projetos WHERE id = ?', [id]);
+  return row ? formatProjetoRow(row) : null;
 }
 
 export async function saveLocalProjeto(p: Projeto, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
+  const contatosJson = p.contatos ? (typeof p.contatos === 'string' ? p.contatos : JSON.stringify(p.contatos)) : '[]';
+  const checklistData = p.checklist_data ? (typeof p.checklist_data === 'string' ? p.checklist_data : JSON.stringify(p.checklist_data)) : '';
+
   await db.runAsync(
     `INSERT OR REPLACE INTO projetos (
       id, numero, nome, descricao, endereco, latitude, longitude, tipo_obra, 
@@ -304,8 +339,8 @@ export async function saveLocalProjeto(p: Projeto, syncStatus: 'synced' | 'pendi
       especificacao_chapisco_colante, especificacao_chapisco_alvenaria, especificacao_argamassa_emboco,
       forma_aplicacao_argamassa, acabamentos_revestimento, acabamento_peitoris, acabamento_muretas,
       definicao_frisos_cor, definicao_face_inferior_abas, observacoes_projeto_fachada, 
-      outras_observacoes, sync_status, local_updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      outras_observacoes, contatos, checklist_data, sync_status, local_updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       p.id, p.numero, p.nome, p.descricao || '', p.endereco || '', p.latitude || null, p.longitude || null,
       p.tipo_obra, p.construtora, p.nome_funcionario, p.responsavel_id, p.email_principal,
@@ -316,9 +351,23 @@ export async function saveLocalProjeto(p: Projeto, syncStatus: 'synced' | 'pendi
       p.acabamentos_revestimento || '', p.acabamento_peitoris || '', p.acabamento_muretas || '',
       p.definicao_frisos_cor || '', p.definicao_face_inferior_abas || '',
       p.observacoes_projeto_fachada || '', p.outras_observacoes || '',
+      contatosJson, checklistData,
       syncStatus, new Date().toISOString()
     ]
   );
+
+  // Também persiste contatos individuais na tabela 'contatos' para que getLocalContatos(p.id) os encontre
+  if (p.contatos && Array.isArray(p.contatos) && p.contatos.length > 0) {
+    for (let i = 0; i < p.contatos.length; i++) {
+      const c = p.contatos[i];
+      const contatoId = c.id || (Number(p.id) * 1000 + (i + 1));
+      await db.runAsync(
+        `INSERT OR REPLACE INTO contatos (id, nome, email, telefone, empresa, cargo, projeto_id, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [contatoId, c.nome, c.email || '', c.telefone || '', c.empresa || '', c.cargo || '', p.id, syncStatus]
+      ).catch(() => null);
+    }
+  }
 
   // Garante que a pasta física da obra seja criada imediatamente no aparelho
   try {
@@ -590,10 +639,13 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
   const safeNumero = String(r.numero || `REL-${safeId}`);
   const safeProjetoId = Number(r.projeto_id) || 0;
   const safeTitulo = String(r.titulo || 'Relatório de Obra');
-  const safeDataRelatorio = String(r.data_relatorio || new Date().toISOString().substring(0, 10));
+  const now = new Date().toISOString();
+  const safeDataRelatorio = String(r.data_relatorio || now.substring(0, 10));
   const safeChecklistData = typeof r.checklist_data === 'string' ? r.checklist_data : JSON.stringify(r.checklist_data || []);
   const safeAcompanhantes = typeof r.acompanhantes === 'string' ? r.acompanhantes : JSON.stringify(r.acompanhantes || []);
-  const now = new Date().toISOString();
+  const safeTechInfo = r.informacoes_tecnicas
+    ? (typeof r.informacoes_tecnicas === 'string' ? r.informacoes_tecnicas : JSON.stringify(r.informacoes_tecnicas))
+    : null;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO relatorios (
@@ -601,8 +653,9 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       autor_id, autor_nome, aprovador_id, aprovador_nome, data_relatorio,
       data_aprovacao, conteudo, descricao, checklist_data, categoria, local,
       lembrete_proxima_visita, observacoes_finais, status, comentario_aprovacao,
-      acompanhantes, created_at, updated_at, uuid, data_criacao_local, data_sincronizacao, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      acompanhantes, created_at, updated_at, uuid, data_criacao_local, data_sincronizacao,
+      informacoes_tecnicas, sync_status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       safeId,
       safeNumero,
@@ -632,6 +685,7 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       safeUuid,
       String(r.data_criacao_local || r.created_at || now),
       r.data_sincronizacao ? String(r.data_sincronizacao) : null,
+      safeTechInfo,
       String(syncStatus || r.sync_status || 'pending')
     ]
   );
@@ -1158,9 +1212,9 @@ export async function getLocalContatos(projetoId?: number): Promise<Contato[]> {
 export async function saveLocalContato(c: Contato, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
-    `INSERT OR REPLACE INTO contatos (id, nome, email, telefone, empresa, projeto_id, sync_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [c.id, c.nome, c.email || '', c.telefone || '', c.empresa || '', c.projeto_id || null, syncStatus]
+    `INSERT OR REPLACE INTO contatos (id, nome, email, telefone, empresa, cargo, projeto_id, sync_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [c.id, c.nome, c.email || '', c.telefone || '', c.empresa || '', c.cargo || '', c.projeto_id || null, syncStatus]
   );
 }
 

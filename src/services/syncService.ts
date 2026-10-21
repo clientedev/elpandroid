@@ -25,6 +25,8 @@ class SyncService {
   private listeners: ((state: SyncState, pendingCount: number) => void)[] = [];
   private autoSyncInterval: any = null;
   private lastSyncTimestamp: number = 0;
+  private wasOffline: boolean = false;
+  private hasNotifiedOfflineSyncDone: boolean = false;
 
   constructor() {
     this.initAutoSync();
@@ -47,6 +49,8 @@ class SyncService {
           this.syncAll(false);
         }
       } else {
+        this.wasOffline = true;
+        this.hasNotifiedOfflineSyncDone = false;
         this.getPendingCount().then(c => this.notify('offline', c));
       }
     });
@@ -117,6 +121,8 @@ class SyncService {
 
     const online = await this.isOnline();
     if (!online) {
+      this.wasOffline = true;
+      this.hasNotifiedOfflineSyncDone = false;
       const pending = await this.getPendingCount();
       this.notify('offline', pending);
       return { 
@@ -325,12 +331,26 @@ class SyncService {
         ? `Sincronização concluída! ${processedCount} alteração(ões) enviada(s) com sucesso para o servidor.`
         : 'Sincronização concluída! Todos os dados estão atualizados no servidor.';
 
-      if (processedCount > 0) {
+      const shouldShowPopup = manual || (this.wasOffline && !this.hasNotifiedOfflineSyncDone);
+
+      if (shouldShowPopup) {
+        this.hasNotifiedOfflineSyncDone = true;
+        this.wasOffline = false;
         notificationService.notify({
           titulo: 'Sincronização Concluída',
           mensagem: msg,
           tipo: 'sincronizacao',
           silent: true,
+          showToast: true,
+        }).catch(() => null);
+      } else if (processedCount > 0) {
+        // Notificação interna silenciosa (apenas histórico, sem popup invasivo na tela)
+        notificationService.notify({
+          titulo: 'Sincronização Concluída',
+          mensagem: msg,
+          tipo: 'sincronizacao',
+          silent: true,
+          showToast: false,
         }).catch(() => null);
       }
 

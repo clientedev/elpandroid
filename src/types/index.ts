@@ -135,6 +135,7 @@ export interface Relatorio {
   fotos_count?: number;
   projeto_construtora?: string;
   projeto_endereco?: string;
+  informacoes_tecnicas?: string;
   is_express?: boolean;
 }
 

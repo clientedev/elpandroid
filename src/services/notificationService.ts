@@ -21,6 +21,7 @@ class NotificationService {
   private hasPermission: boolean = false;
   private listeners: Array<() => void> = [];
   private toastListeners: Array<(toast: ToastPayload) => void> = [];
+  private lastSyncToastTime: number = 0;
 
   /**
    * Verifica se o aplicativo já tem permissão concedida no Android
@@ -136,6 +137,14 @@ class NotificationService {
 
       // 4. Se solicitado, despachar para listeners de Toast visual em tela cheia
       if (showToast) {
+        if (tipo === 'sincronizacao') {
+          const now = Date.now();
+          if (now - this.lastSyncToastTime < 30000) {
+            // Suprime popups repetidos de sincronização dentro de 30 segundos
+            return;
+          }
+          this.lastSyncToastTime = now;
+        }
         this.toastListeners.forEach(cb => {
           try { cb({ titulo, mensagem, tipo }); } catch {}
         });

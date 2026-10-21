@@ -10,7 +10,8 @@ import {
   addToSyncQueue, 
   getNextProjectNumber, 
   getLocalUsers, 
-  getLocalChecklistTemplate 
+  getLocalChecklistTemplate,
+  getLocalContatos
 } from '../../database/db';
 import { ensureProjectFolders } from '../../services/appFilesService';
 import { apiClient } from '../../services/api';
@@ -168,6 +169,24 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       }
       setChecklistItems(items);
     }).catch(err => console.warn('Erro ao carregar checklist:', err));
+
+    if (existingProject?.id) {
+      getLocalContatos(existingProject.id).then(cList => {
+        if (cList && cList.length > 0) {
+          setContatos(prev => {
+            if (prev && prev.length > 0) return prev;
+            return cList.map(c => ({
+              id: c.id,
+              nome: c.nome,
+              cargo: c.cargo || 'Engenheiro/a',
+              empresa: c.empresa || '',
+              email: c.email || '',
+              telefone: c.telefone || '',
+            }));
+          });
+        }
+      }).catch(err => console.warn('Erro ao carregar contatos da obra:', err));
+    }
   }, [existingProject, user]);
 
   // Ao selecionar responsável, linkar automaticamente ao seu e-mail e nome
@@ -480,6 +499,9 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       : contatoCargo;
 
     const newContato: ContatoObraItem = {
+      id: (editingContatoIndex !== null && contatos[editingContatoIndex]?.id) 
+        ? contatos[editingContatoIndex].id 
+        : Date.now() + Math.floor(Math.random() * 1000),
       nome: contatoNome.trim(),
       cargo: finalCargo,
       empresa: contatoEmpresa.trim(),

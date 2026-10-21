@@ -100,7 +100,21 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       const l = await getLocalLembretes(projectId, false);
       setLembretes(l);
       const c = await getLocalContatos(projectId);
-      setContatos(c);
+      if (c && c.length > 0) {
+        setContatos(c);
+      } else if (p?.contatos && p.contatos.length > 0) {
+        setContatos(p.contatos.map((co, idx) => ({
+          id: co.id || (idx + 1),
+          nome: co.nome,
+          cargo: co.cargo,
+          empresa: co.empresa,
+          email: co.email,
+          telefone: co.telefone,
+          projeto_id: projectId
+        })));
+      } else {
+        setContatos([]);
+      }
 
       // Carrega o template e histórico cumulativo de checklist da obra
       const [template, progressoObra] = await Promise.all([
@@ -108,9 +122,25 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         getChecklistProgressoObra(projectId),
       ]);
 
-      const baseItems: Array<{ id?: number; item: string; ordem: number }> = template.length > 0 
-        ? template.map((t, idx) => ({ id: t.id, item: t.item, ordem: t.ordem || idx + 1 }))
-        : DEFAULT_OBRA_CHECKLIST.map((texto, idx) => ({ id: idx + 1, item: texto, ordem: idx + 1 }));
+      let baseItems: Array<{ id?: number; item: string; ordem: number }> = [];
+      if (p?.checklist_data) {
+        try {
+          const parsed = JSON.parse(p.checklist_data);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            baseItems = parsed.map((t: any, idx: number) => ({
+              id: t.id || idx + 1,
+              item: t.item || t.texto,
+              ordem: t.ordem || idx + 1
+            }));
+          }
+        } catch {}
+      }
+
+      if (baseItems.length === 0) {
+        baseItems = template.length > 0 
+          ? template.map((t, idx) => ({ id: t.id, item: t.item, ordem: t.ordem || idx + 1 }))
+          : DEFAULT_OBRA_CHECKLIST.map((texto, idx) => ({ id: idx + 1, item: texto, ordem: idx + 1 }));
+      }
 
       const aprovacoesMap = new Map<string, { aprovado: boolean; relatorioNumero?: string; dataAprovacao?: string; obs?: string }>();
 

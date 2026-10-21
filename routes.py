@@ -13731,6 +13731,100 @@ def api_visitante_item(visitante_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': str(err)}), 500
 
+def _sync_projeto_extras(projeto, data, responsavel_id=1):
+    """Sincroniza contatos, checklist personalizado e dados tecnicos completos da obra"""
+    import json
+    tech_fields = [
+        'elementos_construtivos_base', 'especificacao_chapisco_colante',
+        'especificacao_chapisco_alvenaria', 'especificacao_argamassa_emboco',
+        'forma_aplicacao_argamassa', 'acabamentos_revestimento',
+        'acabamento_peitoris', 'acabamento_muretas', 'definicao_frisos_cor',
+        'definicao_face_inferior_abas', 'observacoes_projeto_fachada',
+        'outras_observacoes', 'numeracao_inicial'
+    ]
+    for tf in tech_fields:
+        if tf in data and data[tf] is not None:
+            setattr(projeto, tf, data[tf])
+
+    # Contatos da Obra
+    contatos_data = data.get('contatos')
+    if contatos_data:
+        if isinstance(contatos_data, str):
+            try:
+                contatos_data = json.loads(contatos_data)
+            except Exception:
+                contatos_data = []
+        if isinstance(contatos_data, list):
+            for c in contatos_data:
+                if not isinstance(c, dict):
+                    continue
+                c_nome = (c.get('nome') or '').strip()
+                c_email = (c.get('email') or '').strip() or None
+                c_cargo = (c.get('cargo') or '').strip()
+                c_empresa = (c.get('empresa') or '').strip()
+                c_telefone = (c.get('telefone') or '').strip()
+                if not c_nome and not c_email:
+                    continue
+                existing_c = None
+                if c_email:
+                    existing_c = EmailCliente.query.filter_by(projeto_id=projeto.id, email=c_email).first()
+                if not existing_c and c_nome:
+                    existing_c = EmailCliente.query.filter_by(projeto_id=projeto.id, nome_contato=c_nome).first()
+                if existing_c:
+                    existing_c.nome_contato = c_nome or existing_c.nome_contato
+                    existing_c.cargo = c_cargo or existing_c.cargo
+                    existing_c.empresa = c_empresa or existing_c.empresa
+                    existing_c.telefone = c_telefone or existing_c.telefone
+                    existing_c.ativo = True
+                else:
+                    novo_c = EmailCliente(
+                        projeto_id=projeto.id,
+                        nome_contato=c_nome or 'Contato',
+                        cargo=c_cargo,
+                        empresa=c_empresa,
+                        email=c_email,
+                        telefone=c_telefone,
+                        ativo=True
+                    )
+                    db.session.add(novo_c)
+
+    # Checklist Personalizado da Obra
+    chk_data = data.get('checklist_data')
+    if chk_data:
+        if isinstance(chk_data, str):
+            try:
+                chk_data = json.loads(chk_data)
+            except Exception:
+                chk_data = []
+        if isinstance(chk_data, list) and len(chk_data) > 0:
+            chk_config = ProjetoChecklistConfig.query.filter_by(projeto_id=projeto.id).first()
+            if not chk_config:
+                chk_config = ProjetoChecklistConfig(
+                    projeto_id=projeto.id,
+                    tipo_checklist='personalizado',
+                    criado_por=responsavel_id or 1
+                )
+                db.session.add(chk_config)
+            else:
+                chk_config.tipo_checklist = 'personalizado'
+
+            for idx, item_obj in enumerate(chk_data):
+                if not isinstance(item_obj, dict):
+                    continue
+                item_txt = (item_obj.get('texto') or item_obj.get('item') or '').strip()
+                if not item_txt:
+                    continue
+                ordem = item_obj.get('ordem', idx + 1)
+                existing_item = ChecklistObra.query.filter_by(projeto_id=projeto.id, texto=item_txt).first()
+                if not existing_item:
+                    new_chk = ChecklistObra(
+                        projeto_id=projeto.id,
+                        texto=item_txt,
+                        ordem=ordem,
+                        ativo=True
+                    )
+                    db.session.add(new_chk)
+
 # --- PROJETOS ---
 @app.route('/api/projetos', methods=['GET', 'POST'])
 @csrf.exempt
@@ -13779,11 +13873,6 @@ def api_projetos_collection():
             projeto.descricao = data.get('descricao') or ''
             projeto.endereco = data.get('endereco') or ''
             projeto.status = data.get('status') or 'Ativo'
-            projeto.elementos_construtivos_base = data.get('elementos_construtivos_base')
-            projeto.especificacao_chapisco_colante = data.get('especificacao_chapisco_colante')
-            projeto.especificacao_argamassa_emboco = data.get('especificacao_argamassa_emboco')
-            projeto.acabamento_peitoris = data.get('acabamento_peitoris')
-            projeto.definicao_frisos_cor = data.get('definicao_frisos_cor')
 
             if data.get('latitude') is not None:
                 projeto.latitude = float(data['latitude'])
@@ -13793,6 +13882,11 @@ def api_projetos_collection():
                 projeto.data_inicio = _parse_iso_date(data.get('data_inicio'), as_date=True)
             if data.get('data_previsao_fim'):
                 projeto.data_previsao_fim = _parse_iso_date(data.get('data_previsao_fim'), as_date=True)
+
+            db.session.flush()
+
+            # Sincronizar contatos, checklist e dados técnicos
+            _sync_projeto_extras(projeto, data, responsavel_id)
 
             db.session.commit()
             return jsonify({
@@ -13808,9 +13902,28 @@ def api_projetos_collection():
 
     # GET
     try:
+        import json
         projetos = Projeto.query.order_by(Projeto.id.desc()).all()
         result = []
         for p in projetos:
+            chk_items = ChecklistObra.query.filter_by(projeto_id=p.id, ativo=True).order_by(ChecklistObra.ordem.asc()).all()
+            checklist_json = json.dumps([
+                {'id': ch.id, 'item': ch.texto, 'texto': ch.texto, 'ordem': ch.ordem, 'ativo': ch.ativo}
+                for ch in chk_items
+            ]) if chk_items else None
+
+            contatos_list = [
+                {
+                    'id': ec.id,
+                    'nome': ec.nome_contato,
+                    'cargo': ec.cargo or '',
+                    'empresa': ec.empresa or '',
+                    'email': ec.email or '',
+                    'telefone': ec.telefone or ''
+                }
+                for ec in p.emails_clientes if ec.ativo
+            ]
+
             result.append({
                 'id': p.id,
                 'numero': p.numero,
@@ -13830,9 +13943,18 @@ def api_projetos_collection():
                 'numeracao_inicial': getattr(p, 'numeracao_inicial', 1),
                 'elementos_construtivos_base': p.elementos_construtivos_base,
                 'especificacao_chapisco_colante': p.especificacao_chapisco_colante,
+                'especificacao_chapisco_alvenaria': p.especificacao_chapisco_alvenaria,
                 'especificacao_argamassa_emboco': p.especificacao_argamassa_emboco,
+                'forma_aplicacao_argamassa': p.forma_aplicacao_argamassa,
+                'acabamentos_revestimento': p.acabamentos_revestimento,
                 'acabamento_peitoris': p.acabamento_peitoris,
+                'acabamento_muretas': p.acabamento_muretas,
                 'definicao_frisos_cor': p.definicao_frisos_cor,
+                'definicao_face_inferior_abas': p.definicao_face_inferior_abas,
+                'observacoes_projeto_fachada': p.observacoes_projeto_fachada,
+                'outras_observacoes': p.outras_observacoes,
+                'contatos': contatos_list,
+                'checklist_data': checklist_json,
                 'created_at': p.created_at.isoformat() if p.created_at else None,
             })
         return jsonify(result), 200
@@ -13945,9 +14067,12 @@ def api_projeto_detail_sync(projeto_id):
         if request.method in ['PUT', 'POST']:
             data = request.get_json(silent=True) or request.form or {}
             for field in ['nome', 'tipo_obra', 'construtora', 'nome_funcionario', 'email_principal',
-                          'descricao', 'endereco', 'status', 'elementos_construtivos_base',
-                          'especificacao_chapisco_colante', 'especificacao_argamassa_emboco',
-                          'acabamento_peitoris', 'definicao_frisos_cor']:
+                          'descricao', 'endereco', 'status', 'numeracao_inicial', 'elementos_construtivos_base',
+                          'especificacao_chapisco_colante', 'especificacao_chapisco_alvenaria',
+                          'especificacao_argamassa_emboco', 'forma_aplicacao_argamassa',
+                          'acabamentos_revestimento', 'acabamento_peitoris', 'acabamento_muretas',
+                          'definicao_frisos_cor', 'definicao_face_inferior_abas',
+                          'observacoes_projeto_fachada', 'outras_observacoes']:
                 if field in data and data[field] is not None:
                     setattr(projeto, field, data[field])
             
@@ -13956,6 +14081,9 @@ def api_projeto_detail_sync(projeto_id):
             if 'longitude' in data and data['longitude'] is not None:
                 projeto.longitude = float(data['longitude'])
             
+            # Sincronizar contatos, checklist e dados técnicos adicionais
+            _sync_projeto_extras(projeto, data, getattr(projeto, 'responsavel_id', 1))
+
             db.session.commit()
             return jsonify({'success': True, 'id': projeto.id, 'numero': projeto.numero}), 200
 
@@ -14248,6 +14376,25 @@ def api_relatorios_collection():
 
             db.session.flush()
 
+            # Atualizar dados tecnicos da obra se enviados junto ao relatorio
+            if proj_check:
+                tech_data = data.get('informacoes_tecnicas')
+                if tech_data and isinstance(tech_data, str):
+                    try:
+                        tech_data = json.loads(tech_data)
+                    except Exception:
+                        tech_data = None
+                if not tech_data and isinstance(data, dict):
+                    tech_data = data
+                if tech_data and isinstance(tech_data, dict):
+                    for tf in ['elementos_construtivos_base', 'especificacao_chapisco_colante',
+                               'especificacao_chapisco_alvenaria', 'especificacao_argamassa_emboco',
+                               'forma_aplicacao_argamassa', 'acabamentos_revestimento',
+                               'acabamento_peitoris', 'acabamento_muretas', 'definicao_frisos_cor',
+                               'definicao_face_inferior_abas', 'observacoes_projeto_fachada',
+                               'outras_observacoes']:
+                        if tf in tech_data and tech_data[tf]:
+                            setattr(proj_check, tf, tech_data[tf])
             # Processar fotos em lote se enviadas no payload
             fotos_list = data.get('fotos') or []
             if isinstance(fotos_list, list) and len(fotos_list) > 0:
