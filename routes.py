@@ -14944,19 +14944,30 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
         if not foto_existente and raw_url and (raw_url in existing_by_url or clean_url in existing_by_url):
             foto_existente = existing_by_url.get(raw_url) or existing_by_url.get(clean_url)
 
-        # 5. Fallback por ordem se o ID for provisório do cliente e não enviou novos bytes
-        if not foto_existente and req_foto_id:
-            try:
-                if int(req_foto_id) >= 2000000000 and not img_bytes:
-                    for ef in existing_fotos:
-                        if ef.id not in retained_photo_ids and ef.ordem == idx:
-                            foto_existente = ef
-                            break
-            except Exception:
-                pass
+        # 5. Fallback por ordem se não encontrou por id/hash/url
+        if not foto_existente:
+            for ef in existing_fotos:
+                if ef.id not in retained_photo_ids and (ef.ordem == f_data.get('ordem', idx) or ef.ordem == idx):
+                    foto_existente = ef
+                    break
 
         if foto_existente:
             # Já existe no relatório: atualiza metadados sem duplicar registro nem imagem
+            if img_bytes and img_hash and (not foto_existente.imagem or not foto_existente.url):
+                foto_existente.imagem = img_bytes
+                foto_existente.imagem_hash = img_hash
+                foto_existente.imagem_size = len(img_bytes)
+                foto_existente.content_type = 'image/jpeg'
+                fname = f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+                fpath = os.path.join(upload_dir, fname)
+                try:
+                    with open(fpath, 'wb') as f_out:
+                        f_out.write(img_bytes)
+                    foto_existente.filename = fname
+                    foto_existente.url = f"/uploads/{fname}"
+                except Exception as write_err:
+                    current_app.logger.warning(f"Erro ao salvar arquivo de foto express: {write_err}")
+
             foto_existente.titulo = f_data.get('titulo') or foto_existente.titulo or f"Foto Express {idx+1}"
             foto_existente.legenda = f_data.get('legenda') or foto_existente.legenda or ''
             foto_existente.descricao = f_data.get('descricao') or foto_existente.descricao or ''
@@ -14966,6 +14977,10 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
             foto_existente.ordem = f_data.get('ordem', idx)
             retained_photo_ids.add(foto_existente.id)
             saved += 1
+            continue
+
+        # Evita criar foto fantasma totalmente vazia (sem imagem em bytes e sem URL remota)
+        if not img_bytes and not (raw_url and ('/uploads/' in raw_url or raw_url.startswith('http'))):
             continue
 
         # 6. Nova foto: criar registro limpo
@@ -15053,20 +15068,12 @@ def api_relatorios_express_sync():
             if not existing and numero:
                 candidate = RelatorioExpress.query.filter_by(numero=numero).first()
                 if candidate:
-                    is_same_author = (candidate.autor_id == autor_id)
-                    is_draft = candidate.status in ['Rascunho', 'Em preenchimento', 'em_andamento']
-                    if is_same_author or is_draft or data.get('action') == 'update':
-                        existing = candidate
-                    elif data.get('action') == 'create' and not is_draft and not is_same_author:
-                        try:
-                            from routes_express import generate_express_number
-                            numero = generate_express_number()
-                        except Exception:
-                            count = RelatorioExpress.query.count()
-                            numero = f"EXP-{count:04d}"
+                    existing = candidate
 
             if existing:
                 rel = existing
+                if not rel.autor_id and autor_id:
+                    rel.autor_id = autor_id
             else:
                 if not numero:
                     try:

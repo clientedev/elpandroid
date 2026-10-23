@@ -1197,12 +1197,23 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
   const seenByFilename = new Map<string, FotoRelatorioExpress>();
   const seenByUri = new Map<string, FotoRelatorioExpress>();
   const seenByB64 = new Map<string, FotoRelatorioExpress>();
+  const seenByOrdem = new Map<number, FotoRelatorioExpress>();
   const result: FotoRelatorioExpress[] = [];
 
   for (const f of rows) {
+    // Ignora fotos fantasmas totalmente vazias (sem arquivo local, sem URL válida e sem base64)
+    const hasLocalUri = Boolean(f.uri_local && f.uri_local.startsWith('file://'));
+    const hasValidUrl = Boolean(f.url && f.url.startsWith('http') && !f.url.endsWith('/uploads/') && !f.url.endsWith('null'));
+    const hasBase64 = Boolean(f.base64 && f.base64.length > 50);
+
+    if (!hasLocalUri && !hasValidUrl && !hasBase64) {
+      continue;
+    }
+
     const filenameKey = (f.filename && f.filename.trim()) || '';
-    const uriKey = (f.uri_local && f.uri_local.startsWith('file://')) ? f.uri_local.trim() : '';
-    const b64Key = (f.base64 && f.base64.length > 100) ? f.base64.substring(0, 80) : '';
+    const uriKey = hasLocalUri ? f.uri_local!.trim() : '';
+    const b64Key = hasBase64 ? f.base64!.substring(0, 80) : '';
+    const ordemKey = (f.ordem !== undefined && f.ordem !== null) ? Number(f.ordem) : -1;
 
     let existing: FotoRelatorioExpress | undefined;
     if (f.id && seenById.has(f.id)) {
@@ -1213,17 +1224,19 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
       existing = seenByUri.get(uriKey);
     } else if (b64Key && seenByB64.has(b64Key)) {
       existing = seenByB64.get(b64Key);
+    } else if (ordemKey >= 0 && seenByOrdem.has(ordemKey)) {
+      existing = seenByOrdem.get(ordemKey);
     }
 
     if (existing) {
-      if (f.uri_local && f.uri_local.startsWith('file://')) {
+      if (hasLocalUri) {
         existing.uri_local = f.uri_local;
       }
-      if (!existing.base64 && f.base64) existing.base64 = f.base64;
+      if (!existing.base64 && hasBase64) existing.base64 = f.base64;
       if (!existing.legenda && f.legenda) existing.legenda = f.legenda;
       if (!existing.anotacoes_dados && f.anotacoes_dados) existing.anotacoes_dados = f.anotacoes_dados;
-      if (f.id && f.id < 2000000000) existing.id = f.id;
-      if (f.url) existing.url = f.url;
+      if (f.id && f.id < 1000000000) existing.id = f.id;
+      if (f.url && hasValidUrl) existing.url = f.url;
       if (f.filename) existing.filename = f.filename;
     } else {
       result.push(f);
@@ -1231,6 +1244,7 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
       if (filenameKey) seenByFilename.set(filenameKey, f);
       if (uriKey) seenByUri.set(uriKey, f);
       if (b64Key) seenByB64.set(b64Key, f);
+      if (ordemKey >= 0) seenByOrdem.set(ordemKey, f);
     }
   }
 
@@ -1240,21 +1254,45 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
 export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
 
-  // Reconciliação inteligente: se já existe foto com mesmo filename nesta obra, atualiza em vez de duplicar
+  // Reconciliação inteligente: se já existe foto local provisória (id >= 1000000000) para esta mesma ordem ou filename,
+  // preserva o arquivo local file:// e base64 e substitui o registro temporário pelo oficial
   try {
-    if (f.filename && f.filename.length > 8 && !f.filename.startsWith('photo_') && f.filename !== 'photo.jpg') {
-      const matchFile = await db.getFirstAsync<{ id: number; uri_local?: string }>(
-        'SELECT id, uri_local FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND filename = ? AND id != ? LIMIT 1',
-        [Number(f.relatorio_express_id) || 0, String(f.relatorio_express_id), f.filename, f.id || 0]
+    const numRelId = Number(f.relatorio_express_id) || 0;
+    const strRelId = String(f.relatorio_express_id);
+
+    let matchLocal: { id: number; uri_local?: string; base64?: string; anotacoes_dados?: string } | null = null;
+
+    if (f.id && f.id < 1000000000) {
+      // É foto oficial do servidor: procura foto temporária correspondente pela ordem
+      matchLocal = await db.getFirstAsync<{ id: number; uri_local?: string; base64?: string; anotacoes_dados?: string }>(
+        'SELECT id, uri_local, base64, anotacoes_dados FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND ordem = ? AND id >= 1000000000 LIMIT 1',
+        [numRelId, strRelId, f.ordem || 0]
       );
-      if (matchFile) {
-        // Se tinha URI local file://, preserva
-        const preservedUri = (matchFile.uri_local && matchFile.uri_local.startsWith('file://')) ? matchFile.uri_local : f.uri_local;
-        await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [matchFile.id]);
-        f.uri_local = preservedUri;
-      }
     }
-  } catch {}
+
+    if (!matchLocal && f.filename && f.filename.length > 8 && !f.filename.startsWith('photo_') && f.filename !== 'photo.jpg') {
+      matchLocal = await db.getFirstAsync<{ id: number; uri_local?: string; base64?: string; anotacoes_dados?: string }>(
+        'SELECT id, uri_local, base64, anotacoes_dados FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND filename = ? AND id != ? LIMIT 1',
+        [numRelId, strRelId, f.filename, f.id || 0]
+      );
+    }
+
+    if (matchLocal) {
+      // Preserva URI local file:// e base64 para nunca ficar card vazio
+      if (matchLocal.uri_local && matchLocal.uri_local.startsWith('file://')) {
+        f.uri_local = matchLocal.uri_local;
+      }
+      if (matchLocal.base64 && !f.base64) {
+        f.base64 = matchLocal.base64;
+      }
+      if (matchLocal.anotacoes_dados && !f.anotacoes_dados) {
+        f.anotacoes_dados = matchLocal.anotacoes_dados;
+      }
+      await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [matchLocal.id]);
+    }
+  } catch (reconcileErr) {
+    console.warn('[saveLocalFotoExpress] Erro na reconciliação de foto express:', reconcileErr);
+  }
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio_express (

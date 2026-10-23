@@ -13,7 +13,7 @@ import {
   getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade,
   getDeletedEntityIds, clearDeletedEntityLocally, migrateLocalProjetoId, saveLocalVisitante
 } from '../database/db';
-import { Projeto, Visita, Relatorio, RelatorioExpress, Lembrete, Contato, Visitante } from '../types';
+import { Projeto, Visita, Relatorio, RelatorioExpress, FotoRelatorioExpress, Lembrete, Contato, Visitante } from '../types';
 import { notificationService } from './notificationService';
 import { screenConfigService } from './screenConfigService';
 import { ensureProjectFolders } from './appFilesService';
@@ -289,6 +289,7 @@ class SyncService {
             if (serverId && serverId !== item.entity_id) {
               await migrateLocalFotosRelatorioExpressId(item.entity_id, serverId);
               const db = await getDatabase();
+              await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
               await db.runAsync(
                 'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
                 [serverId, officialNumero || null, new Date().toISOString(), item.entity_id]
@@ -547,24 +548,56 @@ class SyncService {
         for (const exp of serverExpress) {
           await saveLocalRelatorioExpress(exp, 'synced');
           if (Array.isArray(exp.fotos)) {
+            // Busca fotos locais provisórias deste relatório para não perder arquivos locais file:// nem duplicar
+            const existingLocalFotos = await db.getAllAsync<FotoRelatorioExpress>(
+              'SELECT * FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?',
+              [exp.id, String(exp.id)]
+            );
+
             for (const f of exp.fotos) {
               const fullUrl = f.url?.startsWith('http')
                 ? f.url
                 : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
+
+              // Tenta casar com foto local existente por id, filename ou ordem
+              const match = existingLocalFotos.find(lf => 
+                lf.id === f.id || 
+                (f.filename && lf.filename === f.filename) ||
+                (lf.ordem === f.ordem)
+              );
+
+              const preservedUri = (match && match.uri_local && match.uri_local.startsWith('file://')) 
+                ? match.uri_local 
+                : fullUrl;
+              const preservedB64 = (match && match.base64) ? match.base64 : '';
+              const preservedAnot = (match && match.anotacoes_dados) ? match.anotacoes_dados : (f.anotacoes_dados || '');
+
+              if (match && match.id !== f.id) {
+                await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [match.id]);
+              }
+
               await saveLocalFotoExpress({
                 id: f.id,
                 relatorio_express_id: exp.id,
                 url: fullUrl,
                 filename: f.filename,
-                uri_local: fullUrl,
+                uri_local: preservedUri,
                 titulo: f.titulo || '',
                 legenda: f.legenda || '',
                 descricao: f.descricao || '',
                 local: f.local || '',
+                base64: preservedB64,
+                anotacoes_dados: preservedAnot,
                 ordem: f.ordem || 0,
                 sync_status: 'synced',
               }, 'synced');
             }
+
+            // Remove quaisquer fotos provisórias órfãs com id temporário que sobraram para este relatório
+            await db.runAsync(
+              'DELETE FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND id >= 1000000000',
+              [exp.id, String(exp.id)]
+            );
           }
         }
       }

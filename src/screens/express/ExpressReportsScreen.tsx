@@ -20,6 +20,7 @@ import {
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { generateReportPDF } from '../../services/pdfService';
 import { apiClient } from '../../services/api';
+import { syncService } from '../../services/syncService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio, Visitante, Relatorio, LegendaPredefinida } from '../../types';
@@ -567,15 +568,19 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     try {
       const fotosDb = await getLocalFotosExpress(item.id);
       if (fotosDb && fotosDb.length > 0) {
-        setAttachedPhotos(fotosDb.map(f => ({
-          id: f.id,
-          uri: f.uri_local || f.url || '',
-          base64: f.base64,
-          filename: f.filename,
-          legenda: f.legenda || '',
-          anotacoes_dados: f.anotacoes_dados,
-          local: f.local || item.obra_nome || '',
-        })));
+        setAttachedPhotos(
+          fotosDb
+            .filter(f => (f.uri_local && f.uri_local.startsWith('file://')) || (f.base64 && f.base64.length > 50) || (f.url && f.url.startsWith('http') && !f.url.endsWith('/uploads/') && !f.url.endsWith('null')))
+            .map(f => ({
+              id: f.id,
+              uri: f.uri_local || f.url || '',
+              base64: f.base64,
+              filename: f.filename,
+              legenda: f.legenda || '',
+              anotacoes_dados: f.anotacoes_dados,
+              local: f.local || item.obra_nome || '',
+            }))
+        );
       } else {
         setAttachedPhotos([]);
       }
@@ -616,14 +621,20 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               );
 
               const fotosDb = await getLocalFotosExpress(item.id);
-              const fotosPayload = (fotosDb || []).map(f => ({
-                uri_local: f.uri_local,
-                base64: f.base64,
-                imagem_base64: f.base64,
-                titulo: f.titulo,
-                legenda: f.legenda,
-                ordem: f.ordem,
-              }));
+              const fotosPayload = (fotosDb || [])
+                .filter(f => (f.uri_local && f.uri_local.startsWith('file://')) || (f.base64 && f.base64.length > 50) || (f.url && f.url.startsWith('http')))
+                .map((f, idx) => ({
+                  id: f.id,
+                  filename: f.filename,
+                  uri_local: f.uri_local,
+                  url: f.url,
+                  base64: f.base64,
+                  imagem_base64: f.base64,
+                  titulo: f.titulo,
+                  legenda: f.legenda,
+                  anotacoes_dados: f.anotacoes_dados,
+                  ordem: (f.ordem !== undefined && f.ordem !== null) ? f.ordem : idx,
+                }));
 
               await addToSyncQueue(
                 'relatorio_express',
@@ -638,7 +649,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 }
               );
 
-              if (isOnline) triggerSync();
+              if (isOnline) {
+                triggerSync();
+                syncService.syncAll().catch(() => null);
+              }
               await loadReports();
               Alert.alert('Sucesso', `Relatório Express ${item.numero} enviado para aprovação!`);
             } catch (e: any) {
@@ -1040,7 +1054,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       await saveLocalRelatorioExpress(newExp, 'pending');
 
       const isEditingExisting = Boolean(
-        editingReportIdRef.current && expressList.some(r => r.id === editingReportIdRef.current)
+        editingReportIdRef.current && (
+          (typeof editingReportIdRef.current === 'number' && editingReportIdRef.current < 1000000000) ||
+          expressList.some(r => r.id === editingReportIdRef.current || r.numero === currentNumber.trim())
+        )
       );
 
       await addToSyncQueue(
@@ -1061,7 +1078,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
       setLastAutoSaveTime(null);
 
-      if (isOnline) triggerSync();
+      if (isOnline) {
+        triggerSync();
+        syncService.syncAll().catch(() => null);
+      }
 
       setEditingReportId(null);
       editingReportIdRef.current = null;
@@ -1071,7 +1091,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         'Sucesso', 
         status === 'Aguardando Aprovação' 
           ? `Relatório Express ${currentNumber} enviado para aprovação com sucesso!` 
-          : `Rascunho do Relatório Express ${currentNumber} salvo localmente!`
+          : `Rascunho do Relatório Express ${currentNumber} salvo e sincronizado!`
       );
     } catch (err: any) {
       Alert.alert('Erro ao Salvar', err.message);
