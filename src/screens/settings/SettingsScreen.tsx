@@ -293,78 +293,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
         </View>
 
-        {/* SEÇÃO 1: COMUNICAÇÃO DO SITE COM O APK */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>COMUNICAÇÃO SITE & APLICATIVO</Text>
-        </View>
-
-        <View style={styles.connectionCard}>
-          <View style={styles.connectionHeader}>
-            <View style={styles.statusRow}>
-              <View
-                style={[
-                  styles.statusDot,
-                  {
-                    backgroundColor: !isOnline
-                      ? '#DC2626'
-                      : connectionStatus.success
-                      ? '#16A34A'
-                      : '#F59E0B',
-                  },
-                ]}
-              />
-              <Text style={styles.connectionStatusTitle}>
-                {!isOnline
-                  ? 'Celular Sem Internet'
-                  : connectionStatus.success
-                  ? 'Site e APK Conectados'
-                  : connectionStatus.tested
-                  ? 'Conexão Instável'
-                  : 'Verificando Comunicação...'}
-              </Text>
-            </View>
-
-            {connectionStatus.latencyMs !== undefined && connectionStatus.success ? (
-              <View style={styles.latencyBadge}>
-                <Ionicons name="speedometer-outline" size={12} color="#16A34A" />
-                <Text style={styles.latencyText}>{connectionStatus.latencyMs} ms</Text>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.connectionDetailsBox}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Servidor Backend:</Text>
-              <Text style={styles.detailValue} numberOfLines={1}>
-                {DEFAULT_API_URL.replace('https://', '')}
-              </Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Sincronização em Nuvem:</Text>
-              <Text style={[styles.detailValue, { color: isOnline ? '#16A34A' : '#DC2626' }]}>
-                {isOnline ? 'Ativa em Tempo Real' : 'Pendente (Modo Offline)'}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.testConnectionBtn}
-            activeOpacity={0.8}
-            onPress={() => testServerConnection(true)}
-            disabled={testingConnection}
-          >
-            {testingConnection ? (
-              <ActivityIndicator size="small" color="#2563EB" />
-            ) : (
-              <>
-                <Ionicons name="pulse-outline" size={16} color="#2563EB" />
-                <Text style={styles.testConnectionBtnText}>Testar Comunicação com o Site</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* SEÇÃO 2: PREFERÊNCIAS DO APLICATIVO */}
+        {/* SEÇÃO 1: PREFERÊNCIAS DO APLICATIVO */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>PREFERÊNCIAS DO APLICATIVO</Text>
         </View>

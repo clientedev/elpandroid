@@ -18,8 +18,14 @@ from models import RelatorioExpress, FotoRelatorioExpress, User, ChecklistPadrao
 logger = logging.getLogger(__name__)
 
 def generate_express_number():
-    """Gera o próximo número sequencial para Relatório Express (iniciando em EXP-0000)"""
+    """Gera o próximo número sequencial para Relatório Express de forma atômica e segura contra concorrência (iniciando em EXP-0000)"""
     try:
+        # Lock de transação PostgreSQL se disponível para prevenir concorrência
+        try:
+            db.session.execute(db.text("SELECT pg_advisory_xact_lock(987654321)"))
+        except Exception:
+            pass
+
         reports = RelatorioExpress.query.all()
         if not reports:
             return "EXP-0000"
@@ -51,18 +57,27 @@ def generate_express_number():
                 v = int(m_end.group(1))
                 if v < 1900 and v > max_seq:
                     max_seq = v
-        if max_seq < 0:
-            return "EXP-0000"
-        return f"EXP-{max_seq + 1:04d}"
+
+        proximo = max_seq + 1 if max_seq >= 0 else 0
+        tentativas = 0
+        while tentativas < 50:
+            candidato = f"EXP-{proximo:04d}"
+            existe = RelatorioExpress.query.filter_by(numero=candidato).first()
+            if not existe:
+                return candidato
+            proximo += 1
+            tentativas += 1
+        return f"EXP-{proximo:04d}"
     except Exception as e:
         logger.warning(f"Erro ao gerar número express: {e}")
-        return "EXP-0000"
+        count = RelatorioExpress.query.count()
+        return f"EXP-{count:04d}"
 
 
 @app.route('/relatorios-express')
 @login_required
 def express_reports_list():
-    """Lista todos os Relatórios Express com filtros"""
+    """Lista todos os Relatórios Express com filtros e controle de acesso a rascunhos"""
     try:
         page = request.args.get('page', 1, type=int)
         per_page = 20
@@ -71,6 +86,15 @@ def express_reports_list():
         search_query = request.args.get('q', '')
         
         query = RelatorioExpress.query
+
+        # Controle de visibilidade de rascunhos de outros usuários
+        if current_user and not current_user.is_admin_or_dev and not getattr(current_user, 'can_view_others_drafts', False):
+            query = query.filter(
+                db.or_(
+                    ~RelatorioExpress.status.in_(['Rascunho', 'Em preenchimento']),
+                    RelatorioExpress.autor_id == current_user.id
+                )
+            )
         
         if status_filter:
             if status_filter == 'Em preenchimento':

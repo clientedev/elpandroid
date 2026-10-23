@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, ScrollView 
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, ScrollView, Alert 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { Header } from '../../components/Header';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { getLocalProjetos, getLocalRelatorios, getLocalUsers } from '../../database/db';
 import { Projeto, Relatorio, User } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
-
-// Reference coordinate for SP / default position if user location unavailable
-const DEFAULT_USER_LAT = -23.5505;
-const DEFAULT_USER_LON = -46.6333;
 
 function calculateHaversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // km
@@ -35,12 +32,46 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [selectedStatus, setSelectedStatus] = useState<'Ativo' | 'Não Iniciado' | 'Pausado' | 'Concluído' | 'Todos'>('Ativo');
   const [refreshing, setRefreshing] = useState(false);
 
+  // Estados de Localização Real GPS & Ordenação por Proximidade
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'loading' | 'available' | 'denied' | 'disabled'>('loading');
+  const [sortByProximity, setSortByProximity] = useState(false);
+
   // Estados de Busca Avançada (Status, Tipo de Obra, Construtora, Funcionário, Responsável)
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [filterTipo, setFilterTipo] = useState('');
   const [filterConstrutora, setFilterConstrutora] = useState('');
   const [filterFuncionario, setFilterFuncionario] = useState('');
   const [filterResponsavel, setFilterResponsavel] = useState('');
+
+  const refreshUserLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationStatus('denied');
+        setUserCoords(null);
+        return null;
+      }
+      const hasServices = await Location.hasServicesEnabledAsync();
+      if (!hasServices) {
+        setLocationStatus('disabled');
+        setUserCoords(null);
+        return null;
+      }
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setUserCoords(coords);
+      setLocationStatus('available');
+      return coords;
+    } catch (err) {
+      console.warn('Erro ao obter localização do usuário:', err);
+      setLocationStatus('disabled');
+      setUserCoords(null);
+      return null;
+    }
+  }, []);
 
   const filterList = useCallback((
     data: Projeto[],
@@ -50,9 +81,11 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     fConstrutora: string,
     fFuncionario: string,
     fResponsavel: string,
-    uList: User[]
+    uList: User[],
+    currentProximitySort = sortByProximity,
+    currentCoords = userCoords
   ) => {
-    let result = data;
+    let result = [...data];
 
     // Filtro por Status
     if (statusTab !== 'Todos') {
@@ -99,11 +132,27 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
         (p.endereco && p.endereco.toLowerCase().includes(q))
       );
     }
+
+    // Ordenação por Proximidade GPS (Menor para maior distância)
+    if (currentProximitySort && currentCoords) {
+      result.sort((a, b) => {
+        const hasA = typeof a.latitude === 'number' && typeof a.longitude === 'number' && !isNaN(a.latitude) && !isNaN(a.longitude);
+        const hasB = typeof b.latitude === 'number' && typeof b.longitude === 'number' && !isNaN(b.latitude) && !isNaN(b.longitude);
+        if (!hasA && !hasB) return 0;
+        if (!hasA) return 1;
+        if (!hasB) return -1;
+        const distA = calculateHaversine(currentCoords.latitude, currentCoords.longitude, a.latitude!, a.longitude!);
+        const distB = calculateHaversine(currentCoords.latitude, currentCoords.longitude, b.latitude!, b.longitude!);
+        return distA - distB;
+      });
+    }
+
     setFilteredProjetos(result);
-  }, []);
+  }, [sortByProximity, userCoords]);
 
   const loadProjetos = useCallback(async () => {
     try {
+      const coords = await refreshUserLocation();
       const data = await getLocalProjetos();
       const allRels = await getLocalRelatorios();
       const localUsers = await getLocalUsers().catch(() => []);
@@ -115,19 +164,12 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
       }
       setRelatoriosCounts(counts);
 
-      // Sort by GPS distance (closest first)
-      const sortedByGps = [...data].sort((a, b) => {
-        const distA = a.latitude && a.longitude ? calculateHaversine(DEFAULT_USER_LAT, DEFAULT_USER_LON, a.latitude, a.longitude) : 9999;
-        const distB = b.latitude && b.longitude ? calculateHaversine(DEFAULT_USER_LAT, DEFAULT_USER_LON, b.latitude, b.longitude) : 9999;
-        return distA - distB;
-      });
-
-      setProjetos(sortedByGps);
-      filterList(sortedByGps, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers);
+      setProjetos(data);
+      filterList(data, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers, sortByProximity, coords);
     } catch (e) {
       console.warn('Erro ao carregar projetos:', e);
     }
-  }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList]);
+  }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList, refreshUserLocation, sortByProximity]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -340,6 +382,44 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
           </TouchableOpacity>
         </View>
 
+        {/* Barra de Ordenação por Proximidade GPS Real */}
+        <View style={styles.sortToolbarRow}>
+          <TouchableOpacity 
+            style={[styles.proximityBtn, sortByProximity && styles.proximityBtnActive]}
+            onPress={async () => {
+              const nextSort = !sortByProximity;
+              if (nextSort && !userCoords) {
+                const coords = await refreshUserLocation();
+                if (!coords) {
+                  Alert.alert(
+                    'Localização Necessária',
+                    'Para ordenar pela distância real, autorize a permissão de localização do aparelho e ative o GPS.'
+                  );
+                }
+              }
+              setSortByProximity(nextSort);
+              filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, users, nextSort, userCoords);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name={sortByProximity ? "navigate" : "navigate-outline"} 
+              size={14} 
+              color={sortByProximity ? "#FFFFFF" : "#0284C7"} 
+            />
+            <Text style={[styles.proximityBtnText, sortByProximity && styles.proximityBtnTextActive]}>
+              {sortByProximity ? 'Mais Próximas de Mim' : 'Ordenar por Proximidade (GPS)'}
+            </Text>
+          </TouchableOpacity>
+
+          {userCoords && (
+            <View style={styles.gpsActiveIndicator}>
+              <View style={styles.gpsPulseDot} />
+              <Text style={styles.gpsActiveText}>GPS Ativo</Text>
+            </View>
+          )}
+        </View>
+
         {/* Painel Colapsável de Filtros Avançados */}
         {showAdvanced && (
           <View style={styles.advancedFilterPanel}>
@@ -520,9 +600,22 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
           </View>
         }
         renderItem={({ item }) => {
-          const distanceKm = item.latitude && item.longitude 
-            ? calculateHaversine(DEFAULT_USER_LAT, DEFAULT_USER_LON, item.latitude, item.longitude) 
-            : 1.2;
+          const hasValidCoords = typeof item.latitude === 'number' && typeof item.longitude === 'number' && !isNaN(item.latitude) && !isNaN(item.longitude);
+          let distanceLabel = '';
+          let isAccurateGps = false;
+
+          if (userCoords && hasValidCoords) {
+            const distKm = calculateHaversine(userCoords.latitude, userCoords.longitude, item.latitude!, item.longitude!);
+            distanceLabel = `📍 A ${distKm < 1 ? Math.round(distKm * 1000) + ' m' : distKm.toFixed(1) + ' km'} de você`;
+            isAccurateGps = true;
+          } else if (!hasValidCoords) {
+            distanceLabel = '📍 Coordenadas não cadastradas';
+          } else if (locationStatus === 'denied') {
+            distanceLabel = '📍 Permissão de GPS negada';
+          } else {
+            distanceLabel = '📍 GPS indisponível no dispositivo';
+          }
+
           const totalRels = relatoriosCounts[item.id] || 0;
 
           return (
@@ -550,9 +643,9 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
 
               {/* Tag de Proximidade GPS (Seção 15.4) */}
               <View style={styles.gpsBadgeRow}>
-                <View style={styles.gpsDistanceBadge}>
-                  <Text style={styles.gpsDistanceText}>
-                    📍 A {distanceKm} km de você
+                <View style={[styles.gpsDistanceBadge, isAccurateGps && styles.gpsDistanceBadgeAccurate]}>
+                  <Text style={[styles.gpsDistanceText, isAccurateGps && styles.gpsDistanceTextAccurate]}>
+                    {distanceLabel}
                   </Text>
                 </View>
 
@@ -967,5 +1060,65 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     marginTop: 4,
+  },
+  sortToolbarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingHorizontal: 2,
+  },
+  proximityBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  proximityBtnActive: {
+    backgroundColor: '#0284C7',
+    borderColor: '#0284C7',
+  },
+  proximityBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0284C7',
+  },
+  proximityBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  gpsActiveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  gpsPulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#10B981',
+  },
+  gpsActiveText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#059669',
+  },
+  gpsDistanceBadgeAccurate: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
+  },
+  gpsDistanceTextAccurate: {
+    color: '#1D4ED8',
+    fontWeight: '600',
   },
 });

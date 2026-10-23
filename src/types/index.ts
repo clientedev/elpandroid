@@ -10,6 +10,8 @@ export interface User {
   telefone?: string;
   cor_agenda?: string;
   ativo?: boolean;
+  can_view_others_drafts?: boolean;
+  notification_preferences?: string;
   primeiro_login?: boolean;
   tipo_acesso?: 'admin' | 'master' | 'aprovador' | 'funcionario' | 'visualizador';
   created_at?: string;

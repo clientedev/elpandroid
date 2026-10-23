@@ -669,6 +669,9 @@ def init_database():
             # Ensure uuid and audit columns exist in relatorios table
             ensure_relatorios_uuid_columns()
 
+            # Ensure user draft and notification preferences columns exist
+            ensure_user_permissions_columns()
+
             # Ensure imported legacy users exist
             sync_imported_legacy_users()
 
@@ -676,6 +679,28 @@ def init_database():
             ensure_user_app_customizations_table()
     except Exception as e:
         logging.error(f"Database initialization error: {e}")
+
+def ensure_user_permissions_columns():
+    """Garante a existência das colunas can_view_others_drafts e notification_preferences na tabela users"""
+    try:
+        with db.engine.connect() as conn:
+            dialect = db.engine.dialect.name
+            if dialect == 'postgresql':
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS can_view_others_drafts BOOLEAN DEFAULT FALSE;"))
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_preferences TEXT;"))
+                conn.commit()
+                logging.info("✅ Colunas can_view_others_drafts e notification_preferences verificadas/adicionadas no PostgreSQL")
+            elif dialect == 'sqlite':
+                res = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+                col_names = [r[1] for r in res]
+                if 'can_view_others_drafts' not in col_names:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN can_view_others_drafts BOOLEAN DEFAULT 0;"))
+                if 'notification_preferences' not in col_names:
+                    conn.execute(text("ALTER TABLE users ADD COLUMN notification_preferences TEXT;"))
+                conn.commit()
+                logging.info("✅ Colunas can_view_others_drafts e notification_preferences verificadas/adicionadas no SQLite")
+    except Exception as e:
+        logging.warning(f"⚠️ Erro ao verificar/adicionar colunas de permissões em users: {e}")
 
 def ensure_user_app_customizations_table():
     """Garante que a tabela user_app_customizations existe no banco de dados"""
@@ -751,6 +776,7 @@ if os.environ.get("RAILWAY_ENVIRONMENT") or (os.environ.get("DATABASE_URL") and 
             create_default_checklists()
             create_default_legendas()
             ensure_relatorios_uuid_columns()
+            ensure_user_permissions_columns()
             sync_imported_legacy_users()
             ensure_user_app_customizations_table()
 

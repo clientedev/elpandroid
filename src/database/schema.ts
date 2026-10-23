@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS users (
   cargo TEXT,
   telefone TEXT,
   cor_agenda TEXT,
-  ativo INTEGER DEFAULT 1
+  ativo INTEGER DEFAULT 1,
+  can_view_others_drafts INTEGER DEFAULT 0,
+  notification_preferences TEXT
 );
 
 CREATE TABLE IF NOT EXISTS projetos (

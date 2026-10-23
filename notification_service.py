@@ -53,7 +53,34 @@ class NotificationService:
         try:
             from models import Notificacao, User
             
-            # Verificação de Política de Notificação Dinâmica
+            # 1. Verificação de Preferências Individuais do Usuário
+            target_user = User.query.get(user_id)
+            if target_user and target_user.notification_preferences:
+                try:
+                    prefs = json.loads(target_user.notification_preferences)
+                    if isinstance(prefs, dict) and tipo in prefs:
+                        if not bool(prefs[tipo]):
+                            logger.info(f"🚫 [PREFERÊNCIA INDIVIDUAL] Usuário {user_id} (@{target_user.username}) desativou notificações do tipo '{tipo}'.")
+                            return {'success': True, 'skipped': True, 'reason': f"Categoria '{tipo}' desativada pelo usuário."}
+                except Exception as pref_err:
+                    logger.debug(f"Aviso ao consultar preferências do usuário {user_id}: {pref_err}")
+
+            # 2. Proteção contra disparos duplicados nos últimos 60 segundos
+            from datetime import timedelta
+            from models import brazil_now
+            agora = brazil_now()
+            limite_dup = agora - timedelta(seconds=60)
+            dup = Notificacao.query.filter(
+                Notificacao.user_id == user_id,
+                Notificacao.tipo == tipo,
+                Notificacao.mensagem == mensagem,
+                Notificacao.created_at >= limite_dup
+            ).first()
+            if dup:
+                logger.info(f"🚫 [DEDUPLICAÇÃO] Notificação duplicada recente ignorada para usuário {user_id}, tipo '{tipo}'.")
+                return {'success': True, 'skipped': True, 'reason': 'Duplicação recente evitada.'}
+
+            # 3. Verificação de Política de Notificação Dinâmica Global
             try:
                 from notification_policy_service import notification_policy_service
                 if not notification_policy_service.should_notify(tipo, channel='sistema'):

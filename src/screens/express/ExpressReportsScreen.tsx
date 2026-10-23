@@ -162,7 +162,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const loadReports = useCallback(async () => {
     try {
       const [data, vis] = await Promise.all([
-        getLocalRelatoriosExpress(),
+        getLocalRelatoriosExpress(user),
         getLocalVisitantes(),
       ]);
       const enriched = await Promise.all(

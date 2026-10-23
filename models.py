@@ -30,6 +30,8 @@ class User(UserMixin, db.Model):
     is_aprovador_express = db.Column(db.Boolean, default=False)  # Aprovador de Relatório Express
     primeiro_login = db.Column(db.Boolean, default=True)  # Campo para controlar primeiro login
     ativo = db.Column(db.Boolean, default=True)
+    can_view_others_drafts = db.Column(db.Boolean, default=False, nullable=False)  # Permissão individual para ver rascunhos de terceiros
+    notification_preferences = db.Column(db.Text, nullable=True)  # Preferências individuais de categorias de notificação (JSON)
     cor_agenda = db.Column(db.String(7), default="#0EA5E9")  # Cor HEX para agenda - Item 29
     fcm_token = db.Column(db.Text, nullable=True)  # Token do Firebase Cloud Messaging para push notifications
     reset_token = db.Column(db.String(100), nullable=True, unique=True)  # Token para recuperação de senha

@@ -97,11 +97,11 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
 
   const loadRelatorios = useCallback(async () => {
     try {
-      const data = await getLocalRelatorios().catch(e => {
+      const data = await getLocalRelatorios(undefined, user).catch(e => {
         console.warn('Erro ao carregar relatórios locais:', e);
         return [];
       });
-      const expData = await getLocalRelatoriosExpress().catch(e => {
+      const expData = await getLocalRelatoriosExpress(user).catch(e => {
         console.warn('Erro ao carregar relatórios express locais:', e);
         return [];
       });
@@ -130,8 +130,8 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
 
       if (isOnline) {
         syncService.syncAll().then(async () => {
-          const fresh = await getLocalRelatorios().catch(() => []);
-          const freshExp = await getLocalRelatoriosExpress().catch(() => []);
+          const fresh = await getLocalRelatorios(undefined, user).catch(() => []);
+          const freshExp = await getLocalRelatoriosExpress(user).catch(() => []);
           const freshExpAdapted: Relatorio[] = (freshExp || []).map(exp => ({
             id: exp.id,
             numero: exp.numero,

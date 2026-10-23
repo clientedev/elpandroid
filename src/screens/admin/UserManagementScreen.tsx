@@ -15,6 +15,16 @@ import { getLocalUsers, saveLocalUsers } from '../../database/db';
 
 type TipoAcesso = 'admin' | 'master' | 'aprovador' | 'funcionario' | 'visualizador';
 
+export const NOTIFICATION_CATEGORIES: { id: string; label: string; desc: string; icon: any; color: string }[] = [
+  { id: 'relatorio_pendente', label: 'Relatórios Pendentes', desc: 'Avisos quando um relatório é enviado para aprovação técnica', icon: 'document-text-outline', color: '#2563EB' },
+  { id: 'relatorio_aprovado', label: 'Relatórios Aprovados', desc: 'Avisos quando um relatório ou express é homologado', icon: 'checkmark-circle-outline', color: '#10B981' },
+  { id: 'relatorio_reprovado', label: 'Correções Solicitadas', desc: 'Avisos de relatórios reprovados ou com ajustes pendentes', icon: 'alert-circle-outline', color: '#EF4444' },
+  { id: 'relatorio_editado', label: 'Relatórios Editados', desc: 'Avisos de alterações realizadas em relatórios já existentes', icon: 'create-outline', color: '#8B5CF6' },
+  { id: 'obra_criada', label: 'Novas Obras', desc: 'Avisos de novos canteiros ou obras cadastradas', icon: 'business-outline', color: '#F59E0B' },
+  { id: 'visita_pendente', label: 'Visitas Pendentes', desc: 'Lembretes de visitas técnicas agendadas no sistema', icon: 'calendar-outline', color: '#06B6D4' },
+  { id: 'sistema', label: 'Avisos do Sistema', desc: 'Comunicados globais, manutenções e alertas gerais', icon: 'notifications-outline', color: '#64748B' },
+];
+
 interface UserFormData {
   id?: number;
   username: string;
@@ -27,6 +37,8 @@ interface UserFormData {
   ativo: boolean;
   is_master?: boolean;
   is_aprovador_express?: boolean;
+  can_view_others_drafts?: boolean;
+  notification_preferences?: Record<string, boolean>;
 }
 
 const ROLES_INFO: { [key in TipoAcesso]: { label: string; desc: string; color: string; bg: string; icon: any } } = {
@@ -98,6 +110,16 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
   const [formPassword, setFormPassword] = useState('');
   const [formAtivo, setFormAtivo] = useState(true);
   const [formAprovadorExpress, setFormAprovadorExpress] = useState(false);
+  const [formCanViewOthersDrafts, setFormCanViewOthersDrafts] = useState(false);
+  const [formNotificationPrefs, setFormNotificationPrefs] = useState<Record<string, boolean>>({
+    relatorio_pendente: true,
+    relatorio_aprovado: true,
+    relatorio_reprovado: true,
+    relatorio_editado: true,
+    obra_criada: true,
+    visita_pendente: true,
+    sistema: true,
+  });
 
   const isMasterOrAdmin = Boolean(
     currentUser?.is_master || currentUser?.username === 'admin'
@@ -205,6 +227,16 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
     setShowPassword(false);
     setFormAtivo(true);
     setFormAprovadorExpress(false);
+    setFormCanViewOthersDrafts(false);
+    setFormNotificationPrefs({
+      relatorio_pendente: true,
+      relatorio_aprovado: true,
+      relatorio_reprovado: true,
+      relatorio_editado: true,
+      obra_criada: true,
+      visita_pendente: true,
+      sistema: true,
+    });
     setModalVisible(true);
   }
 
@@ -214,6 +246,29 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
       userToEdit.is_master ? 'master' :
       userToEdit.is_aprovador_express ? 'aprovador' : 'funcionario'
     );
+
+    let parsedPrefs: Record<string, boolean> = {
+      relatorio_pendente: true,
+      relatorio_aprovado: true,
+      relatorio_reprovado: true,
+      relatorio_editado: true,
+      obra_criada: true,
+      visita_pendente: true,
+      sistema: true,
+    };
+
+    if (userToEdit.notification_preferences) {
+      if (typeof userToEdit.notification_preferences === 'string') {
+        try {
+          const parsed = JSON.parse(userToEdit.notification_preferences);
+          if (parsed && typeof parsed === 'object') {
+            parsedPrefs = { ...parsedPrefs, ...parsed };
+          }
+        } catch {}
+      } else if (userToEdit.notification_preferences && typeof userToEdit.notification_preferences === 'object') {
+        parsedPrefs = { ...parsedPrefs, ...(userToEdit.notification_preferences as Record<string, boolean>) };
+      }
+    }
 
     setEditingUser({
       id: userToEdit.id,
@@ -226,6 +281,8 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
       ativo: Boolean(userToEdit.ativo !== false),
       is_master: userToEdit.is_master,
       is_aprovador_express: userToEdit.is_aprovador_express,
+      can_view_others_drafts: Boolean(userToEdit.can_view_others_drafts),
+      notification_preferences: parsedPrefs,
     });
 
     setFormNome(userToEdit.nome_completo || userToEdit.username);
@@ -238,6 +295,8 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
     setShowPassword(false);
     setFormAtivo(Boolean(userToEdit.ativo !== false));
     setFormAprovadorExpress(Boolean(userToEdit.is_aprovador_express));
+    setFormCanViewOthersDrafts(Boolean(userToEdit.can_view_others_drafts));
+    setFormNotificationPrefs(parsedPrefs);
     setModalVisible(true);
   }
 
@@ -263,6 +322,8 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
         tipo_acesso: formTipoAcesso,
         ativo: formAtivo,
         is_aprovador_express: formAprovadorExpress || formTipoAcesso === 'admin' || formTipoAcesso === 'master' || formTipoAcesso === 'aprovador',
+        can_view_others_drafts: formCanViewOthersDrafts,
+        notification_preferences: formNotificationPrefs,
       };
 
       if (formPassword.trim()) {
@@ -622,6 +683,13 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                       <Text style={styles.detailText}>{item.telefone}</Text>
                     </View>
                   ) : null}
+
+                  {item.can_view_others_drafts ? (
+                    <View style={[styles.detailRow, styles.draftsAllowedTag]}>
+                      <Ionicons name="documents-outline" size={12} color="#0284C7" />
+                      <Text style={styles.draftsAllowedTagText}>Vê rascunhos da equipe</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* Barra de Ações do Card */}
@@ -886,6 +954,67 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                     disabled={editingUser?.username === 'admin'}
                   />
                 </View>
+              </View>
+
+              {/* SEÇÃO 5: PERMISSÃO DE RASCUNHOS DE TERCEIROS */}
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="documents-outline" size={16} color="#0284C7" />
+                  <Text style={styles.sectionTitle}>5. Acesso a Rascunhos da Equipe</Text>
+                </View>
+
+                <View style={[styles.switchGroup, { borderBottomWidth: 0 }]}>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <Text style={styles.switchTitle}>Visualizar Rascunhos de Outros Usuários</Text>
+                    <Text style={styles.switchSub}>
+                      {formCanViewOthersDrafts
+                        ? 'Habilitado: O usuário pode ver e abrir rascunhos criados por outros membros da equipe.'
+                        : 'Desabilitado: O usuário visualiza exclusivamente os próprios rascunhos salvos.'}
+                    </Text>
+                  </View>
+                  <Switch 
+                    value={formCanViewOthersDrafts}
+                    onValueChange={setFormCanViewOthersDrafts}
+                    trackColor={{ true: '#0284C7', false: '#CBD5E1' }}
+                  />
+                </View>
+              </View>
+
+              {/* SEÇÃO 6: PREFERÊNCIAS DE NOTIFICAÇÕES */}
+              <View style={styles.formSection}>
+                <View style={styles.sectionHeaderRow}>
+                  <Ionicons name="notifications-outline" size={16} color="#8B5CF6" />
+                  <Text style={styles.sectionTitle}>6. Notificações Individuais Recebidas</Text>
+                </View>
+                <Text style={styles.sectionInfoHelper}>
+                  Configure individualmente as categorias de alerta que este usuário receberá no dispositivo:
+                </Text>
+
+                {NOTIFICATION_CATEGORIES.map((cat, idx) => {
+                  const isEnabled = formNotificationPrefs[cat.id] !== false;
+                  const isLast = idx === NOTIFICATION_CATEGORIES.length - 1;
+                  return (
+                    <View key={cat.id} style={[styles.switchGroup, isLast && { borderBottomWidth: 0 }]}>
+                      <View style={{ marginRight: 10 }}>
+                        <Ionicons name={cat.icon} size={20} color={cat.color} />
+                      </View>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={styles.switchTitle}>{cat.label}</Text>
+                        <Text style={styles.switchSub}>{cat.desc}</Text>
+                      </View>
+                      <Switch 
+                        value={isEnabled}
+                        onValueChange={(val) => {
+                          setFormNotificationPrefs(prev => ({
+                            ...prev,
+                            [cat.id]: val,
+                          }));
+                        }}
+                        trackColor={{ true: cat.color, false: '#CBD5E1' }}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             </ScrollView>
 
@@ -1830,5 +1959,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sectionInfoHelper: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  draftsAllowedTag: {
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  draftsAllowedTagText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0284C7',
   },
 });

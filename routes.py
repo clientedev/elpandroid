@@ -818,7 +818,9 @@ def api_current_user():
         'is_developer': is_dev,
         'is_aprovador': current_user.is_aprovador,
         'nome_completo': getattr(current_user, 'nome_completo', None),
-        'cargo': getattr(current_user, 'cargo', None)
+        'cargo': getattr(current_user, 'cargo', None),
+        'can_view_others_drafts': bool(getattr(current_user, 'can_view_others_drafts', False)),
+        'notification_preferences': getattr(current_user, 'notification_preferences', None)
     })
 
 @app.route('/api/user-data-counts')
@@ -14436,7 +14438,19 @@ def api_relatorios_collection():
 
     # GET: Sempre ordenar do mais recente para o mais antigo
     try:
-        relatorios = Relatorio.query.order_by(
+        user = _resolve_mobile_user()
+        query = Relatorio.query
+
+        # Filtrar rascunhos de outros usuários se não tiver permissão can_view_others_drafts
+        if user and not user.is_admin_or_dev and not getattr(user, 'can_view_others_drafts', False):
+            query = query.filter(
+                db.or_(
+                    ~Relatorio.status.in_(['Rascunho', 'em_andamento', 'preenchimento']),
+                    Relatorio.autor_id == user.id
+                )
+            )
+
+        relatorios = query.order_by(
             db.func.coalesce(Relatorio.updated_at, Relatorio.data_criacao_local, Relatorio.created_at, Relatorio.data_relatorio).desc(),
             Relatorio.id.desc()
         ).limit(200).all()
@@ -14836,8 +14850,16 @@ def api_update_relatorio_status(relatorio_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+def _clean_express_photo_url(u):
+    if not u:
+        return ''
+    u_str = str(u).strip()
+    if '/uploads/' in u_str:
+        return '/uploads/' + u_str.split('/uploads/', 1)[1]
+    return u_str
+
 def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
-    """Salva fotos vinculadas a um Relatório Express de forma idempotente, impedindo duplicação no autosave e sincronização"""
+    """Salva fotos vinculadas a um Relatório Express de forma rigorosamente idempotente, impedindo qualquer duplicação no autosave e sincronização"""
     if not fotos_data or not isinstance(fotos_data, list):
         return 0
     upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
@@ -14846,7 +14868,12 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
     existing_fotos = FotoRelatorioExpress.query.filter_by(relatorio_express_id=rel_exp_id).all()
     existing_by_id = {f.id: f for f in existing_fotos}
     existing_by_hash = {f.imagem_hash: f for f in existing_fotos if f.imagem_hash}
-    existing_by_url = {f.url: f for f in existing_fotos if f.url}
+    existing_by_filename = {f.filename: f for f in existing_fotos if f.filename}
+    existing_by_url = {}
+    for f in existing_fotos:
+        if f.url:
+            existing_by_url[f.url] = f
+            existing_by_url[_clean_express_photo_url(f.url)] = f
     
     retained_photo_ids = set()
     saved = 0
@@ -14888,7 +14915,7 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
             except Exception as b64_err:
                 current_app.logger.warning(f"Erro ao decodificar base64 express: {b64_err}")
 
-        # 1. Tentar encontrar foto existente por ID (se válido e menor que 2 bilhões)
+        # 1. Tentar encontrar foto existente por ID (se válido e existente)
         foto_existente = None
         req_foto_id = f_data.get('id')
         if req_foto_id:
@@ -14899,14 +14926,34 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
             except Exception:
                 pass
 
-        # 2. Tentar encontrar por hash de imagem
+        # 2. Tentar encontrar por filename
+        raw_filename = f_data.get('filename')
+        raw_url = f_data.get('url') or f_data.get('uri_local') or f_data.get('uri') or ''
+        clean_url = _clean_express_photo_url(raw_url)
+        if not raw_filename and clean_url and clean_url.startswith('/uploads/'):
+            raw_filename = clean_url.replace('/uploads/', '', 1)
+
+        if not foto_existente and raw_filename and raw_filename in existing_by_filename:
+            foto_existente = existing_by_filename[raw_filename]
+
+        # 3. Tentar encontrar por hash de imagem
         if not foto_existente and img_hash and img_hash in existing_by_hash:
             foto_existente = existing_by_hash[img_hash]
 
-        # 3. Tentar encontrar por URL existente
-        raw_url = f_data.get('url') or f_data.get('uri_local') or f_data.get('uri') or ''
-        if not foto_existente and raw_url and raw_url in existing_by_url:
-            foto_existente = existing_by_url[raw_url]
+        # 4. Tentar encontrar por URL existente (absoluta ou relativa)
+        if not foto_existente and raw_url and (raw_url in existing_by_url or clean_url in existing_by_url):
+            foto_existente = existing_by_url.get(raw_url) or existing_by_url.get(clean_url)
+
+        # 5. Fallback por ordem se o ID for provisório do cliente e não enviou novos bytes
+        if not foto_existente and req_foto_id:
+            try:
+                if int(req_foto_id) >= 2000000000 and not img_bytes:
+                    for ef in existing_fotos:
+                        if ef.id not in retained_photo_ids and ef.ordem == idx:
+                            foto_existente = ef
+                            break
+            except Exception:
+                pass
 
         if foto_existente:
             # Já existe no relatório: atualiza metadados sem duplicar registro nem imagem
@@ -14921,7 +14968,7 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
             saved += 1
             continue
 
-        # 4. Nova foto: criar registro limpo
+        # 6. Nova foto: criar registro limpo
         foto = FotoRelatorioExpress(
             relatorio_express_id=rel_exp_id,
             titulo=f_data.get('titulo') or f"Foto Express {idx+1}",
@@ -14946,28 +14993,36 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
                 foto.url = f"/uploads/{fname}"
             except Exception as write_err:
                 current_app.logger.warning(f"Erro ao salvar arquivo de foto express: {write_err}")
-                foto.url = raw_url
+                foto.url = clean_url or raw_url
         else:
-            foto.url = raw_url
+            foto.filename = raw_filename or None
+            foto.url = clean_url or raw_url
 
         db.session.add(foto)
         db.session.flush()
         retained_photo_ids.add(foto.id)
-        existing_by_hash[foto.imagem_hash] = foto
+        if foto.imagem_hash:
+            existing_by_hash[foto.imagem_hash] = foto
+        if foto.filename:
+            existing_by_filename[foto.filename] = foto
+        if foto.url:
+            existing_by_url[foto.url] = foto
+            existing_by_url[_clean_express_photo_url(foto.url)] = foto
         existing_by_id[foto.id] = foto
         saved += 1
 
-    # 5. Expurgar fotos antigas do relatório que foram removidas pelo usuário
-    for old_foto in existing_fotos:
-        if old_foto.id not in retained_photo_ids:
-            try:
-                if old_foto.filename:
-                    old_path = os.path.join(upload_dir, old_foto.filename)
-                    if os.path.exists(old_path):
-                        os.remove(old_path)
-            except Exception:
-                pass
-            db.session.delete(old_foto)
+    # 7. Expurgar fotos antigas do relatório que foram removidas pelo usuário (somente se recebemos lista de fotos)
+    if fotos_data:
+        for old_foto in existing_fotos:
+            if old_foto.id not in retained_photo_ids:
+                try:
+                    if old_foto.filename:
+                        old_path = os.path.join(upload_dir, old_foto.filename)
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                except Exception:
+                    pass
+                db.session.delete(old_foto)
 
     db.session.flush()
     return saved
@@ -15144,7 +15199,19 @@ def api_relatorios_express_sync():
             return jsonify({'success': False, 'error': str(e)}), 500
 
     try:
-        rels = RelatorioExpress.query.order_by(
+        user = _resolve_mobile_user()
+        query = RelatorioExpress.query
+
+        # Filtrar rascunhos de outros usuários se não tiver permissão
+        if user and not user.is_admin_or_dev and not getattr(user, 'can_view_others_drafts', False):
+            query = query.filter(
+                db.or_(
+                    ~RelatorioExpress.status.in_(['Rascunho', 'Em preenchimento']),
+                    RelatorioExpress.autor_id == user.id
+                )
+            )
+
+        rels = query.order_by(
             db.func.coalesce(RelatorioExpress.updated_at, RelatorioExpress.created_at).desc(),
             RelatorioExpress.id.desc()
         ).limit(100).all()
@@ -15273,6 +15340,11 @@ def api_users_collection():
             if 'is_aprovador_express' in data:
                 is_aprovador_express = bool(data['is_aprovador_express'])
 
+            can_view_drafts = bool(data.get('can_view_others_drafts', False))
+            notif_prefs = data.get('notification_preferences')
+            if isinstance(notif_prefs, (dict, list)):
+                notif_prefs = json.dumps(notif_prefs)
+
             new_user = User(
                 username=username,
                 email=email,
@@ -15282,6 +15354,8 @@ def api_users_collection():
                 telefone=telefone,
                 is_master=is_master,
                 is_aprovador_express=is_aprovador_express,
+                can_view_others_drafts=can_view_drafts,
+                notification_preferences=notif_prefs,
                 ativo=bool(data.get('ativo', True))
             )
             db.session.add(new_user)
@@ -15298,6 +15372,8 @@ def api_users_collection():
                     'telefone': new_user.telefone,
                     'is_master': new_user.is_master,
                     'is_aprovador_express': new_user.is_aprovador_express,
+                    'can_view_others_drafts': new_user.can_view_others_drafts,
+                    'notification_preferences': new_user.notification_preferences,
                     'ativo': new_user.ativo,
                     'tipo_acesso': tipo_acesso
                 }
@@ -15332,6 +15408,8 @@ def api_users_collection():
                 'telefone': u.telefone or '',
                 'is_master': bool(u.is_master),
                 'is_aprovador_express': bool(u.is_aprovador_express),
+                'can_view_others_drafts': bool(getattr(u, 'can_view_others_drafts', False)),
+                'notification_preferences': getattr(u, 'notification_preferences', None),
                 'ativo': bool(u.ativo),
                 'tipo_acesso': tipo,
                 'cor_agenda': getattr(u, 'cor_agenda', '#0EA5E9') or '#0EA5E9',
@@ -15403,6 +15481,13 @@ def api_users_detail(user_id):
                 else:
                     target_user.ativo = bool(data['ativo'])
 
+            if 'can_view_others_drafts' in data:
+                target_user.can_view_others_drafts = bool(data['can_view_others_drafts'])
+
+            if 'notification_preferences' in data:
+                np = data['notification_preferences']
+                target_user.notification_preferences = json.dumps(np) if isinstance(np, (dict, list)) else np
+
             tipo_acesso = data.get('tipo_acesso')
             if tipo_acesso:
                 if target_user.username == 'admin':
@@ -15451,6 +15536,8 @@ def api_users_detail(user_id):
                     'cargo': target_user.cargo,
                     'is_master': target_user.is_master,
                     'is_aprovador_express': target_user.is_aprovador_express,
+                    'can_view_others_drafts': target_user.can_view_others_drafts,
+                    'notification_preferences': target_user.notification_preferences,
                     'ativo': target_user.ativo
                 }
             }), 200
@@ -15468,6 +15555,8 @@ def api_users_detail(user_id):
         'telefone': target_user.telefone,
         'is_master': target_user.is_master,
         'is_aprovador_express': target_user.is_aprovador_express,
+        'can_view_others_drafts': bool(getattr(target_user, 'can_view_others_drafts', False)),
+        'notification_preferences': getattr(target_user, 'notification_preferences', None),
         'ativo': target_user.ativo
     }), 200
 

@@ -84,8 +84,16 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   return dbInitPromise;
 }
 
-async function initDatabase(db: SQLite.SQLiteDatabase) {
+async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(CREATE_TABLES_SQL);
+
+  // Migration: ensure can_view_others_drafts and notification_preferences exist in users
+  try {
+    await db.execAsync('ALTER TABLE users ADD COLUMN can_view_others_drafts INTEGER DEFAULT 0;');
+  } catch {}
+  try {
+    await db.execAsync('ALTER TABLE users ADD COLUMN notification_preferences TEXT;');
+  } catch {}
 
   // Migration: ensure base64 column exists in fotos_relatorio
   try {
@@ -244,8 +252,9 @@ async function initDatabase(db: SQLite.SQLiteDatabase) {
 export async function saveLocalUser(user: User): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
-    `INSERT OR REPLACE INTO users (id, username, email, is_master, is_aprovador_express, cargo, telefone, cor_agenda, ativo)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO users (
+      id, username, email, is_master, is_aprovador_express, cargo, telefone, cor_agenda, ativo, can_view_others_drafts, notification_preferences
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       user.id,
       user.username,
@@ -255,7 +264,9 @@ export async function saveLocalUser(user: User): Promise<void> {
       user.cargo || '',
       user.telefone || '',
       user.cor_agenda || '#2563EB',
-      user.ativo !== false ? 1 : 0
+      user.ativo !== false ? 1 : 0,
+      user.can_view_others_drafts ? 1 : 0,
+      user.notification_preferences || null
     ]
   );
 }
@@ -268,7 +279,9 @@ export async function getLocalUser(id: number): Promise<User | null> {
     ...row,
     is_master: Boolean(row.is_master),
     is_aprovador_express: Boolean(row.is_aprovador_express),
-    ativo: Boolean(row.ativo)
+    ativo: Boolean(row.ativo),
+    can_view_others_drafts: Boolean(row.can_view_others_drafts),
+    notification_preferences: row.notification_preferences || null
   };
 }
 
@@ -582,14 +595,28 @@ export async function deleteLocalVisita(id: number): Promise<void> {
 }
 
 // ================= RELATORIOS =================
-export async function getLocalRelatorios(projetoId?: number): Promise<Relatorio[]> {
+export async function getLocalRelatorios(projetoId?: number, currentUser?: User | null): Promise<Relatorio[]> {
   const db = await getDatabase();
   // IMPORTANTE: GROUP BY r.id (chave primária) para não perder rascunhos com mesmo uuid/numero
   let query = 'SELECT r.*, COUNT(f.id) as fotos_count FROM relatorios r LEFT JOIN fotos_relatorio f ON r.id = f.relatorio_id';
+  const conditions: string[] = [];
   const params: any[] = [];
   if (projetoId) {
-    query += ' WHERE r.projeto_id = ?';
+    conditions.push('r.projeto_id = ?');
     params.push(projetoId);
+  }
+  const isMasterOrAdmin = Boolean(
+    currentUser?.is_master ||
+    currentUser?.cargo?.toLowerCase() === 'administrador' ||
+    currentUser?.cargo?.toLowerCase() === 'master' ||
+    currentUser?.username?.toLowerCase() === 'admin'
+  );
+  if (currentUser && !isMasterOrAdmin && !currentUser.can_view_others_drafts) {
+    conditions.push("(r.status NOT IN ('em_andamento', 'preenchimento', 'Rascunho') OR r.autor_id = ?)");
+    params.push(currentUser.id);
+  }
+  if (conditions.length > 0) {
+    query += ' WHERE ' + conditions.join(' AND ');
   }
   query += ' GROUP BY r.id ORDER BY CASE WHEN r.status = \'em_andamento\' THEN 0 ELSE 1 END ASC, COALESCE(NULLIF(r.data_criacao_local, ""), NULLIF(r.created_at, ""), NULLIF(r.updated_at, ""), NULLIF(r.data_sincronizacao, ""), r.data_relatorio) DESC, r.id DESC';
   return await db.getAllAsync<Relatorio>(query, params);
@@ -970,7 +997,15 @@ export async function updateLocalProjetoInfoTecnica(
 export async function getLocalUsers(): Promise<User[]> {
   const db = await getDatabase();
   try {
-    return await db.getAllAsync<User>('SELECT * FROM users ORDER BY username ASC');
+    const rows = await db.getAllAsync<any>('SELECT * FROM users ORDER BY username ASC');
+    return rows.map(r => ({
+      ...r,
+      is_master: Boolean(r.is_master),
+      is_aprovador_express: Boolean(r.is_aprovador_express),
+      ativo: Boolean(r.ativo),
+      can_view_others_drafts: Boolean(r.can_view_others_drafts),
+      notification_preferences: r.notification_preferences || null
+    }));
   } catch {
     return [];
   }
@@ -982,8 +1017,9 @@ export async function saveLocalUsers(users: User[]): Promise<void> {
     await db.runAsync(
       `INSERT OR REPLACE INTO users (
         id, username, email, nome_completo, is_master, is_aprovador_express,
-        cargo, telefone, cor_agenda, ativo, primeiro_login, tipo_acesso, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        cargo, telefone, cor_agenda, ativo, primeiro_login, tipo_acesso, created_at,
+        can_view_others_drafts, notification_preferences
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         Number(u.id) || Date.now(),
         String(u.username || ''),
@@ -997,7 +1033,9 @@ export async function saveLocalUsers(users: User[]): Promise<void> {
         u.ativo !== false ? 1 : 0,
         u.primeiro_login ? 1 : 0,
         String(u.tipo_acesso || 'funcionario'),
-        String(u.created_at || new Date().toISOString())
+        String(u.created_at || new Date().toISOString()),
+        u.can_view_others_drafts ? 1 : 0,
+        u.notification_preferences || null
       ]
     );
   }
@@ -1065,16 +1103,27 @@ export async function getNextExpressReportNumber(): Promise<string> {
   return `EXP-${String(nextSeq).padStart(4, '0')}`;
 }
 
-export async function getLocalRelatoriosExpress(): Promise<RelatorioExpress[]> {
+export async function getLocalRelatoriosExpress(currentUser?: User | null): Promise<RelatorioExpress[]> {
   try {
     const db = await getDatabase();
-    return await db.getAllAsync<RelatorioExpress>(`
+    let query = `
       SELECT r.*, COUNT(f.id) as fotos_count 
       FROM relatorios_express r 
       LEFT JOIN fotos_relatorio_express f ON r.id = f.relatorio_express_id 
-      GROUP BY r.id 
-      ORDER BY r.id DESC
-    `);
+    `;
+    const params: any[] = [];
+    const isMasterOrAdmin = Boolean(
+      currentUser?.is_master ||
+      currentUser?.cargo?.toLowerCase() === 'administrador' ||
+      currentUser?.cargo?.toLowerCase() === 'master' ||
+      currentUser?.username?.toLowerCase() === 'admin'
+    );
+    if (currentUser && !isMasterOrAdmin && !currentUser.can_view_others_drafts) {
+      query += ` WHERE (r.status NOT IN ('Rascunho', 'Em preenchimento') OR r.autor_id = ?) `;
+      params.push(currentUser.id);
+    }
+    query += ` GROUP BY r.id ORDER BY r.id DESC`;
+    return await db.getAllAsync<RelatorioExpress>(query, params);
   } catch (err) {
     console.warn('Erro ao buscar relatórios express:', err);
     return [];
@@ -1129,14 +1178,75 @@ export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus:
 export async function getLocalFotosExpress(relatorioExpressId: number | string): Promise<FotoRelatorioExpress[]> {
   const db = await getDatabase();
   const numId = Number(relatorioExpressId);
-  return await db.getAllAsync<FotoRelatorioExpress>(
+  const rows = await db.getAllAsync<FotoRelatorioExpress>(
     'SELECT * FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ? ORDER BY ordem ASC, id ASC',
     [numId, String(relatorioExpressId)]
   );
+
+  // Deduplicação não-destrutiva de fotos express: consolida fotos comprovadamente idênticas
+  const seenById = new Map<number, FotoRelatorioExpress>();
+  const seenByFilename = new Map<string, FotoRelatorioExpress>();
+  const seenByUri = new Map<string, FotoRelatorioExpress>();
+  const seenByB64 = new Map<string, FotoRelatorioExpress>();
+  const result: FotoRelatorioExpress[] = [];
+
+  for (const f of rows) {
+    const filenameKey = (f.filename && f.filename.trim()) || '';
+    const uriKey = (f.uri_local && f.uri_local.startsWith('file://')) ? f.uri_local.trim() : '';
+    const b64Key = (f.base64 && f.base64.length > 100) ? f.base64.substring(0, 80) : '';
+
+    let existing: FotoRelatorioExpress | undefined;
+    if (f.id && seenById.has(f.id)) {
+      existing = seenById.get(f.id);
+    } else if (filenameKey && seenByFilename.has(filenameKey)) {
+      existing = seenByFilename.get(filenameKey);
+    } else if (uriKey && seenByUri.has(uriKey)) {
+      existing = seenByUri.get(uriKey);
+    } else if (b64Key && seenByB64.has(b64Key)) {
+      existing = seenByB64.get(b64Key);
+    }
+
+    if (existing) {
+      if (f.uri_local && f.uri_local.startsWith('file://')) {
+        existing.uri_local = f.uri_local;
+      }
+      if (!existing.base64 && f.base64) existing.base64 = f.base64;
+      if (!existing.legenda && f.legenda) existing.legenda = f.legenda;
+      if (!existing.anotacoes_dados && f.anotacoes_dados) existing.anotacoes_dados = f.anotacoes_dados;
+      if (f.id && f.id < 2000000000) existing.id = f.id;
+      if (f.url) existing.url = f.url;
+      if (f.filename) existing.filename = f.filename;
+    } else {
+      result.push(f);
+      if (f.id) seenById.set(f.id, f);
+      if (filenameKey) seenByFilename.set(filenameKey, f);
+      if (uriKey) seenByUri.set(uriKey, f);
+      if (b64Key) seenByB64.set(b64Key, f);
+    }
+  }
+
+  return result.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
 }
 
 export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
+
+  // Reconciliação inteligente: se já existe foto com mesmo filename nesta obra, atualiza em vez de duplicar
+  try {
+    if (f.filename) {
+      const matchFile = await db.getFirstAsync<{ id: number; uri_local?: string }>(
+        'SELECT id, uri_local FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND filename = ? AND id != ? LIMIT 1',
+        [Number(f.relatorio_express_id) || 0, String(f.relatorio_express_id), f.filename, f.id || 0]
+      );
+      if (matchFile) {
+        // Se tinha URI local file://, preserva
+        const preservedUri = (matchFile.uri_local && matchFile.uri_local.startsWith('file://')) ? matchFile.uri_local : f.uri_local;
+        await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [matchFile.id]);
+        f.uri_local = preservedUri;
+      }
+    }
+  } catch {}
+
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio_express (
       id, relatorio_express_id, url, filename, uri_local, titulo, legenda, descricao, local, base64, anotacoes_dados, ordem, sync_status
