@@ -15047,20 +15047,17 @@ def api_relatorios_express_sync():
             except Exception:
                 pass
 
-            is_new_mobile = (req_id is not None and req_id >= 2000000000) or data.get('action') == 'create'
-
             existing = None
-            if not is_new_mobile:
-                if req_id and req_id < 2000000000:
-                    existing = RelatorioExpress.query.get(req_id)
-                if not existing and numero:
-                    existing = RelatorioExpress.query.filter_by(numero=numero).first()
-            else:
-                # É um novo relatório criado no mobile!
-                # Se o número já existir no servidor, gera novo número sequencial para não colidir nem sobrescrever
-                if numero:
-                    collision = RelatorioExpress.query.filter_by(numero=numero).first()
-                    if collision:
+            if req_id and req_id < 2000000000:
+                existing = RelatorioExpress.query.get(req_id)
+            if not existing and numero:
+                candidate = RelatorioExpress.query.filter_by(numero=numero).first()
+                if candidate:
+                    is_same_author = (candidate.autor_id == autor_id)
+                    is_draft = candidate.status in ['Rascunho', 'Em preenchimento', 'em_andamento']
+                    if is_same_author or is_draft or data.get('action') == 'update':
+                        existing = candidate
+                    elif data.get('action') == 'create' and not is_draft and not is_same_author:
                         try:
                             from routes_express import generate_express_number
                             numero = generate_express_number()

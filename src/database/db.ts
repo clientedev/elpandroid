@@ -1119,8 +1119,8 @@ export async function getLocalRelatoriosExpress(currentUser?: User | null): Prom
       currentUser?.username?.toLowerCase() === 'admin'
     );
     if (currentUser && !isMasterOrAdmin && !currentUser.can_view_others_drafts) {
-      query += ` WHERE (r.status NOT IN ('Rascunho', 'Em preenchimento') OR r.autor_id = ?) `;
-      params.push(currentUser.id);
+      query += ` WHERE (r.status NOT IN ('Rascunho', 'Em preenchimento', 'em_andamento') OR r.autor_id = ? OR r.autor_id = ? OR r.sync_status = 'pending') `;
+      params.push(Number(currentUser.id) || 0, String(currentUser.id));
     }
     query += ` GROUP BY r.id ORDER BY r.id DESC`;
     return await db.getAllAsync<RelatorioExpress>(query, params);
@@ -1142,15 +1142,20 @@ export async function getLocalRelatorioExpressById(id: number | string): Promise
 export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
 
-  // Previne sobrescrita indevida de relatórios diferentes por colisão de número
+  // Reconciliação se existir registro local provisório para o mesmo número
   try {
     if (r.numero && !r.numero.includes('Pendente')) {
-      const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios_express WHERE numero = ? AND id != ?', [r.numero, r.id]);
+      const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM relatorios_express WHERE numero = ? AND id != ? LIMIT 1', [r.numero, r.id]);
       if (existing) {
-        const freshNum = await getNextExpressReportNumber();
-        r.numero = freshNum;
-        if (!r.titulo || r.titulo === 'Relatório Express de Visita' || r.titulo.startsWith('Relatório Express EXP-')) {
-          r.titulo = `Relatório Express ${freshNum}`;
+        const numIncoming = Number(r.id);
+        const numExisting = Number(existing.id);
+        if (numIncoming < 2000000000 && numExisting >= 2000000000) {
+          // Relatório oficial do servidor substitui o temporário do mobile
+          await migrateLocalFotosRelatorioExpressId(numExisting, numIncoming);
+          await db.runAsync('DELETE FROM relatorios_express WHERE id = ?', [numExisting]);
+        } else if (numIncoming >= 2000000000 && numExisting < 2000000000) {
+          // O dispositivo já conhece o ID oficial do servidor para este relatório
+          r.id = numExisting;
         }
       }
     }
@@ -1237,7 +1242,7 @@ export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 
 
   // Reconciliação inteligente: se já existe foto com mesmo filename nesta obra, atualiza em vez de duplicar
   try {
-    if (f.filename) {
+    if (f.filename && f.filename.length > 8 && !f.filename.startsWith('photo_') && f.filename !== 'photo.jpg') {
       const matchFile = await db.getFirstAsync<{ id: number; uri_local?: string }>(
         'SELECT id, uri_local FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND filename = ? AND id != ? LIMIT 1',
         [Number(f.relatorio_express_id) || 0, String(f.relatorio_express_id), f.filename, f.id || 0]

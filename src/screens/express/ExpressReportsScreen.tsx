@@ -60,6 +60,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingReportId, setEditingReportId] = useState<number | null>(null);
+  const editingReportIdRef = React.useRef<number | null>(null);
+  const currentNumberRef = React.useRef<string>('EXP-0000');
 
   // Modal de Aprovação / Rejeição
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
@@ -220,16 +222,19 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         setIsAutoSaving(true);
 
         // Garante ID estável para este rascunho
-        let targetId = editingReportId;
+        let targetId = editingReportIdRef.current || editingReportId;
         if (!targetId) {
           targetId = Date.now();
+          editingReportIdRef.current = targetId;
           setEditingReportId(targetId);
         }
+
+        const currentNum = currentNumberRef.current || (numero && numero.startsWith('EXP-') ? numero : 'EXP-0000');
 
         const draftPayload = {
           editingReportId: targetId,
           titulo,
-          numero,
+          numero: currentNum,
           dataVisita,
           obraConstrutora,
           obraNome,
@@ -251,7 +256,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           checklist,
           attachedPhotos,
         };
-        await AsyncStorage.setItem('@elp_express_report_draft', JSON.stringify(draftPayload));
+        await AsyncStorage.setItem(`@elp_express_report_draft_${targetId}`, JSON.stringify(draftPayload));
 
         const techInfoJson = JSON.stringify({
           elementos_construtivos_base: techElementosBase.trim(),
@@ -270,9 +275,9 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
         const expDraft: RelatorioExpress = {
           id: targetId,
-          numero: numero || 'EXP-0000',
+          numero: currentNum,
           titulo: (!titulo || titulo.trim() === 'Relatório Express' || titulo.startsWith('Relatório Express EXP-'))
-            ? `Relatório Express ${numero || 'EXP-0000'}`
+            ? `Relatório Express ${currentNum}`
             : titulo.trim(),
           autor_id: user?.id || 1,
           autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
@@ -289,20 +294,13 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           fotos_count: attachedPhotos.length,
         };
 
-        // Salva imediatamente no SQLite local para aparecer na lista como Rascunho
+        // Salva imediatamente no SQLite local para persistir com segurança
         await saveLocalRelatorioExpress(expDraft, 'pending');
-
-        // Limpa fotos anteriores do rascunho temporário para evitar duplicação a cada ciclo de autosave
-        const db = await getDatabase();
-        await db.runAsync(
-          'DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?;',
-          [targetId, String(targetId)]
-        );
 
         for (let i = 0; i < attachedPhotos.length; i++) {
           const ap = attachedPhotos[i];
           const photoId = ap.id || (Date.now() + i + 1);
-          ap.id = photoId; // Fixa o ID no objeto para os próximos ciclos de autosave
+          ap.id = photoId;
           const fotoObj: FotoRelatorioExpress = {
             id: photoId,
             relatorio_express_id: targetId,
@@ -319,22 +317,19 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         }
 
         setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-
-        // Atualiza a lista na tela principal em segundo plano
-        loadReports();
       } catch (errDraft) {
         console.warn('[Express] Erro no autosave de rascunho:', errDraft);
       } finally {
         setIsAutoSaving(false);
       }
-    }, 1200);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [
-    modalVisible, editingReportId, titulo, numero, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, observacoes,
+    modalVisible, titulo, numero, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, observacoes,
     techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa,
     techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor,
-    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist, attachedPhotos, loadReports
+    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist, attachedPhotos
   ]);
 
   async function handleClearDraft() {
@@ -382,10 +377,12 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       console.warn('Erro ao calcular próximo EXP:', e);
     }
 
-    // Limpa imediatamente qualquer foto ou rascunho anterior para evitar contaminação
-    await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
+    const newId = Date.now();
+    setEditingReportId(newId);
+    editingReportIdRef.current = newId;
+    setNumero(nextNum);
+    currentNumberRef.current = nextNum;
     setAttachedPhotos([]);
-    setEditingReportId(null);
     setObraNome('');
     setObraConstrutora('');
     setObraEndereco('');
@@ -409,7 +406,6 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setLastAutoSaveTime(null);
 
     setTitulo(`Relatório Express ${nextNum}`);
-    setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
     setModalVisible(true);
   }
@@ -418,6 +414,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setModalVisible(false);
     setAttachedPhotos([]);
     setEditingReportId(null);
+    editingReportIdRef.current = null;
+    currentNumberRef.current = 'EXP-0000';
     setObraNome('');
     setObraConstrutora('');
     setObraEndereco('');
@@ -439,7 +437,6 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setShowTechInfo(false);
     setShowChecklist(false);
     setLastAutoSaveTime(null);
-    AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
     loadReports();
   }
 
@@ -449,8 +446,12 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       nextNum = await getNextExpressReportNumber();
     } catch {}
 
-    setTitulo(`Relatório Express ${nextNum} (Cópia)`);
+    const newId = Date.now();
+    setEditingReportId(newId);
+    editingReportIdRef.current = newId;
     setNumero(nextNum);
+    currentNumberRef.current = nextNum;
+    setTitulo(`Relatório Express ${nextNum} (Cópia)`);
     setDataVisita(new Date().toISOString().split('T')[0]);
     setObraConstrutora(original.obra_construtora || '');
     setObraNome(original.obra_nome || '');
@@ -458,7 +459,6 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setAcompanhantes(original.acompanhantes || '');
     setObservacoes(original.observacoes_finais || '');
     setAttachedPhotos([]);
-    setEditingReportId(null);
 
     // Extrair info técnica
     if (original.informacoes_tecnicas) {
@@ -501,9 +501,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   async function handleEditReport(item: RelatorioExpress) {
     setAttachedPhotos([]);
     setEditingReportId(item.id);
+    editingReportIdRef.current = item.id;
     const itemNum = item.numero || 'EXP-0000';
     setTitulo(item.titulo || `Relatório Express ${itemNum}`);
     setNumero(itemNum);
+    currentNumberRef.current = itemNum;
     setDataVisita(item.data_relatorio ? item.data_relatorio.split('T')[0] : new Date().toISOString().split('T')[0]);
     setObraConstrutora(item.obra_construtora || '');
     setObraNome(item.obra_nome || '');
@@ -824,9 +826,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       const projName = obraNome.trim() || 'Obra_Express';
       const photo = await takePhoto(projName);
       if (photo) {
+        const photoId = Date.now() + Math.floor(Math.random() * 1000);
         setAttachedPhotos(prev => [
           ...prev,
           {
+            id: photoId,
             uri: photo.uri,
             base64: photo.base64,
             filename: photo.filename,
@@ -852,9 +856,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       const projName = obraNome.trim() || 'Obra_Express';
       const photo = await pickImage(projName);
       if (photo) {
+        const photoId = Date.now() + Math.floor(Math.random() * 1000);
         setAttachedPhotos(prev => [
           ...prev,
           {
+            id: photoId,
             uri: photo.uri,
             base64: photo.base64,
             filename: photo.filename,
@@ -933,11 +939,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
     setLoading(true);
     try {
-      const expId = editingReportId || Date.now();
-      let currentNumber = (editingReportId && numero) ? numero : (numero.startsWith('EXP-') ? numero : await getNextExpressReportNumber());
-      if (!editingReportId) {
-        currentNumber = await getNextExpressReportNumber();
-      }
+      const expId = editingReportIdRef.current || editingReportId || Date.now();
+      const currentNumber = currentNumberRef.current || (numero && numero.startsWith('EXP-') ? numero : await getNextExpressReportNumber());
 
       const finalTitle = (!titulo || titulo.trim() === 'Relatório Express de Visita' || titulo.startsWith('Relatório Express EXP-') || titulo === 'Relatório Express')
         ? `Relatório Express ${currentNumber}`
@@ -961,14 +964,21 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       const techInfoJson = JSON.stringify(techInfoPayload);
       const checklistJson = JSON.stringify(checklist);
 
-      // Se for edição, limpa fotos antigas deste relatório express localmente antes de regravar
-      if (editingReportId) {
-        try {
-          const db = await getDatabase();
-          await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?;', [editingReportId, String(editingReportId)]);
-        } catch (delFotosErr) {
-          console.warn('Erro ao limpar fotos antigas do relatório express:', delFotosErr);
+      // Limpeza não-destrutiva: remove apenas fotos excluídas pelo usuário deste relatório
+      const keepPhotoIds = new Set(attachedPhotos.map(p => p.id).filter(Boolean));
+      try {
+        const db = await getDatabase();
+        const existingFotos = await db.getAllAsync<{ id: number }>(
+          'SELECT id FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?',
+          [expId, String(expId)]
+        );
+        for (const ef of existingFotos) {
+          if (!keepPhotoIds.has(ef.id)) {
+            await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [ef.id]);
+          }
         }
+      } catch (delErr) {
+        console.warn('[Express] Erro na reconciliação de fotos:', delErr);
       }
 
       // Salva fotos anexadas com legenda e dados de anotação
@@ -978,6 +988,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         let b64 = ap.base64;
         if (!b64 && ap.uri) {
           b64 = await readPhotoBase64(ap.uri);
+          ap.base64 = b64;
         }
 
         const fotoObj: FotoRelatorioExpress = {
@@ -986,7 +997,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           uri_local: ap.uri,
           base64: b64,
           local: ap.local || obraNome.trim(),
-          titulo: `Foto ${i + 1} - ${obraNome.trim()}`,
+          titulo: `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
           legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
           anotacoes_dados: ap.anotacoes_dados,
           ordem: i,
@@ -1028,25 +1039,32 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
       await saveLocalRelatorioExpress(newExp, 'pending');
 
+      const isEditingExisting = Boolean(
+        editingReportIdRef.current && expressList.some(r => r.id === editingReportIdRef.current)
+      );
+
       await addToSyncQueue(
         'relatorio_express',
         expId,
-        editingReportId ? 'update' : 'create',
+        isEditingExisting ? 'update' : 'create',
         '/api/relatorios-express',
         'POST',
         {
           ...newExp,
+          action: isEditingExisting ? 'update' : 'create',
           fotos: savedFotosList
         }
       );
 
       // Limpa rascunho após salvar com sucesso
+      await AsyncStorage.removeItem(`@elp_express_report_draft_${expId}`).catch(() => null);
       await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
       setLastAutoSaveTime(null);
 
       if (isOnline) triggerSync();
 
       setEditingReportId(null);
+      editingReportIdRef.current = null;
       setModalVisible(false);
       await loadReports();
       Alert.alert(
