@@ -382,59 +382,64 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       console.warn('Erro ao calcular próximo EXP:', e);
     }
 
-    let loadedPhotosFromDraft: AttachedExpressPhoto[] = [];
-
-    try {
-      const draftStr = await AsyncStorage.getItem('@elp_express_report_draft');
-      if (draftStr) {
-        const d = JSON.parse(draftStr);
-        if (d.obraNome) setObraNome(d.obraNome);
-        if (d.obraConstrutora) setObraConstrutora(d.obraConstrutora);
-        if (d.obraEndereco) setObraEndereco(d.obraEndereco);
-        if (d.observacoes) setObservacoes(d.observacoes);
-        if (d.acompanhantes) setAcompanhantes(d.acompanhantes);
-
-        if (d.techElementosBase) setTechElementosBase(d.techElementosBase);
-        if (d.techChapiscoColante) setTechChapiscoColante(d.techChapiscoColante);
-        if (d.techChapiscoAlvenaria) setTechChapiscoAlvenaria(d.techChapiscoAlvenaria);
-        if (d.techArgamassaEmboco) setTechArgamassaEmboco(d.techArgamassaEmboco);
-        if (d.techFormaAplicacaoArgamassa) setTechFormaAplicacaoArgamassa(d.techFormaAplicacaoArgamassa);
-        if (d.techAcabamentosRevestimento) setTechAcabamentosRevestimento(d.techAcabamentosRevestimento);
-        if (d.techAcabamentoPeitoris) setTechAcabamentoPeitoris(d.techAcabamentoPeitoris);
-        if (d.techAcabamentoMuretas) setTechAcabamentoMuretas(d.techAcabamentoMuretas);
-        if (d.techDefinicaoFrisosCor) setTechDefinicaoFrisosCor(d.techDefinicaoFrisosCor);
-        if (d.techDefinicaoFaceInferiorAbas) setTechDefinicaoFaceInferiorAbas(d.techDefinicaoFaceInferiorAbas);
-        if (d.techObservacoesFachada) setTechObservacoesFachada(d.techObservacoesFachada);
-        if (d.techOutrasObservacoes) setTechOutrasObservacoes(d.techOutrasObservacoes);
-
-        if (d.checklist && Array.isArray(d.checklist)) {
-          setChecklist(d.checklist);
-        } else {
-          setChecklist(DEFAULT_CHECKLIST);
-        }
-
-        if (d.attachedPhotos && Array.isArray(d.attachedPhotos)) {
-          loadedPhotosFromDraft = d.attachedPhotos;
-        }
-
-        setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-      } else {
-        setChecklist(DEFAULT_CHECKLIST);
-      }
-    } catch (e) {
-      setChecklist(DEFAULT_CHECKLIST);
-    }
+    // Limpa imediatamente qualquer foto ou rascunho anterior para evitar contaminação
+    await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
+    setAttachedPhotos([]);
+    setEditingReportId(null);
+    setObraNome('');
+    setObraConstrutora('');
+    setObraEndereco('');
+    setAcompanhantes('');
+    setObservacoes('');
+    setTechElementosBase('');
+    setTechChapiscoColante('');
+    setTechChapiscoAlvenaria('');
+    setTechArgamassaEmboco('');
+    setTechFormaAplicacaoArgamassa('');
+    setTechAcabamentosRevestimento('');
+    setTechAcabamentoPeitoris('');
+    setTechAcabamentoMuretas('');
+    setTechDefinicaoFrisosCor('');
+    setTechDefinicaoFaceInferiorAbas('');
+    setTechObservacoesFachada('');
+    setTechOutrasObservacoes('');
+    setChecklist(DEFAULT_CHECKLIST);
+    setShowTechInfo(false);
+    setShowChecklist(false);
+    setLastAutoSaveTime(null);
 
     setTitulo(`Relatório Express ${nextNum}`);
     setNumero(nextNum);
     setDataVisita(new Date().toISOString().split('T')[0]);
-    setAttachedPhotos(loadedPhotosFromDraft);
-    setEditingReportId(null);
     setModalVisible(true);
   }
 
   function handleCloseModal() {
     setModalVisible(false);
+    setAttachedPhotos([]);
+    setEditingReportId(null);
+    setObraNome('');
+    setObraConstrutora('');
+    setObraEndereco('');
+    setAcompanhantes('');
+    setObservacoes('');
+    setTechElementosBase('');
+    setTechChapiscoColante('');
+    setTechChapiscoAlvenaria('');
+    setTechArgamassaEmboco('');
+    setTechFormaAplicacaoArgamassa('');
+    setTechAcabamentosRevestimento('');
+    setTechAcabamentoPeitoris('');
+    setTechAcabamentoMuretas('');
+    setTechDefinicaoFrisosCor('');
+    setTechDefinicaoFaceInferiorAbas('');
+    setTechObservacoesFachada('');
+    setTechOutrasObservacoes('');
+    setChecklist(DEFAULT_CHECKLIST);
+    setShowTechInfo(false);
+    setShowChecklist(false);
+    setLastAutoSaveTime(null);
+    AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
     loadReports();
   }
 
@@ -494,6 +499,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   }
 
   async function handleEditReport(item: RelatorioExpress) {
+    setAttachedPhotos([]);
     setEditingReportId(item.id);
     const itemNum = item.numero || 'EXP-0000';
     setTitulo(item.titulo || `Relatório Express ${itemNum}`);

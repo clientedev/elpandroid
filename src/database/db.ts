@@ -1176,10 +1176,14 @@ export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus:
 }
 
 export async function getLocalFotosExpress(relatorioExpressId: number | string): Promise<FotoRelatorioExpress[]> {
-  const db = await getDatabase();
+  if (!relatorioExpressId) return [];
   const numId = Number(relatorioExpressId);
+  if (isNaN(numId) && typeof relatorioExpressId !== 'string') return [];
+  if (numId === 0 && (relatorioExpressId === 0 || relatorioExpressId === '0')) return [];
+
+  const db = await getDatabase();
   const rows = await db.getAllAsync<FotoRelatorioExpress>(
-    'SELECT * FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ? ORDER BY ordem ASC, id ASC',
+    'SELECT * FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND relatorio_express_id IS NOT NULL AND relatorio_express_id != 0 AND relatorio_express_id != "" ORDER BY ordem ASC, id ASC',
     [numId, String(relatorioExpressId)]
   );
 

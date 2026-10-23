@@ -342,12 +342,12 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                     } catch {}
                   }
                   if ((item as any).is_express) {
-                    navigation.navigate('ReportDetailScreen', { reportId: item.id });
+                    navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true });
                   } else {
                     navigation.navigate('ReportFormScreen', { reportId: item.id });
                   }
                 } else {
-                  navigation.navigate('ReportDetailScreen', { reportId: item.id });
+                  navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: Boolean((item as any).is_express) });
                 }
               }}
             >

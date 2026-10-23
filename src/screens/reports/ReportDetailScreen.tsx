@@ -44,6 +44,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
 
   async function loadReport() {
     try {
+      setFotos([]);
       const isRouteExpress = Boolean(route.params?.isExpress);
       let r: any = null;
       let isExpress = isRouteExpress;
@@ -73,36 +74,33 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
             is_express: true,
           };
         }
-      }
-
-      if (!r) {
+      } else {
         r = await getLocalRelatorioById(reportId);
-      }
-
-      if (!r && !isExpress) {
-        const exp = await getLocalRelatorioExpressById(reportId);
-        if (exp) {
-          isExpress = true;
-          r = {
-            id: exp.id,
-            numero: exp.numero,
-            titulo: exp.titulo || `Relatório Express ${exp.numero}`,
-            projeto_id: 0,
-            projeto_nome: exp.obra_nome || 'Obra Express',
-            projeto_construtora: exp.obra_construtora,
-            projeto_endereco: exp.obra_endereco,
-            autor_id: exp.autor_id || 1,
-            autor_nome: exp.autor_nome || 'Fiscal Técnico',
-            data_relatorio: exp.data_relatorio,
-            status: exp.status as any,
-            sync_status: exp.sync_status as any,
-            fotos_count: exp.fotos_count || 0,
-            observacoes_finais: exp.observacoes_finais,
-            informacoes_tecnicas: exp.informacoes_tecnicas,
-            checklist_data: exp.checklist_data,
-            acompanhantes: exp.acompanhantes,
-            is_express: true,
-          };
+        if (!r) {
+          const exp = await getLocalRelatorioExpressById(reportId);
+          if (exp) {
+            isExpress = true;
+            r = {
+              id: exp.id,
+              numero: exp.numero,
+              titulo: exp.titulo || `Relatório Express ${exp.numero}`,
+              projeto_id: 0,
+              projeto_nome: exp.obra_nome || 'Obra Express',
+              projeto_construtora: exp.obra_construtora,
+              projeto_endereco: exp.obra_endereco,
+              autor_id: exp.autor_id || 1,
+              autor_nome: exp.autor_nome || 'Fiscal Técnico',
+              data_relatorio: exp.data_relatorio,
+              status: exp.status as any,
+              sync_status: exp.sync_status as any,
+              fotos_count: exp.fotos_count || 0,
+              observacoes_finais: exp.observacoes_finais,
+              informacoes_tecnicas: exp.informacoes_tecnicas,
+              checklist_data: exp.checklist_data,
+              acompanhantes: exp.acompanhantes,
+              is_express: true,
+            };
+          }
         }
       }
 
@@ -135,8 +133,9 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
       setRelatorio(r);
 
       let f: any[] = [];
+      const targetId = (r && r.id) ? r.id : reportId;
       if (isExpress || (r as any)?.is_express) {
-        const expFotos = await getLocalFotosExpress(reportId);
+        const expFotos = await getLocalFotosExpress(targetId);
         f = (expFotos || []).map(ef => ({
           id: ef.id,
           relatorio_id: ef.relatorio_express_id,
@@ -149,7 +148,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           anotacoes_dados: ef.anotacoes_dados,
         }));
       } else {
-        f = (await getLocalFotos(reportId, r?.uuid)) || [];
+        f = (await getLocalFotos(targetId, r?.uuid)) || [];
       }
       setFotos(f);
     } catch (e) {
