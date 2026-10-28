@@ -1197,13 +1197,12 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
   const seenByFilename = new Map<string, FotoRelatorioExpress>();
   const seenByUri = new Map<string, FotoRelatorioExpress>();
   const seenByB64 = new Map<string, FotoRelatorioExpress>();
-  const seenByOrdem = new Map<number, FotoRelatorioExpress>();
   const result: FotoRelatorioExpress[] = [];
 
   for (const f of rows) {
     // Ignora fotos fantasmas totalmente vazias (sem arquivo local, sem URL válida e sem base64)
-    const hasLocalUri = Boolean(f.uri_local && f.uri_local.startsWith('file://'));
-    const hasValidUrl = Boolean(f.url && f.url.startsWith('http') && !f.url.endsWith('/uploads/') && !f.url.endsWith('null'));
+    const hasLocalUri = Boolean(f.uri_local && (f.uri_local.startsWith('file://') || f.uri_local.startsWith('/') || f.uri_local.startsWith('content://')));
+    const hasValidUrl = Boolean(f.url && f.url.length > 5 && !f.url.endsWith('null') && !f.url.endsWith('undefined'));
     const hasBase64 = Boolean(f.base64 && f.base64.length > 50);
 
     if (!hasLocalUri && !hasValidUrl && !hasBase64) {
@@ -1213,7 +1212,6 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
     const filenameKey = (f.filename && f.filename.trim()) || '';
     const uriKey = hasLocalUri ? f.uri_local!.trim() : '';
     const b64Key = hasBase64 ? f.base64!.substring(0, 80) : '';
-    const ordemKey = (f.ordem !== undefined && f.ordem !== null) ? Number(f.ordem) : -1;
 
     let existing: FotoRelatorioExpress | undefined;
     if (f.id && seenById.has(f.id)) {
@@ -1224,8 +1222,6 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
       existing = seenByUri.get(uriKey);
     } else if (b64Key && seenByB64.has(b64Key)) {
       existing = seenByB64.get(b64Key);
-    } else if (ordemKey >= 0 && seenByOrdem.has(ordemKey)) {
-      existing = seenByOrdem.get(ordemKey);
     }
 
     if (existing) {
@@ -1244,7 +1240,6 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
       if (filenameKey) seenByFilename.set(filenameKey, f);
       if (uriKey) seenByUri.set(uriKey, f);
       if (b64Key) seenByB64.set(b64Key, f);
-      if (ordemKey >= 0) seenByOrdem.set(ordemKey, f);
     }
   }
 

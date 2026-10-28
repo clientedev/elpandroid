@@ -1,4 +1,5 @@
 import os
+import base64
 import uuid
 import io
 import hashlib
@@ -14515,16 +14516,19 @@ def api_relatorios_collection():
 
 
 @app.route('/api/fotos/<int:foto_id>', methods=['GET'])
+@app.route('/api/fotos-express/<int:foto_id>', methods=['GET'])
 @csrf.exempt
 def api_serve_foto_binary(foto_id):
-    """Serve imagem de relatório diretamente do banco PostgreSQL como binary JPEG"""
+    """Serve imagem de relatório (comum ou express) diretamente do banco PostgreSQL como binary JPEG"""
     try:
-        from models import FotoRelatorio
+        from models import FotoRelatorio, FotoRelatorioExpress
         foto = FotoRelatorio.query.get(foto_id)
+        if not foto:
+            foto = FotoRelatorioExpress.query.get(foto_id)
         if not foto:
             return jsonify({'error': 'Foto não encontrada'}), 404
         if foto.imagem:
-            mimetype = foto.content_type or 'image/jpeg'
+            mimetype = getattr(foto, 'content_type', None) or 'image/jpeg'
             res = Response(foto.imagem, mimetype=mimetype)
             res.headers['Cache-Control'] = 'public, max-age=86400'
             return res
@@ -14533,6 +14537,10 @@ def api_serve_foto_binary(foto_id):
             fpath = os.path.join(upload_dir, foto.filename)
             if os.path.exists(fpath):
                 return send_from_directory(upload_dir, foto.filename)
+            static_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+            static_fpath = os.path.join(static_dir, foto.filename)
+            if os.path.exists(static_fpath):
+                return send_from_directory(static_dir, foto.filename)
         return jsonify({'error': 'Dados da foto indisponíveis'}), 404
     except Exception as e:
         current_app.logger.error(f"Erro ao servir foto API: {e}")
@@ -14862,8 +14870,15 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
     """Salva fotos vinculadas a um Relatório Express de forma rigorosamente idempotente, impedindo qualquer duplicação no autosave e sincronização"""
     if not fotos_data or not isinstance(fotos_data, list):
         return 0
-    upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+    import base64
+    import hashlib
+    import uuid
+    import json
+
+    upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
     os.makedirs(upload_dir, exist_ok=True)
+    static_upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+    os.makedirs(static_upload_dir, exist_ok=True)
     
     existing_fotos = FotoRelatorioExpress.query.filter_by(relatorio_express_id=rel_exp_id).all()
     existing_by_id = {f.id: f for f in existing_fotos}
@@ -14898,11 +14913,12 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
             f_data.get('base64') or 
             f_data.get('imagem_base64') or 
             f_data.get('imagem') or 
+            f_data.get('dataUrl') or
             ''
         )
         img_bytes = None
         img_hash = None
-        if b64_str and isinstance(b64_str, str):
+        if b64_str and isinstance(b64_str, str) and len(b64_str) > 50:
             if ',' in b64_str:
                 b64_str = b64_str.split(',', 1)[1]
             b64_str = b64_str.strip()
@@ -14958,10 +14974,13 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
                 foto_existente.imagem_hash = img_hash
                 foto_existente.imagem_size = len(img_bytes)
                 foto_existente.content_type = 'image/jpeg'
-                fname = f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+                fname = foto_existente.filename or raw_filename or f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
                 fpath = os.path.join(upload_dir, fname)
+                fpath_static = os.path.join(static_upload_dir, fname)
                 try:
                     with open(fpath, 'wb') as f_out:
+                        f_out.write(img_bytes)
+                    with open(fpath_static, 'wb') as f_out:
                         f_out.write(img_bytes)
                     foto_existente.filename = fname
                     foto_existente.url = f"/uploads/{fname}"
@@ -14999,10 +15018,13 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
             foto.imagem_hash = img_hash
             foto.imagem_size = len(img_bytes)
             foto.content_type = 'image/jpeg'
-            fname = f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+            fname = raw_filename or f"rel_exp_{rel_exp_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
             fpath = os.path.join(upload_dir, fname)
+            fpath_static = os.path.join(static_upload_dir, fname)
             try:
                 with open(fpath, 'wb') as f_out:
+                    f_out.write(img_bytes)
+                with open(fpath_static, 'wb') as f_out:
                     f_out.write(img_bytes)
                 foto.filename = fname
                 foto.url = f"/uploads/{fname}"
@@ -15027,7 +15049,7 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
         saved += 1
 
     # 7. Expurgar fotos antigas do relatório que foram removidas pelo usuário (somente se recebemos lista de fotos)
-    if fotos_data:
+    if fotos_data and len(retained_photo_ids) > 0:
         for old_foto in existing_fotos:
             if old_foto.id not in retained_photo_ids:
                 try:

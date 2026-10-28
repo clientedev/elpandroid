@@ -290,7 +290,15 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
       console.warn('[Gallery] Fallback para uri original:', copyErr);
     }
 
-    return { uri: permanentUri, base64: asset.base64 || undefined, filename };
+    // Garante Base64 em memória para persistência no SQLite e upload
+    let b64 = asset.base64 || undefined;
+    if (!b64) {
+      try {
+        b64 = await readPhotoBase64(permanentUri);
+      } catch {}
+    }
+
+    return { uri: permanentUri, base64: b64, filename };
   } catch (error) {
     console.error('[Gallery] Erro ao selecionar foto:', error);
     return null;

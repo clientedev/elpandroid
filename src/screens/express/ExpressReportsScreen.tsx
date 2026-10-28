@@ -29,6 +29,7 @@ import { Colors, Shadows } from '../../theme/colors';
 export interface AttachedExpressPhoto {
   id?: number;
   uri: string;
+  url?: string;
   base64?: string;
   filename?: string;
   legenda?: string;
@@ -302,11 +303,18 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           const ap = attachedPhotos[i];
           const photoId = ap.id || (Date.now() + i + 1);
           ap.id = photoId;
+          let b64 = ap.base64;
+          if (!b64 && ap.uri && !ap.uri.startsWith('http')) {
+            b64 = await readPhotoBase64(ap.uri).catch(() => undefined);
+            if (b64) ap.base64 = b64;
+          }
           const fotoObj: FotoRelatorioExpress = {
             id: photoId,
             relatorio_express_id: targetId,
+            url: ap.url || (ap.uri && ap.uri.startsWith('http') ? ap.uri : undefined),
+            filename: ap.filename,
             uri_local: ap.uri,
-            base64: ap.base64,
+            base64: b64,
             local: ap.local || obraNome.trim(),
             titulo: `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
             legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
@@ -570,10 +578,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       if (fotosDb && fotosDb.length > 0) {
         setAttachedPhotos(
           fotosDb
-            .filter(f => (f.uri_local && f.uri_local.startsWith('file://')) || (f.base64 && f.base64.length > 50) || (f.url && f.url.startsWith('http') && !f.url.endsWith('/uploads/') && !f.url.endsWith('null')))
+            .filter(f => Boolean((f.uri_local && f.uri_local.length > 3) || (f.base64 && f.base64.length > 50) || (f.url && f.url.length > 5 && !f.url.endsWith('null'))))
             .map(f => ({
               id: f.id,
               uri: f.uri_local || f.url || '',
+              url: f.url,
               base64: f.base64,
               filename: f.filename,
               legenda: f.legenda || '',
@@ -621,19 +630,24 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               );
 
               const fotosDb = await getLocalFotosExpress(item.id);
-              const fotosPayload = (fotosDb || [])
-                .filter(f => (f.uri_local && f.uri_local.startsWith('file://')) || (f.base64 && f.base64.length > 50) || (f.url && f.url.startsWith('http')))
-                .map((f, idx) => ({
-                  id: f.id,
-                  filename: f.filename,
-                  uri_local: f.uri_local,
-                  url: f.url,
-                  base64: f.base64,
-                  imagem_base64: f.base64,
-                  titulo: f.titulo,
-                  legenda: f.legenda,
-                  anotacoes_dados: f.anotacoes_dados,
-                  ordem: (f.ordem !== undefined && f.ordem !== null) ? f.ordem : idx,
+              const fotosPayload = await Promise.all((fotosDb || [])
+                .map(async (f, idx) => {
+                  let b64 = f.base64;
+                  if (!b64 && f.uri_local && !f.uri_local.startsWith('http')) {
+                    b64 = await readPhotoBase64(f.uri_local).catch(() => undefined);
+                  }
+                  return {
+                    id: f.id,
+                    filename: f.filename,
+                    uri_local: f.uri_local,
+                    url: f.url,
+                    base64: b64,
+                    imagem_base64: b64,
+                    titulo: f.titulo,
+                    legenda: f.legenda,
+                    anotacoes_dados: f.anotacoes_dados,
+                    ordem: (f.ordem !== undefined && f.ordem !== null) ? f.ordem : idx,
+                  };
                 }));
 
               await addToSyncQueue(
@@ -1000,14 +1014,16 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       for (let i = 0; i < attachedPhotos.length; i++) {
         const ap = attachedPhotos[i];
         let b64 = ap.base64;
-        if (!b64 && ap.uri) {
-          b64 = await readPhotoBase64(ap.uri);
+        if (!b64 && ap.uri && !ap.uri.startsWith('http')) {
+          b64 = await readPhotoBase64(ap.uri).catch(() => undefined);
           ap.base64 = b64;
         }
 
         const fotoObj: FotoRelatorioExpress = {
           id: ap.id || (Date.now() + i + 1),
           relatorio_express_id: expId,
+          url: ap.url || (ap.uri && ap.uri.startsWith('http') ? ap.uri : undefined),
+          filename: ap.filename,
           uri_local: ap.uri,
           base64: b64,
           local: ap.local || obraNome.trim(),
@@ -1021,6 +1037,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
         savedFotosList.push({
           id: fotoObj.id,
+          url: fotoObj.url,
+          filename: ap.filename,
           uri_local: ap.uri,
           base64: b64,
           imagem_base64: b64,

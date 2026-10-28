@@ -201,13 +201,16 @@ class SyncService {
 
           if (item.entity_type === 'relatorio_express' && item.method !== 'DELETE') {
             try {
-              const fotosExp = await getLocalFotosExpress(item.entity_id);
+              let fotosExp = await getLocalFotosExpress(item.entity_id);
+              if (!fotosExp || fotosExp.length === 0) {
+                fotosExp = payload.fotos || [];
+              }
               if (fotosExp && fotosExp.length > 0) {
                 const enrichedFotos = await Promise.all(
-                  fotosExp.map(async (f) => {
-                    let base64Data = f.base64;
-                    if (!base64Data && f.uri_local) {
-                      base64Data = await readPhotoBase64(f.uri_local);
+                  fotosExp.map(async (f: any) => {
+                    let base64Data = f.base64 || f.imagem_base64;
+                    if (!base64Data && f.uri_local && !f.uri_local.startsWith('http')) {
+                      base64Data = await readPhotoBase64(f.uri_local).catch(() => undefined);
                       if (base64Data) {
                         await saveLocalFotoExpress({ ...f, base64: base64Data }, 'pending').catch(() => null);
                       }
@@ -593,9 +596,9 @@ class SyncService {
               }, 'synced');
             }
 
-            // Remove quaisquer fotos provisórias órfãs com id temporário que sobraram para este relatório
+            // Remove quaisquer fotos provisórias órfãs com id temporário que sobraram para este relatório (somente as que não estão pendentes)
             await db.runAsync(
-              'DELETE FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND id >= 1000000000',
+              'DELETE FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND id >= 1000000000 AND sync_status != "pending"',
               [exp.id, String(exp.id)]
             );
           }
