@@ -4,6 +4,7 @@ import { User } from '../types';
 import { apiClient } from '../services/api';
 import { saveLocalUser, getLocalUser } from '../database/db';
 import NetInfo from '@react-native-community/netinfo';
+import { syncService } from '../services/syncService';
 
 interface AuthContextData {
   user: User | null;
@@ -30,6 +31,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(cached);
         setUser(parsed);
         apiClient.setMobileUser(parsed);
+        // Sincronização proativa em background para atualizar banco SQLite local
+        syncService.syncAll().catch(() => null);
       }
     } catch (e) {
       console.warn('Error loading cached user:', e);
@@ -85,6 +88,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           apiClient.setMobileUser(userData);
           await AsyncStorage.setItem('obraflow_current_user', JSON.stringify(userData));
           await saveLocalUser(userData);
+          // Dispara sincronização inicial completa imediatamente após o login
+          syncService.syncAll().catch(() => null);
           return { success: true };
         }
       }

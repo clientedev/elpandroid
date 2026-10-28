@@ -188,7 +188,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   useEffect(() => {
     loadReports();
-  }, [loadReports]);
+    if (isOnline) {
+      syncService.syncAll().then(() => loadReports()).catch(() => null);
+    }
+  }, [loadReports, isOnline]);
 
   // Autosave contínuo para Relatório Express: assim que abrir e preencher qualquer dado, entra como Rascunho no SQLite
   useEffect(() => {

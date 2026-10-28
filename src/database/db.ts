@@ -240,12 +240,6 @@ async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
       `);
     }
   } catch {}
-
-  // Garante que todas as obras no SQLite tenham suas pastas físicas criadas imediatamente
-  try {
-    const { ensureAllProjectsFolders } = require('../services/appFilesService');
-    ensureAllProjectsFolders().catch(() => null);
-  } catch {}
 }
 
 // ================= USER =================

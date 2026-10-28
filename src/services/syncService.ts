@@ -11,7 +11,7 @@ import {
   getLocalFotosExpress, saveLocalFotoExpress,
   updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, migrateLocalFotosRelatorioExpressId, getDatabase,
   getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade,
-  getDeletedEntityIds, clearDeletedEntityLocally, migrateLocalProjetoId, saveLocalVisitante
+  getDeletedEntityIds, clearDeletedEntityLocally, migrateLocalProjetoId, saveLocalVisitante, saveLocalUsers
 } from '../database/db';
 import { Projeto, Visita, Relatorio, RelatorioExpress, FotoRelatorioExpress, Lembrete, Contato, Visitante } from '../types';
 import { notificationService } from './notificationService';
@@ -605,13 +605,11 @@ class SyncService {
         }
       }
 
-      // 6. Limpeza de integridade referencial: garantir que nenhum registro órfão permaneça (APENAS já sincronizados, NUNCA pendentes locais)
-      await db.runAsync('DELETE FROM fotos_relatorio WHERE sync_status = "synced" AND relatorio_id IN (SELECT id FROM relatorios WHERE sync_status = "synced" AND projeto_id NOT IN (SELECT id FROM projetos));');
-      await db.runAsync('DELETE FROM relatorios WHERE sync_status = "synced" AND projeto_id NOT IN (SELECT id FROM projetos);');
-      await db.runAsync('DELETE FROM visita_participantes WHERE visita_id IN (SELECT id FROM visitas WHERE sync_status = "synced" AND projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos));');
-      await db.runAsync('DELETE FROM visitas WHERE sync_status = "synced" AND projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
-      await db.runAsync('DELETE FROM lembretes WHERE sync_status = "synced" AND projeto_id NOT IN (SELECT id FROM projetos);');
-      await db.runAsync('DELETE FROM contatos WHERE sync_status = "synced" AND projeto_id IS NOT NULL AND projeto_id NOT IN (SELECT id FROM projetos);');
+      // 6. Sincronizar usuários e equipe do servidor para o celular
+      const usersRes = await apiClient.axios.get('/api/users', { timeout: 8000 }).catch(() => null);
+      if (usersRes && Array.isArray(usersRes.data)) {
+        await saveLocalUsers(usersRes.data).catch(() => null);
+      }
 
       // 7. Sincronizar visitantes cadastrados para o celular
       const visitantesRes = await apiClient.axios.get('/api/visitantes', { timeout: 8000 }).catch(() => null);

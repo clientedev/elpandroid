@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import NetInfo from '@react-native-community/netinfo';
 import { syncService, SyncState } from '../services/syncService';
 
@@ -35,6 +35,15 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Initial check
     syncService.getPendingCount().then(c => setPendingCount(c));
+
+    // Verificação inicial ativa de conexão e sincronização imediata ao abrir o app
+    NetInfo.fetch().then(state => {
+      const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+      setIsOnline(online);
+      if (online) {
+        syncService.syncAll();
+      }
+    }).catch(() => null);
 
     return () => {
       unsubscribeNet();

@@ -10,6 +10,8 @@ import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { getLocalProjetos, getLocalRelatorios, getLocalUsers } from '../../database/db';
 import { Projeto, Relatorio, User } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { useNetwork } from '../../contexts/NetworkContext';
+import { syncService } from '../../services/syncService';
 
 function calculateHaversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // km
@@ -24,6 +26,7 @@ function calculateHaversine(lat1: number, lon1: number, lat2: number, lon2: numb
 }
 
 export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { isOnline } = useNetwork();
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [filteredProjetos, setFilteredProjetos] = useState<Projeto[]>([]);
   const [relatoriosCounts, setRelatoriosCounts] = useState<{ [projId: number]: number }>({});
@@ -58,9 +61,16 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
         setUserCoords(null);
         return null;
       }
-      const loc = await Location.getCurrentPositionAsync({
+      // Timeout seguro de 3.5s para nunca travar a renderização do app
+      const locPromise = Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500));
+      const loc = await Promise.race([locPromise, timeoutPromise]);
+      if (!loc || !loc.coords) {
+        setLocationStatus('available');
+        return null;
+      }
       const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
       setUserCoords(coords);
       setLocationStatus('available');
@@ -152,7 +162,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   const loadProjetos = useCallback(async () => {
     try {
-      const coords = await refreshUserLocation();
+      // 1. CARREGAMENTO INSTANTÂNEO DOS DADOS LOCAIS DO SQLITE
       const data = await getLocalProjetos();
       const allRels = await getLocalRelatorios();
       const localUsers = await getLocalUsers().catch(() => []);
@@ -163,13 +173,36 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
         counts[r.projeto_id] = (counts[r.projeto_id] || 0) + 1;
       }
       setRelatoriosCounts(counts);
-
       setProjetos(data);
-      filterList(data, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers, sortByProximity, coords);
+      filterList(data, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers, sortByProximity, userCoords);
+
+      // 2. OBTENÇÃO DA LOCALIZAÇÃO REAL EM SEGUNDO PLANO
+      refreshUserLocation().then(coords => {
+        if (coords) {
+          filterList(data, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers, sortByProximity, coords);
+        }
+      }).catch(() => null);
+
+      // 3. SINCRONIZAÇÃO EM BACKGROUND COM O SERVIDOR RAILWAY SE ESTIVER ONLINE
+      if (isOnline) {
+        syncService.syncAll().then(async () => {
+          const freshData = await getLocalProjetos();
+          const freshRels = await getLocalRelatorios();
+          const freshUsers = await getLocalUsers().catch(() => []);
+          setUsers(freshUsers);
+          const freshCounts: { [projId: number]: number } = {};
+          for (const r of freshRels) {
+            freshCounts[r.projeto_id] = (freshCounts[r.projeto_id] || 0) + 1;
+          }
+          setRelatoriosCounts(freshCounts);
+          setProjetos(freshData);
+          filterList(freshData, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, freshUsers, sortByProximity, userCoords);
+        }).catch(() => null);
+      }
     } catch (e) {
       console.warn('Erro ao carregar projetos:', e);
     }
-  }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList, refreshUserLocation, sortByProximity]);
+  }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList, refreshUserLocation, sortByProximity, userCoords, isOnline]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -199,6 +232,9 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   const onRefresh = async () => {
     setRefreshing(true);
+    if (isOnline) {
+      await syncService.syncAll().catch(() => null);
+    }
     await loadProjetos();
     setRefreshing(false);
   };

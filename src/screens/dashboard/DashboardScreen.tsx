@@ -228,13 +228,19 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    if (isOnline) {
+      triggerSync().then(() => loadData()).catch(() => null);
+    }
+  }, [loadData, isOnline, triggerSync]);
 
   useFocusEffect(
     useCallback(() => {
       loadServerConfig();
       loadData();
-    }, [loadServerConfig, loadData])
+      if (isOnline) {
+        triggerSync().then(() => loadData()).catch(() => null);
+      }
+    }, [loadServerConfig, loadData, isOnline, triggerSync])
   );
 
   const onRefresh = async () => {

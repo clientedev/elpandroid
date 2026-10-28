@@ -10,6 +10,8 @@ import { getLocalVisitas, getLocalRelatorios, saveLocalVisita, addToSyncQueue } 
 import { Visita, Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNetwork } from '../../contexts/NetworkContext';
+import { syncService } from '../../services/syncService';
 
 // Team fixed colors per specification (Item 8.1):
 // Leopoldo: Azul (#1E88E5), Mateus: Verde (#43A047), Isadora: Amarelo (#FDD835), Luciana: Laranja (#FB8C00)
@@ -47,6 +49,7 @@ interface DayCell {
 
 export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
+  const { isOnline } = useNetwork();
   const [visitas, setVisitas] = useState<Visita[]>([]);
   const [filteredVisitas, setFilteredVisitas] = useState<Visita[]>([]);
   const [selectedFilter, setSelectedFilter] = useState('Todas');
@@ -122,10 +125,18 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
       setVisitas(data);
       applyFilters(data, selectedFilter, searchQuery);
+
+      if (isOnline) {
+        syncService.syncAll().then(async () => {
+          const freshData = await getLocalVisitas().catch(() => []);
+          setVisitas(freshData);
+          applyFilters(freshData, selectedFilter, searchQuery);
+        }).catch(() => null);
+      }
     } catch (e) {
       console.warn('Erro ao carregar visitas:', e);
     }
-  }, [selectedFilter, searchQuery, applyFilters]);
+  }, [selectedFilter, searchQuery, applyFilters, isOnline]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -152,6 +163,9 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
   const onRefresh = async () => {
     setRefreshing(true);
+    if (isOnline) {
+      await syncService.syncAll().catch(() => null);
+    }
     await loadVisitasAndAutoCheck();
     setRefreshing(false);
   };
