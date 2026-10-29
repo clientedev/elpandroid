@@ -14960,13 +14960,6 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
         if not foto_existente and raw_url and (raw_url in existing_by_url or clean_url in existing_by_url):
             foto_existente = existing_by_url.get(raw_url) or existing_by_url.get(clean_url)
 
-        # 5. Fallback por ordem se não encontrou por id/hash/url
-        if not foto_existente:
-            for ef in existing_fotos:
-                if ef.id not in retained_photo_ids and (ef.ordem == f_data.get('ordem', idx) or ef.ordem == idx):
-                    foto_existente = ef
-                    break
-
         if foto_existente:
             # Já existe no relatório: atualiza metadados sem duplicar registro nem imagem
             if img_bytes and img_hash and (not foto_existente.imagem or not foto_existente.url):

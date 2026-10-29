@@ -1,6 +1,8 @@
+$env:NODE_OPTIONS = "--max-old-space-size=2048"
+$env:CMAKE_BUILD_PARALLEL_LEVEL = "2"
 Set-Location "$PSScriptRoot\..\android"
 Write-Host "[ELP Build] Compilando APK nativo de producao..." -ForegroundColor Cyan
-& .\gradlew.bat assembleRelease
+& .\gradlew.bat assembleRelease --no-daemon
 if ($LASTEXITCODE -eq 0) {
     Set-Location "$PSScriptRoot\.."
     node scripts\copy-apk.js

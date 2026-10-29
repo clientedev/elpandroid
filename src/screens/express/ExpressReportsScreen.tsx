@@ -54,6 +54,58 @@ const DEFAULT_CHECKLIST: ChecklistItemState[] = [
   { id: 7, item: 'Limpeza e desincrustação final da fachada', checked: false, observacao: '' },
 ];
 
+/**
+ * Converte qualquer data (ISO "YYYY-MM-DD", ISO com hora, ou "DD/MM/AAAA") para o padrão brasileiro "DD/MM/AAAA"
+ */
+export function toBRDate(dateStr?: string | null): string {
+  if (!dateStr || !dateStr.trim()) {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+  const clean = dateStr.trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+    return clean;
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(clean)) {
+    const parts = clean.split('T')[0].split('-');
+    if (parts.length === 3) {
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+  }
+  return clean;
+}
+
+/**
+ * Converte data no padrão brasileiro "DD/MM/AAAA" para o padrão ISO "AAAA-MM-DD" para o banco/API
+ */
+export function toISODate(brDateStr?: string | null): string {
+  if (!brDateStr || !brDateStr.trim()) {
+    return new Date().toISOString().split('T')[0];
+  }
+  const clean = brDateStr.trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(clean)) {
+    const [d, m, y] = clean.split('/');
+    return `${y}-${m}-${d}`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}/.test(clean)) {
+    return clean.split('T')[0];
+  }
+  return clean;
+}
+
+/**
+ * Aplica máscara de digitação em tempo real para DD/MM/AAAA
+ */
+export function maskBRDate(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4, 8)}`;
+}
+
 export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
   const { isOnline, triggerSync } = useNetwork();
@@ -89,7 +141,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   // Form state:
   const [titulo, setTitulo] = useState('Relatório Express EXP-0000');
   const [numero, setNumero] = useState('EXP-0000');
-  const [dataVisita, setDataVisita] = useState(new Date().toISOString().split('T')[0]);
+  const [dataVisita, setDataVisita] = useState(toBRDate());
   const [obraConstrutora, setObraConstrutora] = useState('');
   const [obraNome, setObraNome] = useState('');
   const [obraEndereco, setObraEndereco] = useState('');
@@ -193,11 +245,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     }
   }, [loadReports, isOnline]);
 
-  // Autosave contínuo para Relatório Express: assim que abrir e preencher qualquer dado, entra como Rascunho no SQLite
-  useEffect(() => {
-    if (!modalVisible) return;
-
-    // Detecta se o usuário inseriu qualquer dado, foto ou checklist
+  // Persistência segura do rascunho com todas as fotos anexadas (evita perda ao sair sem salvar)
+  async function persistDraftToStorage(targetIdParam?: number, currentNumParam?: string) {
     const hasAnyContent = Boolean(
       obraNome.trim() || 
       obraConstrutora.trim() || 
@@ -220,115 +269,121 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       attachedPhotos.length > 0
     );
 
-    if (!hasAnyContent) return;
+    if (!hasAnyContent) return null;
+
+    let targetId = targetIdParam || editingReportIdRef.current || editingReportId;
+    if (!targetId) {
+      targetId = Date.now();
+      editingReportIdRef.current = targetId;
+      setEditingReportId(targetId);
+    }
+
+    const currentNum = currentNumParam || currentNumberRef.current || (numero && numero.startsWith('EXP-') ? numero : 'EXP-0000');
+
+    const draftPayload = {
+      editingReportId: targetId,
+      titulo,
+      numero: currentNum,
+      dataVisita,
+      obraConstrutora,
+      obraNome,
+      obraEndereco,
+      acompanhantes,
+      observacoes,
+      techElementosBase,
+      techChapiscoColante,
+      techChapiscoAlvenaria,
+      techArgamassaEmboco,
+      techFormaAplicacaoArgamassa,
+      techAcabamentosRevestimento,
+      techAcabamentoPeitoris,
+      techAcabamentoMuretas,
+      techDefinicaoFrisosCor,
+      techDefinicaoFaceInferiorAbas,
+      techObservacoesFachada,
+      techOutrasObservacoes,
+      checklist,
+      attachedPhotos,
+    };
+    await AsyncStorage.setItem(`@elp_express_report_draft_${targetId}`, JSON.stringify(draftPayload)).catch(() => null);
+
+    const techInfoJson = JSON.stringify({
+      elementos_construtivos_base: techElementosBase.trim(),
+      especificacao_chapisco_colante: techChapiscoColante.trim(),
+      especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
+      especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
+      forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
+      acabamentos_revestimento: techAcabamentosRevestimento.trim(),
+      acabamento_peitoris: techAcabamentoPeitoris.trim(),
+      acabamento_muretas: techAcabamentoMuretas.trim(),
+      definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
+      definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
+      observacoes_projeto_fachada: techObservacoesFachada.trim(),
+      outras_observacoes: techOutrasObservacoes.trim(),
+    });
+
+    const expDraft: RelatorioExpress = {
+      id: targetId,
+      numero: currentNum,
+      titulo: (!titulo || titulo.trim() === 'Relatório Express' || titulo.startsWith('Relatório Express EXP-'))
+        ? `Relatório Express ${currentNum}`
+        : titulo.trim(),
+      autor_id: user?.id || 1,
+      autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
+      data_relatorio: toISODate(dataVisita),
+      obra_nome: obraNome.trim() || 'Rascunho de Obra',
+      obra_endereco: obraEndereco.trim(),
+      obra_construtora: obraConstrutora.trim(),
+      acompanhantes: acompanhantes.trim(),
+      informacoes_tecnicas: techInfoJson,
+      checklist_data: JSON.stringify(checklist),
+      observacoes_finais: observacoes.trim(),
+      status: 'Rascunho',
+      sync_status: 'pending',
+      fotos_count: attachedPhotos.length,
+    };
+
+    // Salva imediatamente no SQLite local para persistir com segurança
+    await saveLocalRelatorioExpress(expDraft, 'pending');
+
+    for (let i = 0; i < attachedPhotos.length; i++) {
+      const ap = attachedPhotos[i];
+      const photoId = ap.id || (Date.now() + i + 1);
+      ap.id = photoId;
+      let b64 = ap.base64;
+      if (!b64 && ap.uri && !ap.uri.startsWith('http')) {
+        b64 = await readPhotoBase64(ap.uri).catch(() => undefined);
+        if (b64) ap.base64 = b64;
+      }
+      const fotoObj: FotoRelatorioExpress = {
+        id: photoId,
+        relatorio_express_id: targetId,
+        url: ap.url || (ap.uri && ap.uri.startsWith('http') ? ap.uri : undefined),
+        filename: ap.filename,
+        uri_local: ap.uri,
+        base64: b64,
+        local: ap.local || obraNome.trim(),
+        titulo: `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
+        legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
+        anotacoes_dados: ap.anotacoes_dados,
+        ordem: i,
+        sync_status: 'pending'
+      };
+      await saveLocalFotoExpress(fotoObj, 'pending');
+    }
+
+    setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+    return targetId;
+  }
+
+  // Autosave contínuo para Relatório Express: assim que abrir e preencher qualquer dado, entra como Rascunho no SQLite
+  useEffect(() => {
+    if (!modalVisible) return;
 
     const timer = setTimeout(async () => {
       try {
         setIsAutoSaving(true);
-
-        // Garante ID estável para este rascunho
-        let targetId = editingReportIdRef.current || editingReportId;
-        if (!targetId) {
-          targetId = Date.now();
-          editingReportIdRef.current = targetId;
-          setEditingReportId(targetId);
-        }
-
-        const currentNum = currentNumberRef.current || (numero && numero.startsWith('EXP-') ? numero : 'EXP-0000');
-
-        const draftPayload = {
-          editingReportId: targetId,
-          titulo,
-          numero: currentNum,
-          dataVisita,
-          obraConstrutora,
-          obraNome,
-          obraEndereco,
-          acompanhantes,
-          observacoes,
-          techElementosBase,
-          techChapiscoColante,
-          techChapiscoAlvenaria,
-          techArgamassaEmboco,
-          techFormaAplicacaoArgamassa,
-          techAcabamentosRevestimento,
-          techAcabamentoPeitoris,
-          techAcabamentoMuretas,
-          techDefinicaoFrisosCor,
-          techDefinicaoFaceInferiorAbas,
-          techObservacoesFachada,
-          techOutrasObservacoes,
-          checklist,
-          attachedPhotos,
-        };
-        await AsyncStorage.setItem(`@elp_express_report_draft_${targetId}`, JSON.stringify(draftPayload));
-
-        const techInfoJson = JSON.stringify({
-          elementos_construtivos_base: techElementosBase.trim(),
-          especificacao_chapisco_colante: techChapiscoColante.trim(),
-          especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
-          especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
-          forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
-          acabamentos_revestimento: techAcabamentosRevestimento.trim(),
-          acabamento_peitoris: techAcabamentoPeitoris.trim(),
-          acabamento_muretas: techAcabamentoMuretas.trim(),
-          definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
-          definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
-          observacoes_projeto_fachada: techObservacoesFachada.trim(),
-          outras_observacoes: techOutrasObservacoes.trim(),
-        });
-
-        const expDraft: RelatorioExpress = {
-          id: targetId,
-          numero: currentNum,
-          titulo: (!titulo || titulo.trim() === 'Relatório Express' || titulo.startsWith('Relatório Express EXP-'))
-            ? `Relatório Express ${currentNum}`
-            : titulo.trim(),
-          autor_id: user?.id || 1,
-          autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
-          data_relatorio: dataVisita || new Date().toISOString().split('T')[0],
-          obra_nome: obraNome.trim() || 'Rascunho de Obra',
-          obra_endereco: obraEndereco.trim(),
-          obra_construtora: obraConstrutora.trim(),
-          acompanhantes: acompanhantes.trim(),
-          informacoes_tecnicas: techInfoJson,
-          checklist_data: JSON.stringify(checklist),
-          observacoes_finais: observacoes.trim(),
-          status: 'Rascunho',
-          sync_status: 'pending',
-          fotos_count: attachedPhotos.length,
-        };
-
-        // Salva imediatamente no SQLite local para persistir com segurança
-        await saveLocalRelatorioExpress(expDraft, 'pending');
-
-        for (let i = 0; i < attachedPhotos.length; i++) {
-          const ap = attachedPhotos[i];
-          const photoId = ap.id || (Date.now() + i + 1);
-          ap.id = photoId;
-          let b64 = ap.base64;
-          if (!b64 && ap.uri && !ap.uri.startsWith('http')) {
-            b64 = await readPhotoBase64(ap.uri).catch(() => undefined);
-            if (b64) ap.base64 = b64;
-          }
-          const fotoObj: FotoRelatorioExpress = {
-            id: photoId,
-            relatorio_express_id: targetId,
-            url: ap.url || (ap.uri && ap.uri.startsWith('http') ? ap.uri : undefined),
-            filename: ap.filename,
-            uri_local: ap.uri,
-            base64: b64,
-            local: ap.local || obraNome.trim(),
-            titulo: `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
-            legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
-            anotacoes_dados: ap.anotacoes_dados,
-            ordem: i,
-            sync_status: 'pending'
-          };
-          await saveLocalFotoExpress(fotoObj, 'pending');
-        }
-
-        setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+        await persistDraftToStorage();
       } catch (errDraft) {
         console.warn('[Express] Erro no autosave de rascunho:', errDraft);
       } finally {
@@ -354,6 +409,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           text: 'Sim, Limpar',
           style: 'destructive',
           onPress: async () => {
+            const currentId = editingReportIdRef.current || editingReportId;
+            if (currentId) {
+              await AsyncStorage.removeItem(`@elp_express_report_draft_${currentId}`).catch(() => null);
+            }
             await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
             setObraNome('');
             setObraConstrutora('');
@@ -418,11 +477,17 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setLastAutoSaveTime(null);
 
     setTitulo(`Relatório Express ${nextNum}`);
-    setDataVisita(new Date().toISOString().split('T')[0]);
+    setDataVisita(toBRDate());
     setModalVisible(true);
   }
 
-  function handleCloseModal() {
+  async function handleCloseModal() {
+    try {
+      // Salva rascunho com segurança antes de fechar se houver conteúdo, evitando qualquer perda de fotos
+      await persistDraftToStorage();
+    } catch (errPersist) {
+      console.warn('[Express] Falha ao persistir rascunho ao fechar modal:', errPersist);
+    }
     setModalVisible(false);
     setAttachedPhotos([]);
     setEditingReportId(null);
@@ -449,7 +514,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setShowTechInfo(false);
     setShowChecklist(false);
     setLastAutoSaveTime(null);
-    loadReports();
+    await loadReports();
   }
 
   async function handleDuplicateReport(original: RelatorioExpress) {
@@ -464,7 +529,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setNumero(nextNum);
     currentNumberRef.current = nextNum;
     setTitulo(`Relatório Express ${nextNum} (Cópia)`);
-    setDataVisita(new Date().toISOString().split('T')[0]);
+    setDataVisita(toBRDate());
     setObraConstrutora(original.obra_construtora || '');
     setObraNome(original.obra_nome || '');
     setObraEndereco(original.obra_endereco || '');
@@ -518,7 +583,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     setTitulo(item.titulo || `Relatório Express ${itemNum}`);
     setNumero(itemNum);
     currentNumberRef.current = itemNum;
-    setDataVisita(item.data_relatorio ? item.data_relatorio.split('T')[0] : new Date().toISOString().split('T')[0]);
+    setDataVisita(toBRDate(item.data_relatorio));
     setObraConstrutora(item.obra_construtora || '');
     setObraNome(item.obra_nome || '');
     setObraEndereco(item.obra_endereco || '');
@@ -1059,7 +1124,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         titulo: finalTitle,
         autor_id: user?.id || 1,
         autor_nome: user?.nome_completo || user?.username || 'Fiscal Técnico',
-        data_relatorio: dataVisita,
+        data_relatorio: toISODate(dataVisita),
         obra_nome: obraNome.trim() || 'Rascunho de Obra',
         obra_endereco: obraEndereco.trim(),
         obra_construtora: obraConstrutora.trim(),
@@ -1219,7 +1284,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                     <Text style={styles.expBadgeText}>{item.numero}</Text>
                   </View>
                   <Text style={styles.dateText}>
-                    {item.data_relatorio ? new Date(item.data_relatorio).toLocaleDateString('pt-BR') : ''}
+                    {toBRDate(item.data_relatorio)}
                   </Text>
                 </View>
                 <SyncStatusBadge status={item.sync_status} />
@@ -1279,102 +1344,111 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               })()}
 
               <View style={styles.cardFooter}>
-                <View style={[
-                  styles.statusPill,
-                  item.status === 'Aprovado' ? styles.statusApproved : 
-                  item.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusDraft
-                ]}>
-                  <Text style={[
-                    styles.statusPillText,
-                    item.status === 'Aprovado' ? { color: '#065F46' } :
-                    item.status === 'Aguardando Aprovação' ? { color: '#92400E' } : { color: '#B45309' }
+                <View style={styles.cardFooterTopRow}>
+                  <View style={[
+                    styles.statusPill,
+                    item.status === 'Aprovado' ? styles.statusApproved : 
+                    item.status === 'Aguardando Aprovação' ? styles.statusWaiting : styles.statusDraft
                   ]}>
-                    {displayStatus === 'Rascunho' ? '✏️ Rascunho' : displayStatus}
-                  </Text>
+                    <Text style={[
+                      styles.statusPillText,
+                      item.status === 'Aprovado' ? { color: '#065F46' } :
+                      item.status === 'Aguardando Aprovação' ? { color: '#92400E' } : { color: '#B45309' }
+                    ]}>
+                      {displayStatus === 'Rascunho' ? '✏️ Rascunho' : displayStatus}
+                    </Text>
+                  </View>
+
+                  {item.fotos && item.fotos.length > 0 && (
+                    <View style={styles.cardFooterPhotoBadge}>
+                      <Ionicons name="images-outline" size={12} color="#64748B" />
+                      <Text style={styles.cardFooterPhotoBadgeText}>{item.fotos.length} fotos</Text>
+                    </View>
+                  )}
                 </View>
 
-              <View style={styles.cardActionsRow}>
-                {/* Botão Visualizar Sempre Visível */}
-                <TouchableOpacity 
-                  style={styles.viewBtn} 
-                  onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true })}
-                >
-                  <Ionicons name="eye-outline" size={13} color="#0284C7" />
-                  <Text style={styles.viewBtnText}>Visualizar</Text>
-                </TouchableOpacity>
+                <View style={styles.cardActionsRow}>
+                  {/* Botão Visualizar Sempre Visível */}
+                  <TouchableOpacity 
+                    style={styles.viewBtn} 
+                    onPress={() => navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true })}
+                  >
+                    <Ionicons name="eye-outline" size={12.5} color="#0284C7" />
+                    <Text style={styles.viewBtnText}>Visualizar</Text>
+                  </TouchableOpacity>
 
-                {/* Ações de Aprovação / Rejeição diretas no Card */}
-                {item.status === 'Aguardando Aprovação' && canApprove && (
-                  <>
+                  {/* Ações de Aprovação / Rejeição diretas no Card */}
+                  {item.status === 'Aguardando Aprovação' && canApprove && (
+                    <>
+                      <TouchableOpacity 
+                        style={styles.cardApproveBtn} 
+                        onPress={() => handleOpenApproveModal(item)}
+                      >
+                        <Ionicons name="checkmark-circle" size={12.5} color="#FFFFFF" />
+                        <Text style={styles.cardApproveBtnText}>Aprovar</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity 
+                        style={styles.cardRejectBtn} 
+                        onPress={() => handleOpenRejectModal(item)}
+                      >
+                        <Ionicons name="close-circle" size={12.5} color="#FFFFFF" />
+                        <Text style={styles.cardRejectBtnText}>Rejeitar</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+
+                  {item.status !== 'Aprovado' && (
                     <TouchableOpacity 
-                      style={styles.cardApproveBtn} 
-                      onPress={() => handleOpenApproveModal(item)}
+                      style={styles.editBtn} 
+                      onPress={() => handleEditReport(item)}
                     >
-                      <Ionicons name="checkmark-circle" size={13} color="#FFFFFF" />
-                      <Text style={styles.cardApproveBtnText}>Aprovar</Text>
+                      <Ionicons name="create-outline" size={12.5} color="#D97706" />
+                      <Text style={styles.editBtnText}>Editar</Text>
                     </TouchableOpacity>
+                  )}
 
+                  {(item.status === 'em_andamento' || item.status === 'Em preenchimento' || item.status === 'Rejeitado' || item.status === 'Rascunho') && (
                     <TouchableOpacity 
-                      style={styles.cardRejectBtn} 
-                      onPress={() => handleOpenRejectModal(item)}
+                      style={styles.sendApprovalBtn} 
+                      onPress={() => handleSendForApproval(item)}
                     >
-                      <Ionicons name="close-circle" size={13} color="#FFFFFF" />
-                      <Text style={styles.cardRejectBtnText}>Rejeitar</Text>
+                      <Ionicons name="paper-plane-outline" size={12.5} color="#059669" />
+                      <Text style={styles.sendApprovalBtnText}>Enviar</Text>
                     </TouchableOpacity>
-                  </>
-                )}
+                  )}
 
-                {item.status !== 'Aprovado' && (
-                  <TouchableOpacity 
-                    style={styles.editBtn} 
-                    onPress={() => handleEditReport(item)}
-                  >
-                    <Ionicons name="create-outline" size={13} color="#D97706" />
-                    <Text style={styles.editBtnText}>Editar</Text>
+                  {item.status === 'Aprovado' && (
+                    <TouchableOpacity 
+                      style={styles.duplicateBtn} 
+                      onPress={() => handleDuplicateReport(item)}
+                    >
+                      <Ionicons name="copy-outline" size={12.5} color="#0284C7" />
+                      <Text style={styles.duplicateBtnText}>Duplicar</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity style={styles.pdfBtn} onPress={() => handleExportPDF(item)}>
+                    <Ionicons name="download-outline" size={14} color={Colors.primary} />
+                    <Text style={styles.pdfBtnText}>PDF</Text>
                   </TouchableOpacity>
-                )}
 
-                {(item.status === 'em_andamento' || item.status === 'Em preenchimento' || item.status === 'Rejeitado') && (
                   <TouchableOpacity 
-                    style={styles.sendApprovalBtn} 
-                    onPress={() => handleSendForApproval(item)}
+                    style={styles.cardDeleteBtn} 
+                    onPress={() => handleDeleteExpress(item)}
                   >
-                    <Ionicons name="paper-plane-outline" size={13} color="#059669" />
-                    <Text style={styles.sendApprovalBtnText}>Enviar</Text>
+                    <Ionicons name="trash-outline" size={12.5} color="#DC2626" />
+                    <Text style={styles.cardDeleteBtnText}>Excluir</Text>
                   </TouchableOpacity>
-                )}
-
-                {item.status === 'Aprovado' && (
-                  <TouchableOpacity 
-                    style={styles.duplicateBtn} 
-                    onPress={() => handleDuplicateReport(item)}
-                  >
-                    <Ionicons name="copy-outline" size={14} color="#0284C7" />
-                    <Text style={styles.duplicateBtnText}>Duplicar</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity style={styles.pdfBtn} onPress={() => handleExportPDF(item)}>
-                  <Ionicons name="download-outline" size={16} color={Colors.primary} />
-                  <Text style={styles.pdfBtnText}>PDF</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.cardDeleteBtn} 
-                  onPress={() => handleDeleteExpress(item)}
-                >
-                  <Ionicons name="trash-outline" size={13} color="#DC2626" />
-                  <Text style={styles.cardDeleteBtnText}>Excluir</Text>
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        );
-      }}
-      />
+            </TouchableOpacity>
+          );
+        }}
+        />
 
       {/* Modal Form: Relatório Express com Paridade ao Relatório Normal */}
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={handleCloseModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
@@ -1441,8 +1515,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 <TextInput 
                   style={styles.input} 
                   value={dataVisita} 
-                  onChangeText={setDataVisita} 
-                  placeholder="AAAA-MM-DD"
+                  onChangeText={t => setDataVisita(maskBRDate(t))} 
+                  placeholder="DD/MM/AAAA"
+                  keyboardType="numeric"
+                  maxLength={10}
                 />
               </View>
 
@@ -2063,6 +2139,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
+    overflow: 'hidden',
     ...Shadows.sm,
   },
   cardHeader: {
@@ -2114,30 +2191,55 @@ const styles = StyleSheet.create({
   photoCountLabel: { fontSize: 12, fontWeight: '600', color: Colors.text },
   photoDescLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     paddingTop: 10,
+    marginTop: 4,
+  },
+  cardFooterTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  cardFooterPhotoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  cardFooterPhotoBadgeText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
   },
   statusPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
     borderRadius: 12,
   },
   statusApproved: { backgroundColor: '#D1FAE5' },
   statusWaiting: { backgroundColor: '#FEF3C7' },
   statusDraft: { backgroundColor: '#F1F5F9' },
   statusPillText: { fontSize: 11, fontWeight: '700' },
-  cardActionsRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  cardActionsRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 5, 
+    flexWrap: 'wrap', 
+    justifyContent: 'flex-end',
+    width: '100%',
+  },
   editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#FDE68A',
@@ -2148,8 +2250,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#A7F3D0',
@@ -2158,25 +2260,25 @@ const styles = StyleSheet.create({
   duplicateBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#F0F9FF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4.5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#BAE6FD',
   },
-  duplicateBtnText: { fontSize: 12, fontWeight: '600', color: '#0284C7' },
+  duplicateBtnText: { fontSize: 11, fontWeight: '600', color: '#0284C7' },
   pdfBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
     backgroundColor: '#EFF6FF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4.5,
     borderRadius: 6,
   },
-  pdfBtnText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
+  pdfBtnText: { fontSize: 11, fontWeight: '600', color: Colors.primary },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -2608,8 +2710,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#059669',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
     borderRadius: 6,
   },
   cardApproveBtnText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
@@ -2618,8 +2720,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#DC2626',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
     borderRadius: 6,
   },
   cardRejectBtnText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
@@ -2696,8 +2798,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#F0F9FF',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#BAE6FD',
@@ -2708,8 +2810,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     backgroundColor: '#FEF2F2',
-    paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 4.5,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#FECACA',

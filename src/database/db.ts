@@ -1251,15 +1251,7 @@ export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 
 
     let matchLocal: { id: number; uri_local?: string; base64?: string; anotacoes_dados?: string } | null = null;
 
-    if (f.id && f.id < 1000000000) {
-      // É foto oficial do servidor: procura foto temporária correspondente pela ordem
-      matchLocal = await db.getFirstAsync<{ id: number; uri_local?: string; base64?: string; anotacoes_dados?: string }>(
-        'SELECT id, uri_local, base64, anotacoes_dados FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND ordem = ? AND id >= 1000000000 LIMIT 1',
-        [numRelId, strRelId, f.ordem || 0]
-      );
-    }
-
-    if (!matchLocal && f.filename && f.filename.length > 8 && !f.filename.startsWith('photo_') && f.filename !== 'photo.jpg') {
+    if (f.filename && f.filename.length > 8 && !f.filename.startsWith('photo_') && f.filename !== 'photo.jpg') {
       matchLocal = await db.getFirstAsync<{ id: number; uri_local?: string; base64?: string; anotacoes_dados?: string }>(
         'SELECT id, uri_local, base64, anotacoes_dados FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND filename = ? AND id != ? LIMIT 1',
         [numRelId, strRelId, f.filename, f.id || 0]

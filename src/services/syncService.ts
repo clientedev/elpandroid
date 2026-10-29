@@ -562,11 +562,10 @@ class SyncService {
                 ? f.url
                 : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
 
-              // Tenta casar com foto local existente por id, filename ou ordem
+              // Tenta casar com foto local existente por id ou filename real
               const match = existingLocalFotos.find(lf => 
                 lf.id === f.id || 
-                (f.filename && lf.filename === f.filename) ||
-                (lf.ordem === f.ordem)
+                (f.filename && f.filename.length > 5 && lf.filename === f.filename)
               );
 
               const preservedUri = (match && match.uri_local && match.uri_local.startsWith('file://')) 
