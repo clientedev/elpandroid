@@ -596,8 +596,9 @@ export async function getLocalRelatorios(projetoId?: number, currentUser?: User 
   const conditions: string[] = [];
   const params: any[] = [];
   if (projetoId) {
-    conditions.push('r.projeto_id = ?');
-    params.push(projetoId);
+    // Casa pelo ID da obra OU pelo nome da obra (cobre migração de ID local -> ID do servidor)
+    conditions.push("(r.projeto_id = ? OR (r.projeto_nome IS NOT NULL AND r.projeto_nome != '' AND LOWER(TRIM(r.projeto_nome)) = LOWER(TRIM(COALESCE((SELECT nome FROM projetos WHERE id = ?), '__sem_obra__')))))");
+    params.push(projetoId, projetoId);
   }
   const isMasterOrAdmin = Boolean(
     currentUser?.is_master ||
@@ -657,7 +658,8 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
     console.warn('[db] Aviso na deduplicação de relatório:', dedupErr);
   }
 
-  const safeNumero = String(r.numero || `REL-${safeId}`);
+  // Nunca usa o ID/timestamp como número oficial; rascunhos sem número ficam como 'Rascunho'
+  const safeNumero = String(r.numero || (safeId >= 100000 ? 'Rascunho' : `REL-${String(safeId).padStart(4, '0')}`));
   const safeProjetoId = Number(r.projeto_id) || 0;
   const safeTitulo = String(r.titulo || 'Relatório de Obra');
   const now = new Date().toISOString();
@@ -749,18 +751,20 @@ export async function deleteLocalRelatorio(id: number): Promise<void> {
   await db.runAsync('DELETE FROM sync_queue WHERE entity_type = "relatorio" AND entity_id = ? AND action != "delete";', [id]);
 }
 
-export async function getNextReportNumberForProject(projectId: number): Promise<string> {
+export async function getNextReportNumberForProject(projectId: number, excludeReportId?: number): Promise<string> {
   const db = await getDatabase();
   const proj = await db.getFirstAsync<{ numeracao_inicial?: number }>('SELECT numeracao_inicial FROM projetos WHERE id = ?', [projectId]);
   const startNum = proj?.numeracao_inicial && proj.numeracao_inicial > 0 ? proj.numeracao_inicial : 1;
-  const rows = await db.getAllAsync<{ numero: string }>('SELECT numero FROM relatorios WHERE projeto_id = ?', [projectId]);
+  const rows = await db.getAllAsync<{ id: number; numero: string }>('SELECT id, numero FROM relatorios WHERE projeto_id = ?', [projectId]);
   let maxSeq = startNum - 1;
   for (const row of rows) {
+    if (excludeReportId && Number(row.id) === Number(excludeReportId)) continue;
     if (!row.numero) continue;
     const match = row.numero.match(/REL[-_ ]*(\d+)/i);
     if (match) {
       const val = parseInt(match[1], 10);
-      if (!isNaN(val) && val > maxSeq) {
+      // Ignora números poluídos por timestamps/IDs locais
+      if (!isNaN(val) && val < 100000 && val > maxSeq) {
         maxSeq = val;
       }
     }

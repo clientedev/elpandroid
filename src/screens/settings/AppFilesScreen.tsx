@@ -43,6 +43,7 @@ export default function AppFilesScreen() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('imagens');
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [expandedObraId, setExpandedObraId] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -150,7 +151,7 @@ export default function AppFilesScreen() {
             {file.name}
           </Text>
           <Text style={styles.fileSubtext}>
-            {isPdf ? 'Relatório PDF' : 'Foto da Obra'} • Toque para abrir/compartilhar
+            {file.obraName ? `${file.obraName} • ` : ''}{isPdf ? 'Relatório PDF' : 'Foto da Obra'} • Toque para abrir/compartilhar
           </Text>
         </View>
 
@@ -163,17 +164,20 @@ export default function AppFilesScreen() {
 
   const renderObraCard = ({ item }: { item: Projeto }) => {
     const projFolder = folders.find(
-      (f) =>
-        f.projectName.toLowerCase().includes(item.nome.toLowerCase()) ||
-        item.nome.toLowerCase().includes(f.projectName.toLowerCase())
+      (f) => f.projectName.trim().toLowerCase() === item.nome.trim().toLowerCase()
     );
     const imgCount = projFolder?.imagens?.length ?? 0;
     const pdfCount = projFolder?.pdfs?.length ?? 0;
+    const isExpanded = expandedObraId === item.id;
 
     return (
-      <View style={styles.obraCard}>
+      <TouchableOpacity
+        style={styles.obraCard}
+        activeOpacity={0.8}
+        onPress={() => setExpandedObraId(isExpanded ? null : item.id)}
+      >
         <View style={styles.folderIconWrap}>
-          <Ionicons name="folder" size={28} color="#F59E0B" />
+          <Ionicons name={isExpanded ? 'folder-open' : 'folder'} size={28} color="#F59E0B" />
         </View>
 
         <View style={styles.infoCol}>
@@ -194,8 +198,22 @@ export default function AppFilesScreen() {
               <Text style={styles.subfolderTagText}>Relatórios ({pdfCount})</Text>
             </View>
           </View>
+
+          {isExpanded && (
+            <View style={{ marginTop: 10 }}>
+              {imgCount === 0 && pdfCount === 0 ? (
+                <Text style={styles.fileSubtext}>Nenhum arquivo salvo nesta obra ainda.</Text>
+              ) : (
+                <>
+                  {(projFolder?.imagens || []).map((f) => renderFileCard(f, 'image'))}
+                  {(projFolder?.pdfs || []).map((f) => renderFileCard(f, 'pdf'))}
+                </>
+              )}
+            </View>
+          )}
         </View>
-      </View>
+        <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#94A3B8" />
+      </TouchableOpacity>
     );
   };
 

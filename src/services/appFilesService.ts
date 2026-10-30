@@ -22,6 +22,7 @@ const INTERNAL_DOC_DIR = `${(FileSystem as any).documentDirectory || ''}`;
 const INTERNAL_ROOT = `${INTERNAL_DOC_DIR}${APP_FILES_ROOT_NAME}/`;
 const INTERNAL_IMAGENS = `${INTERNAL_ROOT}Imagens/`;
 const INTERNAL_RELATORIOS = `${INTERNAL_ROOT}Relatorios/`;
+const INTERNAL_OBRAS = `${INTERNAL_ROOT}Obras/`;
 
 export interface FileItem {
   name: string;
@@ -29,6 +30,7 @@ export interface FileItem {
   size?: number;
   modificationTime?: number;
   isDirectory?: boolean;
+  obraName?: string;
 }
 
 export interface ProjectFolderSummary {
@@ -300,6 +302,22 @@ export async function getStoredPhysicalFiles(): Promise<{
     console.warn('[appFilesService] Leitura de relatórios internos:', errIntRels);
   }
 
+  // 1b. Lê arquivos salvos nas pastas de cada obra (Obras/<Obra>/Imagens e /Relatorios)
+  try {
+    const obrasInfo = await FileSystem.getInfoAsync(INTERNAL_OBRAS);
+    if (obrasInfo.exists) {
+      const obraFolders = await FileSystem.readDirectoryAsync(INTERNAL_OBRAS);
+      for (const folder of obraFolders) {
+        const imgs = await listInternalFiles(`${INTERNAL_OBRAS}${folder}/Imagens/`);
+        for (const f of imgs) imagensMap.set(`${folder}/${f.name}`.toLowerCase(), { ...f, obraName: folder });
+        const pdfs = await listInternalFiles(`${INTERNAL_OBRAS}${folder}/Relatorios/`);
+        for (const f of pdfs) relatoriosMap.set(`${folder}/${f.name}`.toLowerCase(), { ...f, obraName: folder });
+      }
+    }
+  } catch (errObras) {
+    console.warn('[appFilesService] Leitura das pastas das obras:', errObras);
+  }
+
   // 2. Lê arquivos do SAF (diretório público escolhido pelo usuário)
   if (Platform.OS === 'android') {
     const imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
@@ -363,8 +381,84 @@ async function ensureInternalDirs(): Promise<void> {
 }
 
 /**
+ * Lista os arquivos (não diretórios) de uma pasta interna.
+ */
+async function listInternalFiles(dir: string): Promise<FileItem[]> {
+  const out: FileItem[] = [];
+  try {
+    const info = await FileSystem.getInfoAsync(dir);
+    if (!info.exists) return out;
+    const names = await FileSystem.readDirectoryAsync(dir);
+    for (const f of names) {
+      const fUri = `${dir}${f}`;
+      const fStat: any = await FileSystem.getInfoAsync(fUri);
+      if (fStat?.isDirectory) continue;
+      out.push({
+        name: f,
+        uri: fUri,
+        size: fStat?.size || 0,
+        modificationTime: fStat?.modificationTime,
+      });
+    }
+  } catch (e) {
+    console.warn('[appFilesService] Falha ao listar pasta:', dir, e);
+  }
+  return out;
+}
+
+/**
+ * Localiza (ou cria) uma subpasta com o nome informado dentro de um diretório SAF.
+ */
+async function findOrCreateSafDir(parentUri: string, name: string): Promise<string | null> {
+  try {
+    const entries: string[] = await StorageAccessFramework.readDirectoryAsync(parentUri);
+    const target = name.toLowerCase();
+    for (const entry of entries) {
+      const decoded = decodeURIComponent(entry);
+      const last = decoded.split('/').pop() || '';
+      const lastName = (last.includes(':') ? last.split(':').pop() : last) || last;
+      if (lastName.toLowerCase() === target) return entry;
+    }
+  } catch {}
+  try {
+    return await StorageAccessFramework.makeDirectoryAsync(parentUri, name);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Retorna (criando se necessário) a subpasta SAF "<raiz>/<Obra>/<sub>" escolhida pelo usuário.
+ */
+async function getSafObraSubfolder(obraFolder: string, sub: 'Imagens' | 'Relatorios'): Promise<string | null> {
+  const cacheKey = `@obraflow_saf_obra_${obraFolder}_${sub}`;
+  try {
+    const cached = await AsyncStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        await StorageAccessFramework.readDirectoryAsync(cached);
+        return cached;
+      } catch {
+        await AsyncStorage.removeItem(cacheKey);
+      }
+    }
+    const rootDirUri = await AsyncStorage.getItem(KEY_SAF_DIRECTORY_URI);
+    if (!rootDirUri) return null;
+    const obraUri = await findOrCreateSafDir(rootDirUri, obraFolder);
+    if (!obraUri) return null;
+    const subUri = await findOrCreateSafDir(obraUri, sub);
+    if (subUri) await AsyncStorage.setItem(cacheKey, subUri);
+    return subUri;
+  } catch (e) {
+    console.warn('[appFilesService] Falha ao obter subpasta SAF da obra:', e);
+    return null;
+  }
+}
+
+/**
  * SALVAMENTO DE IMAGEM:
- * Salva a foto tirada/selecionada na pasta "Imagens" do diretório escolhido pelo usuário.
+ * Salva a foto na pasta da própria Obra: <ELP_Arquivos>/Obras/<Obra>/Imagens/
+ * (e, quando o usuário vinculou uma pasta do aparelho, em <pasta>/<Obra>/Imagens/).
  */
 export async function saveImageToProjectFolder(
   projectName: string,
@@ -376,66 +470,53 @@ export async function saveImageToProjectFolder(
   const filename = suggestedFilename || `FOTO_${cleanObra}_${timestamp}.jpg`;
   const safeFilename = cleanFolderName(filename, `FOTO_${timestamp}.jpg`);
 
-  await ensureInternalDirs();
+  const { imagensDir } = await ensureProjectFolders(projectName);
 
-  // 1. Salva na pasta interna do app para garantir exibição imediata e offline
-  const internalDest = `${INTERNAL_IMAGENS}${cleanObra}_${safeFilename}`;
+  // 1. Salva na pasta da obra (offline e exibição imediata)
+  const internalDest = `${imagensDir}${safeFilename}`;
   try {
-    await FileSystem.copyAsync({ from: sourceUri, to: internalDest });
+    const existing = await FileSystem.getInfoAsync(internalDest);
+    if (!existing.exists) {
+      await FileSystem.copyAsync({ from: sourceUri, to: internalDest });
+    }
   } catch (errCopy) {
     console.warn('[appFilesService] Cópia interna de imagem:', errCopy);
   }
 
-  // 2. Salva em background no diretório SAF público do usuário (pasta "Imagens")
+  // 2. Salva em background no diretório SAF público do usuário (pasta da obra)
   if (Platform.OS === 'android') {
     (async () => {
       try {
-        let imagensUri = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
-
-        // Se ainda não tiver imagensUri mas tiver directoryUri, tenta recriar/obter a pasta Imagens
-        if (!imagensUri) {
-          const rootDirUri = await AsyncStorage.getItem(KEY_SAF_DIRECTORY_URI);
-          if (rootDirUri) {
-            try {
-              imagensUri = await StorageAccessFramework.makeDirectoryAsync(rootDirUri, 'Imagens');
-              if (imagensUri) await AsyncStorage.setItem(KEY_SAF_IMAGENS_URI, imagensUri);
-            } catch {}
-          }
+        let targetDir = await getSafObraSubfolder(cleanObra, 'Imagens');
+        let targetName = safeFilename;
+        if (!targetDir) {
+          targetDir = await AsyncStorage.getItem(KEY_SAF_IMAGENS_URI);
+          targetName = `${cleanObra}_${safeFilename}`;
         }
+        if (!targetDir) return;
 
-        if (imagensUri) {
-          // Lê o conteúdo da foto em Base64 a partir do destino interno
-          const base64 = await FileSystem.readAsStringAsync(internalDest, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          // Cria o arquivo físico na pasta Imagens escolhida pelo usuário
-          const targetFileUri = await StorageAccessFramework.createFileAsync(
-            imagensUri,
-            `${cleanObra}_${safeFilename}`,
-            'image/jpeg'
-          );
-
-          // Grava o arquivo físico
-          await FileSystem.writeAsStringAsync(targetFileUri, base64, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-
-          console.log(`[appFilesService] ✅ Imagem salva fisicamente na pasta Imagens via SAF: ${targetFileUri}`);
-        }
+        const base64 = await FileSystem.readAsStringAsync(internalDest, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const targetFileUri = await StorageAccessFramework.createFileAsync(targetDir, targetName, 'image/jpeg');
+        await FileSystem.writeAsStringAsync(targetFileUri, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        console.log(`[appFilesService] ✅ Imagem salva na pasta da obra via SAF: ${targetFileUri}`);
       } catch (safErr) {
-        console.warn('[appFilesService] Erro ao gravar foto via SAF na pasta Imagens:', safErr);
+        console.warn('[appFilesService] Erro ao gravar foto via SAF:', safErr);
       }
     })().catch(() => null);
   }
 
-  // SEMPRE retorna a URI do arquivo local interno (file://...) para exibição IMEDIATA (60fps) e offline-first!
+  // SEMPRE retorna a URI do arquivo local (file://...) para exibição imediata e offline-first
   return internalDest || sourceUri;
 }
 
 /**
  * SALVAMENTO DE RELATÓRIO PDF:
- * Salva o relatório PDF na pasta "Relatórios" do diretório escolhido pelo usuário.
+ * Salva o PDF na pasta da própria Obra: <ELP_Arquivos>/Obras/<Obra>/Relatorios/
+ * (e, quando o usuário vinculou uma pasta do aparelho, em <pasta>/<Obra>/Relatorios/).
  */
 export async function saveApprovedPdfToProjectFolder(
   projectName: string,
@@ -447,59 +528,37 @@ export async function saveApprovedPdfToProjectFolder(
   const baseName = `REL_${cleanObra}_${cleanNum}`;
   const filename = baseName.toLowerCase().endsWith('.pdf') ? baseName : `${baseName}.pdf`;
 
-  await ensureInternalDirs();
+  const { pdfsDir } = await ensureProjectFolders(projectName);
 
-  // 1. Salva na pasta interna do app
-  const internalDest = `${INTERNAL_RELATORIOS}${filename}`;
+  // 1. Salva na pasta da obra (sobrescreve a versão anterior do mesmo relatório)
+  const internalDest = `${pdfsDir}${filename}`;
   try {
+    await FileSystem.deleteAsync(internalDest, { idempotent: true });
     await FileSystem.copyAsync({ from: sourcePdfUri, to: internalDest });
   } catch (errCopy) {
     console.warn('[appFilesService] Cópia interna de PDF:', errCopy);
   }
 
-  // 2. Salva no diretório SAF público do usuário (pasta "Relatórios")
+  // 2. Salva no diretório SAF público do usuário (pasta da obra)
   if (Platform.OS === 'android') {
     try {
-      let relatoriosUri = await AsyncStorage.getItem(KEY_SAF_RELATORIOS_URI);
-
-      // Se ainda não tiver relatoriosUri mas tiver directoryUri, tenta recriar/obter a pasta Relatórios
-      if (!relatoriosUri) {
-        const rootDirUri = await AsyncStorage.getItem(KEY_SAF_DIRECTORY_URI);
-        if (rootDirUri) {
-          try {
-            relatoriosUri = await StorageAccessFramework.makeDirectoryAsync(rootDirUri, 'Relatórios');
-          } catch {
-            try {
-              relatoriosUri = await StorageAccessFramework.makeDirectoryAsync(rootDirUri, 'Relatorios');
-            } catch {}
-          }
-          if (relatoriosUri) await AsyncStorage.setItem(KEY_SAF_RELATORIOS_URI, relatoriosUri);
-        }
+      let targetDir = await getSafObraSubfolder(cleanObra, 'Relatorios');
+      if (!targetDir) {
+        targetDir = await AsyncStorage.getItem(KEY_SAF_RELATORIOS_URI);
       }
-
-      if (relatoriosUri) {
-        // Lê o PDF em Base64
+      if (targetDir) {
         const base64Pdf = await FileSystem.readAsStringAsync(sourcePdfUri, {
           encoding: FileSystem.EncodingType.Base64,
         });
-
-        // Cria o arquivo físico na pasta Relatórios escolhida pelo usuário
-        const targetFileUri = await StorageAccessFramework.createFileAsync(
-          relatoriosUri,
-          filename,
-          'application/pdf'
-        );
-
-        // Grava o arquivo físico
+        const targetFileUri = await StorageAccessFramework.createFileAsync(targetDir, filename, 'application/pdf');
         await FileSystem.writeAsStringAsync(targetFileUri, base64Pdf, {
           encoding: FileSystem.EncodingType.Base64,
         });
-
-        console.log(`[appFilesService] ✅ PDF salvo fisicamente na pasta Relatórios via SAF: ${targetFileUri}`);
-        return targetFileUri;
+        console.log(`[appFilesService] ✅ PDF salvo na pasta da obra via SAF: ${targetFileUri}`);
+        return internalDest || targetFileUri;
       }
     } catch (safErr) {
-      console.warn('[appFilesService] Erro ao gravar PDF via SAF na pasta Relatórios:', safErr);
+      console.warn('[appFilesService] Erro ao gravar PDF via SAF:', safErr);
     }
   }
 
@@ -507,7 +566,7 @@ export async function saveApprovedPdfToProjectFolder(
 }
 
 /**
- * Garante pastas das obras e inicialização de diretórios
+ * Garante pastas da obra: <ELP_Arquivos>/Obras/<Obra>/{Imagens,Relatorios}/
  */
 export async function ensureProjectFolders(projectName: string, projectCode?: string): Promise<{
   projectDir: string;
@@ -516,22 +575,16 @@ export async function ensureProjectFolders(projectName: string, projectCode?: st
 }> {
   await ensureInternalDirs();
   const folderName = cleanFolderName(projectName);
-  const pDir = `${INTERNAL_ROOT}${folderName}/`;
+  const pDir = `${INTERNAL_OBRAS}${folderName}/`;
   const iDir = `${pDir}Imagens/`;
-  const rDir = `${pDir}Relatorios_Aprovados_PDF/`;
+  const rDir = `${pDir}Relatorios/`;
 
   try {
-    const info = await FileSystem.getInfoAsync(pDir);
-    if (!info.exists) {
-      await FileSystem.makeDirectoryAsync(pDir, { intermediates: true });
-    }
-    const infoImg = await FileSystem.getInfoAsync(iDir);
-    if (!infoImg.exists) {
-      await FileSystem.makeDirectoryAsync(iDir, { intermediates: true });
-    }
-    const infoPdf = await FileSystem.getInfoAsync(rDir);
-    if (!infoPdf.exists) {
-      await FileSystem.makeDirectoryAsync(rDir, { intermediates: true });
+    for (const d of [pDir, iDir, rDir]) {
+      const info = await FileSystem.getInfoAsync(d);
+      if (!info.exists) {
+        await FileSystem.makeDirectoryAsync(d, { intermediates: true });
+      }
     }
   } catch {}
 
@@ -556,28 +609,37 @@ export async function ensureAllProjectsFolders(): Promise<void> {
 }
 
 /**
- * Retorna o resumo das pastas de obras cadastradas.
+ * Retorna o resumo das pastas de obras cadastradas (arquivos lidos direto da pasta de cada obra).
  */
 export async function getProjectsFoldersSummary(): Promise<ProjectFolderSummary[]> {
   const projetos = await getLocalProjetos('Todos');
-  const { imagens: allImgs, relatorios: allRels } = await getStoredPhysicalFiles();
+  const { imagens: legacyImgs, relatorios: legacyRels } = await getStoredPhysicalFiles();
   const summaries: ProjectFolderSummary[] = [];
 
   for (const p of projetos) {
     const cleanName = cleanFolderName(p.nome, 'Obra');
     const { projectDir, imagensDir, pdfsDir } = await ensureProjectFolders(p.nome, (p as any).codigo || p.numero);
-    
-    // Filtra fotos e PDFs que pertencem a esta obra
-    const projImgs = allImgs.filter(img => 
-      img.name.toLowerCase().includes(cleanName.toLowerCase()) || 
-      (p.nome && img.name.toLowerCase().includes(cleanFolderName(p.nome).toLowerCase()))
-    );
 
-    const projPdfs = allRels.filter(pdf => 
-      pdf.name.toLowerCase().includes(cleanName.toLowerCase()) || 
-      (p.nome && pdf.name.toLowerCase().includes(cleanFolderName(p.nome).toLowerCase())) ||
-      (p.numero && pdf.name.toLowerCase().includes(cleanFolderName(p.numero).toLowerCase()))
-    );
+    const projImgs = await listInternalFiles(imagensDir);
+    const projPdfs = await listInternalFiles(pdfsDir);
+
+    // Arquivos legados (salvos antes na pasta global) que pertencem a esta obra
+    const known = new Set([...projImgs, ...projPdfs].map(f => f.name.toLowerCase()));
+    for (const img of legacyImgs) {
+      if (img.obraName) continue;
+      if (img.name.toLowerCase().includes(cleanName.toLowerCase()) && !known.has(img.name.toLowerCase())) {
+        projImgs.push(img);
+      }
+    }
+    for (const pdf of legacyRels) {
+      if (pdf.obraName) continue;
+      const matches =
+        pdf.name.toLowerCase().includes(cleanName.toLowerCase()) ||
+        (p.numero && pdf.name.toLowerCase().includes(cleanFolderName(p.numero).toLowerCase()));
+      if (matches && !known.has(pdf.name.toLowerCase())) {
+        projPdfs.push(pdf);
+      }
+    }
 
     let totalSize = 0;
     projImgs.forEach(i => totalSize += (i.size || 0));

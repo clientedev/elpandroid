@@ -46,6 +46,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   const [filterConstrutora, setFilterConstrutora] = useState('');
   const [filterFuncionario, setFilterFuncionario] = useState('');
   const [filterResponsavel, setFilterResponsavel] = useState('');
+  const [openDropdown, setOpenDropdown] = useState<'status' | 'tipo' | 'construtora' | 'funcionario' | 'responsavel' | null>(null);
 
   const refreshUserLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
     try {
@@ -261,6 +262,57 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
                              (filterFuncionario ? 1 : 0) + 
                              (filterResponsavel ? 1 : 0);
 
+  const renderDropdown = (
+    key: 'status' | 'tipo' | 'construtora' | 'funcionario' | 'responsavel',
+    label: string,
+    value: string,
+    allLabel: string,
+    options: string[],
+    onSelect: (v: string) => void
+  ) => {
+    const isOpen = openDropdown === key;
+    return (
+      <View style={styles.filterSection}>
+        <Text style={styles.filterSectionLabel}>{label}:</Text>
+        <TouchableOpacity
+          style={[styles.dropdownBtn, isOpen && styles.dropdownBtnOpen]}
+          activeOpacity={0.7}
+          onPress={() => setOpenDropdown(isOpen ? null : key)}
+        >
+          <Text
+            style={[styles.dropdownBtnText, !value && styles.dropdownBtnPlaceholder]}
+            numberOfLines={1}
+          >
+            {value || allLabel}
+          </Text>
+          <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#475569" />
+        </TouchableOpacity>
+        {isOpen && (
+          <View style={styles.dropdownList}>
+            <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+              {[{ v: '', l: allLabel }, ...options.map(o => ({ v: o, l: o }))].map(opt => {
+                const active = value === opt.v;
+                return (
+                  <TouchableOpacity
+                    key={opt.v || '__all__'}
+                    style={[styles.dropdownItem, active && styles.dropdownItemActive]}
+                    onPress={() => {
+                      onSelect(opt.v);
+                      setOpenDropdown(null);
+                    }}
+                  >
+                    <Text style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}>{opt.l}</Text>
+                    {active && <Ionicons name="checkmark" size={16} color="#2563EB" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Cabeçalho dinâmico com ícone de prédio (Seção 15.4) */}
@@ -472,145 +524,26 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
               )}
             </View>
 
-            {/* 1. Filtro por Status */}
-            <View style={styles.filterSection}>
-              <Text style={styles.filterSectionLabel}>Status da Obra:</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-                {(['Todos', 'Ativo', 'Não Iniciado', 'Pausado', 'Concluído'] as const).map(st => (
-                  <TouchableOpacity
-                    key={st}
-                    style={[styles.chipBtn, selectedStatus === st && styles.chipBtnActive]}
-                    onPress={() => handleStatusFilter(st)}
-                  >
-                    <Text style={[styles.chipText, selectedStatus === st && styles.chipTextActive]}>{st}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-
-            {/* 2. Filtro por Tipo de Obra */}
-            {tiposUnicos.length > 0 && (
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionLabel}>Tipo de Obra:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-                  <TouchableOpacity
-                    style={[styles.chipBtn, !filterTipo && styles.chipBtnActive]}
-                    onPress={() => {
-                      setFilterTipo('');
-                      filterList(projetos, search, selectedStatus, '', filterConstrutora, filterFuncionario, filterResponsavel, users);
-                    }}
-                  >
-                    <Text style={[styles.chipText, !filterTipo && styles.chipTextActive]}>Todos os Tipos</Text>
-                  </TouchableOpacity>
-                  {tiposUnicos.map(tp => (
-                    <TouchableOpacity
-                      key={tp}
-                      style={[styles.chipBtn, filterTipo === tp && styles.chipBtnActive]}
-                      onPress={() => {
-                        const newVal = filterTipo === tp ? '' : tp;
-                        setFilterTipo(newVal);
-                        filterList(projetos, search, selectedStatus, newVal, filterConstrutora, filterFuncionario, filterResponsavel, users);
-                      }}
-                    >
-                      <Text style={[styles.chipText, filterTipo === tp && styles.chipTextActive]}>{tp}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* 3. Filtro por Construtora */}
-            {construtorasUnicas.length > 0 && (
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionLabel}>Construtora:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-                  <TouchableOpacity
-                    style={[styles.chipBtn, !filterConstrutora && styles.chipBtnActive]}
-                    onPress={() => {
-                      setFilterConstrutora('');
-                      filterList(projetos, search, selectedStatus, filterTipo, '', filterFuncionario, filterResponsavel, users);
-                    }}
-                  >
-                    <Text style={[styles.chipText, !filterConstrutora && styles.chipTextActive]}>Todas Construtoras</Text>
-                  </TouchableOpacity>
-                  {construtorasUnicas.map(c => (
-                    <TouchableOpacity
-                      key={c}
-                      style={[styles.chipBtn, filterConstrutora === c && styles.chipBtnActive]}
-                      onPress={() => {
-                        const newVal = filterConstrutora === c ? '' : c;
-                        setFilterConstrutora(newVal);
-                        filterList(projetos, search, selectedStatus, filterTipo, newVal, filterFuncionario, filterResponsavel, users);
-                      }}
-                    >
-                      <Text style={[styles.chipText, filterConstrutora === c && styles.chipTextActive]}>{c}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* 4. Filtro por Funcionário */}
-            {funcionariosUnicos.length > 0 && (
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionLabel}>Funcionário:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-                  <TouchableOpacity
-                    style={[styles.chipBtn, !filterFuncionario && styles.chipBtnActive]}
-                    onPress={() => {
-                      setFilterFuncionario('');
-                      filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, '', filterResponsavel, users);
-                    }}
-                  >
-                    <Text style={[styles.chipText, !filterFuncionario && styles.chipTextActive]}>Todos Funcionários</Text>
-                  </TouchableOpacity>
-                  {funcionariosUnicos.map(func => (
-                    <TouchableOpacity
-                      key={func}
-                      style={[styles.chipBtn, filterFuncionario === func && styles.chipBtnActive]}
-                      onPress={() => {
-                        const newVal = filterFuncionario === func ? '' : func;
-                        setFilterFuncionario(newVal);
-                        filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, newVal, filterResponsavel, users);
-                      }}
-                    >
-                      <Text style={[styles.chipText, filterFuncionario === func && styles.chipTextActive]}>{func}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* 5. Filtro por Responsável */}
-            {responsaveisUnicos.length > 0 && (
-              <View style={styles.filterSection}>
-                <Text style={styles.filterSectionLabel}>Responsável Técnico:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsScroll}>
-                  <TouchableOpacity
-                    style={[styles.chipBtn, !filterResponsavel && styles.chipBtnActive]}
-                    onPress={() => {
-                      setFilterResponsavel('');
-                      filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, '', users);
-                    }}
-                  >
-                    <Text style={[styles.chipText, !filterResponsavel && styles.chipTextActive]}>Todos Responsáveis</Text>
-                  </TouchableOpacity>
-                  {responsaveisUnicos.map(resp => (
-                    <TouchableOpacity
-                      key={resp}
-                      style={[styles.chipBtn, filterResponsavel === resp && styles.chipBtnActive]}
-                      onPress={() => {
-                        const newVal = filterResponsavel === resp ? '' : resp;
-                        setFilterResponsavel(newVal);
-                        filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, newVal, users);
-                      }}
-                    >
-                      <Text style={[styles.chipText, filterResponsavel === resp && styles.chipTextActive]}>{resp}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+            {/* Filtros em menu dropdown */}
+            {renderDropdown('status', 'Status da Obra', selectedStatus === 'Todos' ? '' : selectedStatus, 'Todos os Status',
+              ['Ativo', 'Não Iniciado', 'Pausado', 'Concluído'],
+              (v) => handleStatusFilter((v || 'Todos') as any))}
+            {renderDropdown('tipo', 'Tipo de Obra', filterTipo, 'Todos os Tipos', tiposUnicos, (v) => {
+              setFilterTipo(v);
+              filterList(projetos, search, selectedStatus, v, filterConstrutora, filterFuncionario, filterResponsavel, users);
+            })}
+            {renderDropdown('construtora', 'Construtora', filterConstrutora, 'Todas as Construtoras', construtorasUnicas, (v) => {
+              setFilterConstrutora(v);
+              filterList(projetos, search, selectedStatus, filterTipo, v, filterFuncionario, filterResponsavel, users);
+            })}
+            {renderDropdown('funcionario', 'Funcionário', filterFuncionario, 'Todos os Funcionários', funcionariosUnicos, (v) => {
+              setFilterFuncionario(v);
+              filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, v, filterResponsavel, users);
+            })}
+            {renderDropdown('responsavel', 'Responsável Técnico', filterResponsavel, 'Todos os Responsáveis', responsaveisUnicos, (v) => {
+              setFilterResponsavel(v);
+              filterList(projetos, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, v, users);
+            })}
 
             {/* Contador de Obras Encontradas */}
             <View style={styles.advFooterRow}>
@@ -1156,5 +1089,60 @@ const styles = StyleSheet.create({
   gpsDistanceTextAccurate: {
     color: '#1D4ED8',
     fontWeight: '600',
+  },
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dropdownBtnOpen: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  dropdownBtnText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1E293B',
+    fontWeight: '600',
+  },
+  dropdownBtnPlaceholder: {
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  dropdownList: {
+    marginTop: 4,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    maxHeight: 220,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#EFF6FF',
+  },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#334155',
+  },
+  dropdownItemTextActive: {
+    color: '#1D4ED8',
+    fontWeight: '700',
   },
 });

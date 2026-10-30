@@ -746,8 +746,8 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                     <Text style={styles.subDate}>
                       {r.data_relatorio ? new Date(r.data_relatorio).toLocaleDateString('pt-BR') : ''}
                     </Text>
-                    <Text style={[styles.statusTagText, { color: Colors.primary, fontWeight: 'bold' }]}>
-                      {r.status}
+                    <Text style={[styles.statusTagText, { color: r.status === 'em_andamento' ? '#D97706' : Colors.primary, fontWeight: 'bold' }]}>
+                      {r.status === 'em_andamento' ? 'Em Preenchimento (AutoSave)' : r.status}
                     </Text>
                   </View>
                 </TouchableOpacity>

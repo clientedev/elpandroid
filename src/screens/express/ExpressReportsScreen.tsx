@@ -192,7 +192,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   }, []);
 
   const legendCategories = React.useMemo(() => {
-    const cats = Array.from(new Set(legendas.map(l => l.categoria).filter(Boolean))) as string[];
+    const cats = Array.from(new Set(legendas.map(l => l.categoria).filter(c => c && c.trim() !== 'Informações Técnicas'))) as string[];
     return ['Todas', ...cats];
   }, [legendas]);
 
@@ -2050,9 +2050,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                   style={styles.legendItem}
                   onPress={() => handleSelectLegenda(item.texto)}
                 >
-                  <View style={styles.legendCategoryBadge}>
-                    <Text style={styles.legendCategoryText}>{item.categoria}</Text>
-                  </View>
+                  {item.categoria && item.categoria.trim() !== 'Informações Técnicas' ? (
+                    <View style={styles.legendCategoryBadge}>
+                      <Text style={styles.legendCategoryText}>{item.categoria}</Text>
+                    </View>
+                  ) : null}
                   <Text style={styles.legendItemText}>{item.texto}</Text>
                 </TouchableOpacity>
               )}

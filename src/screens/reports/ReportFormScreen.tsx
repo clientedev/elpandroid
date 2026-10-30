@@ -21,6 +21,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { apiClient } from '../../services/api';
 import { notificationService } from '../../services/notificationService';
+import { generateReportPDF } from '../../services/pdfService';
 
 import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete, ChecklistProgressoObra, Visitante } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
@@ -69,7 +70,22 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const preSelectedVisitId = route?.params?.preSelectedVisitId;
   const initialReportId = route?.params?.reportId;
 
-  const [currentReportId, setCurrentReportId] = useState<number>(initialReportId || Date.now());
+  const [currentReportId, setCurrentReportIdState] = useState<number>(initialReportId || Date.now());
+  // Ref sempre atualizado com o ID corrente (evita closures obsoletas e recriação de rascunho apagado no autosave)
+  const currentReportIdRef = useRef<number>(currentReportId);
+  const setCurrentReportId = useCallback((id: number) => {
+    currentReportIdRef.current = id;
+    setCurrentReportIdState(id);
+  }, []);
+  // Status original do relatório carregado (autosave nunca rebaixa um relatório já enviado)
+  const originalStatusRef = useRef<string>('em_andamento');
+  // Fila serial: autosave por debounce e salvamento imediato nunca executam em paralelo
+  const saveQueueRef = useRef<Promise<any>>(Promise.resolve());
+  const runSerialized = useCallback(<T,>(fn: () => Promise<T>): Promise<T> => {
+    const next = saveQueueRef.current.catch(() => null).then(fn);
+    saveQueueRef.current = next.catch(() => null);
+    return next;
+  }, []);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   // Ref para acessar projetos no autosave sem gerar re-renders/re-trigger do efeito
@@ -135,7 +151,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     const cats = new Set<string>();
     cats.add('Todas');
     for (const l of legendas) {
-      if (l.categoria && l.categoria.trim()) {
+      if (l.categoria && l.categoria.trim() && l.categoria.trim() !== 'Informações Técnicas') {
         cats.add(l.categoria.trim());
       }
     }
@@ -283,9 +299,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [selectedProjectId, techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa, techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor, techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, isOnline]);
 
   // Função central para persistência imediata de rascunho
-  const saveDraftImmediately = useCallback(async () => {
+  const saveDraftImmediatelyInner = useCallback(async () => {
+    if (hasSavedAndExitingRef.current) return;
     try {
       setIsAutoSaving(true);
+      const rid = currentReportIdRef.current;
       const proj = projetosRef.current.find(p => p.id === selectedProjectId) || projetosRef.current[0];
       const projId = selectedProjectId || proj?.id || 1;
       const projNome = proj?.nome || 'Obra';
@@ -317,7 +335,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       }
 
       const draftObj: Relatorio = {
-        id: currentReportId,
+        id: rid,
         uuid: reportUuid,
         uuid_local: reportUuid,
         numero: reportNumber && reportNumber.startsWith('REL-') ? reportNumber : 'Rascunho',
@@ -336,7 +354,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         acompanhantes: JSON.stringify(acompanhantesList),
         categoria: categoria,
         local: local,
-        status: 'em_andamento', // RASCUNHO GARANTIDO
+        status: originalStatusRef.current as any, // RASCUNHO GARANTIDO (preserva status original se já enviado)
         sync_status: 'pending',
         updated_at: new Date().toISOString(),
       };
@@ -354,7 +372,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         }
         await saveLocalFoto({
           ...fotos[i],
-          relatorio_id: currentReportId,
+          relatorio_id: rid,
           relatorio_uuid: reportUuid,
           ordem: i,
           base64: b64,
@@ -378,6 +396,21 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor,
     techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes
   ]);
+
+  const saveDraftImmediately = useCallback(
+    () => runSerialized(saveDraftImmediatelyInner),
+    [runSerialized, saveDraftImmediatelyInner]
+  );
+
+  // Numeração por obra: novo relatório recebe imediatamente o próximo REL-XXXX (começa em REL-0001 em cada obra)
+  useEffect(() => {
+    if (initialReportId || !selectedProjectId) return;
+    let cancelled = false;
+    getNextReportNumberForProject(selectedProjectId, currentReportIdRef.current)
+      .then(n => { if (!cancelled && n) setReportNumber(n); })
+      .catch(() => null);
+    return () => { cancelled = true; };
+  }, [selectedProjectId, initialReportId]);
 
   // Sempre que o usuário inicia um novo relatório, o rascunho é criado imediatamente
   useEffect(() => {
@@ -591,6 +624,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     if (initialReportId) {
       getLocalRelatorioById(initialReportId).then(async (r) => {
         if (r) {
+          originalStatusRef.current = r.status || 'em_andamento';
+          // Relatório já enviado/aprovado nunca reabre no formulário via "Voltar" (somente via "Editar" explícito)
+          if (['Aguardando Aprovação', 'Aprovado', 'Concluído'].includes(String(r.status)) && !route?.params?.allowEdit) {
+            hasSavedAndExitingRef.current = true;
+            navigation.replace('ReportDetailScreen', { reportId: r.id });
+            return;
+          }
           setCurrentReportId(r.id);
           if (r.uuid) setReportUuid(r.uuid);
           setReportNumber(r.numero || 'Pendente Sincronização');
@@ -663,9 +703,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   useEffect(() => {
     if (!selectedProjectId) return;
 
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => runSerialized(async () => {
+      if (hasSavedAndExitingRef.current) return;
       try {
         setIsAutoSaving(true);
+        const rid = currentReportIdRef.current;
         const proj = projetosRef.current.find(p => p.id === selectedProjectId);
 
         // 0. Salva informações técnicas da obra no SQLite se houver obra selecionada
@@ -695,11 +737,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         }
 
         const draft: Relatorio = {
-          id: currentReportId,
+          id: rid,
           uuid: reportUuid,
           uuid_local: reportUuid,
           data_criacao_local: new Date().toISOString(),
-          numero: reportNumber,
+          numero: reportNumber && reportNumber.startsWith('REL-') ? reportNumber : 'Rascunho',
           titulo: titulo.trim() || 'Rascunho de Relatório',
           projeto_id: selectedProjectId,
           projeto_nome: proj?.nome || 'Obra',
@@ -714,7 +756,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           acompanhantes: JSON.stringify(acompanhantesList),
           categoria: categoria,
           local: local,
-          status: 'em_andamento',
+          status: originalStatusRef.current as any,
           sync_status: 'pending',
         };
 
@@ -734,7 +776,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           }
           const fObj: FotoRelatorio = {
             ...fotos[i],
-            relatorio_id: currentReportId,
+            relatorio_id: rid,
             relatorio_uuid: reportUuid,
             ordem: i,
             base64: b64,
@@ -749,9 +791,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         // 3. Sincronização em tempo real com o servidor Railway se conectado
         if (isOnline) {
           try {
-            const isServerId = currentReportId > 0 && currentReportId < 2000000000;
+            const isServerId = rid > 0 && rid < 2000000000;
             if (isServerId) {
-              await apiClient.axios.put(`/api/relatorios/${currentReportId}`, {
+              await apiClient.axios.put(`/api/relatorios/${rid}`, {
                 ...draft,
                 autor_id: user?.id,
                 fotos: preparedFotos,
@@ -760,6 +802,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             } else {
               const res = await apiClient.axios.post('/api/relatorios', {
                 ...draft,
+                projeto_numero: proj?.numero,
                 uuid: reportUuid,
                 uuid_local: reportUuid,
                 autor_id: user?.id,
@@ -769,7 +812,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               if (res?.data?.id) {
                 const serverId = res.data.id;
                 const serverNumero = res.data.numero || draft.numero;
-                const oldId = currentReportId;
+                const oldId = rid;
                 setCurrentReportId(serverId);
                 setReportNumber(serverNumero);
                 if (oldId !== serverId) {
@@ -796,7 +839,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       } finally {
         setIsAutoSaving(false);
       }
-    }, 2000);
+    }), 2000);
 
     return () => clearTimeout(timer);
   }, [
@@ -1011,12 +1054,15 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }
 
     setLoading(true);
+    // Bloqueia novos autosaves e aguarda o que estiver em andamento (evita sobrescrever status/ID)
+    hasSavedAndExitingRef.current = true;
     try {
-      const reportId = currentReportId;
+      await saveQueueRef.current.catch(() => null);
+      const reportId = currentReportIdRef.current;
 
       let finalReportNumber = reportNumber;
-      if (status === 'Aguardando Aprovação' && (!finalReportNumber || !finalReportNumber.startsWith('REL-') || finalReportNumber.includes('Pendente') || finalReportNumber.includes('Rascunho'))) {
-        finalReportNumber = await getNextReportNumberForProject(selectedProjectId);
+      if (!finalReportNumber || !finalReportNumber.startsWith('REL-')) {
+        finalReportNumber = await getNextReportNumberForProject(selectedProjectId, reportId);
         setReportNumber(finalReportNumber);
       }
 
@@ -1101,6 +1147,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       }
 
       // 3. Sincronização ou enfileiramento inteligente
+      let savedNumero = finalReportNumber;
       const isServerId = reportId > 0 && reportId < 2000000000;
       if (isOnline) {
         try {
@@ -1114,6 +1161,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             const preparedFotos = fotos.map((f, i) => ({ ...f, relatorio_id: reportId, relatorio_uuid: reportUuid, ordem: i, imagem_base64: f.base64 }));
             const res = await apiClient.axios.post('/api/relatorios', {
               ...relData,
+              projeto_numero: selectedProj?.numero,
               uuid: reportUuid,
               uuid_local: reportUuid,
               autor_id: user?.id,
@@ -1123,6 +1171,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             if (res?.data?.id) {
               const serverId = res.data.id;
               const serverNumero = res.data.numero;
+              if (serverNumero) savedNumero = serverNumero;
               await migrateLocalFotosRelatorioId(reportId, serverId, reportUuid);
               const db = await getDatabase();
               await db.runAsync('DELETE FROM relatorios WHERE id = ?', [reportId]);
@@ -1151,6 +1200,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         );
       }
 
+      // Gera o PDF em segundo plano e salva na pasta da obra no aparelho
+      generateReportPDF({ ...relData, numero: savedNumero }, fotos).catch(() => null);
+
       Alert.alert(
         'Sucesso!', 
         status === 'Aguardando Aprovação' 
@@ -1166,15 +1218,18 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                 .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
                 .catch(() => null);
             }
-            if (preSelectedProjectId) {
-              navigation.navigate('ProjectDetailScreen', { projectId: preSelectedProjectId });
-            } else {
+            // goBack remove este formulário da pilha: "Voltar" nunca reabre um relatório salvo/enviado
+            if (navigation.canGoBack()) {
               navigation.goBack();
+            } else if (preSelectedProjectId) {
+              navigation.replace('ProjectDetailScreen', { projectId: preSelectedProjectId });
             }
           } 
-        }]
+        }],
+        { cancelable: false }
       );
     } catch (err: any) {
+      hasSavedAndExitingRef.current = false;
       Alert.alert('Erro ao Salvar', err.message);
     } finally {
       setLoading(false);
@@ -1947,9 +2002,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                   style={styles.legendItem}
                   onPress={() => handleSelectLegenda(item.texto)}
                 >
-                  <View style={styles.legendCategoryBadge}>
-                    <Text style={styles.legendCategoryText}>{item.categoria}</Text>
-                  </View>
+                  {item.categoria && item.categoria.trim() !== 'Informações Técnicas' ? (
+                    <View style={styles.legendCategoryBadge}>
+                      <Text style={styles.legendCategoryText}>{item.categoria}</Text>
+                    </View>
+                  ) : null}
                   <Text style={styles.legendItemText}>{item.texto}</Text>
                 </TouchableOpacity>
               )}
@@ -2021,7 +2078,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                       setShowProjectPickerModal(false);
                       setProjectSearchQuery('');
                       try {
-                        const nextNum = await getNextReportNumberForProject(item.id);
+                        if (!initialReportId) return; // novo relatório: número é recalculado automaticamente ao trocar de obra
+                        const nextNum = await getNextReportNumberForProject(item.id, currentReportIdRef.current);
                         if (nextNum) setReportNumber(nextNum);
                       } catch (e) {}
                     }}

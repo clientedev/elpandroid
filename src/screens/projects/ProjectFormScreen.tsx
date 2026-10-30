@@ -71,7 +71,10 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
 
   // ================= 3. ENDEREÇO =================
   const [endereco, setEndereco] = useState(existingProject?.endereco || '');
-  const [cep, setCep] = useState('');
+  const [cep, setCep] = useState(() => {
+    const match = (existingProject?.endereco || '').match(/\b(\d{5})-?(\d{3})\b/);
+    return match ? `${match[1]}-${match[2]}` : '';
+  });
   const [latitude, setLatitude] = useState<number | undefined>(existingProject?.latitude);
   const [longitude, setLongitude] = useState<number | undefined>(existingProject?.longitude);
   const [loadingCep, setLoadingCep] = useState(false);
@@ -393,6 +396,13 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       setLatitude(parseFloat(item.lat));
       setLongitude(parseFloat(item.lon));
     }
+    const rawPostcode = item?.address?.postcode || '';
+    const digits = String(rawPostcode).replace(/\D/g, '');
+    if (digits.length === 8) {
+      setCep(`${digits.slice(0, 5)}-${digits.slice(5)}`);
+    } else if (rawPostcode) {
+      setCep(String(rawPostcode));
+    }
     setStreetSuggestions([]);
   }
 
@@ -418,6 +428,8 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       setLongitude(newLon);
 
       let resolvedAddress = '';
+      let detectedCep = '';
+
       try {
         const reverseGeocode = await Location.reverseGeocodeAsync({
           latitude: newLat,
@@ -435,23 +447,56 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
           const uf = item.region || '';
           if (cidade && uf) parts.push(`${cidade} - ${uf}`);
           else if (cidade || uf) parts.push(cidade || uf);
-          if (item.postalCode) parts.push(`CEP ${item.postalCode}`);
+          if (item.postalCode) {
+            const digits = String(item.postalCode).replace(/\D/g, '');
+            detectedCep = digits.length === 8 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : String(item.postalCode).trim();
+            parts.push(`CEP ${detectedCep}`);
+          }
           resolvedAddress = parts.filter(Boolean).join(', ');
         }
       } catch (revErr) {
         console.warn('[GPS] Erro no geocoding reverso:', revErr);
       }
 
+      // Fallback / complemento via Nominatim para garantir preenchimento automático do CEP
+      if (!detectedCep || detectedCep.replace(/\D/g, '').length < 8 || !resolvedAddress) {
+        try {
+          const nomResp = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${newLat}&lon=${newLon}&addressdetails=1`,
+            { headers: { 'User-Agent': 'ELP-ObraFlow-Mobile/1.0' } }
+          );
+          if (nomResp.ok) {
+            const nomData = await nomResp.json();
+            const addr = nomData?.address || {};
+            if (addr.postcode && (!detectedCep || detectedCep.replace(/\D/g, '').length < 8)) {
+              const digits = String(addr.postcode).replace(/\D/g, '');
+              detectedCep = digits.length === 8 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : String(addr.postcode).trim();
+            }
+            if (!resolvedAddress && nomData?.display_name) {
+              resolvedAddress = nomData.display_name;
+            } else if (resolvedAddress && detectedCep && !resolvedAddress.includes('CEP')) {
+              resolvedAddress = `${resolvedAddress}, CEP ${detectedCep}`;
+            }
+          }
+        } catch (nomErr) {
+          console.warn('[GPS] Fallback Nominatim CEP:', nomErr);
+        }
+      }
+
+      if (detectedCep) {
+        setCep(detectedCep);
+      }
+
       if (resolvedAddress) {
         setEndereco(resolvedAddress);
         Alert.alert(
           'Localização do Dispositivo Obtida',
-          `Endereço identificado com sucesso pelo GPS do dispositivo:\n\n${resolvedAddress}\n\nCoordenadas:\nLat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`
+          `Endereço identificado com sucesso pelo GPS do dispositivo:\n\n${resolvedAddress}${detectedCep ? `\nCEP: ${detectedCep}` : ''}\n\nCoordenadas:\nLat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`
         );
       } else {
         const fallbackCoord = `Lat: ${newLat.toFixed(6)}, Lon: ${newLon.toFixed(6)}`;
         if (!endereco.trim()) setEndereco(fallbackCoord);
-        Alert.alert('GPS Capturado', `Coordenadas obtidas:\n${fallbackCoord}`);
+        Alert.alert('GPS Capturado', `Coordenadas obtidas:\n${fallbackCoord}${detectedCep ? `\nCEP: ${detectedCep}` : ''}`);
       }
     } catch {
       Alert.alert('Falha no GPS', 'Não foi possível obter a localização do dispositivo no momento.');

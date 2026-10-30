@@ -444,7 +444,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
         }
       } catch {}
     }
-    navigation.navigate('ReportFormScreen', { reportId, preSelectedProjectId: preProjId });
+    navigation.navigate('ReportFormScreen', { reportId, preSelectedProjectId: preProjId, allowEdit: true });
   }
 
   if (!relatorio) {

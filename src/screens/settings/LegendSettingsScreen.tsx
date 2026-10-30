@@ -142,14 +142,17 @@ export default function LegendSettingsScreen() {
 
   const renderItem = ({ item, index }: { item: LegendaPredefinida; index: number }) => (
     <View style={styles.card}>
-      <View style={styles.tagBadge}>
-        <Text style={styles.tagBadgeText}>{item.categoria}</Text>
-      </View>
-
-      <View style={styles.contentCol}>
-        <Text style={styles.itemText}>{item.texto}</Text>
-        <Text style={styles.orderLabel}>Posição: #{index + 1}</Text>
-      </View>
+      <View style={styles.cardTopRow}>
+        <View style={styles.cardMetaRow}>
+          <View style={styles.orderBadge}>
+            <Text style={styles.orderBadgeText}>#{index + 1}</Text>
+          </View>
+          {item.categoria && item.categoria !== 'Informações Técnicas' ? (
+            <View style={styles.tagBadge}>
+              <Text style={styles.tagBadgeText}>{item.categoria}</Text>
+            </View>
+          ) : null}
+        </View>
 
       <View style={styles.actionButtons}>
         {/* Subir */}
@@ -184,6 +187,9 @@ export default function LegendSettingsScreen() {
           <Ionicons name="trash-outline" size={16} color="#DC2626" />
         </TouchableOpacity>
       </View>
+      </View>
+
+      <Text style={styles.itemText}>{item.texto}</Text>
     </View>
   );
 
@@ -403,8 +409,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
@@ -417,12 +421,34 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  orderBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+  },
+  orderBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
   tagBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 6,
     backgroundColor: '#EFF6FF',
-    marginRight: 10,
     borderWidth: 1,
     borderColor: '#DBEAFE',
   },

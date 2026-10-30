@@ -461,7 +461,9 @@ class SyncService {
 
         const localReports = await getLocalRelatorios();
         for (const lr of localReports) {
-          if (lr.sync_status === 'synced' && !serverReportIds.has(lr.id)) {
+          // Rascunhos (autosave) nunca são removidos na reconciliação: podem não vir na listagem do servidor
+          const isDraftLocal = ['em_andamento', 'preenchimento', 'Rascunho'].includes(String(lr.status)) || !lr.status;
+          if (!isDraftLocal && lr.sync_status === 'synced' && lr.id < 2000000000 && !serverReportIds.has(lr.id)) {
             console.log(`[SyncService] Relatório ${lr.id} (${lr.numero}) excluído na nuvem. Removendo do dispositivo.`);
             await db.runAsync('DELETE FROM fotos_relatorio WHERE relatorio_id = ?;', [lr.id]);
             await db.runAsync('DELETE FROM relatorios WHERE id = ?;', [lr.id]);
