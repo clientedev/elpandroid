@@ -788,21 +788,21 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
 
   // Deduplicação segura e não-destrutiva: mescla apenas fotos comprovadamente idênticas
   const seenById = new Map<number, FotoRelatorio>();
+  const seenByFilename = new Map<string, FotoRelatorio>();
   const seenByUri = new Map<string, FotoRelatorio>();
-  const seenByB64 = new Map<string, FotoRelatorio>();
   const result: FotoRelatorio[] = [];
 
   for (const f of rows) {
     const uriKey = (f.uri_local && f.uri_local.startsWith('file://')) ? f.uri_local.trim() : '';
-    const b64Key = (f.base64 && f.base64.length > 100) ? f.base64.substring(0, 80) : '';
+    const filenameKey = (f.filename && f.filename.trim()) || '';
 
     let existing: FotoRelatorio | undefined;
     if (f.id && seenById.has(f.id)) {
       existing = seenById.get(f.id);
+    } else if (filenameKey && seenByFilename.has(filenameKey)) {
+      existing = seenByFilename.get(filenameKey);
     } else if (uriKey && seenByUri.has(uriKey)) {
       existing = seenByUri.get(uriKey);
-    } else if (b64Key && seenByB64.has(b64Key)) {
-      existing = seenByB64.get(b64Key);
     }
 
     if (existing) {
@@ -818,8 +818,8 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
     } else {
       result.push(f);
       if (f.id) seenById.set(f.id, f);
+      if (filenameKey) seenByFilename.set(filenameKey, f);
       if (uriKey) seenByUri.set(uriKey, f);
-      if (b64Key) seenByB64.set(b64Key, f);
     }
   }
 
@@ -923,11 +923,16 @@ export async function migrateLocalFotosRelatorioId(oldRelatorioId: number, newRe
 }
 
 /** Migra fotos express no SQLite quando o ID provisório do relatório muda para o ID do servidor */
-export async function migrateLocalFotosRelatorioExpressId(oldRelatorioId: number, newRelatorioId: number): Promise<void> {
-  if (!oldRelatorioId || !newRelatorioId || oldRelatorioId === newRelatorioId) return;
+export async function migrateLocalFotosRelatorioExpressId(oldRelatorioId: number | string, newRelatorioId: number | string): Promise<void> {
+  if (!oldRelatorioId || !newRelatorioId || String(oldRelatorioId) === String(newRelatorioId)) return;
   const db = await getDatabase();
   try {
-    await db.runAsync('UPDATE fotos_relatorio_express SET relatorio_express_id = ? WHERE relatorio_express_id = ?', [newRelatorioId, oldRelatorioId]);
+    const numOld = Number(oldRelatorioId);
+    const numNew = Number(newRelatorioId);
+    await db.runAsync(
+      'UPDATE fotos_relatorio_express SET relatorio_express_id = ? WHERE relatorio_express_id = ? OR relatorio_express_id = ?',
+      [numNew, numOld, String(oldRelatorioId)]
+    );
     console.log(`[db] Fotos express migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId}`);
   } catch (err) {
     console.warn('[db] Erro ao migrar fotos express:', err);
@@ -1186,103 +1191,43 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
     [numId, String(relatorioExpressId)]
   );
 
-  // Deduplicação não-destrutiva de fotos express: consolida fotos comprovadamente idênticas
-  const seenById = new Map<number, FotoRelatorioExpress>();
-  const seenByFilename = new Map<string, FotoRelatorioExpress>();
-  const seenByUri = new Map<string, FotoRelatorioExpress>();
-  const seenByB64 = new Map<string, FotoRelatorioExpress>();
-  const result: FotoRelatorioExpress[] = [];
-
-  for (const f of rows) {
-    // Ignora fotos fantasmas totalmente vazias (sem arquivo local, sem URL válida e sem base64)
-    const hasLocalUri = Boolean(f.uri_local && (f.uri_local.startsWith('file://') || f.uri_local.startsWith('/') || f.uri_local.startsWith('content://')));
-    const hasValidUrl = Boolean(f.url && f.url.length > 5 && !f.url.endsWith('null') && !f.url.endsWith('undefined'));
-    const hasBase64 = Boolean(f.base64 && f.base64.length > 50);
-
-    if (!hasLocalUri && !hasValidUrl && !hasBase64) {
-      continue;
-    }
-
-    const filenameKey = (f.filename && f.filename.trim()) || '';
-    const uriKey = hasLocalUri ? f.uri_local!.trim() : '';
-    const b64Key = hasBase64 ? f.base64!.substring(0, 80) : '';
-
-    let existing: FotoRelatorioExpress | undefined;
-    if (f.id && seenById.has(f.id)) {
-      existing = seenById.get(f.id);
-    } else if (filenameKey && seenByFilename.has(filenameKey)) {
-      existing = seenByFilename.get(filenameKey);
-    } else if (uriKey && seenByUri.has(uriKey)) {
-      existing = seenByUri.get(uriKey);
-    } else if (b64Key && seenByB64.has(b64Key)) {
-      existing = seenByB64.get(b64Key);
-    }
-
-    if (existing) {
-      if (hasLocalUri) {
-        existing.uri_local = f.uri_local;
-      }
-      if (!existing.base64 && hasBase64) existing.base64 = f.base64;
-      if (!existing.legenda && f.legenda) existing.legenda = f.legenda;
-      if (!existing.anotacoes_dados && f.anotacoes_dados) existing.anotacoes_dados = f.anotacoes_dados;
-      if (f.id && f.id < 1000000000) existing.id = f.id;
-      if (f.url && hasValidUrl) existing.url = f.url;
-      if (f.filename) existing.filename = f.filename;
-    } else {
-      result.push(f);
-      if (f.id) seenById.set(f.id, f);
-      if (filenameKey) seenByFilename.set(filenameKey, f);
-      if (uriKey) seenByUri.set(uriKey, f);
-      if (b64Key) seenByB64.set(b64Key, f);
-    }
-  }
-
-  return result.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+  return rows || [];
 }
 
 export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
 
-  // Reconciliação inteligente: se já existe foto local provisória (id >= 1000000000) para esta mesma ordem ou filename,
-  // preserva o arquivo local file:// e base64 e substitui o registro temporário pelo oficial
-  try {
-    const numRelId = Number(f.relatorio_express_id) || 0;
-    const strRelId = String(f.relatorio_express_id);
-
-    let matchLocal: { id: number; uri_local?: string; base64?: string; anotacoes_dados?: string } | null = null;
-
-    if (f.filename && f.filename.length > 8 && !f.filename.startsWith('photo_') && f.filename !== 'photo.jpg') {
-      matchLocal = await db.getFirstAsync<{ id: number; uri_local?: string; base64?: string; anotacoes_dados?: string }>(
-        'SELECT id, uri_local, base64, anotacoes_dados FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND filename = ? AND id != ? LIMIT 1',
-        [numRelId, strRelId, f.filename, f.id || 0]
-      );
-    }
-
-    if (matchLocal) {
-      // Preserva URI local file:// e base64 para nunca ficar card vazio
-      if (matchLocal.uri_local && matchLocal.uri_local.startsWith('file://')) {
-        f.uri_local = matchLocal.uri_local;
+  let finalBase64 = f.base64 || '';
+  if (!finalBase64 && f.id) {
+    try {
+      const existing = await db.getFirstAsync<{ base64?: string }>('SELECT base64 FROM fotos_relatorio_express WHERE id = ?', [f.id]);
+      if (existing?.base64) {
+        finalBase64 = existing.base64;
       }
-      if (matchLocal.base64 && !f.base64) {
-        f.base64 = matchLocal.base64;
-      }
-      if (matchLocal.anotacoes_dados && !f.anotacoes_dados) {
-        f.anotacoes_dados = matchLocal.anotacoes_dados;
-      }
-      await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [matchLocal.id]);
-    }
-  } catch (reconcileErr) {
-    console.warn('[saveLocalFotoExpress] Erro na reconciliação de foto express:', reconcileErr);
+    } catch {}
   }
+  // Se ainda não tiver base64 e tiver arquivo local, lê diretamente do arquivo para salvar no SQLite
+  if (!finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
+    try {
+      const { readPhotoBase64 } = require('../services/imageService');
+      const b64Read = await readPhotoBase64(f.uri_local);
+      if (b64Read) {
+        finalBase64 = b64Read;
+      }
+    } catch {}
+  }
+
+  const safeId = Number(f.id) || Date.now();
+  const safeRelId = Number(f.relatorio_express_id) || 0;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio_express (
       id, relatorio_express_id, url, filename, uri_local, titulo, legenda, descricao, local, base64, anotacoes_dados, ordem, sync_status
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      f.id, f.relatorio_express_id, f.url || '', f.filename || '', f.uri_local || '',
-      f.titulo || '', f.legenda || '', f.descricao || '', f.local || '', f.base64 || '',
-      f.anotacoes_dados || '', f.ordem || 0, syncStatus
+      safeId, safeRelId, String(f.url || ''), String(f.filename || ''), String(f.uri_local || ''),
+      String(f.titulo || ''), String(f.legenda || ''), String(f.descricao || ''), String(f.local || ''), String(finalBase64 || ''),
+      String(f.anotacoes_dados || ''), Number(f.ordem) || 0, String(syncStatus || f.sync_status || 'pending')
     ]
   );
 }

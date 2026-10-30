@@ -14884,6 +14884,7 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
     existing_by_id = {f.id: f for f in existing_fotos}
     existing_by_hash = {f.imagem_hash: f for f in existing_fotos if f.imagem_hash}
     existing_by_filename = {f.filename: f for f in existing_fotos if f.filename}
+    existing_by_ordem = {f.ordem: f for f in existing_fotos if f.ordem is not None}
     existing_by_url = {}
     for f in existing_fotos:
         if f.url:
@@ -14959,6 +14960,10 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
         # 4. Tentar encontrar por URL existente (absoluta ou relativa)
         if not foto_existente and raw_url and (raw_url in existing_by_url or clean_url in existing_by_url):
             foto_existente = existing_by_url.get(raw_url) or existing_by_url.get(clean_url)
+
+        # 5. Tentar encontrar por ordem se posicao bater
+        if not foto_existente and idx in existing_by_ordem:
+            foto_existente = existing_by_ordem[idx]
 
         if foto_existente:
             # Já existe no relatório: atualiza metadados sem duplicar registro nem imagem

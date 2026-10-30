@@ -551,39 +551,40 @@ class SyncService {
         for (const exp of serverExpress) {
           await saveLocalRelatorioExpress(exp, 'synced');
           if (Array.isArray(exp.fotos)) {
-            // Busca fotos locais provisórias deste relatório para não perder arquivos locais file:// nem duplicar
-            const existingLocalFotos = await db.getAllAsync<FotoRelatorioExpress>(
-              'SELECT * FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?',
-              [exp.id, String(exp.id)]
-            );
-
             for (const f of exp.fotos) {
               const fullUrl = f.url?.startsWith('http')
                 ? f.url
                 : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
 
-              // Tenta casar com foto local existente por id ou filename real
-              const match = existingLocalFotos.find(lf => 
-                lf.id === f.id || 
-                (f.filename && f.filename.length > 5 && lf.filename === f.filename)
-              );
+              let targetUri = fullUrl;
+              let preservedB64 = '';
+              let preservedAnot = typeof f.anotacoes_dados === 'object' ? JSON.stringify(f.anotacoes_dados) : (f.anotacoes_dados || '');
 
-              const preservedUri = (match && match.uri_local && match.uri_local.startsWith('file://')) 
-                ? match.uri_local 
-                : fullUrl;
-              const preservedB64 = (match && match.base64) ? match.base64 : '';
-              const preservedAnot = (match && match.anotacoes_dados) ? match.anotacoes_dados : (f.anotacoes_dados || '');
-
-              if (match && match.id !== f.id) {
-                await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [match.id]);
-              }
+              try {
+                const existingFoto = await db.getFirstAsync<{ id: number; uri_local?: string; base64?: string; anotacoes_dados?: string }>(
+                  'SELECT id, uri_local, base64, anotacoes_dados FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND ((filename IS NOT NULL AND filename != "" AND filename = ?) OR id = ? OR ordem = ?)',
+                  [exp.id, String(exp.id), f.filename || '', f.id, f.ordem !== undefined ? f.ordem : -1]
+                );
+                if (existingFoto?.uri_local && existingFoto.uri_local.startsWith('file://')) {
+                  targetUri = existingFoto.uri_local;
+                }
+                if (existingFoto?.base64) {
+                  preservedB64 = existingFoto.base64;
+                }
+                if (existingFoto?.anotacoes_dados && !preservedAnot) {
+                  preservedAnot = existingFoto.anotacoes_dados;
+                }
+                if (existingFoto && existingFoto.id !== f.id && existingFoto.id >= 1000000000) {
+                  await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [existingFoto.id]);
+                }
+              } catch {}
 
               await saveLocalFotoExpress({
                 id: f.id,
                 relatorio_express_id: exp.id,
                 url: fullUrl,
                 filename: f.filename,
-                uri_local: preservedUri,
+                uri_local: targetUri,
                 titulo: f.titulo || '',
                 legenda: f.legenda || '',
                 descricao: f.descricao || '',
@@ -594,12 +595,6 @@ class SyncService {
                 sync_status: 'synced',
               }, 'synced');
             }
-
-            // Remove quaisquer fotos provisórias órfãs com id temporário que sobraram para este relatório (somente as que não estão pendentes)
-            await db.runAsync(
-              'DELETE FROM fotos_relatorio_express WHERE (relatorio_express_id = ? OR relatorio_express_id = ?) AND id >= 1000000000 AND sync_status != "pending"',
-              [exp.id, String(exp.id)]
-            );
           }
         }
       }

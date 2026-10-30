@@ -26,16 +26,7 @@ import { useNetwork } from '../../contexts/NetworkContext';
 import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio, Visitante, Relatorio, LegendaPredefinida } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
-export interface AttachedExpressPhoto {
-  id?: number;
-  uri: string;
-  url?: string;
-  base64?: string;
-  filename?: string;
-  legenda?: string;
-  anotacoes_dados?: string;
-  local?: string;
-}
+export type AttachedExpressPhoto = FotoRelatorioExpress;
 
 export interface ChecklistItemState {
   id: number;
@@ -346,28 +337,21 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     // Salva imediatamente no SQLite local para persistir com segurança
     await saveLocalRelatorioExpress(expDraft, 'pending');
 
+    // Persistir fotos no SQLite com ID estável e propriedades preservadas
     for (let i = 0; i < attachedPhotos.length; i++) {
       const ap = attachedPhotos[i];
-      const photoId = ap.id || (Date.now() + i + 1);
-      ap.id = photoId;
       let b64 = ap.base64;
-      if (!b64 && ap.uri && !ap.uri.startsWith('http')) {
-        b64 = await readPhotoBase64(ap.uri).catch(() => undefined);
+      if (!b64 && ap.uri_local && !ap.uri_local.startsWith('http')) {
+        b64 = await readPhotoBase64(ap.uri_local).catch(() => undefined);
         if (b64) ap.base64 = b64;
       }
       const fotoObj: FotoRelatorioExpress = {
-        id: photoId,
+        ...ap,
+        id: ap.id,
         relatorio_express_id: targetId,
-        url: ap.url || (ap.uri && ap.uri.startsWith('http') ? ap.uri : undefined),
-        filename: ap.filename,
-        uri_local: ap.uri,
-        base64: b64,
-        local: ap.local || obraNome.trim(),
-        titulo: `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
-        legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
-        anotacoes_dados: ap.anotacoes_dados,
         ordem: i,
-        sync_status: 'pending'
+        base64: b64,
+        sync_status: 'pending',
       };
       await saveLocalFotoExpress(fotoObj, 'pending');
     }
@@ -643,24 +627,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     // Carregar fotos do relatório com legendas e anotações técnicas
     try {
       const fotosDb = await getLocalFotosExpress(item.id);
-      if (fotosDb && fotosDb.length > 0) {
-        setAttachedPhotos(
-          fotosDb
-            .filter(f => Boolean((f.uri_local && f.uri_local.length > 3) || (f.base64 && f.base64.length > 50) || (f.url && f.url.length > 5 && !f.url.endsWith('null'))))
-            .map(f => ({
-              id: f.id,
-              uri: f.uri_local || f.url || '',
-              url: f.url,
-              base64: f.base64,
-              filename: f.filename,
-              legenda: f.legenda || '',
-              anotacoes_dados: f.anotacoes_dados,
-              local: f.local || item.obra_nome || '',
-            }))
-        );
-      } else {
-        setAttachedPhotos([]);
-      }
+      setAttachedPhotos(fotosDb || []);
     } catch {
       setAttachedPhotos([]);
     }
@@ -687,6 +654,15 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           text: 'Enviar',
           onPress: async () => {
             try {
+              const fotosDb = await getLocalFotosExpress(item.id);
+              if (fotosDb && fotosDb.length > 0) {
+                const semLegenda = fotosDb.findIndex(f => !f.legenda || !f.legenda.trim());
+                if (semLegenda !== -1) {
+                  Alert.alert('Legenda Obrigatória', `A foto #${semLegenda + 1} está sem legenda técnica. Todas as fotos devem possuir legenda antes do envio para aprovação.`);
+                  return;
+                }
+              }
+
               setLoading(true);
               await updateLocalRelatorioExpressStatus(
                 item.id,
@@ -697,8 +673,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 'pending'
               );
 
-              const fotosDb = await getLocalFotosExpress(item.id);
-              const fotosPayload = await Promise.all((fotosDb || [])
+              const targetFotosDb = await getLocalFotosExpress(item.id);
+              const fotosPayload = await Promise.all((targetFotosDb || [])
                 .map(async (f, idx) => {
                   let b64 = f.base64;
                   if (!b64 && f.uri_local && !f.uri_local.startsWith('http')) {
@@ -921,20 +897,48 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     try {
       const projName = obraNome.trim() || 'Obra_Express';
       const photo = await takePhoto(projName);
-      if (photo) {
-        const photoId = Date.now() + Math.floor(Math.random() * 1000);
-        setAttachedPhotos(prev => [
-          ...prev,
-          {
-            id: photoId,
-            uri: photo.uri,
-            base64: photo.base64,
-            filename: photo.filename,
-            legenda: '',
-            anotacoes_dados: undefined,
-            local: obraNome.trim() || 'Fachada',
-          }
-        ]);
+      if (photo && photo.uri) {
+        let b64 = photo.base64;
+        if (!b64 && photo.uri) {
+          b64 = await readPhotoBase64(photo.uri).catch(() => undefined);
+        }
+        const photoFilename = photo.filename || `elp_foto_${Date.now()}_${Math.floor(100 + Math.random() * 900)}.jpg`;
+        const currentExpId = editingReportIdRef.current || editingReportId || Date.now();
+        if (!editingReportIdRef.current) {
+          editingReportIdRef.current = currentExpId;
+          setEditingReportId(currentExpId);
+        }
+
+        const photoId = Date.now() + Math.floor(100 + Math.random() * 900);
+        const newFoto: FotoRelatorioExpress = {
+          id: photoId,
+          relatorio_express_id: currentExpId,
+          filename: photoFilename,
+          uri_local: photo.uri,
+          url: undefined,
+          base64: b64,
+          titulo: `Foto ${attachedPhotos.length + 1} - ${obraNome.trim() || 'Registro'}`,
+          legenda: '',
+          descricao: '',
+          local: obraNome.trim() || 'Fachada',
+          anotacoes_dados: undefined,
+          ordem: attachedPhotos.length,
+          sync_status: 'pending',
+        };
+
+        // Salva imediatamente no SQLite para garantir persistência offline absoluta
+        await saveLocalFotoExpress(newFoto, 'pending');
+
+        // Adiciona ao estado prevenindo duplicidade
+        setAttachedPhotos(prev => {
+          const isDup = prev.some(existing => {
+            if (newFoto.filename && existing.filename && existing.filename.toLowerCase() === newFoto.filename.toLowerCase()) return true;
+            if (newFoto.uri_local && existing.uri_local && existing.uri_local === newFoto.uri_local) return true;
+            return false;
+          });
+          if (isDup) return prev;
+          return [...prev, newFoto];
+        });
       }
     } catch (errCam) {
       console.warn('[Express] Erro ao capturar foto da câmera:', errCam);
@@ -951,20 +955,48 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     try {
       const projName = obraNome.trim() || 'Obra_Express';
       const photo = await pickImage(projName);
-      if (photo) {
-        const photoId = Date.now() + Math.floor(Math.random() * 1000);
-        setAttachedPhotos(prev => [
-          ...prev,
-          {
-            id: photoId,
-            uri: photo.uri,
-            base64: photo.base64,
-            filename: photo.filename,
-            legenda: '',
-            anotacoes_dados: undefined,
-            local: obraNome.trim() || 'Fachada',
-          }
-        ]);
+      if (photo && photo.uri) {
+        let b64 = photo.base64;
+        if (!b64 && photo.uri) {
+          b64 = await readPhotoBase64(photo.uri).catch(() => undefined);
+        }
+        const photoFilename = photo.filename || `elp_import_${Date.now()}_${Math.floor(100 + Math.random() * 900)}.jpg`;
+        const currentExpId = editingReportIdRef.current || editingReportId || Date.now();
+        if (!editingReportIdRef.current) {
+          editingReportIdRef.current = currentExpId;
+          setEditingReportId(currentExpId);
+        }
+
+        const photoId = Date.now() + Math.floor(100 + Math.random() * 900);
+        const newFoto: FotoRelatorioExpress = {
+          id: photoId,
+          relatorio_express_id: currentExpId,
+          filename: photoFilename,
+          uri_local: photo.uri,
+          url: undefined,
+          base64: b64,
+          titulo: `Foto ${attachedPhotos.length + 1} - ${obraNome.trim() || 'Registro'}`,
+          legenda: '',
+          descricao: '',
+          local: obraNome.trim() || 'Fachada',
+          anotacoes_dados: undefined,
+          ordem: attachedPhotos.length,
+          sync_status: 'pending',
+        };
+
+        // Salva imediatamente no SQLite para garantir persistência offline absoluta
+        await saveLocalFotoExpress(newFoto, 'pending');
+
+        // Adiciona ao estado prevenindo duplicidade
+        setAttachedPhotos(prev => {
+          const isDup = prev.some(existing => {
+            if (newFoto.filename && existing.filename && existing.filename.toLowerCase() === newFoto.filename.toLowerCase()) return true;
+            if (newFoto.uri_local && existing.uri_local && existing.uri_local === newFoto.uri_local) return true;
+            return false;
+          });
+          if (isDup) return prev;
+          return [...prev, newFoto];
+        });
       }
     } catch (errGal) {
       console.warn('[Express] Erro ao selecionar foto da galeria:', errGal);
@@ -1060,64 +1092,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       const techInfoJson = JSON.stringify(techInfoPayload);
       const checklistJson = JSON.stringify(checklist);
 
-      // Limpeza não-destrutiva: remove apenas fotos excluídas pelo usuário deste relatório
-      const keepPhotoIds = new Set(attachedPhotos.map(p => p.id).filter(Boolean));
-      try {
-        const db = await getDatabase();
-        const existingFotos = await db.getAllAsync<{ id: number }>(
-          'SELECT id FROM fotos_relatorio_express WHERE relatorio_express_id = ? OR relatorio_express_id = ?',
-          [expId, String(expId)]
-        );
-        for (const ef of existingFotos) {
-          if (!keepPhotoIds.has(ef.id)) {
-            await db.runAsync('DELETE FROM fotos_relatorio_express WHERE id = ?', [ef.id]);
-          }
-        }
-      } catch (delErr) {
-        console.warn('[Express] Erro na reconciliação de fotos:', delErr);
-      }
-
-      // Salva fotos anexadas com legenda e dados de anotação
-      const savedFotosList: any[] = [];
-      for (let i = 0; i < attachedPhotos.length; i++) {
-        const ap = attachedPhotos[i];
-        let b64 = ap.base64;
-        if (!b64 && ap.uri && !ap.uri.startsWith('http')) {
-          b64 = await readPhotoBase64(ap.uri).catch(() => undefined);
-          ap.base64 = b64;
-        }
-
-        const fotoObj: FotoRelatorioExpress = {
-          id: ap.id || (Date.now() + i + 1),
-          relatorio_express_id: expId,
-          url: ap.url || (ap.uri && ap.uri.startsWith('http') ? ap.uri : undefined),
-          filename: ap.filename,
-          uri_local: ap.uri,
-          base64: b64,
-          local: ap.local || obraNome.trim(),
-          titulo: `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
-          legenda: ap.legenda?.trim() || observacoes || 'Registro Fotográfico Express',
-          anotacoes_dados: ap.anotacoes_dados,
-          ordem: i,
-          sync_status: 'pending'
-        };
-        await saveLocalFotoExpress(fotoObj, 'pending');
-
-        savedFotosList.push({
-          id: fotoObj.id,
-          url: fotoObj.url,
-          filename: ap.filename,
-          uri_local: ap.uri,
-          base64: b64,
-          imagem_base64: b64,
-          titulo: fotoObj.titulo,
-          legenda: fotoObj.legenda,
-          local: fotoObj.local,
-          anotacoes_dados: ap.anotacoes_dados,
-          ordem: i
-        });
-      }
-
+      // 1. Salva o relatório no SQLite local
       const newExp: RelatorioExpress = {
         id: expId,
         numero: currentNumber.trim(),
@@ -1134,10 +1109,44 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         observacoes_finais: observacoes.trim(),
         status: status === 'Aguardando Aprovação' ? 'Aguardando Aprovação' : 'Rascunho',
         sync_status: 'pending',
-        fotos_count: savedFotosList.length,
+        fotos_count: attachedPhotos.length,
       };
-
       await saveLocalRelatorioExpress(newExp, 'pending');
+
+      // 2. Salva todas as fotos no SQLite com base64 garantido
+      const savedFotosList: any[] = [];
+      for (let i = 0; i < attachedPhotos.length; i++) {
+        const ap = attachedPhotos[i];
+        let b64 = ap.base64;
+        if (!b64 && ap.uri_local && !ap.uri_local.startsWith('http')) {
+          b64 = await readPhotoBase64(ap.uri_local).catch(() => undefined);
+          ap.base64 = b64;
+        }
+
+        const fotoObj: FotoRelatorioExpress = {
+          ...ap,
+          id: ap.id,
+          relatorio_express_id: expId,
+          ordem: i,
+          base64: b64,
+          sync_status: 'pending',
+        };
+        await saveLocalFotoExpress(fotoObj, 'pending');
+
+        savedFotosList.push({
+          id: fotoObj.id,
+          url: fotoObj.url,
+          filename: fotoObj.filename,
+          uri_local: fotoObj.uri_local,
+          base64: b64,
+          imagem_base64: b64,
+          titulo: fotoObj.titulo || `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
+          legenda: fotoObj.legenda || '',
+          local: fotoObj.local || obraNome.trim(),
+          anotacoes_dados: fotoObj.anotacoes_dados,
+          ordem: i,
+        });
+      }
 
       const isEditingExisting = Boolean(
         editingReportIdRef.current && (
@@ -1320,9 +1329,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
               {item.fotos && item.fotos.length > 0 && (() => {
                 const f0 = item.fotos[0];
-                const thumbUri = f0.base64
-                  ? (f0.base64.startsWith('data:') ? f0.base64 : `data:image/jpeg;base64,${f0.base64}`)
-                  : (f0.uri_local || f0.url);
+                const thumbUri = (f0.uri_local && f0.uri_local.startsWith('file://'))
+                  ? f0.uri_local
+                  : (f0.base64
+                      ? (f0.base64.startsWith('data:') ? f0.base64 : `data:image/jpeg;base64,${f0.base64}`)
+                      : (f0.uri_local || (f0.url?.startsWith('http') ? f0.url : (f0.url ? `https://elpandroid-production.up.railway.app${f0.url.startsWith('/') ? '' : '/'}${f0.url}` : null))));
                 return (
                   <View style={styles.cardPhotoRow}>
                     {thumbUri ? (
@@ -1847,14 +1858,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
                 {/* Lista de Cards de Fotos no Padrão do Relatório Comum */}
                 {attachedPhotos.map((item, index) => {
-                  const resolvedUri = (item.uri && item.uri.startsWith('file://'))
-                    ? item.uri
+                  const resolvedUri = (item.uri_local && item.uri_local.startsWith('file://'))
+                    ? item.uri_local
                     : (item.base64
                         ? (item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`)
-                        : item.uri);
+                        : (item.uri_local || (item.url?.startsWith('http') ? item.url : (item.url ? `https://elpandroid-production.up.railway.app${item.url.startsWith('/') ? '' : '/'}${item.url}` : null))));
 
                   return (
-                    <View key={`${item.id || index}_${item.uri || index}`} style={styles.photoCard}>
+                    <View key={`${item.id}_${item.filename || index}`} style={styles.photoCard}>
                       <View style={styles.thumbWrapper}>
                         {resolvedUri ? (
                           <Image source={{ uri: resolvedUri }} style={styles.thumb} resizeMode="cover" />
@@ -1970,7 +1981,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       {/* Modal do Editor de Fotos (Anotações com Setas, Círculos, etc.) */}
       <PhotoEditorModal
         visible={showEditorModal}
-        photoUri={editingPhotoIndex !== null && attachedPhotos[editingPhotoIndex] ? (attachedPhotos[editingPhotoIndex].uri || null) : null}
+        photoUri={editingPhotoIndex !== null && attachedPhotos[editingPhotoIndex] ? (attachedPhotos[editingPhotoIndex].uri_local || attachedPhotos[editingPhotoIndex].url || null) : null}
         base64={editingPhotoIndex !== null && attachedPhotos[editingPhotoIndex] ? attachedPhotos[editingPhotoIndex].base64 : undefined}
         initialAnnotations={editingPhotoIndex !== null && attachedPhotos[editingPhotoIndex] ? attachedPhotos[editingPhotoIndex].anotacoes_dados : undefined}
         onClose={() => {
