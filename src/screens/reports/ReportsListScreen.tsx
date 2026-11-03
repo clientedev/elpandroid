@@ -282,7 +282,7 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
       {/* Lista de Relatórios */}
       <FlatList
         data={filteredRelatorios}
-        keyExtractor={item => item.id.toString()}
+        keyExtractor={item => `${(item as any).is_express ? 'exp' : 'rel'}_${item.id}`}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />}
         ListEmptyComponent={

@@ -22,6 +22,7 @@ import { useNetwork } from '../../contexts/NetworkContext';
 import { apiClient } from '../../services/api';
 import { notificationService } from '../../services/notificationService';
 import { generateReportPDF } from '../../services/pdfService';
+import { todayBR, isoToBR, brToISO, maskBR, isValidBR } from '../../utils/dateBR';
 
 import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete, ChecklistProgressoObra, Visitante } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
@@ -92,7 +93,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   const projetosRef = React.useRef<Projeto[]>([]);
 
   // 1º Campo Superior: Data da Visita (editável no topo)
-  const [dataVisita, setDataVisita] = useState(new Date().toISOString().substring(0, 10));
+  // Data da visita no padrão brasileiro (DD/MM/AAAA); convertida para AAAA-MM-DD somente ao persistir
+  const [dataVisita, setDataVisita] = useState(todayBR());
 
   // 2º Campo: Obra Selecionada (ordenada por proximidade geográfica do GPS)
   const [projetos, setProjetos] = useState<Projeto[]>([]);
@@ -304,8 +306,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     try {
       setIsAutoSaving(true);
       const rid = currentReportIdRef.current;
-      const proj = projetosRef.current.find(p => p.id === selectedProjectId) || projetosRef.current[0];
-      const projId = selectedProjectId || proj?.id || 1;
+      if (!selectedProjectId) return; // nunca salva rascunho sem obra definida (evita vincular à obra errada)
+      const proj = projetosRef.current.find(p => p.id === selectedProjectId) || (await getLocalProjetoById(selectedProjectId)) || undefined;
+      const projId = selectedProjectId;
       const projNome = proj?.nome || 'Obra';
 
       // 1. Salva informações técnicas da obra no SQLite se houver obra selecionada
@@ -345,7 +348,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         visita_id: preSelectedVisitId || null,
         autor_id: user?.id || 1,
         autor_nome: user?.nome_completo || user?.username || 'Responsável',
-        data_relatorio: dataVisita || new Date().toISOString().substring(0, 10),
+        data_relatorio: brToISO(dataVisita),
         data_criacao_local: new Date().toISOString(),
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
@@ -636,7 +639,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           setReportNumber(r.numero || 'Pendente Sincronização');
           setTitulo(r.titulo);
           setSelectedProjectId(r.projeto_id);
-          if (r.data_relatorio) setDataVisita(r.data_relatorio.substring(0, 10));
+          if (r.data_relatorio) setDataVisita(isoToBR(r.data_relatorio.substring(0, 10)));
           setDescricao(r.descricao || '');
           setObservacoesFinais(r.observacoes_finais || '');
           setCategoria(r.categoria || 'Geral');
@@ -708,7 +711,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       try {
         setIsAutoSaving(true);
         const rid = currentReportIdRef.current;
-        const proj = projetosRef.current.find(p => p.id === selectedProjectId);
+        const proj = projetosRef.current.find(p => p.id === selectedProjectId) || (await getLocalProjetoById(selectedProjectId)) || undefined;
 
         // 0. Salva informações técnicas da obra no SQLite se houver obra selecionada
         let techInfoJson: string | undefined = undefined;
@@ -748,7 +751,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           visita_id: preSelectedVisitId || null,
           autor_id: user?.id || 1,
           autor_nome: user?.nome_completo || user?.username || 'Responsável',
-          data_relatorio: dataVisita,
+          data_relatorio: brToISO(dataVisita),
           descricao: descricao.trim(),
           observacoes_finais: observacoesFinais.trim(),
           informacoes_tecnicas: techInfoJson,
@@ -1041,6 +1044,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       return;
     }
 
+    if (!isValidBR(dataVisita)) {
+      Alert.alert('Data inválida', 'Informe a data da visita no formato DD/MM/AAAA.');
+      return;
+    }
+
     // Regra Crítica da Tabela 16: Legenda de Fotos é Obrigatória para envio à aprovação
     if (status === 'Aguardando Aprovação' && fotos.length > 0) {
       const fotosSemLegenda = fotos.findIndex(f => !f.legenda || !f.legenda.trim());
@@ -1081,6 +1089,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         outras_observacoes: techOutrasObservacoes.trim(),
       };
       const techInfoJson = JSON.stringify(techPayload);
+      const projForSave = selectedProj || (await getLocalProjetoById(selectedProjectId)) || undefined;
 
       const relData: Relatorio = {
         id: reportId,
@@ -1090,11 +1099,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         numero: finalReportNumber,
         titulo: titulo.trim(),
         projeto_id: selectedProjectId,
-        projeto_nome: selectedProj?.nome || 'Obra',
+        projeto_nome: projForSave?.nome || 'Obra',
         visita_id: preSelectedVisitId || null,
         autor_id: user?.id || 1,
         autor_nome: user?.username || 'Responsável',
-        data_relatorio: dataVisita,
+        data_relatorio: brToISO(dataVisita),
         descricao: descricao.trim(),
         observacoes_finais: observacoesFinais.trim(),
         informacoes_tecnicas: techInfoJson,
@@ -1105,6 +1114,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         status: status,
         sync_status: 'pending',
       };
+
+      // Payload para fila offline inclui número/nome da obra (servidor resolve a obra correta se o ID local mudou)
+      const relPayload: any = { ...relData, projeto_numero: projForSave?.numero };
 
       // 1. Save Relatorio to SQLite
       await saveLocalRelatorio(relData, 'pending');
@@ -1120,7 +1132,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               ordem: c.ordem || c.id,
               aprovado_em_relatorio_id: reportId,
               aprovado_em_relatorio_numero: reportNumber,
-              data_aprovacao: dataVisita || new Date().toISOString(),
+              data_aprovacao: brToISO(dataVisita),
               observacao: c.observacao || '',
             }))
           ).catch(cpErr => console.warn('[ReportForm] Erro ao salvar progresso cumulativo:', cpErr));
@@ -1161,7 +1173,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             const preparedFotos = fotos.map((f, i) => ({ ...f, relatorio_id: reportId, relatorio_uuid: reportUuid, ordem: i, imagem_base64: f.base64 }));
             const res = await apiClient.axios.post('/api/relatorios', {
               ...relData,
-              projeto_numero: selectedProj?.numero,
+              projeto_numero: projForSave?.numero,
               uuid: reportUuid,
               uuid_local: reportUuid,
               autor_id: user?.id,
@@ -1186,7 +1198,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             isServerId ? 'update' : 'create',
             isServerId ? `/api/relatorios/${reportId}` : '/api/relatorios',
             isServerId ? 'PUT' : 'POST',
-            relData
+            relPayload
           );
         }
       } else {
@@ -1196,7 +1208,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           isServerId ? 'update' : 'create',
           isServerId ? `/api/relatorios/${reportId}` : '/api/relatorios',
           isServerId ? 'PUT' : 'POST',
-          relData
+          relPayload
         );
       }
 
@@ -1281,8 +1293,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               <TextInput 
                 style={styles.dateInput} 
                 value={dataVisita} 
-                onChangeText={setDataVisita} 
-                placeholder="AAAA-MM-DD"
+                onChangeText={(t) => setDataVisita(maskBR(t))} 
+                placeholder="DD/MM/AAAA"
+                keyboardType="numeric"
+                maxLength={10}
               />
             </View>
           </View>

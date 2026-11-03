@@ -14256,6 +14256,8 @@ def api_relatorios_collection():
                 if p_num:
                     proj_check = Projeto.query.filter_by(numero=p_num).first()
                 if not proj_check and p_nome:
+                    proj_check = Projeto.query.filter(db.func.lower(db.func.trim(Projeto.nome)) == p_nome.lower()).first()
+                if not proj_check and p_nome:
                     proj_check = Projeto.query.filter(Projeto.nome.ilike(f"%{p_nome}%")).first()
                 if not proj_check:
                     proj_check = Projeto.query.order_by(Projeto.id.desc()).first()
