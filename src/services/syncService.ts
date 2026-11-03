@@ -174,7 +174,7 @@ class SyncService {
           // Enrich report payload with local photos and convert them to base64 if needed
           if (item.entity_type === 'relatorio' && item.method !== 'DELETE') {
             try {
-              const fotos = await getLocalFotos(item.entity_id);
+              const fotos = await getLocalFotos(item.entity_id, payload.uuid || payload.uuid_local);
               if (fotos && fotos.length > 0) {
                 const enrichedFotos = await Promise.all(
                   fotos.map(async (f) => {
@@ -491,18 +491,33 @@ class SyncService {
           }
           await saveLocalRelatorio(r, 'synced');
           if (Array.isArray(r.fotos)) {
+            const serverFotoIds = new Set(r.fotos.map((f: any) => f.id));
+            const localFotos = await db.getAllAsync<{ id: number; sync_status: string }>(
+              'SELECT id, sync_status FROM fotos_relatorio WHERE relatorio_id = ?',
+              [r.id]
+            );
+            for (const lf of localFotos) {
+              if (lf.sync_status === 'synced' && lf.id < 2000000000 && !serverFotoIds.has(lf.id)) {
+                await db.runAsync('DELETE FROM fotos_relatorio WHERE id = ?', [lf.id]);
+              }
+            }
+
             for (const f of r.fotos) {
               const fullUrl = f.url?.startsWith('http') 
                 ? f.url 
                 : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
               let targetUri = fullUrl;
+              let existingBase64 = '';
               try {
-                const existingFoto = await db.getFirstAsync<{ uri_local?: string }>(
-                  'SELECT uri_local FROM fotos_relatorio WHERE (filename IS NOT NULL AND filename = ?) OR (id = ?)',
-                  [f.filename || '', f.id]
+                const existingFoto = await db.getFirstAsync<{ uri_local?: string; base64?: string }>(
+                  'SELECT uri_local, base64 FROM fotos_relatorio WHERE id = ? OR (filename IS NOT NULL AND filename != "" AND filename = ?)',
+                  [f.id, f.filename || '']
                 );
                 if (existingFoto?.uri_local && existingFoto.uri_local.startsWith('file://')) {
                   targetUri = existingFoto.uri_local;
+                }
+                if (existingFoto?.base64) {
+                  existingBase64 = existingFoto.base64;
                 }
               } catch {}
 
@@ -519,6 +534,7 @@ class SyncService {
                 tipo_servico: f.tipo_servico || '',
                 local: f.local || '',
                 ordem: f.ordem || 0,
+                base64: existingBase64,
                 anotacoes_dados: typeof f.anotacoes_dados === 'object' ? JSON.stringify(f.anotacoes_dados) : (f.anotacoes_dados || ''),
                 sync_status: 'synced',
               }, 'synced');

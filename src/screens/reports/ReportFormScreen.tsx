@@ -673,19 +673,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           await loadChecklistForProject(r.projeto_id, r.checklist_data);
           const savedFotos = await getLocalFotos(r.id, r.uuid);
           if (savedFotos && savedFotos.length > 0) {
-            // Deduplica estritamente para não exibir duplicadas ao reabrir relatório
-            const seenFp = new Set<string>();
-            const uniqueSaved = savedFotos.filter(sf => {
-              const rawName = sf.filename 
-                || (sf.uri_local ? sf.uri_local.split('/').pop()?.split('?')[0] : null)
-                || (sf.url ? sf.url.split('/').pop()?.split('?')[0] : null);
-              const m = rawName ? rawName.match(/elp_(?:foto|import)_[0-9]+_[0-9]+\.jpg/i) : null;
-              const fp = m ? m[0].toLowerCase() : (rawName ? rawName.toLowerCase() : `id_${sf.id}`);
-              if (seenFp.has(fp)) return false;
-              seenFp.add(fp);
-              return true;
-            });
-            setFotos(uniqueSaved);
+            setFotos(savedFotos);
           }
         }
       });
@@ -796,12 +784,24 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           try {
             const isServerId = rid > 0 && rid < 2000000000;
             if (isServerId) {
-              await apiClient.axios.put(`/api/relatorios/${rid}`, {
+              const res = await apiClient.axios.put(`/api/relatorios/${rid}`, {
                 ...draft,
                 autor_id: user?.id,
                 fotos: preparedFotos,
               }, { timeout: 12000 });
               await saveLocalRelatorio({ ...draft, sync_status: 'synced' }, 'synced');
+              if (res?.data?.fotos && Array.isArray(res.data.fotos)) {
+                const serverFotos = res.data.fotos;
+                setFotos(prev => prev.map((pf, idx) => {
+                  const sf = serverFotos.find((s: any) => (s.filename && pf.filename && s.filename === pf.filename) || s.ordem === idx);
+                  if (sf) {
+                    const updated = { ...pf, id: sf.id, relatorio_id: rid, url: sf.url || pf.url };
+                    saveLocalFoto({ ...updated, sync_status: 'synced' }, 'synced').catch(() => null);
+                    return updated;
+                  }
+                  return pf;
+                }));
+              }
             } else {
               const res = await apiClient.axios.post('/api/relatorios', {
                 ...draft,
@@ -822,11 +822,24 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                   await migrateLocalFotosRelatorioId(oldId, serverId, reportUuid);
                   const db = await getDatabase();
                   await db.runAsync('DELETE FROM relatorios WHERE id = ?', [oldId]);
-                  setFotos(prev => prev.map(f => ({ ...f, relatorio_id: serverId })));
                 }
                 await saveLocalRelatorio({ ...draft, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
-                for (const f of preparedFotos) {
-                  await saveLocalFoto({ ...f, relatorio_id: serverId, sync_status: 'synced' }, 'synced');
+
+                const serverFotos = res?.data?.fotos;
+                if (serverFotos && Array.isArray(serverFotos)) {
+                  setFotos(prev => prev.map((pf, idx) => {
+                    const sf = serverFotos.find((s: any) => (s.filename && pf.filename && s.filename === pf.filename) || s.ordem === idx);
+                    const officialId = sf ? sf.id : pf.id;
+                    const officialUrl = sf?.url || pf.url;
+                    const updated = { ...pf, id: officialId, relatorio_id: serverId, url: officialUrl };
+                    saveLocalFoto({ ...updated, sync_status: 'synced' }, 'synced').catch(() => null);
+                    return updated;
+                  }));
+                } else {
+                  setFotos(prev => prev.map(f => ({ ...f, relatorio_id: serverId })));
+                  for (const f of preparedFotos) {
+                    await saveLocalFoto({ ...f, relatorio_id: serverId, sync_status: 'synced' }, 'synced');
+                  }
                 }
               }
             }
@@ -869,7 +882,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         const photoFilename = photo.filename || `elp_foto_${Date.now()}_${Math.floor(100 + Math.random() * 900)}.jpg`;
         const newFoto: FotoRelatorio = {
           id: Date.now(),
-          relatorio_id: currentReportId,
+          relatorio_id: currentReportIdRef.current,
           relatorio_uuid: reportUuid,
           filename: photoFilename,
           uri_local: photo.uri,
@@ -921,7 +934,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         const photoFilename = photo.filename || `elp_import_${Date.now()}_${Math.floor(100 + Math.random() * 900)}.jpg`;
         const newFoto: FotoRelatorio = {
           id: Date.now(),
-          relatorio_id: currentReportId,
+          relatorio_id: currentReportIdRef.current,
           relatorio_uuid: reportUuid,
           filename: photoFilename,
           uri_local: photo.uri,
@@ -969,8 +982,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
   async function handleRemovePhoto(index: number) {
     const target = fotos[index];
-    if (target?.id) {
-      await deleteLocalFoto(target.id).catch(() => null);
+    if (target) {
+      if (target.id) {
+        await deleteLocalFoto(target.id, target.filename).catch(() => null);
+      }
+      if (isOnline && target.id && target.id < 2000000000) {
+        apiClient.axios.delete(`/api/fotos/${target.id}`).catch(() => null);
+      }
     }
     const updated = fotos.filter((_, i) => i !== index);
     setFotos(updated);
@@ -1115,9 +1133,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         sync_status: 'pending',
       };
 
-      // Payload para fila offline inclui número/nome da obra (servidor resolve a obra correta se o ID local mudou)
-      const relPayload: any = { ...relData, projeto_numero: projForSave?.numero };
-
       // 1. Save Relatorio to SQLite
       await saveLocalRelatorio(relData, 'pending');
 
@@ -1150,27 +1165,59 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       // 2. Save all Photos to SQLite
       for (let i = 0; i < fotos.length; i++) {
         const f = fotos[i];
+        let b64 = f.base64;
+        if (!b64 && f.uri_local && !f.uri_local.startsWith('http')) {
+          b64 = await readPhotoBase64(f.uri_local).catch(() => undefined);
+        }
         await saveLocalFoto({
           ...f,
           relatorio_id: reportId,
           relatorio_uuid: reportUuid,
           ordem: i,
+          base64: b64,
         }, 'pending');
       }
 
       // 3. Sincronização ou enfileiramento inteligente
       let savedNumero = finalReportNumber;
       const isServerId = reportId > 0 && reportId < 2000000000;
+      const preparedFotos = fotos.map((f, i) => ({
+        ...f,
+        relatorio_id: reportId,
+        relatorio_uuid: reportUuid,
+        ordem: i,
+        imagem_base64: f.base64,
+      }));
+      const relPayload: any = { 
+        ...relData, 
+        projeto_numero: projForSave?.numero,
+        fotos: preparedFotos,
+      };
+
       if (isOnline) {
         try {
           if (isServerId) {
-            await apiClient.axios.put(`/api/relatorios/${reportId}`, {
+            const res = await apiClient.axios.put(`/api/relatorios/${reportId}`, {
               ...relData,
               autor_id: user?.id,
+              fotos: preparedFotos,
             }, { timeout: 12000 });
             await saveLocalRelatorio({ ...relData, sync_status: 'synced' }, 'synced');
+            if (res?.data?.fotos && Array.isArray(res.data.fotos)) {
+              for (const sf of res.data.fotos) {
+                const matchLocal = fotos.find(pf => (pf.filename && sf.filename && pf.filename === sf.filename) || pf.ordem === sf.ordem);
+                if (matchLocal) {
+                  await saveLocalFoto({
+                    ...matchLocal,
+                    id: sf.id,
+                    relatorio_id: reportId,
+                    url: sf.url || matchLocal.url,
+                    sync_status: 'synced',
+                  }, 'synced').catch(() => null);
+                }
+              }
+            }
           } else {
-            const preparedFotos = fotos.map((f, i) => ({ ...f, relatorio_id: reportId, relatorio_uuid: reportUuid, ordem: i, imagem_base64: f.base64 }));
             const res = await apiClient.axios.post('/api/relatorios', {
               ...relData,
               projeto_numero: projForSave?.numero,
@@ -1188,6 +1235,20 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               const db = await getDatabase();
               await db.runAsync('DELETE FROM relatorios WHERE id = ?', [reportId]);
               await saveLocalRelatorio({ ...relData, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
+              if (res?.data?.fotos && Array.isArray(res.data.fotos)) {
+                for (const sf of res.data.fotos) {
+                  const matchLocal = fotos.find(pf => (pf.filename && sf.filename && pf.filename === sf.filename) || pf.ordem === sf.ordem);
+                  if (matchLocal) {
+                    await saveLocalFoto({
+                      ...matchLocal,
+                      id: sf.id,
+                      relatorio_id: serverId,
+                      url: sf.url || matchLocal.url,
+                      sync_status: 'synced',
+                    }, 'synced').catch(() => null);
+                  }
+                }
+              }
             }
           }
         } catch (netErr) {

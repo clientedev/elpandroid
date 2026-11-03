@@ -14113,10 +14113,9 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list, allow_delete=True):
     existing_by_id = {f.id: f for f in existing_fotos}
     existing_by_filename = {f.filename: f for f in existing_fotos if f.filename}
     existing_by_hash = {f.imagem_hash: f for f in existing_fotos if f.imagem_hash}
-    existing_by_ordem = {f.ordem: f for f in existing_fotos}
 
-    incoming_db_ids = set()
-    saved_count = 0
+    retained_photo_ids = set()
+    saved_records = []
 
     for idx, f_data in enumerate(fotos_list):
         if not isinstance(f_data, dict):
@@ -14152,17 +14151,16 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list, allow_delete=True):
             except Exception as b64_err:
                 current_app.logger.warning(f"Erro ao decodificar base64 foto {idx}: {b64_err}")
 
-        # Busca foto existente para evitar duplicar
+        # Busca foto existente de forma ESTRITA (nunca por heurística solta de ordem/local)
         foto = None
+        raw_filename = f_data.get('filename')
+
         if f_id and f_id in existing_by_id:
             foto = existing_by_id[f_id]
-        elif f_data.get('filename') and f_data['filename'] in existing_by_filename:
-            foto = existing_by_filename[f_data['filename']]
+        elif raw_filename and raw_filename in existing_by_filename:
+            foto = existing_by_filename[raw_filename]
         elif img_hash and img_hash in existing_by_hash:
-            # Foto exatamente idêntica já existe no banco: reutiliza para NÃO duplicar
             foto = existing_by_hash[img_hash]
-        elif idx in existing_by_ordem and (existing_by_ordem[idx].titulo == f_data.get('titulo') or existing_by_ordem[idx].local == f_data.get('local')):
-            foto = existing_by_ordem[idx]
 
         anotacoes_raw = f_data.get('anotacoes_dados')
         anotacoes_obj = None
@@ -14186,45 +14184,70 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list, allow_delete=True):
         foto.tipo_servico = f_data.get('tipo_servico')
         foto.local = f_data.get('local') or ''
         foto.ordem = f_data.get('ordem', idx)
-        foto.anotacoes_dados = anotacoes_obj
+        if anotacoes_obj is not None:
+            foto.anotacoes_dados = anotacoes_obj
 
-        if img_bytes:
+        # Somente salva/grava bytes de imagem se a foto for nova OU não possuir imagem gravada ainda
+        if img_bytes and (is_new or not foto.imagem or not foto.url):
             foto.imagem = img_bytes
             foto.imagem_hash = img_hash
             foto.imagem_size = len(img_bytes)
             foto.content_type = 'image/jpeg'
 
-            fname = foto.filename or f_data.get('filename') or f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
+            static_upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+            os.makedirs(static_upload_dir, exist_ok=True)
+            fname = raw_filename or foto.filename or f"rel_{relatorio_id}_{idx}_{uuid.uuid4().hex[:6]}.jpg"
             fpath = os.path.join(upload_dir, fname)
+            fpath_static = os.path.join(static_upload_dir, fname)
             try:
                 with open(fpath, 'wb') as f_out:
+                    f_out.write(img_bytes)
+                with open(fpath_static, 'wb') as f_out:
                     f_out.write(img_bytes)
                 foto.filename = fname
                 foto.url = f"/uploads/{fname}"
             except Exception as file_save_err:
                 current_app.logger.warning(f"Erro ao salvar arquivo em disco: {file_save_err}")
-        else:
-            if f_data.get('url') and not foto.url:
-                foto.url = f_data.get('url')
+                foto.url = f_data.get('url') or f"/api/fotos/{foto.id}"
+        elif f_data.get('url') and not foto.url:
+            foto.url = f_data.get('url')
 
         if is_new:
             db.session.add(foto)
             db.session.flush()
 
-        incoming_db_ids.add(foto.id)
-        saved_count += 1
+        retained_photo_ids.add(foto.id)
+        saved_records.append({
+            'id': foto.id,
+            'relatorio_id': foto.relatorio_id,
+            'filename': foto.filename,
+            'ordem': foto.ordem,
+            'titulo': foto.titulo or '',
+            'legenda': foto.legenda or '',
+            'descricao': foto.descricao or '',
+            'local': foto.local or '',
+            'url': foto.url,
+            'anotacoes_dados': foto.anotacoes_dados,
+        })
 
-    # Remover fotos apenas quando explicitamente permitido (ex: PUT completo do relatório)
-    if allow_delete and len(fotos_list) > 0:
+    # Expurgar fotos antigas do relatório que foram removidas pelo usuário no app
+    if allow_delete and len(fotos_list) > 0 and len(retained_photo_ids) > 0:
         for old_id, old_foto in existing_by_id.items():
-            if old_id not in incoming_db_ids:
+            if old_id not in retained_photo_ids:
+                try:
+                    if old_foto.filename:
+                        p1 = os.path.join(upload_dir, old_foto.filename)
+                        if os.path.exists(p1):
+                            os.remove(p1)
+                except Exception:
+                    pass
                 try:
                     db.session.delete(old_foto)
                 except Exception:
                     pass
 
     db.session.flush()
-    return saved_count
+    return saved_records
 
 # --- RELATORIOS ---
 @app.route('/api/relatorios', methods=['GET', 'POST'])
@@ -14402,8 +14425,9 @@ def api_relatorios_collection():
                             setattr(proj_check, tf, tech_data[tf])
             # Processar fotos em lote se enviadas no payload
             fotos_list = data.get('fotos') or []
+            saved_fotos_list = []
             if isinstance(fotos_list, list) and len(fotos_list) > 0:
-                _save_fotos_for_relatorio(relatorio.id, fotos_list)
+                saved_fotos_list = _save_fotos_for_relatorio(relatorio.id, fotos_list, allow_delete=True)
 
             db.session.commit()
 
@@ -14432,7 +14456,8 @@ def api_relatorios_collection():
                 'uuid': relatorio.uuid,
                 'data_criacao_local': relatorio.data_criacao_local.isoformat() if relatorio.data_criacao_local else None,
                 'data_sincronizacao': relatorio.data_sincronizacao.isoformat() if relatorio.data_sincronizacao else None,
-                'status': relatorio.status
+                'status': relatorio.status,
+                'fotos': saved_fotos_list
             }), 201
         except Exception as post_err:
             db.session.rollback()
@@ -14517,11 +14542,11 @@ def api_relatorios_collection():
         return jsonify([]), 200
 
 
-@app.route('/api/fotos/<int:foto_id>', methods=['GET'])
-@app.route('/api/fotos-express/<int:foto_id>', methods=['GET'])
+@app.route('/api/fotos/<int:foto_id>', methods=['GET', 'DELETE'])
+@app.route('/api/fotos-express/<int:foto_id>', methods=['GET', 'DELETE'])
 @csrf.exempt
 def api_serve_foto_binary(foto_id):
-    """Serve imagem de relatório (comum ou express) diretamente do banco PostgreSQL como binary JPEG"""
+    """Serve imagem de relatório (comum ou express) diretamente do banco PostgreSQL como binary JPEG ou exclui se DELETE"""
     try:
         from models import FotoRelatorio, FotoRelatorioExpress
         foto = FotoRelatorio.query.get(foto_id)
@@ -14529,6 +14554,20 @@ def api_serve_foto_binary(foto_id):
             foto = FotoRelatorioExpress.query.get(foto_id)
         if not foto:
             return jsonify({'error': 'Foto não encontrada'}), 404
+
+        if request.method == 'DELETE':
+            if foto.filename:
+                try:
+                    upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
+                    fpath = os.path.join(upload_dir, foto.filename)
+                    if os.path.exists(fpath):
+                        os.remove(fpath)
+                except Exception:
+                    pass
+            db.session.delete(foto)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Foto excluída com sucesso'}), 200
+
         if foto.imagem:
             mimetype = getattr(foto, 'content_type', None) or 'image/jpeg'
             res = Response(foto.imagem, mimetype=mimetype)
@@ -14545,7 +14584,8 @@ def api_serve_foto_binary(foto_id):
                 return send_from_directory(static_dir, foto.filename)
         return jsonify({'error': 'Dados da foto indisponíveis'}), 404
     except Exception as e:
-        current_app.logger.error(f"Erro ao servir foto API: {e}")
+        db.session.rollback()
+        current_app.logger.error(f"Erro ao processar foto API: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/relatorios/<int:relatorio_id>', methods=['GET', 'PUT', 'POST', 'DELETE'])
@@ -14613,8 +14653,9 @@ def api_relatorio_detail_sync(relatorio_id):
                 else:
                     relatorio.acompanhantes = acomp_val
 
+            saved_fotos_list = []
             if 'fotos' in data and isinstance(data['fotos'], list):
-                _save_fotos_for_relatorio(relatorio.id, data['fotos'])
+                saved_fotos_list = _save_fotos_for_relatorio(relatorio.id, data['fotos'], allow_delete=True)
 
             relatorio.updated_at = brazil_now()
             db.session.commit()
@@ -14634,7 +14675,13 @@ def api_relatorio_detail_sync(relatorio_id):
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de rejeição no PUT: {notif_err}")
 
-            return jsonify({'success': True, 'id': relatorio.id, 'numero': relatorio.numero, 'status': relatorio.status}), 200
+            return jsonify({
+                'success': True, 
+                'id': relatorio.id, 
+                'numero': relatorio.numero, 
+                'status': relatorio.status,
+                'fotos': saved_fotos_list
+            }), 200
 
 
         base_app_url = 'https://elpandroid-production.up.railway.app'
@@ -14962,10 +15009,6 @@ def _save_fotos_for_relatorio_express(rel_exp_id, fotos_data):
         # 4. Tentar encontrar por URL existente (absoluta ou relativa)
         if not foto_existente and raw_url and (raw_url in existing_by_url or clean_url in existing_by_url):
             foto_existente = existing_by_url.get(raw_url) or existing_by_url.get(clean_url)
-
-        # 5. Tentar encontrar por ordem se posicao bater
-        if not foto_existente and idx in existing_by_ordem:
-            foto_existente = existing_by_ordem[idx]
 
         if foto_existente:
             # Já existe no relatório: atualiza metadados sem duplicar registro nem imagem

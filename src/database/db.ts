@@ -790,27 +790,23 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
     );
   }
 
-  // Deduplicação segura e não-destrutiva: mescla apenas fotos comprovadamente idênticas
+  // Deduplicação não-destrutiva de fotos: mescla registros redundantes (ex: provisório + oficial)
+  // preservando estritamente arquivos locais nativos file:// e base64
   const seenById = new Map<number, FotoRelatorio>();
   const seenByFilename = new Map<string, FotoRelatorio>();
-  const seenByUri = new Map<string, FotoRelatorio>();
   const result: FotoRelatorio[] = [];
 
   for (const f of rows) {
-    const uriKey = (f.uri_local && f.uri_local.startsWith('file://')) ? f.uri_local.trim() : '';
-    const filenameKey = (f.filename && f.filename.trim()) || '';
+    const filenameKey = (f.filename && f.filename.trim().length > 4) ? f.filename.trim().toLowerCase() : '';
 
     let existing: FotoRelatorio | undefined;
     if (f.id && seenById.has(f.id)) {
       existing = seenById.get(f.id);
     } else if (filenameKey && seenByFilename.has(filenameKey)) {
       existing = seenByFilename.get(filenameKey);
-    } else if (uriKey && seenByUri.has(uriKey)) {
-      existing = seenByUri.get(uriKey);
     }
 
     if (existing) {
-      // Mescla priorizando a foto que tiver uri_local nativo file:// ou base64
       if (f.uri_local && f.uri_local.startsWith('file://')) {
         existing.uri_local = f.uri_local;
       }
@@ -823,11 +819,10 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
       result.push(f);
       if (f.id) seenById.set(f.id, f);
       if (filenameKey) seenByFilename.set(filenameKey, f);
-      if (uriKey) seenByUri.set(uriKey, f);
     }
   }
 
-  return result.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+  return result.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
 }
 
 export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
@@ -852,35 +847,21 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
     } catch {}
   }
 
-  // Deduplicação no SQLite: se já existe foto com mesmo filename ou mesma uri_local no relatório, limpa o ID duplicado
+  const safeId = Number(f.id) || Date.now();
+  const safeRelId = Number(f.relatorio_id) || 0;
+
+  // Se já existe foto com mesmo filename e ID diferente para este relatório (ex: ID temporário sendo substituído por ID do servidor),
+  // limpa a duplicata para evitar linhas duplicadas no SQLite
   try {
-    if (f.relatorio_id) {
-      const fotoId = f.id || 0;
-      if (f.filename && f.filename.length > 3) {
-        await db.runAsync(
-          'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id != ? AND filename = ?',
-          [f.relatorio_id, fotoId, f.filename]
-        );
-      }
-      if (f.uri_local && f.uri_local.startsWith('file://')) {
-        await db.runAsync(
-          'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id != ? AND uri_local = ?',
-          [f.relatorio_id, fotoId, f.uri_local]
-        );
-      }
-      if (fotoId && fotoId < 2000000000) {
-        await db.runAsync(
-          'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND id >= 2000000000 AND ordem = ?',
-          [f.relatorio_id, f.ordem || 0]
-        );
-      }
+    if (safeRelId && f.filename && f.filename.length > 5) {
+      await db.runAsync(
+        'DELETE FROM fotos_relatorio WHERE relatorio_id = ? AND filename = ? AND id != ?',
+        [safeRelId, f.filename, safeId]
+      );
     }
   } catch (cleanErr) {
     console.warn('[db] Aviso de limpeza de duplicatas:', cleanErr);
   }
-
-  const safeId = Number(f.id) || Date.now();
-  const safeRelId = Number(f.relatorio_id) || 0;
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio (
@@ -1044,9 +1025,13 @@ export async function saveLocalUsers(users: User[]): Promise<void> {
   }
 }
 
-export async function deleteLocalFoto(id: number): Promise<void> {
+export async function deleteLocalFoto(id: number, filename?: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('DELETE FROM fotos_relatorio WHERE id = ?', [id]);
+  if (filename && filename.length > 4) {
+    await db.runAsync('DELETE FROM fotos_relatorio WHERE id = ? OR filename = ?', [id, filename]);
+  } else {
+    await db.runAsync('DELETE FROM fotos_relatorio WHERE id = ?', [id]);
+  }
 }
 
 // ================= RELATORIOS EXPRESS =================
