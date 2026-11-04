@@ -217,17 +217,17 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   }
 
   async function handleManualSync() {
-    if (!isOnline) {
-      Alert.alert('Offline', 'Conecte-se à internet para sincronizar dados.');
-      return;
-    }
     setLoadingSync(true);
     try {
-      await triggerSync();
+      const res = await triggerSync();
       await loadDiagnostics();
-      Alert.alert('Sucesso', 'Sincronização concluída com sucesso!');
-    } catch (err) {
-      Alert.alert('Erro', 'Falha ao sincronizar dados.');
+      if (res && res.success) {
+        Alert.alert('Sincronização Concluída ✅', res.message || 'Dados sincronizados com o servidor Railway com sucesso!');
+      } else {
+        Alert.alert('Aviso de Sincronização ⚠️', res?.message || 'Não foi possível concluir a sincronização.');
+      }
+    } catch (err: any) {
+      Alert.alert('Erro', err?.message || 'Falha ao sincronizar dados com o servidor.');
     } finally {
       setLoadingSync(false);
     }

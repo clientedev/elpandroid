@@ -52,7 +52,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   async function triggerSync() {
-    return await syncService.syncAll();
+    return await syncService.syncAll(true);
   }
 
   return (

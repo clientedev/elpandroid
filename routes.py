@@ -13865,6 +13865,18 @@ def api_projetos_collection():
             user = _resolve_mobile_user(data)
             responsavel_id = user.id if user else 1
 
+            req_resp_id = data.get('responsavel_id')
+            if req_resp_id:
+                try:
+                    if User.query.get(int(req_resp_id)):
+                        responsavel_id = int(req_resp_id)
+                except Exception:
+                    pass
+
+            if not User.query.get(responsavel_id):
+                u_fallback = User.query.first()
+                responsavel_id = u_fallback.id if u_fallback else 1
+
             # Verificar se é atualização de projeto existente por ID do banco
             req_id = data.get('id')
             existing = None
@@ -13902,16 +13914,16 @@ def api_projetos_collection():
                         break
                     next_seq += 1
 
-                projeto = Projeto(numero=official_numero)
+                projeto = Projeto(
+                    numero=official_numero,
+                    nome=(data.get('nome') or 'Nova Obra').strip(),
+                    tipo_obra=data.get('tipo_obra') or 'Edifício Residencial Multifamiliar',
+                    construtora=(data.get('construtora') or 'ELP Engenharia').strip(),
+                    nome_funcionario=data.get('nome_funcionario') or (user.nome_completo if user else 'Engenheiro'),
+                    responsavel_id=responsavel_id,
+                    email_principal=data.get('email_principal') or 'engenharia@elp.com.br'
+                )
                 db.session.add(projeto)
-
-            req_resp_id = data.get('responsavel_id')
-            if req_resp_id:
-                try:
-                    if User.query.get(int(req_resp_id)):
-                        responsavel_id = int(req_resp_id)
-                except Exception:
-                    pass
 
             projeto.nome = (data.get('nome') or 'Nova Obra').strip()
             projeto.tipo_obra = data.get('tipo_obra') or 'Edifício Residencial Multifamiliar'
@@ -14070,13 +14082,25 @@ def api_projeto_detail_sync(projeto_id):
                         candidate_num = f"OBRA-{max_s + 1:04d}"
                     
                     user = _resolve_mobile_user(data)
+                    resp_id = user.id if user else 1
+                    req_resp_id = data.get('responsavel_id')
+                    if req_resp_id:
+                        try:
+                            if User.query.get(int(req_resp_id)):
+                                resp_id = int(req_resp_id)
+                        except Exception:
+                            pass
+                    if not User.query.get(resp_id):
+                        u_first = User.query.first()
+                        resp_id = u_first.id if u_first else 1
+
                     projeto = Projeto(
                         numero=candidate_num,
                         nome=(data.get('nome') or 'Nova Obra').strip(),
                         tipo_obra=data.get('tipo_obra') or 'Edifício Residencial Multifamiliar',
                         construtora=(data.get('construtora') or 'ELP Engenharia').strip(),
                         nome_funcionario=data.get('nome_funcionario') or (user.nome_completo if user else 'Engenheiro'),
-                        responsavel_id=int(data.get('responsavel_id') or (user.id if user else 1)),
+                        responsavel_id=resp_id,
                         email_principal=data.get('email_principal') or 'engenharia@elp.com.br',
                     )
                     db.session.add(projeto)
@@ -14192,6 +14216,13 @@ def api_projeto_detail_sync(projeto_id):
                 projeto.latitude = float(data['latitude'])
             if 'longitude' in data and data['longitude'] is not None:
                 projeto.longitude = float(data['longitude'])
+            if 'responsavel_id' in data and data['responsavel_id']:
+                try:
+                    r_id = int(data['responsavel_id'])
+                    if User.query.get(r_id):
+                        projeto.responsavel_id = r_id
+                except Exception:
+                    pass
             
             # Sincronizar contatos, checklist e dados técnicos adicionais
             _sync_projeto_extras(projeto, data, getattr(projeto, 'responsavel_id', 1))

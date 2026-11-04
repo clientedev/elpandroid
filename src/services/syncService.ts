@@ -95,7 +95,10 @@ class SyncService {
   async isOnline(): Promise<boolean> {
     try {
       const net = await NetInfo.fetch();
-      return Boolean(net.isConnected);
+      if (net.isConnected) return true;
+      // Resilient fallback: tenta ping direto no servidor backend Railway
+      const res = await apiClient.axios.get('/api/ping', { timeout: 3000 });
+      return res.status === 200;
     } catch {
       return false;
     }
@@ -119,7 +122,20 @@ class SyncService {
       return { success: false, message: 'Sincronização já em andamento...' };
     }
 
-    const online = await this.isOnline();
+    // Reativa qualquer item na fila que tenha ficado em 'processing' ou falhado temporariamente
+    try {
+      const db = await getDatabase();
+      await db.runAsync("UPDATE sync_queue SET status = 'pending' WHERE status IN ('processing', 'failed');");
+    } catch {}
+
+    let online = await this.isOnline();
+    if (!online && manual) {
+      try {
+        const ping = await apiClient.axios.get('/api/ping', { timeout: 4000 });
+        if (ping.status === 200) online = true;
+      } catch {}
+    }
+
     if (!online) {
       this.wasOffline = true;
       this.hasNotifiedOfflineSyncDone = false;
@@ -232,18 +248,18 @@ class SyncService {
           let response;
           try {
             if (item.method === 'POST') {
-              response = await apiClient.axios.post(item.endpoint, payload);
+              response = await apiClient.axios.post(item.endpoint, payload, { timeout: 15000 });
             } else if (item.method === 'PUT') {
-              response = await apiClient.axios.put(item.endpoint, payload);
+              response = await apiClient.axios.put(item.endpoint, payload, { timeout: 15000 });
             } else if (item.method === 'DELETE') {
-              response = await apiClient.axios.delete(item.endpoint, { data: payload });
+              response = await apiClient.axios.delete(item.endpoint, { data: payload, timeout: 15000 });
             } else {
-              response = await apiClient.axios.get(item.endpoint);
+              response = await apiClient.axios.get(item.endpoint, { timeout: 15000 });
             }
           } catch (reqErr: any) {
             // Se falhou no PUT para projeto (ex: não existia no servidor), tenta criar via POST
             if (item.entity_type === 'projeto' && item.method === 'PUT') {
-              response = await apiClient.axios.post('/api/projetos', payload);
+              response = await apiClient.axios.post('/api/projetos', payload, { timeout: 15000 });
             } else {
               throw reqErr;
             }
@@ -359,12 +375,12 @@ class SyncService {
             let pRes: any;
             try {
               pRes = isTemp 
-                ? await apiClient.axios.post(endpoint, projPayload)
-                : await apiClient.axios.put(endpoint, projPayload);
+                ? await apiClient.axios.post(endpoint, projPayload, { timeout: 12000 })
+                : await apiClient.axios.put(endpoint, projPayload, { timeout: 12000 });
             } catch (firstErr: any) {
               if (!isTemp) {
                 // Se falhou no PUT (ex: obra ainda não existe no Postgres na nuvem), tenta cadastrar via POST
-                pRes = await apiClient.axios.post('/api/projetos', projPayload);
+                pRes = await apiClient.axios.post('/api/projetos', projPayload, { timeout: 12000 });
               } else {
                 throw firstErr;
               }
@@ -603,13 +619,14 @@ class SyncService {
         const serverProjects = projectsRes.data;
         const serverProjectIds = new Set(serverProjects.map((p: any) => p.id));
 
-        // Reconciliação: se a obra estava sincronizada no aparelho mas não existe mais no servidor, apaga em cascata!
-        // Ignora IDs temporários locais (>= 2000000000) para evitar apagar obras recém criadas offline
-        const localProjetos = await getLocalProjetos('Todos');
-        for (const lp of localProjetos) {
-          if (lp.id < 2000000000 && lp.sync_status === 'synced' && !serverProjectIds.has(lp.id)) {
-            console.log(`[SyncService] Obra ${lp.id} (${lp.nome}) excluída na nuvem. Apagando em cascata do aparelho.`);
-            await deleteLocalProjetoCascade(lp.id);
+        // Reconciliação segura: se houver obras no servidor e alguma obra foi deletada explicitamente (tombstone)
+        if (serverProjects.length > 0) {
+          const localProjetos = await getLocalProjetos('Todos');
+          for (const lp of localProjetos) {
+            if (lp.id < 2000000000 && lp.sync_status === 'synced' && !serverProjectIds.has(lp.id) && deletedProjects.has(lp.id)) {
+              console.log(`[SyncService] Obra ${lp.id} (${lp.nome}) confirmada excluída na nuvem. Apagando em cascata do aparelho.`);
+              await deleteLocalProjetoCascade(lp.id);
+            }
           }
         }
 
