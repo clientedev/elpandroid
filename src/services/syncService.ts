@@ -556,27 +556,9 @@ class SyncService {
         ? `Sincronização concluída! ${processedCount} alteração(ões) enviada(s) com sucesso para o servidor.`
         : 'Sincronização concluída! Todos os dados estão atualizados no servidor.';
 
-      const shouldShowPopup = manual || (this.wasOffline && !this.hasNotifiedOfflineSyncDone);
-
-      if (shouldShowPopup) {
-        this.hasNotifiedOfflineSyncDone = true;
+      if (this.wasOffline) {
         this.wasOffline = false;
-        notificationService.notify({
-          titulo: 'Sincronização Concluída',
-          mensagem: msg,
-          tipo: 'sincronizacao',
-          silent: true,
-          showToast: true,
-        }).catch(() => null);
-      } else if (processedCount > 0) {
-        // Notificação interna silenciosa (apenas histórico, sem popup invasivo na tela)
-        notificationService.notify({
-          titulo: 'Sincronização Concluída',
-          mensagem: msg,
-          tipo: 'sincronizacao',
-          silent: true,
-          showToast: false,
-        }).catch(() => null);
+        this.hasNotifiedOfflineSyncDone = true;
       }
 
       return { success: true, message: msg };

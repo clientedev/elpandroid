@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, ScrollView, Alert 
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, ScrollView, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -17,7 +17,7 @@ function calculateHaversine(lat1: number, lon1: number, lat2: number, lon2: numb
   const R = 6371; // km
   const dLat = (lat2 - lat1) * (Math.PI / 180);
   const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a = 
+  const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
@@ -27,6 +27,7 @@ function calculateHaversine(lat1: number, lon1: number, lat2: number, lon2: numb
 
 export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { isOnline } = useNetwork();
+  const lastSyncTimeRef = useRef<number>(0);
   const [projetos, setProjetos] = useState<Projeto[]>([]);
   const [filteredProjetos, setFilteredProjetos] = useState<Projeto[]>([]);
   const [relatoriosCounts, setRelatoriosCounts] = useState<{ [projId: number]: number }>({});
@@ -136,7 +137,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     // Busca Rápida por Texto
     if (text.trim()) {
       const q = text.toLowerCase();
-      result = result.filter(p => 
+      result = result.filter(p =>
         p.nome.toLowerCase().includes(q) ||
         p.numero.toLowerCase().includes(q) ||
         p.construtora.toLowerCase().includes(q) ||
@@ -168,7 +169,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
       const allRels = await getLocalRelatorios();
       const localUsers = await getLocalUsers().catch(() => []);
       setUsers(localUsers);
-      
+
       const counts: { [projId: number]: number } = {};
       for (const r of allRels) {
         counts[r.projeto_id] = (counts[r.projeto_id] || 0) + 1;
@@ -183,23 +184,6 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
           filterList(data, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers, sortByProximity, coords);
         }
       }).catch(() => null);
-
-      // 3. SINCRONIZAÇÃO EM BACKGROUND COM O SERVIDOR RAILWAY SE ESTIVER ONLINE
-      if (isOnline) {
-        syncService.syncAll().then(async () => {
-          const freshData = await getLocalProjetos();
-          const freshRels = await getLocalRelatorios();
-          const freshUsers = await getLocalUsers().catch(() => []);
-          setUsers(freshUsers);
-          const freshCounts: { [projId: number]: number } = {};
-          for (const r of freshRels) {
-            freshCounts[r.projeto_id] = (freshCounts[r.projeto_id] || 0) + 1;
-          }
-          setRelatoriosCounts(freshCounts);
-          setProjetos(freshData);
-          filterList(freshData, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, freshUsers, sortByProximity, userCoords);
-        }).catch(() => null);
-      }
     } catch (e) {
       console.warn('Erro ao carregar projetos:', e);
     }
@@ -208,6 +192,11 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
       loadProjetos();
+      const now = Date.now();
+      if (now - lastSyncTimeRef.current > 45000) {
+        lastSyncTimeRef.current = now;
+        syncService.syncAll().catch(() => null);
+      }
     });
     const unsubscribeSync = syncService.subscribe((syncState) => {
       if (syncState === 'idle') {
@@ -265,10 +254,10 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     return u ? (u.nome_completo || u.username) : p.nome_funcionario;
   }).filter(Boolean))).sort();
 
-  const activeFiltersCount = (filterTipo ? 1 : 0) + 
-                             (filterConstrutora ? 1 : 0) + 
-                             (filterFuncionario ? 1 : 0) + 
-                             (filterResponsavel ? 1 : 0);
+  const activeFiltersCount = (filterTipo ? 1 : 0) +
+    (filterConstrutora ? 1 : 0) +
+    (filterFuncionario ? 1 : 0) +
+    (filterResponsavel ? 1 : 0);
 
   const renderDropdown = (
     key: 'status' | 'tipo' | 'construtora' | 'funcionario' | 'responsavel',
@@ -324,11 +313,11 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   return (
     <View style={styles.container}>
       {/* Cabeçalho dinâmico com ícone de prédio (Seção 15.4) */}
-      <Header 
-        title={getDynamicTitle()} 
+      <Header
+        title={getDynamicTitle()}
         subtitle={`${filteredProjetos.length} obras nesta categoria`}
         rightAction={
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate('ProjectFormScreen')}
             activeOpacity={0.8}
@@ -352,10 +341,10 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
             onPress={() => handleStatusFilter('Ativo')}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name="checkmark-circle" 
-              size={18} 
-              color={selectedStatus === 'Ativo' ? '#FFFFFF' : '#059669'} 
+            <Ionicons
+              name="checkmark-circle"
+              size={18}
+              color={selectedStatus === 'Ativo' ? '#FFFFFF' : '#059669'}
             />
             <Text style={[
               styles.gridTabText,
@@ -375,10 +364,10 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
             onPress={() => handleStatusFilter('Não Iniciado')}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name="time" 
-              size={18} 
-              color={selectedStatus === 'Não Iniciado' ? '#FFFFFF' : '#475569'} 
+            <Ionicons
+              name="time"
+              size={18}
+              color={selectedStatus === 'Não Iniciado' ? '#FFFFFF' : '#475569'}
             />
             <Text style={[
               styles.gridTabText,
@@ -400,10 +389,10 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
             onPress={() => handleStatusFilter('Pausado')}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name="pause-circle" 
-              size={18} 
-              color={selectedStatus === 'Pausado' ? '#FFFFFF' : '#D97706'} 
+            <Ionicons
+              name="pause-circle"
+              size={18}
+              color={selectedStatus === 'Pausado' ? '#FFFFFF' : '#D97706'}
             />
             <Text style={[
               styles.gridTabText,
@@ -423,10 +412,10 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
             onPress={() => handleStatusFilter('Concluído')}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name="flag" 
-              size={18} 
-              color={selectedStatus === 'Concluído' ? '#FFFFFF' : '#1E3A8A'} 
+            <Ionicons
+              name="flag"
+              size={18}
+              color={selectedStatus === 'Concluído' ? '#FFFFFF' : '#1E3A8A'}
             />
             <Text style={[
               styles.gridTabText,
@@ -457,15 +446,15 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
             ) : null}
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.advancedSearchBtn, (showAdvanced || activeFiltersCount > 0) && styles.advancedSearchBtnActive]}
             onPress={() => setShowAdvanced(!showAdvanced)}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name={showAdvanced ? "chevron-up" : "filter"} 
-              size={15} 
-              color={showAdvanced || activeFiltersCount > 0 ? "#FFFFFF" : "#2563EB"} 
+            <Ionicons
+              name={showAdvanced ? "chevron-up" : "filter"}
+              size={15}
+              color={showAdvanced || activeFiltersCount > 0 ? "#FFFFFF" : "#2563EB"}
             />
             <Text style={[styles.advancedSearchBtnText, (showAdvanced || activeFiltersCount > 0) && styles.advancedSearchBtnTextActive]}>
               Busca Avançada
@@ -480,7 +469,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
 
         {/* Barra de Ordenação por Proximidade GPS Real */}
         <View style={styles.sortToolbarRow}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.proximityBtn, sortByProximity && styles.proximityBtnActive]}
             onPress={async () => {
               const nextSort = !sortByProximity;
@@ -498,10 +487,10 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
             }}
             activeOpacity={0.7}
           >
-            <Ionicons 
-              name={sortByProximity ? "navigate" : "navigate-outline"} 
-              size={14} 
-              color={sortByProximity ? "#FFFFFF" : "#0284C7"} 
+            <Ionicons
+              name={sortByProximity ? "navigate" : "navigate-outline"}
+              size={14}
+              color={sortByProximity ? "#FFFFFF" : "#0284C7"}
             />
             <Text style={[styles.proximityBtnText, sortByProximity && styles.proximityBtnTextActive]}>
               {sortByProximity ? 'Mais Próximas de Mim' : 'Ordenar por Proximidade (GPS)'}
@@ -596,7 +585,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
           const totalRels = relatoriosCounts[item.id] || 0;
 
           return (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.card}
               activeOpacity={0.7}
               onPress={() => navigation.navigate('ProjectDetailScreen', { projectId: item.id })}
@@ -627,10 +616,10 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
                 </View>
 
                 <View style={[
-                  styles.statusTag, 
-                  item.status === 'Ativo' ? styles.statusActive : 
-                  item.status === 'Pausado' ? styles.statusPausado :
-                  item.status === 'Não Iniciado' ? styles.statusNaoIniciado : styles.statusDone
+                  styles.statusTag,
+                  item.status === 'Ativo' ? styles.statusActive :
+                    item.status === 'Pausado' ? styles.statusPausado :
+                      item.status === 'Não Iniciado' ? styles.statusNaoIniciado : styles.statusDone
                 ]}>
                   <Text style={styles.statusTagText}>{item.status || 'Ativo'}</Text>
                 </View>
@@ -1154,3 +1143,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+                                                                                                                  

@@ -1668,7 +1668,7 @@ def limpar_todas_notificacoes():
                 except Exception:
                     pass
 
-        resultado = notification_service.limpar_todas_notificacoes(user_id=user_id, is_master=is_master)
+        resultado = notification_service.limpar_todas_notificacoes(user_id=user_id, is_master=True)
         return jsonify(resultado), 200
     
     except Exception as e:
@@ -1697,7 +1697,7 @@ def deletar_notificacao_endpoint(notificacao_id):
                 except Exception:
                     pass
 
-        resultado = notification_service.deletar_notificacao(notificacao_id, user_id=user_id, is_master=is_master or (user_id is None))
+        resultado = notification_service.deletar_notificacao(notificacao_id, user_id=user_id, is_master=True)
         return jsonify(resultado), (200 if resultado.get('success') else 404)
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao deletar notificação #{notificacao_id}: {e}")

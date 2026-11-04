@@ -90,15 +90,15 @@ export const Header: React.FC<HeaderProps> = ({
   }
 
   async function handleClearAll() {
-    await notificationService.clearAllNotifications(user?.id);
     setNotificacoes([]);
+    await notificationService.clearAllNotifications(user?.id);
   }
 
   async function handleDeleteOne(item: Notificacao, e?: any) {
     if (e && e.stopPropagation) e.stopPropagation();
     const key = `${item.titulo}_${item.created_at}`;
-    await notificationService.deleteNotification(item.id, key);
     setNotificacoes(prev => prev.filter(n => n.id !== item.id));
+    await notificationService.deleteNotification(item.id, key);
   }
 
   async function handleNotificationClick(item: Notificacao) {

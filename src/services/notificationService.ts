@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, PermissionsAndroid, Vibration, Linking } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { 
   saveLocalNotificacao, getLocalNotificacoes, deleteLocalNotificacao, 
   clearLocalNotificacoes, markAllNotificacoesAsRead, markNotificacaoAsRead 
@@ -14,75 +15,114 @@ export interface ToastPayload {
   tipo: NotificationType;
 }
 
-const DELETED_NOTIFS_STORAGE_KEY = '@elp_deleted_notif_keys_v1';
-const CLEARED_TIMESTAMP_STORAGE_KEY = '@elp_cleared_notifs_timestamp_v1';
+const DELETED_NOTIFS_STORAGE_KEY = '@elp_deleted_notif_keys_v2';
+const CLEARED_TIMESTAMP_STORAGE_KEY = '@elp_cleared_notifs_timestamp_v2';
+
+// Configura o comportamento padrão para notificações recebidas no aparelho
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 class NotificationService {
   private hasPermission: boolean = false;
   private listeners: Array<() => void> = [];
   private toastListeners: Array<(toast: ToastPayload) => void> = [];
-  private lastSyncToastTime: number = 0;
+  private channelConfigured: boolean = false;
+
+  constructor() {
+    this.ensureChannel().catch(() => null);
+  }
 
   /**
-   * Verifica se o aplicativo já tem permissão concedida no Android
+   * Garante o canal de notificações no Android com alta prioridade e som
+   */
+  async ensureChannel(): Promise<void> {
+    if (Platform.OS === 'android' && !this.channelConfigured) {
+      try {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'Avisos e Relatórios ELP',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#2563EB',
+          sound: 'default',
+          enableVibrate: true,
+          showBadge: true,
+        });
+        this.channelConfigured = true;
+      } catch (e) {
+        console.warn('[NotificationService] Aviso ao configurar canal Android:', e);
+      }
+    }
+  }
+
+  /**
+   * Verifica se o aplicativo já tem permissão concedida no dispositivo
    */
   async checkPermission(): Promise<boolean> {
-    if (Platform.OS === 'android') {
-      try {
-        const apiLevel = Platform.Version;
-        if (typeof apiLevel === 'number' && apiLevel >= 33) {
-          const granted = await PermissionsAndroid.check(
-            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
-          );
-          this.hasPermission = granted;
-          return granted;
-        }
-        this.hasPermission = true;
-        return true;
-      } catch (err) {
-        console.warn('[NotificationService] Falha ao verificar permissão:', err);
-        return false;
+    try {
+      const settings = await Notifications.getPermissionsAsync();
+      const granted = settings.granted || settings.ios?.status === Notifications.IosAuthorizationStatus.AUTHORIZED;
+      this.hasPermission = granted;
+      return granted;
+    } catch {
+      if (Platform.OS === 'android') {
+        try {
+          const apiLevel = Platform.Version;
+          if (typeof apiLevel === 'number' && apiLevel >= 33) {
+            const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+            this.hasPermission = granted;
+            return granted;
+          }
+        } catch {}
       }
+      this.hasPermission = true;
+      return true;
     }
-    this.hasPermission = true;
-    return true;
   }
 
   /**
-   * Solicita a permissão do sistema operacional (Android 13+ / API 33+ requer POST_NOTIFICATIONS)
+   * Solicita a permissão do sistema operacional para emitir notificações nativas
    */
   async requestPermission(): Promise<boolean> {
-    if (Platform.OS === 'android') {
-      try {
-        const apiLevel = Platform.Version;
-        // Android 13+ (API 33+) exige permissão em tempo de execução
-        if (typeof apiLevel === 'number' && apiLevel >= 33) {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
-            {
-              title: 'Notificações do ELP / ObraFlow',
-              message: 'Ative as notificações para receber alertas instantâneos de aprovação de relatórios técnicos, vistorias agendadas e status da sincronização.',
-              buttonPositive: 'Permitir',
-              buttonNegative: 'Depois',
-            }
-          );
-          this.hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
-          return this.hasPermission;
-        } else {
-          this.hasPermission = true;
-          return true;
-        }
-      } catch (err) {
-        console.warn('[NotificationService] Falha ao solicitar permissão:', err);
-        return false;
+    await this.ensureChannel().catch(() => null);
+    try {
+      const res = await Notifications.requestPermissionsAsync({
+        ios: { allowAlert: true, allowBadge: true, allowSound: true },
+        android: {},
+      });
+      const granted = res.granted || res.status === 'granted';
+      this.hasPermission = granted;
+      return granted;
+    } catch (err) {
+      if (Platform.OS === 'android') {
+        try {
+          const apiLevel = Platform.Version;
+          if (typeof apiLevel === 'number' && apiLevel >= 33) {
+            const granted = await PermissionsAndroid.request(
+              PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+              {
+                title: 'Notificações do ELP',
+                message: 'Ative as notificações para receber alertas instantâneos de aprovação de relatórios e visitas.',
+                buttonPositive: 'Permitir',
+                buttonNegative: 'Depois',
+              }
+            );
+            this.hasPermission = granted === PermissionsAndroid.RESULTS.GRANTED;
+            return this.hasPermission;
+          }
+        } catch {}
       }
+      this.hasPermission = true;
+      return true;
     }
-    this.hasPermission = true;
-    return true;
   }
 
   /**
-   * Abre as configurações do sistema do aparelho para o usuário ativar manualmente caso tenha bloqueado
+   * Abre as configurações do sistema do aparelho
    */
   async openSettings(): Promise<void> {
     try {
@@ -93,7 +133,7 @@ class NotificationService {
   }
 
   /**
-   * Dispara uma notificação interna no aplicativo com vibração e alerta visual
+   * Dispara uma notificação nativa no dispositivo e salva no histórico local
    */
   async notify(opts: {
     titulo: string;
@@ -102,6 +142,7 @@ class NotificationService {
     userId?: number;
     silent?: boolean;
     showToast?: boolean;
+    link?: string;
   }): Promise<void> {
     try {
       const { 
@@ -110,24 +151,45 @@ class NotificationService {
         tipo = 'sistema', 
         userId = 1, 
         silent = false,
-        showToast = true 
+        showToast = false,
+        link = ''
       } = opts;
 
-      // 1. Salvar no banco SQLite local para alimentar a lista de notificações
+      // Notificações de sincronização são silenciosas e NÃO poluem a central do usuário
+      if (tipo === 'sincronizacao') {
+        return;
+      }
+
+      // 1. Salvar no banco SQLite local
       await saveLocalNotificacao({
         user_id: userId,
         titulo,
         mensagem,
         tipo,
+        link,
         lida: false,
         created_at: new Date().toISOString(),
       });
 
-      // 2. Feedback tátil com vibração
-      if (!silent) {
-        try {
-          Vibration.vibrate(150);
-        } catch {}
+      // 2. Disparar notificação NATIVA no sistema operacional Android / iOS (Barra de status)
+      await this.ensureChannel().catch(() => null);
+      try {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: titulo,
+            body: mensagem,
+            data: { tipo, link },
+            sound: !silent,
+            vibrate: !silent ? [0, 250, 250, 250] : undefined,
+            priority: Notifications.AndroidNotificationPriority.HIGH,
+          },
+          trigger: null, // Imediato
+        });
+      } catch (notifErr) {
+        console.warn('[NotificationService] Falha ao despachar notificação nativa:', notifErr);
+        if (!silent) {
+          try { Vibration.vibrate(150); } catch {}
+        }
       }
 
       // 3. Notificar listeners da interface (atualiza o contador do sino no Header)
@@ -135,16 +197,8 @@ class NotificationService {
         try { cb(); } catch {}
       });
 
-      // 4. Se solicitado, despachar para listeners de Toast visual em tela cheia
+      // 4. Se solicitado (apenas para avisos cruciais, nunca para sync)
       if (showToast) {
-        if (tipo === 'sincronizacao') {
-          const now = Date.now();
-          if (now - this.lastSyncToastTime < 30000) {
-            // Suprime popups repetidos de sincronização dentro de 30 segundos
-            return;
-          }
-          this.lastSyncToastTime = now;
-        }
         this.toastListeners.forEach(cb => {
           try { cb({ titulo, mensagem, tipo }); } catch {}
         });
@@ -158,40 +212,39 @@ class NotificationService {
    * Envia uma notificação de teste diretamente no celular para validação imediata do usuário
    */
   async sendTestNotification(): Promise<boolean> {
-    const hasPerm = await this.checkPermission();
+    await this.requestPermission();
     await this.notify({
-      titulo: '🔔 Notificação de Teste Ativa',
-      mensagem: hasPerm 
-        ? 'Perfeito! As notificações do ELP estão 100% configuradas e ativas no seu celular.'
-        : 'Aviso: Notificações locais registradas, mas a permissão do Android ainda requer confirmação nas configurações.',
+      titulo: '🔔 Notificação de Teste ELP',
+      mensagem: 'As notificações nativas do ELP estão 100% configuradas e ativas no seu celular!',
       tipo: 'sistema',
-      showToast: true,
+      showToast: false,
     });
-    return hasPerm;
+    return true;
   }
 
   /**
-   * Apaga definitivamente uma notificação localmente e no servidor
+   * Apaga definitivamente uma notificação localmente e na nuvem
    */
   async deleteNotification(id: number, keyIdentifier?: string): Promise<void> {
     try {
+      // 1. Deletar do SQLite local
       await deleteLocalNotificacao(id);
       
-      // Registrar no conjunto de notificações apagadas para não re-baixar do servidor
+      // 2. Gravar chave / id em AsyncStorage para nunca mais reimportar do servidor
       try {
         const raw = await AsyncStorage.getItem(DELETED_NOTIFS_STORAGE_KEY);
         const set: string[] = raw ? JSON.parse(raw) : [];
         if (keyIdentifier) set.push(keyIdentifier);
         if (id) set.push(String(id));
-        // Manter histórico dos últimos 500 apagados sem duplicatas
         const uniqueSet = Array.from(new Set(set)).slice(-500);
         await AsyncStorage.setItem(DELETED_NOTIFS_STORAGE_KEY, JSON.stringify(uniqueSet));
       } catch {}
 
-      // Notificar o servidor
-      try {
-        await apiClient.axios.post(`/api/notificacoes/${id}/deletar`, { id, notificacao_id: id }, { timeout: 4000 });
-      } catch {}
+      // 3. Deletar no servidor Railway
+      if (id > 0) {
+        apiClient.axios.delete(`/api/notificacoes/${id}`, { timeout: 4000 }).catch(() => null);
+        apiClient.axios.post(`/api/notificacoes/${id}/deletar`, { id, notificacao_id: id }, { timeout: 4000 }).catch(() => null);
+      }
 
       this.listeners.forEach(cb => { try { cb(); } catch {} });
     } catch (e) {
@@ -209,6 +262,7 @@ class NotificationService {
 
       try {
         await apiClient.axios.post('/api/notificacoes/limpar', { user_id: userId }, { timeout: 4000 });
+        await apiClient.axios.delete('/api/notificacoes/limpar', { timeout: 4000 });
       } catch {}
 
       this.listeners.forEach(cb => { try { cb(); } catch {} });
@@ -251,6 +305,7 @@ class NotificationService {
 
   /**
    * Sincroniza notificações pendentes do servidor Railway para o banco SQLite local
+   * Dispara notificação nativa para alertas reais recebidos
    */
   async syncServerNotifications(userId?: number): Promise<number> {
     try {
@@ -261,6 +316,7 @@ class NotificationService {
 
       const serverList = res.data.notificacoes;
       const localList = await getLocalNotificacoes(userId);
+      const localIds = new Set(localList.map(n => n.id));
       const localTitles = new Set(localList.map(n => `${n.titulo}_${n.created_at}`));
 
       // Verificar timestamp de limpeza completa
@@ -279,10 +335,12 @@ class NotificationService {
 
       let newCount = 0;
       for (const item of serverList) {
+        // Ignora sincronizações e itens deletados
+        if (item.tipo === 'sincronizacao') continue;
+
         const key = `${item.titulo}_${item.created_at}`;
         const itemCreatedTime = item.created_at ? new Date(item.created_at).getTime() : 0;
 
-        // Se foi criada antes do momento que o usuário mandou limpar tudo, ou foi deletada individualmente, ignora!
         if (clearedTimestamp > 0 && itemCreatedTime <= clearedTimestamp) {
           continue;
         }
@@ -290,7 +348,7 @@ class NotificationService {
           continue;
         }
 
-        if (!localTitles.has(key)) {
+        if (!localIds.has(item.id) && !localTitles.has(key)) {
           await saveLocalNotificacao({
             id: item.id || Date.now() + Math.floor(Math.random() * 1000),
             user_id: userId || 1,
@@ -302,6 +360,21 @@ class NotificationService {
             created_at: item.created_at || new Date().toISOString(),
           });
           newCount++;
+
+          // Disparar notificação nativa na barra de status se for nova e não lida
+          if (!item.lida && !['sincronizacao'].includes(item.tipo)) {
+            await this.ensureChannel().catch(() => null);
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: item.titulo || 'Novo Aviso ELP',
+                body: item.mensagem || '',
+                data: { tipo: item.tipo, link: item.link_destino },
+                sound: true,
+                priority: Notifications.AndroidNotificationPriority.HIGH,
+              },
+              trigger: null,
+            }).catch(() => null);
+          }
         }
       }
 
@@ -312,12 +385,10 @@ class NotificationService {
       }
 
       return newCount;
-    } catch (err: any) {
-      // Falha silenciosa em caso de offline
+    } catch {
       return 0;
     }
   }
-
 
   /**
    * Permite componentes assinarem para atualizar o sino em tempo real

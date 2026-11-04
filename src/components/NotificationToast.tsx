@@ -15,6 +15,7 @@ export const NotificationToast: React.FC = () => {
 
   useEffect(() => {
     const unsub = notificationService.subscribeToast((payload) => {
+      if (!payload || payload.tipo === 'sincronizacao') return;
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
       setToast(payload);
 
