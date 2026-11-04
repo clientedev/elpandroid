@@ -781,22 +781,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       />
       <OfflineBanner />
 
-      {/* Indicador de AutoSave em Tempo Real no Topo */}
-      <View style={styles.autoSaveBar}>
-        <Ionicons 
-          name={isAutoSaving ? "sync-outline" : "checkmark-circle"} 
-          size={14} 
-          color={isAutoSaving ? "#0284C7" : "#16A34A"} 
-        />
-        <Text style={[styles.autoSaveText, isAutoSaving && { color: '#0284C7' }]}>
-          {isAutoSaving 
-            ? 'Salvando alterações da obra...' 
-            : lastSavedTime 
-              ? `Todas as alterações salvas às ${lastSavedTime}` 
-              : 'Salvamento automático ativo em todos os campos'}
-        </Text>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Identificação Geral da Obra</Text>

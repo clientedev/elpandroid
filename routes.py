@@ -14781,6 +14781,7 @@ def api_relatorio_detail_sync(relatorio_id):
 
         if request.method in ['PUT', 'POST']:
             data = request.get_json(silent=True) or request.form or {}
+            status_anterior = relatorio.status
             for field in ['titulo', 'descricao', 'status', 'categoria', 'local', 'observacoes_finais', 'comentario_aprovacao', 'checklist_data']:
                 if field in data and data[field] is not None:
                     setattr(relatorio, field, data[field])
@@ -14821,14 +14822,14 @@ def api_relatorio_detail_sync(relatorio_id):
             relatorio.updated_at = brazil_now()
             db.session.commit()
 
-            if relatorio.status == 'Aguardando Aprovação':
+            if status_anterior != 'Aguardando Aprovação' and relatorio.status == 'Aguardando Aprovação':
                 try:
                     from notification_service import notification_service
                     notification_service.criar_notificacao_relatorio_pendente(relatorio.id)
                     current_app.logger.info(f"🔔 Notificação automática disparada via PUT para relatório {relatorio.numero}")
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de aprovação pendente no PUT: {notif_err}")
-            elif relatorio.status == 'Rejeitado':
+            elif status_anterior != 'Rejeitado' and relatorio.status == 'Rejeitado':
                 try:
                     from notification_service import notification_service
                     notification_service.criar_notificacao_relatorio_reprovado(relatorio.id, relatorio.comentario_aprovacao)

@@ -17,6 +17,7 @@ export interface ToastPayload {
 
 const DELETED_NOTIFS_STORAGE_KEY = '@elp_deleted_notif_keys_v2';
 const CLEARED_TIMESTAMP_STORAGE_KEY = '@elp_cleared_notifs_timestamp_v2';
+const NOTIFIED_NATIVE_STORAGE_KEY = '@elp_notified_native_keys_v3';
 
 // Configura o comportamento padrão para notificações recebidas no aparelho
 Notifications.setNotificationHandler({
@@ -24,6 +25,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -32,9 +35,32 @@ class NotificationService {
   private listeners: Array<() => void> = [];
   private toastListeners: Array<(toast: ToastPayload) => void> = [];
   private channelConfigured: boolean = false;
+  private isSyncingServer: boolean = false;
+  private lastSyncServerTime: number = 0;
+  private notifiedKeys: Set<string> = new Set<string>();
 
   constructor() {
     this.ensureChannel().catch(() => null);
+    this.loadNotifiedKeys().catch(() => null);
+  }
+
+  private async loadNotifiedKeys(): Promise<void> {
+    try {
+      const raw = await AsyncStorage.getItem(NOTIFIED_NATIVE_STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          this.notifiedKeys = new Set(arr);
+        }
+      }
+    } catch {}
+  }
+
+  private async saveNotifiedKeys(): Promise<void> {
+    try {
+      const arr = Array.from(this.notifiedKeys).slice(-300);
+      await AsyncStorage.setItem(NOTIFIED_NATIVE_STORAGE_KEY, JSON.stringify(arr));
+    } catch {}
   }
 
   /**
@@ -304,10 +330,51 @@ class NotificationService {
   }
 
   /**
+   * Dispara apenas uma única vez a notificação nativa quando um relatório é submetido para aprovação
+   */
+  async notifyOnceForReportApproval(opts: {
+    reportId: number;
+    reportNumber?: string;
+    projetoNome?: string;
+    userId?: number;
+  }): Promise<boolean> {
+    const key = `approval_${opts.reportNumber || opts.reportId}`;
+    if (this.notifiedKeys.has(key)) {
+      return false;
+    }
+    this.notifiedKeys.add(key);
+    this.saveNotifiedKeys().catch(() => null);
+
+    const num = opts.reportNumber || 'Relatório';
+    const obra = opts.projetoNome || 'Obra';
+
+    await this.notify({
+      titulo: '📋 Relatório Enviado para Aprovação',
+      mensagem: `O relatório ${num} da obra "${obra}" foi submetido para aprovação técnica com sucesso.`,
+      tipo: 'relatorio',
+      userId: opts.userId || 1,
+      silent: false,
+      showToast: false,
+      link: `/reports/${opts.reportId}`,
+    });
+    return true;
+  }
+
+  /**
    * Sincroniza notificações pendentes do servidor Railway para o banco SQLite local
-   * Dispara notificação nativa para alertas reais recebidos
+   * Atualiza a central de forma segura e sem criar tempestades de notificações nativas
    */
   async syncServerNotifications(userId?: number): Promise<number> {
+    if (this.isSyncingServer) {
+      return 0;
+    }
+    const now = Date.now();
+    if (now - this.lastSyncServerTime < 15000) {
+      return 0;
+    }
+    this.isSyncingServer = true;
+    this.lastSyncServerTime = now;
+
     try {
       const res = await apiClient.axios.get('/api/notificacoes', { timeout: 8000 });
       if (!res.data || !Array.isArray(res.data.notificacoes)) {
@@ -360,21 +427,6 @@ class NotificationService {
             created_at: item.created_at || new Date().toISOString(),
           });
           newCount++;
-
-          // Disparar notificação nativa na barra de status se for nova e não lida
-          if (!item.lida && !['sincronizacao'].includes(item.tipo)) {
-            await this.ensureChannel().catch(() => null);
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: item.titulo || 'Novo Aviso ELP',
-                body: item.mensagem || '',
-                data: { tipo: item.tipo, link: item.link_destino },
-                sound: true,
-                priority: Notifications.AndroidNotificationPriority.HIGH,
-              },
-              trigger: null,
-            }).catch(() => null);
-          }
         }
       }
 
@@ -387,6 +439,8 @@ class NotificationService {
       return newCount;
     } catch {
       return 0;
+    } finally {
+      this.isSyncingServer = false;
     }
   }
 

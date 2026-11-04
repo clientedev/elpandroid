@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, Platform, StatusBar, Image, 
   Modal, ScrollView, Dimensions, ActivityIndicator 
@@ -41,13 +41,13 @@ export const Header: React.FC<HeaderProps> = ({
   const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [notifFilter, setNotifFilter] = useState<'todas' | 'nao_lidas'>('todas');
+  const lastSyncServerRef = useRef<number>(0);
 
-  const loadNotificacoes = useCallback(async () => {
+  const refreshLocalNotificacoes = useCallback(async () => {
     try {
       let list = await getLocalNotificacoes(user?.id);
       const welcomed = await AsyncStorage.getItem('@elp_welcomed_v1');
       if (!welcomed && list.length === 0) {
-        // Seed initial notifications ONLY ONCE on very first launch
         await AsyncStorage.setItem('@elp_welcomed_v1', 'true');
         await saveLocalNotificacao({
           user_id: user?.id || 1,
@@ -60,27 +60,34 @@ export const Header: React.FC<HeaderProps> = ({
         list = await getLocalNotificacoes(user?.id);
       }
       setNotificacoes(list);
-
-      // Sincronizar em segundo plano com as notificações do servidor Railway se online
-      if (isOnline) {
-        notificationService.syncServerNotifications(user?.id).then((newCount) => {
-          if (newCount > 0) {
-            getLocalNotificacoes(user?.id).then(updated => setNotificacoes(updated));
-          }
-        }).catch(() => null);
-      }
     } catch (e) {
-      console.warn('Erro ao carregar notificacoes:', e);
+      console.warn('Erro ao atualizar notificações locais:', e);
     }
-  }, [user?.id, isOnline]);
+  }, [user?.id]);
+
+  const loadNotificacoes = useCallback(async () => {
+    await refreshLocalNotificacoes();
+
+    // Sincronizar com servidor de forma throttled (no máximo uma vez a cada 60s)
+    const now = Date.now();
+    if (isOnline && (now - lastSyncServerRef.current > 60000)) {
+      lastSyncServerRef.current = now;
+      notificationService.syncServerNotifications(user?.id).then((newCount) => {
+        if (newCount > 0) {
+          refreshLocalNotificacoes();
+        }
+      }).catch(() => null);
+    }
+  }, [user?.id, isOnline, refreshLocalNotificacoes]);
 
   useEffect(() => {
     loadNotificacoes();
+    // O subscriber apenas recarrega o estado local do SQLite, NUNCA dispara syncServerNotifications
     const unsub = notificationService.subscribe(() => {
-      loadNotificacoes();
+      refreshLocalNotificacoes();
     });
     return unsub;
-  }, [loadNotificacoes]);
+  }, [loadNotificacoes, refreshLocalNotificacoes]);
 
   const unreadCount = notificacoes.filter(n => !n.lida).length;
 

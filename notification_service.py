@@ -65,11 +65,11 @@ class NotificationService:
                 except Exception as pref_err:
                     logger.debug(f"Aviso ao consultar preferências do usuário {user_id}: {pref_err}")
 
-            # 2. Proteção contra disparos duplicados nos últimos 60 segundos
+            # 2. Proteção contra disparos duplicados nos últimos 10 minutos
             from datetime import timedelta
             from models import brazil_now
             agora = brazil_now()
-            limite_dup = agora - timedelta(seconds=60)
+            limite_dup = agora - timedelta(minutes=10)
             dup = Notificacao.query.filter(
                 Notificacao.user_id == user_id,
                 Notificacao.tipo == tipo,
@@ -267,13 +267,24 @@ class NotificationService:
             relatorio_id: ID do relatório pendente
         """
         try:
-            from models import Relatorio, Projeto, AprovadorPadrao
+            from models import Relatorio, Projeto, AprovadorPadrao, Notificacao
             
             relatorio = Relatorio.query.get(relatorio_id)
             if not relatorio:
                 logger.error(f"❌ Relatório {relatorio_id} não encontrado")
                 return {'success': False, 'error': 'Relatório não encontrado'}
             
+            # Deduplicação idempotente: evitar disparos em cascata ou múltiplos para o mesmo relatório
+            link_alvo = f'/reports/{relatorio_id}/review'
+            link_alt = f'/reports/{relatorio_id}'
+            existente = Notificacao.query.filter(
+                Notificacao.tipo == 'relatorio_pendente',
+                (Notificacao.link_destino == link_alvo) | (Notificacao.link_destino == link_alt)
+            ).first()
+            if existente:
+                logger.info(f"🚫 [DEDUPLICAÇÃO] Notificação pendente para relatório {relatorio_id} já existe no banco. Pulando duplicação.")
+                return {'success': True, 'skipped': True, 'reason': 'Notificação já existente para este relatório'}
+
             # Buscar aprovadores: tentar específico, global, do relatório e fallback para TODOS os aprovadores/mestres
             destinatarios_ids = set()
             

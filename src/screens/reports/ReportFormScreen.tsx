@@ -1327,6 +1327,15 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       // Gera o PDF em segundo plano e salva na pasta da obra no aparelho
       generateReportPDF({ ...relData, numero: savedNumero }, fotos).catch(() => null);
 
+      if (status === 'Aguardando Aprovação') {
+        notificationService.notifyOnceForReportApproval({
+          reportId,
+          reportNumber: savedNumero,
+          projetoNome: projForSave?.nome || 'Obra',
+          userId: user?.id || 1,
+        }).catch(() => null);
+      }
+
       Alert.alert(
         'Sucesso!', 
         status === 'Aguardando Aprovação' 
@@ -1432,20 +1441,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           </TouchableOpacity>
         }
       />
-
-      {/* Indicador de AutoSave em Tempo Real no Topo (Seção 6 e 15.7) */}
-      <View style={styles.autoSaveBar}>
-        <Ionicons 
-          name={isAutoSaving ? "sync-outline" : "checkmark-circle"} 
-          size={14} 
-          color={isAutoSaving ? "#0284C7" : "#16A34A"} 
-        />
-        <Text style={[styles.autoSaveText, isAutoSaving && { color: '#0284C7' }]}>
-          {isAutoSaving 
-            ? "⏳ Salvando rascunho silenciosamente..." 
-            : (lastSavedTime ? `🟢 Salvo automaticamente às ${lastSavedTime}` : "🟢 Salvamento automático em tempo real ativado")}
-        </Text>
-      </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {/* Bloco 1: Data da Visita, Obra e Número */}
