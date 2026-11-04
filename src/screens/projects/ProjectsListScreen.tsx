@@ -206,11 +206,19 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList, refreshUserLocation, sortByProximity, userCoords, isOnline]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
+    const unsubscribeFocus = navigation.addListener('focus', () => {
       loadProjetos();
     });
+    const unsubscribeSync = syncService.subscribe((syncState) => {
+      if (syncState === 'idle') {
+        loadProjetos();
+      }
+    });
     loadProjetos();
-    return unsubscribe;
+    return () => {
+      unsubscribeFocus();
+      unsubscribeSync();
+    };
   }, [navigation, loadProjetos]);
 
   const handleSearch = (text: string) => {

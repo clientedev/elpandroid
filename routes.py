@@ -14068,9 +14068,18 @@ def api_projeto_detail_sync(projeto_id):
                                 seqs.append(int(m.group()))
                         max_s = max(seqs) if seqs else 0
                         candidate_num = f"OBRA-{max_s + 1:04d}"
-                    projeto = Projeto(numero=candidate_num)
+                    
+                    user = _resolve_mobile_user(data)
+                    projeto = Projeto(
+                        numero=candidate_num,
+                        nome=(data.get('nome') or 'Nova Obra').strip(),
+                        tipo_obra=data.get('tipo_obra') or 'Edifício Residencial Multifamiliar',
+                        construtora=(data.get('construtora') or 'ELP Engenharia').strip(),
+                        nome_funcionario=data.get('nome_funcionario') or (user.nome_completo if user else 'Engenheiro'),
+                        responsavel_id=int(data.get('responsavel_id') or (user.id if user else 1)),
+                        email_principal=data.get('email_principal') or 'engenharia@elp.com.br',
+                    )
                     db.session.add(projeto)
-                    db.session.flush()
             else:
                 return jsonify({'success': False, 'error': 'Projeto nao encontrado'}), 404
 
@@ -14191,6 +14200,24 @@ def api_projeto_detail_sync(projeto_id):
             return jsonify({'success': True, 'id': projeto.id, 'numero': projeto.numero}), 200
 
         return jsonify({'id': projeto.id, 'numero': projeto.numero, 'nome': projeto.nome}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/projetos/<int:projeto_id>/status', methods=['POST', 'PUT'])
+@csrf.exempt
+def api_update_projeto_status(projeto_id):
+    """Atualizacao de status da obra via mobile"""
+    try:
+        projeto = Projeto.query.get(projeto_id)
+        if not projeto:
+            return jsonify({'success': False, 'error': 'Projeto nao encontrado'}), 404
+        data = request.get_json(silent=True) or request.form or {}
+        new_status = data.get('status')
+        if new_status:
+            projeto.status = new_status
+            db.session.commit()
+        return jsonify({'success': True, 'id': projeto.id, 'status': projeto.status}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500

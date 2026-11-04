@@ -625,6 +625,22 @@ class SyncService {
           if (deletedProjects.has(p.id)) {
             continue;
           }
+          // Reconcilia com qualquer obra local pendente que coincida pelo nome ou código
+          try {
+            const matchingPending = await db.getFirstAsync<any>(
+              `SELECT id FROM projetos WHERE id != ? AND (
+                (numero IS NOT NULL AND numero != '' AND numero = ?) OR 
+                (nome IS NOT NULL AND nome != '' AND LOWER(TRIM(nome)) = LOWER(TRIM(?)))
+              ) LIMIT 1`,
+              [p.id, p.numero, p.nome]
+            );
+            if (matchingPending) {
+              console.log(`[SyncService] Reconciliando obra local ${matchingPending.id} com obra oficial ${p.id} (${p.numero})`);
+              await migrateLocalProjetoId(matchingPending.id, p.id, p.numero);
+            }
+          } catch (recErr) {
+            console.warn('[SyncService] Aviso de reconciliação de obra:', recErr);
+          }
           await saveLocalProjeto(p, 'synced');
           await ensureProjectFolders(p.nome, p.numero || p.codigo).catch(() => null);
         }
