@@ -1691,15 +1691,35 @@ export async function clearCompletedSyncQueue(): Promise<void> {
  * atualizando em cascata todas as tabelas relacionadas e os itens pendentes na fila de sincronização.
  */
 export async function migrateLocalProjetoId(oldId: number, newId: number, newNumero?: string): Promise<void> {
+  if (!oldId || !newId || oldId === newId) return;
   const db = await getDatabase();
-  await db.runAsync(
-    'UPDATE projetos SET id = ?, numero = COALESCE(?, numero), sync_status = "synced" WHERE id = ?',
-    [newId, newNumero || null, oldId]
-  );
-  await db.runAsync('UPDATE relatorios SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
-  await db.runAsync('UPDATE visitas SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
-  await db.runAsync('UPDATE contatos SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
-  await db.runAsync('UPDATE lembretes SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]);
+  try {
+    // Se o registro com newId já existir no SQLite (ex: sync em background inseriu), remove o provisório
+    const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM projetos WHERE id = ?', [newId]);
+    if (existing) {
+      await db.runAsync('DELETE FROM projetos WHERE id = ?', [oldId]);
+      if (newNumero) {
+        await db.runAsync('UPDATE projetos SET numero = ?, sync_status = "synced" WHERE id = ?', [newNumero, newId]);
+      }
+    } else {
+      if (newNumero) {
+        await db.runAsync('DELETE FROM projetos WHERE numero = ? AND id != ?', [newNumero, oldId]);
+      }
+      await db.runAsync(
+        'UPDATE projetos SET id = ?, numero = COALESCE(?, numero), sync_status = "synced" WHERE id = ?',
+        [newId, newNumero || null, oldId]
+      );
+    }
+  } catch (migErr) {
+    console.warn('[db] Erro ao migrar ID na tabela projetos:', migErr);
+    try {
+      await db.runAsync('DELETE FROM projetos WHERE id = ?', [oldId]);
+    } catch {}
+  }
+  await db.runAsync('UPDATE relatorios SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]).catch(() => null);
+  await db.runAsync('UPDATE visitas SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]).catch(() => null);
+  await db.runAsync('UPDATE contatos SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]).catch(() => null);
+  await db.runAsync('UPDATE lembretes SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]).catch(() => null);
 
   // Atualiza payloads na fila de sincronização
   const pendingQueue = await db.getAllAsync<{ id: number; payload: string }>(

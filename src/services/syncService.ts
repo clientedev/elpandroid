@@ -325,6 +325,56 @@ class SyncService {
 
       await clearCompletedSyncQueue();
 
+      // 1.5 Proactive Sync for Local Projects that are pending or have temporary local IDs
+      try {
+        const db = await getDatabase();
+        const pendingProjs = await db.getAllAsync<any>(
+          'SELECT * FROM projetos WHERE sync_status = "pending" OR id >= 2000000000'
+        );
+        for (const lp of pendingProjs) {
+          try {
+            const isTemp = lp.id >= 2000000000;
+            const endpoint = isTemp ? '/api/projetos' : `/api/projetos/${lp.id}`;
+            
+            let contatosArr = [];
+            if (typeof lp.contatos === 'string') {
+              try { contatosArr = JSON.parse(lp.contatos); } catch {}
+            } else if (Array.isArray(lp.contatos)) {
+              contatosArr = lp.contatos;
+            }
+            const projPayload = {
+              ...lp,
+              contatos: contatosArr,
+            };
+
+            const pRes = isTemp 
+              ? await apiClient.axios.post(endpoint, projPayload)
+              : await apiClient.axios.put(endpoint, projPayload);
+            
+            if (isTemp && pRes?.data?.id) {
+              const serverId = Number(pRes.data.id);
+              const serverNumero = pRes.data.numero || lp.numero;
+              await migrateLocalProjetoId(lp.id, serverId, serverNumero);
+              await db.runAsync(
+                'UPDATE projetos SET sync_status = "synced" WHERE id = ?',
+                [serverId]
+              );
+              console.log(`[SyncService] Proativo: Obra local ${lp.id} migrada para ID servidor ${serverId} (${serverNumero})`);
+            } else {
+              await db.runAsync(
+                'UPDATE projetos SET sync_status = "synced" WHERE id = ?',
+                [lp.id]
+              );
+            }
+            processedCount++;
+          } catch (projSyncErr: any) {
+            console.warn(`[SyncService] Proativo falhou para obra ${lp.id}:`, projSyncErr?.message);
+          }
+        }
+      } catch (err) {
+        console.warn('[SyncService] Erro na varredura proativa de projetos:', err);
+      }
+
       // 2. Process Inbound Sync (Railway Server -> SQLite Local)
       await this.pullFromServer();
 
@@ -399,9 +449,10 @@ class SyncService {
         const serverProjectIds = new Set(serverProjects.map((p: any) => p.id));
 
         // Reconciliação: se a obra estava sincronizada no aparelho mas não existe mais no servidor, apaga em cascata!
+        // Ignora IDs temporários locais (>= 2000000000) para evitar apagar obras recém criadas offline
         const localProjetos = await getLocalProjetos('Todos');
         for (const lp of localProjetos) {
-          if (lp.sync_status === 'synced' && !serverProjectIds.has(lp.id)) {
+          if (lp.id < 2000000000 && lp.sync_status === 'synced' && !serverProjectIds.has(lp.id)) {
             console.log(`[SyncService] Obra ${lp.id} (${lp.nome}) excluída na nuvem. Apagando em cascata do aparelho.`);
             await deleteLocalProjetoCascade(lp.id);
           }

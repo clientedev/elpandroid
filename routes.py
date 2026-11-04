@@ -13839,37 +13839,49 @@ def api_projetos_collection():
             user = _resolve_mobile_user(data)
             responsavel_id = user.id if user else 1
 
-            # Gerar ou validar numero
-            numero = (data.get('numero') or '').strip()
-            existing = Projeto.query.filter_by(numero=numero).first() if numero else None
-            
+            # Verificar se é atualização de projeto existente por ID do banco
+            req_id = data.get('id')
+            existing = None
+            if req_id:
+                try:
+                    c_id = int(req_id)
+                    if 0 < c_id < 2000000000:
+                        existing = Projeto.query.get(c_id)
+                except Exception:
+                    pass
+
             if existing:
                 # Atualizar existente
                 projeto = existing
             else:
-                if not numero or numero.startswith('OBR-'):
-                    # Regra de indexação oficial: OBRA-0001 em diante
-                    max_seq = 0
-                    all_obras = Projeto.query.all()
-                    for p in all_obras:
-                        if p.numero:
-                            import re
-                            m = re.search(r'OBRA[-_ ]*(\d+)', p.numero, re.IGNORECASE)
-                            if m:
-                                try:
-                                    v = int(m.group(1))
-                                    if v > max_seq:
-                                        max_seq = v
-                                except Exception:
-                                    pass
-                    next_seq = max_seq + 1
-                    numero = f"OBRA-{next_seq:04d}"
-                projeto = Projeto(numero=numero)
+                # Nova obra: gera atomicamente o próximo número sequencial oficial OBRA-XXXX garantindo unicidade
+                import re
+                max_seq = 0
+                all_obras = Projeto.query.all()
+                for p in all_obras:
+                    if p.numero:
+                        m = re.search(r'OBRA[-_ ]*(\d+)', p.numero, re.IGNORECASE)
+                        if m:
+                            try:
+                                v = int(m.group(1))
+                                if v > max_seq:
+                                    max_seq = v
+                            except Exception:
+                                pass
+                next_seq = max_seq + 1
+                while True:
+                    candidate_num = f"OBRA-{next_seq:04d}"
+                    if not Projeto.query.filter_by(numero=candidate_num).first():
+                        official_numero = candidate_num
+                        break
+                    next_seq += 1
+
+                projeto = Projeto(numero=official_numero)
                 db.session.add(projeto)
 
-            projeto.nome = data.get('nome') or 'Nova Obra'
-            projeto.tipo_obra = data.get('tipo_obra') or 'Construção Civil'
-            projeto.construtora = data.get('construtora') or 'ELP Engenharia'
+            projeto.nome = (data.get('nome') or 'Nova Obra').strip()
+            projeto.tipo_obra = data.get('tipo_obra') or 'Edifício Residencial Multifamiliar'
+            projeto.construtora = (data.get('construtora') or 'ELP Engenharia').strip()
             projeto.nome_funcionario = data.get('nome_funcionario') or (user.nome_completo if user else 'Engenheiro')
             projeto.responsavel_id = responsavel_id
             projeto.email_principal = data.get('email_principal') or 'engenharia@elp.com.br'
