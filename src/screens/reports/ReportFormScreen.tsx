@@ -1470,9 +1470,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
           {/* 2º Campo: Obra do Relatório em Menu Dropdown */}
           <View style={styles.inputGroup}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <View style={{ marginBottom: 6 }}>
               <Text style={styles.label}>2. Obra do Relatório *</Text>
-              <Text style={{ fontSize: 11, color: '#0284C7', fontWeight: '600' }}>Toque para alterar obra</Text>
             </View>
             <TouchableOpacity 
               style={styles.fixedProjectCard}
@@ -1773,9 +1772,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           {/* Sugestões de Visitantes Cadastrados com 1 toque */}
           {visitantesCadastrados.length > 0 && (
             <View style={{ marginBottom: 12, marginTop: 4 }}>
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', marginBottom: 6 }}>
-                Visitantes Cadastrados (Toque para incluir):
-              </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 2 }}>
                 {visitantesCadastrados.map((v) => {
                   const desc = `${v.nome.trim()}${v.cargo ? ` (${v.cargo.trim()})` : ''}${v.empresa ? ` - ${v.empresa.trim()}` : ''}`;
@@ -1877,10 +1873,6 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               <Ionicons name="images" size={24} color="#FFFFFF" />
               <Text style={styles.galleryBigBtnText}>{isProcessingPhoto ? 'Processando...' : 'Galeria'}</Text>
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.photoCountRow}>
-            <Text style={styles.photoCountText}>Capacidade: {fotos.length} / 200 fotos</Text>
           </View>
 
           {fotos.map((item, index) => (

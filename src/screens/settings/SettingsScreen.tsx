@@ -159,7 +159,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
       await AsyncStorage.removeItem(WIDGETS_CONFIG_KEY);
       await AsyncStorage.removeItem(APP_PREFS_KEY);
       Alert.alert('Restaurado', 'As preferências foram redefinidas para o padrão.');
-    } catch (e) {}
+    } catch (e) { }
   }
 
   async function testServerConnection(showAlert: boolean = true) {
@@ -309,9 +309,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Preferências de Exibição & Widgets</Text>
-            <Text style={styles.menuSubtitle}>
-              Configurar cartões do painel, atalhos do canteiro e otimização de fotos
-            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
         </TouchableOpacity>
@@ -327,9 +324,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Visitantes & Acompanhantes</Text>
-            <Text style={styles.menuSubtitle}>
-              Cadastro de engenheiros parceiros e acompanhantes frequentes nas vistorias
-            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
         </TouchableOpacity>
@@ -350,9 +344,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Personalizar Checklist</Text>
-            <Text style={styles.menuSubtitle}>
-              Configurar etapas técnicas, reordenar e incluir novos itens
-            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
         </TouchableOpacity>
@@ -368,9 +359,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Legendas Técnicas</Text>
-            <Text style={styles.menuSubtitle}>
-              Biblioteca de termos, anomalias e descrições pré-definidas
-            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
         </TouchableOpacity>
@@ -391,9 +379,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Arquivos do App</Text>
-            <Text style={styles.menuSubtitle}>
-              Pastas locais das obras, fotos e relatórios aprovados em PDF
-            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
         </TouchableOpacity>
@@ -409,9 +394,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Notificações</Text>
-            <Text style={styles.menuSubtitle}>
-              Alertas no celular, teste de som e avisos de vistorias
-            </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
         </TouchableOpacity>
@@ -441,9 +423,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                     <Text style={styles.devMiniBadgeText}>DEV VISÃO TOTAL</Text>
                   </View>
                 </View>
-                <Text style={styles.menuSubtitle}>
-                  Ver tudo o que cada usuário vê, acessa e gerencia no sistema
-                </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
             </TouchableOpacity>
@@ -458,9 +437,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
               </View>
               <View style={styles.menuTextWrap}>
                 <Text style={styles.menuTitle}>Gestão de Usuários</Text>
-                <Text style={styles.menuSubtitle}>
-                  Controle de membros da equipe, cargos e permissões
-                </Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#94A3B8" />
             </TouchableOpacity>
@@ -533,9 +509,6 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>Verificar Atualizações</Text>
-            <Text style={styles.menuSubtitle}>
-              Versão {updateService.getCurrentVersion() || '1.0.21'} • Build de Produção
-            </Text>
           </View>
           {checkingUpdates ? (
             <ActivityIndicator size="small" color="#2563EB" />

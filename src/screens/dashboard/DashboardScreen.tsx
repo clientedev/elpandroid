@@ -382,9 +382,6 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                       </TouchableOpacity>
                     </View>
                     <Text style={[styles.cardValue, { color: '#065F46' }]}>{obrasAtivas}</Text>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                      {obrasAtivas === 1 ? 'Obra em acompanhamento ativo' : 'Obras em acompanhamento ativo'}
-                    </Text>
                   </View>
                   <Ionicons name="business" size={34} color="#A7F3D0" />
                 </TouchableOpacity>
@@ -408,9 +405,6 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                       </TouchableOpacity>
                     </View>
                     <Text style={[styles.cardValue, { color: '#92400E' }]}>{relatoriosPendentes}</Text>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                      {relatoriosPendentes === 1 ? 'Relatório aguardando aprovação técnica' : 'Relatórios aguardando aprovação técnica'}
-                    </Text>
                   </View>
                   <Ionicons name="hourglass" size={34} color="#FDE68A" />
                 </TouchableOpacity>
@@ -434,9 +428,6 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
                       </TouchableOpacity>
                     </View>
                     <Text style={[styles.cardValue, { color: '#1E3A8A' }]}>{visitasAgendadas}</Text>
-                    <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                      {visitasAgendadas === 1 ? 'Vistoria programada na agenda' : 'Vistorias programadas na agenda'}
-                    </Text>
                   </View>
                   <Ionicons name="calendar" size={34} color="#BFDBFE" />
                 </TouchableOpacity>

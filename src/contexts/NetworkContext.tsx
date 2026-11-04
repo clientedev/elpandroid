@@ -19,7 +19,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     // Listen to network status changes
     const unsubscribeNet = NetInfo.addEventListener(state => {
-      const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+      const online = Boolean(state.isConnected);
       setIsOnline(online);
       if (online) {
         // Automatic sync when connection returns
@@ -38,7 +38,7 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Verificação inicial ativa de conexão e sincronização imediata ao abrir o app
     NetInfo.fetch().then(state => {
-      const online = Boolean(state.isConnected && state.isInternetReachable !== false);
+      const online = Boolean(state.isConnected);
       setIsOnline(online);
       if (online) {
         syncService.syncAll();

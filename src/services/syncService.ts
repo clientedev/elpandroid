@@ -95,7 +95,7 @@ class SyncService {
   async isOnline(): Promise<boolean> {
     try {
       const net = await NetInfo.fetch();
-      return Boolean(net.isConnected && net.isInternetReachable !== false);
+      return Boolean(net.isConnected);
     } catch {
       return false;
     }

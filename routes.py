@@ -13802,10 +13802,19 @@ def _sync_projeto_extras(projeto, data, responsavel_id=1):
         if isinstance(chk_data, list) and len(chk_data) > 0:
             chk_config = ProjetoChecklistConfig.query.filter_by(projeto_id=projeto.id).first()
             if not chk_config:
+                valid_user = None
+                if responsavel_id:
+                    try:
+                        valid_user = User.query.get(int(responsavel_id))
+                    except Exception:
+                        pass
+                if not valid_user:
+                    valid_user = User.query.first()
+                creator_id = valid_user.id if valid_user else 1
                 chk_config = ProjetoChecklistConfig(
                     projeto_id=projeto.id,
                     tipo_checklist='personalizado',
-                    criado_por=responsavel_id or 1
+                    criado_por=creator_id
                 )
                 db.session.add(chk_config)
             else:

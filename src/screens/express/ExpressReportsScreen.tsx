@@ -1649,9 +1649,6 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
                 {visitantesCadastrados.length > 0 && (
                   <View style={{ marginTop: 8 }}>
-                    <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600', marginBottom: 4 }}>
-                      Acompanhantes Cadastrados nos Ajustes (Toque para incluir):
-                    </Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexDirection: 'row' }}>
                       {visitantesCadastrados.map(v => (
                         <TouchableOpacity
@@ -1885,9 +1882,8 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
               {/* 11. Galeria de Fotos do Laudo Express (Idêntico ao Relatório Normal) */}
               <View style={styles.inputGroup}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <View style={{ marginBottom: 8 }}>
                   <Text style={styles.label}>11. Galeria de Fotos do Laudo ({attachedPhotos.length})</Text>
-                  <Text style={styles.photoCountText}>Capacidade: {attachedPhotos.length} / 200 fotos</Text>
                 </View>
 
                 {/* Barra Fixa de 56px de altura para Captura Rápida (Câmera e Galeria) */}

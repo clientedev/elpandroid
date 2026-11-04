@@ -1,5 +1,5 @@
-$env:NODE_OPTIONS = "--max-old-space-size=2048"
-$env:CMAKE_BUILD_PARALLEL_LEVEL = "2"
+$env:NODE_OPTIONS = "--max-old-space-size=4096"
+$env:CMAKE_BUILD_PARALLEL_LEVEL = "1"
 Set-Location "$PSScriptRoot\..\android"
 Write-Host "[ELP Build] Compilando APK nativo de producao..." -ForegroundColor Cyan
 & .\gradlew.bat assembleRelease --no-daemon

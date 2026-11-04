@@ -219,7 +219,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       setIsAutoSaving(true);
       const numInicialParsed = parseInt(numeracaoInicial, 10);
       const rid = projectIdRef.current;
-      const isServerId = isServerIdRef.current && rid > 0 && rid < 2000000000;
+      const isServerId = rid > 0 && rid < 2000000000;
 
       const projData: Projeto = {
         id: rid,
@@ -249,38 +249,47 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         outras_observacoes: outrasObs.trim(),
         contatos: contatos,
         checklist_data: JSON.stringify(checklistItems),
-        sync_status: 'pending',
+        sync_status: isServerId ? 'synced' : 'pending',
       };
 
       // 1. Salva no SQLite local
-      await saveLocalProjeto(projData, 'pending');
+      await saveLocalProjeto(projData, isServerId ? 'synced' : 'pending');
 
       // 2. Garante pastas da obra
       await ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
 
-      // 3. Espelhamento online imediato se conectado
-      if (isOnline) {
-        try {
-          if (isServerId) {
-            await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 8000 });
-            await saveLocalProjeto({ ...projData, sync_status: 'synced' }, 'synced');
-          } else {
-            const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 8000 });
-            if (res?.data?.id) {
-              const serverId = res.data.id;
-              const serverNumero = res.data.numero || projData.numero;
-              const oldId = rid;
-              setProjectId(serverId);
-              if (serverNumero) setNumero(serverNumero);
-              if (oldId !== serverId) {
-                await migrateLocalProjetoId(oldId, serverId, serverNumero);
-              }
-              await saveLocalProjeto({ ...projData, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
+      // 3. Espelhamento online imediato na nuvem
+      try {
+        if (isServerId) {
+          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 10000 });
+          await saveLocalProjeto({ ...projData, sync_status: 'synced' }, 'synced');
+        } else {
+          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 10000 });
+          if (res?.data?.id) {
+            const serverId = Number(res.data.id);
+            const serverNumero = res.data.numero || projData.numero;
+            const oldId = rid;
+            setProjectId(serverId);
+            if (serverNumero) setNumero(serverNumero);
+            if (oldId !== serverId) {
+              await migrateLocalProjetoId(oldId, serverId, serverNumero);
             }
+            await saveLocalProjeto({ ...projData, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
           }
-        } catch (netSaveErr) {
-          console.warn('[ProjectForm] AutoSave online aviso (mantido offline):', netSaveErr);
         }
+      } catch (netSaveErr) {
+        console.warn('[ProjectForm] AutoSave online aviso (mantido offline e enfileirado):', netSaveErr);
+        // Adiciona à fila de sincronização para garantir envio posterior
+        const curRid = projectIdRef.current;
+        const curIsServer = curRid > 0 && curRid < 2000000000;
+        await addToSyncQueue(
+          'projeto',
+          curRid,
+          curIsServer ? 'update' : 'create',
+          curIsServer ? `/api/projetos/${curRid}` : '/api/projetos',
+          curIsServer ? 'PUT' : 'POST',
+          { ...projData, id: curRid }
+        ).catch(() => null);
       }
 
       const d = new Date();
@@ -297,7 +306,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     elementosBase, chapiscoColante, chapiscoAlvenaria, argamassaEmboco,
     formaAplicacao, acabamentosRevestimento, peitoris, muretas, frisosCor,
     faceInferiorAbas, observacoesFachada, outrasObs, contatos, checklistItems,
-    isOnline, setProjectId
+    setProjectId
   ]);
 
   // Debounced AutoSave (700ms - Espelhamento ágil com a nuvem)
@@ -630,7 +639,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     try {
       const numInicialParsed = parseInt(numeracaoInicial, 10) || 1;
       const rid = projectIdRef.current;
-      const isServerId = isServerIdRef.current && rid > 0 && rid < 2000000000;
+      const isServerId = rid > 0 && rid < 2000000000;
 
       const projData: Projeto = {
         id: rid,
@@ -660,44 +669,42 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         outras_observacoes: outrasObs.trim(),
         contatos: contatos,
         checklist_data: JSON.stringify(checklistItems),
-        sync_status: 'pending',
+        sync_status: isServerId ? 'synced' : 'pending',
       };
 
-      await saveLocalProjeto(projData, 'pending');
+      await saveLocalProjeto(projData, isServerId ? 'synced' : 'pending');
       await ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
 
       let savedToServer = false;
-      if (isOnline) {
-        try {
-          if (isServerId) {
-            await apiClient.axios.put(`/api/projetos/${rid}`, projData);
-            await saveLocalProjeto({ ...projData, sync_status: 'synced' }, 'synced');
+      try {
+        if (isServerId) {
+          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 12000 });
+          await saveLocalProjeto({ ...projData, sync_status: 'synced' }, 'synced');
+          savedToServer = true;
+        } else {
+          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 12000 });
+          if (res?.data?.id) {
+            const serverId = Number(res.data.id);
+            const serverNumero = res.data.numero || projData.numero;
+            setProjectId(serverId);
+            setNumero(serverNumero);
+            await migrateLocalProjetoId(rid, serverId, serverNumero);
+            await saveLocalProjeto({
+              ...projData,
+              id: serverId,
+              numero: serverNumero,
+              sync_status: 'synced',
+            }, 'synced');
             savedToServer = true;
-          } else {
-            const res = await apiClient.axios.post('/api/projetos', projData);
-            if (res?.data?.id) {
-              const serverId = Number(res.data.id);
-              const serverNumero = res.data.numero || projData.numero;
-              setProjectId(serverId);
-              setNumero(serverNumero);
-              await migrateLocalProjetoId(rid, serverId, serverNumero);
-              await saveLocalProjeto({
-                ...projData,
-                id: serverId,
-                numero: serverNumero,
-                sync_status: 'synced',
-              }, 'synced');
-              savedToServer = true;
-            }
           }
-        } catch (serverErr) {
-          console.warn('[ProjectForm] Falha ao enviar diretamente para o servidor no salvamento final:', serverErr);
         }
+      } catch (serverErr) {
+        console.warn('[ProjectForm] Falha ao enviar diretamente para o servidor no salvamento final:', serverErr);
       }
 
       if (!savedToServer) {
         const finalRid = projectIdRef.current;
-        const finalIsServer = isServerIdRef.current && finalRid > 0 && finalRid < 2000000000;
+        const finalIsServer = finalRid > 0 && finalRid < 2000000000;
         await addToSyncQueue(
           'projeto',
           finalRid,
@@ -708,9 +715,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         );
       }
 
-      if (isOnline) {
-        triggerSync().catch(() => null);
-      }
+      triggerSync().catch(() => null);
 
       Alert.alert(
         'Sucesso', 
@@ -795,10 +800,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
             <Text style={styles.label}>3. Endereço</Text>
 
             {/* Busca por CEP */}
-            <Text style={[styles.label, { fontSize: 12, color: '#64748B', marginTop: 4 }]}>
-              Preenchimento Automático por CEP:
-            </Text>
-            <View style={styles.cepRow}>
+            <View style={[styles.cepRow, { marginTop: 4 }]}>
               <TextInput
                 style={[styles.input, { flex: 1 }]}
                 placeholder="Digite o CEP (Ex: 01001-000)"
@@ -825,10 +827,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
             </View>
 
             {/* Logradouro com Autocomplete ou GPS */}
-            <Text style={[styles.label, { fontSize: 12, color: '#64748B', marginTop: 6 }]}>
-              Logradouro Completo / Captura GPS:
-            </Text>
-            <View style={styles.addressRow}>
+            <View style={[styles.addressRow, { marginTop: 6 }]}>
               <TextInput 
                 style={[styles.input, { flex: 1 }]} 
                 placeholder="Digite a rua ou capture pelo GPS" 
@@ -905,14 +904,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
               </View>
               <Ionicons name="chevron-forward" size={18} color="#64748B" />
             </TouchableOpacity>
-
-            {/* Email linkado automaticamente (não precisa campo separado) */}
-            <View style={styles.linkedEmailBox}>
-              <Ionicons name="mail" size={14} color="#2563EB" />
-              <Text style={styles.linkedEmailText}>
-                E-mail vinculado automaticamente: <Text style={{ fontWeight: 'bold' }}>{emailPrincipal || 'Não configurado'}</Text>
-              </Text>
-            </View>
           </View>
 
           {/* ================= 5. CONTATOS DA OBRA ================= */}
@@ -1017,9 +1008,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
               value={numeracaoInicial} 
               onChangeText={setNumeracaoInicial} 
             />
-            <Text style={styles.hintText}>
-              Primeiro número sequencial dos relatórios técnicos desta obra.
-            </Text>
           </View>
 
           {/* Status da Obra */}
@@ -1205,10 +1193,6 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
               <Text style={styles.customChecklistBtnText}>Checklist Personalizado</Text>
             </TouchableOpacity>
           </View>
-
-          <Text style={styles.checklistSubtitle}>
-            Itens padrão configurados aplicáveis a esta obra ({checklistItems.length} etapas):
-          </Text>
 
           <View style={styles.checklistCardList}>
             {checklistItems.map((item, index) => (

@@ -307,7 +307,6 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
             </View>
             <View>
               <Text style={styles.indexCodeText}>{visitNumber}</Text>
-              <Text style={styles.indexSubText}>Visita Técnica & Acompanhamento</Text>
             </View>
           </View>
           {lastAutoSaveTime ? (
@@ -320,11 +319,10 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
 
         {/* 1º CAMPO: OBRA EM MENU DROPDOWN (E CAMPO OUTROS ABAIXO QUANDO SELECIONADO) */}
         <View style={styles.formCard}>
-          <View style={styles.fieldHeader}>
+          <View style={[styles.fieldHeader, { marginBottom: 10 }]}>
             <Ionicons name="business" size={16} color="#2563EB" />
             <Text style={styles.fieldTitle}>1. Obra / Projeto</Text>
           </View>
-          <Text style={styles.fieldDesc}>Selecione o local da visita no menu dropdown:</Text>
 
           {/* Botão Trigger do Dropdown */}
           <TouchableOpacity
@@ -431,11 +429,10 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
 
         {/* 5º CAMPO: RESPONSÁVEL (PUXADO DOS USUÁRIOS CADASTRADOS) */}
         <View style={styles.formCard}>
-          <View style={styles.fieldHeader}>
+          <View style={[styles.fieldHeader, { marginBottom: 10 }]}>
             <Ionicons name="person" size={16} color="#2563EB" />
             <Text style={styles.fieldTitle}>5. Responsável da Visita</Text>
           </View>
-          <Text style={styles.fieldDesc}>Selecione o engenheiro/responsável cadastrado:</Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
             {usersList.map(u => {
@@ -531,9 +528,6 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
                 <Ionicons name="lock-closed" size={16} color="#D97706" />
                 <Text style={styles.pessoalTitle}>7. Compromisso Pessoal</Text>
               </View>
-              <Text style={styles.pessoalDesc}>
-                Marcar como compromisso particular na agenda de visitas.
-              </Text>
             </View>
             <Switch
               value={isPessoal}
