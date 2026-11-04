@@ -121,7 +121,10 @@ class UpdateService {
 
       // 2. Check Backend Deploy & App Version
       try {
-        const res = await apiClient.axios.get('/api/app-version', { timeout: 10000 });
+        const res = await apiClient.axios.get(`/api/app-version?_t=${Date.now()}`, { 
+          timeout: 8000,
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+        });
         if (res.data && res.data.version) {
           serverData = res.data;
         }
@@ -129,24 +132,27 @@ class UpdateService {
         console.warn('[UpdateService] Backend check notice (tentando fallback GitHub):', backendErr);
       }
 
-      // Fallback: consulta direta via GitHub CDN caso Railway esteja instável ou bloqueado por DNS da rede
-      if (!serverData) {
-        try {
-          const ghRes = await fetch('https://raw.githubusercontent.com/clientedev/elpandroid/main/app.json', {
-            headers: { 'Cache-Control': 'no-cache' }
-          }).then(r => r.json());
-          if (ghRes?.expo?.version) {
+      // Consulta direta via GitHub CDN para atualização instantânea (sem esperar build do Railway)
+      try {
+        const ghRes = await fetch(`https://raw.githubusercontent.com/clientedev/elpandroid/main/version.json?_t=${Date.now()}`, {
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+        }).then(r => r.json());
+        if (ghRes?.version) {
+          const ghVc = Number(ghRes.versionCode || 0);
+          const srvVc = Number(serverData?.versionCode || 0);
+          if (!serverData || ghVc > srvVc || isVersionGreater(String(ghRes.version), String(serverData?.version || '0.0.0'))) {
             serverData = {
-              version: ghRes.expo.version,
-              versionCode: ghRes.expo.android?.versionCode,
+              version: String(ghRes.version),
+              versionCode: ghVc,
               appName: 'ELP',
-              notes: 'Atualização recente sincronizada no repositório.',
+              deployId: String(ghRes.versionCode || ghRes.version),
+              notes: ghRes.notes || 'Atualização recente sincronizada no repositório.',
               downloadUrl: 'https://github.com/clientedev/elpandroid/raw/main/ELP.apk',
             };
           }
-        } catch (ghErr) {
-          console.warn('[UpdateService] GitHub fallback check notice:', ghErr);
         }
+      } catch (ghErr) {
+        console.warn('[UpdateService] GitHub check notice:', ghErr);
       }
 
       if (serverData) {

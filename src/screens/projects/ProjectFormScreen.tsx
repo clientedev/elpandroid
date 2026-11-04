@@ -279,6 +279,23 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         }
       } catch (netSaveErr) {
         console.warn('[ProjectForm] AutoSave online aviso (mantido offline e enfileirado):', netSaveErr);
+        if (isServerId) {
+          try {
+            const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 10000 });
+            if (res?.data?.id) {
+              const serverId = Number(res.data.id);
+              const serverNumero = res.data.numero || projData.numero;
+              const oldId = rid;
+              setProjectId(serverId);
+              if (serverNumero) setNumero(serverNumero);
+              if (oldId !== serverId) {
+                await migrateLocalProjetoId(oldId, serverId, serverNumero);
+              }
+              await saveLocalProjeto({ ...projData, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
+              return;
+            }
+          } catch {}
+        }
         // Adiciona à fila de sincronização para garantir envio posterior
         const curRid = projectIdRef.current;
         const curIsServer = curRid > 0 && curRid < 2000000000;
@@ -700,6 +717,25 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         }
       } catch (serverErr) {
         console.warn('[ProjectForm] Falha ao enviar diretamente para o servidor no salvamento final:', serverErr);
+        if (isServerId) {
+          try {
+            const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 12000 });
+            if (res?.data?.id) {
+              const serverId = Number(res.data.id);
+              const serverNumero = res.data.numero || projData.numero;
+              setProjectId(serverId);
+              setNumero(serverNumero);
+              await migrateLocalProjetoId(rid, serverId, serverNumero);
+              await saveLocalProjeto({
+                ...projData,
+                id: serverId,
+                numero: serverNumero,
+                sync_status: 'synced',
+              }, 'synced');
+              savedToServer = true;
+            }
+          } catch {}
+        }
       }
 
       if (!savedToServer) {

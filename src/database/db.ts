@@ -1721,6 +1721,12 @@ export async function migrateLocalProjetoId(oldId: number, newId: number, newNum
   await db.runAsync('UPDATE contatos SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]).catch(() => null);
   await db.runAsync('UPDATE lembretes SET projeto_id = ? WHERE projeto_id = ?', [newId, oldId]).catch(() => null);
 
+  // Atualiza a própria entidade projeto na fila de sincronização se constar
+  await db.runAsync(
+    "UPDATE sync_queue SET entity_id = ?, endpoint = '/api/projetos/' || ? WHERE entity_type = 'projeto' AND entity_id = ?",
+    [newId, newId, oldId]
+  ).catch(() => null);
+
   // Atualiza payloads na fila de sincronização
   const pendingQueue = await db.getAllAsync<{ id: number; payload: string }>(
     "SELECT id, payload FROM sync_queue WHERE status = 'pending' OR status = 'failed'"

@@ -230,14 +230,23 @@ class SyncService {
           }
 
           let response;
-          if (item.method === 'POST') {
-            response = await apiClient.axios.post(item.endpoint, payload);
-          } else if (item.method === 'PUT') {
-            response = await apiClient.axios.put(item.endpoint, payload);
-          } else if (item.method === 'DELETE') {
-            response = await apiClient.axios.delete(item.endpoint, { data: payload });
-          } else {
-            response = await apiClient.axios.get(item.endpoint);
+          try {
+            if (item.method === 'POST') {
+              response = await apiClient.axios.post(item.endpoint, payload);
+            } else if (item.method === 'PUT') {
+              response = await apiClient.axios.put(item.endpoint, payload);
+            } else if (item.method === 'DELETE') {
+              response = await apiClient.axios.delete(item.endpoint, { data: payload });
+            } else {
+              response = await apiClient.axios.get(item.endpoint);
+            }
+          } catch (reqErr: any) {
+            // Se falhou no PUT para projeto (ex: não existia no servidor), tenta criar via POST
+            if (item.entity_type === 'projeto' && item.method === 'PUT') {
+              response = await apiClient.axios.post('/api/projetos', payload);
+            } else {
+              throw reqErr;
+            }
           }
 
           // Mark completed
@@ -347,19 +356,31 @@ class SyncService {
               contatos: contatosArr,
             };
 
-            const pRes = isTemp 
-              ? await apiClient.axios.post(endpoint, projPayload)
-              : await apiClient.axios.put(endpoint, projPayload);
+            let pRes: any;
+            try {
+              pRes = isTemp 
+                ? await apiClient.axios.post(endpoint, projPayload)
+                : await apiClient.axios.put(endpoint, projPayload);
+            } catch (firstErr: any) {
+              if (!isTemp) {
+                // Se falhou no PUT (ex: obra ainda não existe no Postgres na nuvem), tenta cadastrar via POST
+                pRes = await apiClient.axios.post('/api/projetos', projPayload);
+              } else {
+                throw firstErr;
+              }
+            }
             
-            if (isTemp && pRes?.data?.id) {
+            if (pRes?.data?.id) {
               const serverId = Number(pRes.data.id);
               const serverNumero = pRes.data.numero || lp.numero;
-              await migrateLocalProjetoId(lp.id, serverId, serverNumero);
+              if (lp.id !== serverId) {
+                await migrateLocalProjetoId(lp.id, serverId, serverNumero);
+              }
               await db.runAsync(
-                'UPDATE projetos SET sync_status = "synced" WHERE id = ?',
-                [serverId]
+                'UPDATE projetos SET sync_status = "synced", numero = COALESCE(?, numero) WHERE id = ?',
+                [serverNumero || null, serverId]
               );
-              console.log(`[SyncService] Proativo: Obra local ${lp.id} migrada para ID servidor ${serverId} (${serverNumero})`);
+              console.log(`[SyncService] Proativo: Obra local ${lp.id} sincronizada no servidor com ID ${serverId} (${serverNumero})`);
             } else {
               await db.runAsync(
                 'UPDATE projetos SET sync_status = "synced" WHERE id = ?',

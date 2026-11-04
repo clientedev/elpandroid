@@ -13567,7 +13567,7 @@ def get_app_version_info():
     }), 200
 
 
-@app.route('/download/ELP.apk', methods=['GET'])
+@app.route('/download/ELP.apk', methods=['GET', 'HEAD'])
 def download_official_apk():
     """Permite download direto do executavel ELP.apk"""
     from flask import send_file
@@ -13800,17 +13800,18 @@ def _sync_projeto_extras(projeto, data, responsavel_id=1):
             except Exception:
                 chk_data = []
         if isinstance(chk_data, list) and len(chk_data) > 0:
+            valid_user = None
+            if responsavel_id:
+                try:
+                    valid_user = User.query.get(int(responsavel_id))
+                except Exception:
+                    pass
+            if not valid_user:
+                valid_user = User.query.first()
+            creator_id = valid_user.id if valid_user else 1
+
             chk_config = ProjetoChecklistConfig.query.filter_by(projeto_id=projeto.id).first()
             if not chk_config:
-                valid_user = None
-                if responsavel_id:
-                    try:
-                        valid_user = User.query.get(int(responsavel_id))
-                    except Exception:
-                        pass
-                if not valid_user:
-                    valid_user = User.query.first()
-                creator_id = valid_user.id if valid_user else 1
                 chk_config = ProjetoChecklistConfig(
                     projeto_id=projeto.id,
                     tipo_checklist='personalizado',
@@ -13820,20 +13821,36 @@ def _sync_projeto_extras(projeto, data, responsavel_id=1):
             else:
                 chk_config.tipo_checklist = 'personalizado'
 
+            existing_items = ChecklistObra.query.filter_by(projeto_id=projeto.id).all()
+            existing_texts = {item.texto.strip(): item for item in existing_items if item.texto}
+            used_ordens = {item.ordem for item in existing_items if item.ordem is not None}
+
+            current_ordem = 1
             for idx, item_obj in enumerate(chk_data):
                 if not isinstance(item_obj, dict):
                     continue
                 item_txt = (item_obj.get('texto') or item_obj.get('item') or '').strip()
                 if not item_txt:
                     continue
-                ordem = item_obj.get('ordem', idx + 1)
-                existing_item = ChecklistObra.query.filter_by(projeto_id=projeto.id, texto=item_txt).first()
-                if not existing_item:
+
+                if item_txt in existing_texts:
+                    existing_match = existing_texts[item_txt]
+                    existing_match.ativo = True
+                else:
+                    target_ordem = item_obj.get('ordem')
+                    if not target_ordem or target_ordem in used_ordens:
+                        while current_ordem in used_ordens:
+                            current_ordem += 1
+                        target_ordem = current_ordem
+                        current_ordem += 1
+                    used_ordens.add(target_ordem)
+
                     new_chk = ChecklistObra(
                         projeto_id=projeto.id,
                         texto=item_txt,
-                        ordem=ordem,
-                        ativo=True
+                        ordem=target_ordem,
+                        ativo=True,
+                        criado_por=creator_id
                     )
                     db.session.add(new_chk)
 
@@ -14022,9 +14039,40 @@ def api_projetos_collection():
 def api_projeto_detail_sync(projeto_id):
     """Atualizacao, consulta e exclusao em cascata de projeto por ID (Master/Admin)"""
     try:
-        projeto = Projeto.query.get(projeto_id)
+        projeto = None
+        if 0 < projeto_id < 2000000000:
+            try:
+                projeto = Projeto.query.get(projeto_id)
+            except Exception:
+                projeto = None
+
         if not projeto:
-            return jsonify({'success': False, 'error': 'Projeto nao encontrado'}), 404
+            if request.method in ['PUT', 'POST']:
+                data = request.get_json(silent=True) or request.form or {}
+                p_num = data.get('numero')
+                p_nome = (data.get('nome') or '').strip()
+                if p_num:
+                    projeto = Projeto.query.filter_by(numero=p_num).first()
+                if not projeto and p_nome:
+                    from sqlalchemy import func
+                    projeto = Projeto.query.filter(func.lower(Projeto.nome) == func.lower(p_nome)).first()
+                if not projeto:
+                    candidate_num = p_num or f"OBRA-{projeto_id:04d}"
+                    if Projeto.query.filter_by(numero=candidate_num).first():
+                        all_nums = [p.numero for p in Projeto.query.all() if p.numero]
+                        import re
+                        seqs = []
+                        for n in all_nums:
+                            m = re.search(r'\d+', n)
+                            if m:
+                                seqs.append(int(m.group()))
+                        max_s = max(seqs) if seqs else 0
+                        candidate_num = f"OBRA-{max_s + 1:04d}"
+                    projeto = Projeto(numero=candidate_num)
+                    db.session.add(projeto)
+                    db.session.flush()
+            else:
+                return jsonify({'success': False, 'error': 'Projeto nao encontrado'}), 404
 
         if request.method == 'DELETE':
             # Validação estrita de privilégio: apenas Master ou Admin geral pode excluir obra
