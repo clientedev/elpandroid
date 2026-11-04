@@ -375,6 +375,140 @@ class SyncService {
         console.warn('[SyncService] Erro na varredura proativa de projetos:', err);
       }
 
+      // 1.6 Proactive Sync for Local Reports (including drafts / rascunhos em andamento)
+      try {
+        const db = await getDatabase();
+        const pendingRels = await db.getAllAsync<any>(
+          'SELECT * FROM relatorios WHERE sync_status = "pending" OR id >= 2000000000'
+        );
+        for (const lr of pendingRels) {
+          try {
+            const isTemp = lr.id >= 2000000000;
+            const endpoint = isTemp ? '/api/relatorios' : `/api/relatorios/${lr.id}`;
+            const method = isTemp ? 'POST' : 'PUT';
+
+            // Enrich with photos
+            const fotos = await getLocalFotos(lr.id, lr.uuid || lr.uuid_local);
+            let enrichedFotos: any[] = [];
+            if (fotos && fotos.length > 0) {
+              enrichedFotos = await Promise.all(
+                fotos.map(async (f) => {
+                  let base64Data = f.base64;
+                  if (!base64Data && f.uri_local && !f.uri_local.startsWith('http')) {
+                    base64Data = await readPhotoBase64(f.uri_local).catch(() => undefined);
+                    if (base64Data) {
+                      await saveLocalFoto({ ...f, base64: base64Data }, 'pending').catch(() => null);
+                    }
+                  }
+                  return {
+                    ...f,
+                    base64: base64Data,
+                    imagem_base64: base64Data,
+                  };
+                })
+              );
+            }
+
+            const relPayload = {
+              ...lr,
+              fotos: enrichedFotos,
+            };
+
+            const rRes = isTemp
+              ? await apiClient.axios.post(endpoint, relPayload)
+              : await apiClient.axios.put(endpoint, relPayload);
+
+            const serverId = rRes?.data?.id;
+            const officialNumero = rRes?.data?.numero;
+            const serverUuid = rRes?.data?.uuid || lr.uuid;
+
+            if (isTemp && serverId) {
+              await migrateLocalFotosRelatorioId(lr.id, serverId, serverUuid);
+              await db.runAsync('DELETE FROM relatorios WHERE id = ?;', [serverId]);
+              await db.runAsync(
+                'UPDATE relatorios SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", data_sincronizacao = ? WHERE id = ?',
+                [serverId, officialNumero || null, new Date().toISOString(), lr.id]
+              );
+              console.log(`[SyncService] Proativo: Relatório local ${lr.id} migrado para ID servidor ${serverId} (${officialNumero})`);
+            } else {
+              await db.runAsync(
+                'UPDATE relatorios SET sync_status = "synced", data_sincronizacao = ? WHERE id = ?',
+                [new Date().toISOString(), lr.id]
+              );
+            }
+            processedCount++;
+          } catch (relSyncErr: any) {
+            console.warn(`[SyncService] Proativo falhou para relatório ${lr.id}:`, relSyncErr?.message);
+          }
+        }
+      } catch (err) {
+        console.warn('[SyncService] Erro na varredura proativa de relatórios:', err);
+      }
+
+      // 1.7 Proactive Sync for Local Express Reports (including drafts / rascunhos)
+      try {
+        const db = await getDatabase();
+        const pendingExp = await db.getAllAsync<any>(
+          'SELECT * FROM relatorios_express WHERE sync_status = "pending" OR id >= 2000000000'
+        );
+        for (const exp of pendingExp) {
+          try {
+            const isTemp = exp.id >= 2000000000;
+            const endpoint = '/api/relatorios-express/sync';
+
+            const fotosExp = await getLocalFotosExpress(exp.id);
+            let enrichedFotosExp: any[] = [];
+            if (fotosExp && fotosExp.length > 0) {
+              enrichedFotosExp = await Promise.all(
+                fotosExp.map(async (f: any) => {
+                  let base64Data = f.base64 || f.imagem_base64;
+                  if (!base64Data && f.uri_local && !f.uri_local.startsWith('http')) {
+                    base64Data = await readPhotoBase64(f.uri_local).catch(() => undefined);
+                    if (base64Data) {
+                      await saveLocalFotoExpress({ ...f, base64: base64Data }, 'pending').catch(() => null);
+                    }
+                  }
+                  return {
+                    ...f,
+                    base64: base64Data,
+                    imagem_base64: base64Data,
+                  };
+                })
+              );
+            }
+
+            const expPayload = {
+              ...exp,
+              fotos: enrichedFotosExp,
+            };
+
+            const expRes = await apiClient.axios.post(endpoint, expPayload);
+            const serverId = expRes?.data?.id;
+            const officialNumero = expRes?.data?.numero;
+
+            if (isTemp && serverId) {
+              await migrateLocalFotosRelatorioExpressId(exp.id, serverId);
+              await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
+              await db.runAsync(
+                'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
+                [serverId, officialNumero || null, new Date().toISOString(), exp.id]
+              );
+              console.log(`[SyncService] Proativo: Relatório Express local ${exp.id} migrado para ID servidor ${serverId}`);
+            } else {
+              await db.runAsync(
+                'UPDATE relatorios_express SET sync_status = "synced", updated_at = ? WHERE id = ?',
+                [new Date().toISOString(), exp.id]
+              );
+            }
+            processedCount++;
+          } catch (expSyncErr: any) {
+            console.warn(`[SyncService] Proativo falhou para relatório express ${exp.id}:`, expSyncErr?.message);
+          }
+        }
+      } catch (err) {
+        console.warn('[SyncService] Erro na varredura proativa de relatórios express:', err);
+      }
+
       // 2. Process Inbound Sync (Railway Server -> SQLite Local)
       await this.pullFromServer();
 

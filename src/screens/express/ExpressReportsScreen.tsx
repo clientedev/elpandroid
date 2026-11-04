@@ -15,7 +15,8 @@ import {
   getLocalRelatoriosExpress, saveLocalRelatorioExpress, 
   getLocalFotosExpress, saveLocalFotoExpress, addToSyncQueue,
   getNextExpressReportNumber, getLocalVisitantes, updateLocalRelatorioExpressStatus,
-  deleteLocalRelatorioExpress, deleteLocalFotoExpress, getDatabase, getLocalLegendas
+  deleteLocalRelatorioExpress, deleteLocalFotoExpress, getDatabase, getLocalLegendas,
+  migrateLocalFotosRelatorioExpressId
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { generateReportPDF } from '../../services/pdfService';
@@ -356,6 +357,49 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       await saveLocalFotoExpress(fotoObj, 'pending');
     }
 
+    // Espelhamento online imediato do rascunho express com a nuvem (Railway)
+    if (isOnline) {
+      try {
+        const enrichedFotos = attachedPhotos.map((ap, i) => ({
+          ...ap,
+          id: ap.id,
+          relatorio_express_id: targetId,
+          ordem: i,
+          base64: ap.base64,
+          imagem_base64: ap.base64,
+        }));
+
+        const expPayload = {
+          ...expDraft,
+          fotos: enrichedFotos,
+        };
+
+        const res = await apiClient.axios.post('/api/relatorios-express/sync', expPayload, { timeout: 8000 });
+        if (res?.data?.id) {
+          const serverId = Number(res.data.id);
+          const serverNumero = res.data.numero || expDraft.numero;
+          if (serverId && serverId !== targetId) {
+            await migrateLocalFotosRelatorioExpressId(targetId, serverId);
+            await saveLocalRelatorioExpress({
+              ...expDraft,
+              id: serverId,
+              numero: serverNumero,
+              sync_status: 'synced',
+            }, 'synced');
+            setEditingReportId(serverId);
+            editingReportIdRef.current = serverId;
+          } else {
+            await saveLocalRelatorioExpress({
+              ...expDraft,
+              sync_status: 'synced',
+            }, 'synced');
+          }
+        }
+      } catch (cloudErr) {
+        console.warn('[Express] Falha no autosave online do rascunho express (mantido local):', cloudErr);
+      }
+    }
+
     setLastAutoSaveTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
     return targetId;
   }
@@ -385,16 +429,24 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   async function handleClearDraft() {
     Alert.alert(
-      'Limpar Rascunho',
-      'Deseja limpar todos os dados e fotos deste rascunho express?',
+      'Excluir Rascunho',
+      'Deseja excluir permanentemente todos os dados e fotos deste rascunho express?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Sim, Limpar',
+          text: 'Sim, Excluir',
           style: 'destructive',
           onPress: async () => {
             const currentId = editingReportIdRef.current || editingReportId;
             if (currentId) {
+              await deleteLocalRelatorioExpress(currentId).catch(() => null);
+              if (isOnline) {
+                apiClient.axios.delete(`/api/relatorios-express/${currentId}`, {
+                  data: { user_id: user?.id, is_master: isMasterOrAdmin }
+                }).catch(() => null);
+              } else {
+                await addToSyncQueue('relatorio_express', currentId, 'delete', `/api/relatorios-express/${currentId}`, 'DELETE', { user_id: user?.id, is_master: isMasterOrAdmin });
+              }
               await AsyncStorage.removeItem(`@elp_express_report_draft_${currentId}`).catch(() => null);
             }
             await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
@@ -418,6 +470,9 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
             setChecklist(DEFAULT_CHECKLIST);
             setAttachedPhotos([]);
             setLastAutoSaveTime(null);
+            setModalVisible(false);
+            await loadReports();
+            Alert.alert('Sucesso', 'Rascunho excluído com sucesso.');
           }
         }
       ]

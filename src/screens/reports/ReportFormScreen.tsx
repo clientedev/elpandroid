@@ -14,7 +14,7 @@ import {
   migrateLocalFotosRelatorioId, getDatabase, getLocalChecklistTemplate,
   getChecklistProgressoObra, saveBatchChecklistProgressoObra, getLocalRelatorios,
   updateLocalProjetoInfoTecnica, getNextReportNumberForProject, getLocalVisitantes,
-  getLocalProjetoById
+  getLocalProjetoById, deleteLocalRelatorio
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -380,6 +380,57 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           ordem: i,
           base64: b64,
         }, 'pending');
+      }
+
+      // 4. Espelhamento online imediato do rascunho com a nuvem (Railway)
+      if (isOnline) {
+        try {
+          const isServerId = rid > 0 && rid < 2000000000;
+          const endpoint = isServerId ? `/api/relatorios/${rid}` : '/api/relatorios';
+
+          // Format fotos for payload
+          const enrichedFotos = fotos.map((f, idx) => ({
+            ...f,
+            relatorio_id: rid,
+            ordem: idx,
+            base64: f.base64,
+            imagem_base64: f.base64,
+          }));
+
+          const relPayload = {
+            ...draftObj,
+            fotos: enrichedFotos,
+          };
+
+          const res = isServerId
+            ? await apiClient.axios.put(endpoint, relPayload, { timeout: 8000 })
+            : await apiClient.axios.post(endpoint, relPayload, { timeout: 8000 });
+
+          if (res?.data?.id) {
+            const serverId = Number(res.data.id);
+            const serverNumero = res.data.numero;
+            if (serverId && !isServerId) {
+              currentReportIdRef.current = serverId;
+              setCurrentReportId(serverId);
+              await migrateLocalFotosRelatorioId(rid, serverId, reportUuid);
+              await saveLocalRelatorio({
+                ...draftObj,
+                id: serverId,
+                numero: serverNumero || draftObj.numero,
+                sync_status: 'synced',
+                data_sincronizacao: new Date().toISOString()
+              }, 'synced');
+            } else {
+              await saveLocalRelatorio({
+                ...draftObj,
+                sync_status: 'synced',
+                data_sincronizacao: new Date().toISOString()
+              }, 'synced');
+            }
+          }
+        } catch (cloudErr) {
+          console.warn('[ReportForm] Falha no autosave online do rascunho (mantido local):', cloudErr);
+        }
       }
 
       const d = new Date();
@@ -1309,6 +1360,52 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }
   }
 
+  async function handleDeleteDraft() {
+    const isDraft = !originalStatusRef.current || originalStatusRef.current === 'em_andamento' || originalStatusRef.current === 'rascunho' || originalStatusRef.current === 'preenchimento';
+    const title = isDraft ? 'Excluir Rascunho' : 'Excluir Relatório';
+    const msg = isDraft 
+      ? 'Tem certeza que deseja excluir permanentemente este rascunho? Todos os dados e fotos dele serão removidos.'
+      : `Tem certeza que deseja excluir o relatório ${reportNumber}? Esta ação não pode ser desfeita.`;
+
+    Alert.alert(title, msg, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sim, Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            hasSavedAndExitingRef.current = true;
+            setLoading(true);
+            const rid = currentReportIdRef.current;
+            await deleteLocalRelatorio(rid);
+            
+            const isMasterOrAdmin = Boolean(
+              user?.is_master ||
+              user?.cargo?.toLowerCase() === 'administrador' ||
+              user?.cargo?.toLowerCase() === 'master' ||
+              user?.username?.toLowerCase() === 'admin'
+            );
+
+            if (isOnline) {
+              await apiClient.axios.delete(`/api/relatorios/${rid}`, {
+                data: { user_id: user?.id, is_master: isMasterOrAdmin }
+              }).catch(() => null);
+            } else {
+              await addToSyncQueue('relatorio', rid, 'delete', `/api/relatorios/${rid}`, 'DELETE', { user_id: user?.id, is_master: isMasterOrAdmin });
+            }
+
+            Alert.alert('Sucesso', isDraft ? 'Rascunho excluído com sucesso.' : 'Relatório excluído com sucesso.');
+            navigation.goBack();
+          } catch (e: any) {
+            Alert.alert('Erro ao excluir', e.message || 'Falha ao excluir.');
+          } finally {
+            setLoading(false);
+          }
+        }
+      }
+    ]);
+  }
+
   return (
     <View style={styles.container}>
       <Header 
@@ -1325,6 +1422,15 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           }
           navigation.goBack();
         }} 
+        rightAction={
+          <TouchableOpacity
+            style={styles.deleteHeaderBtn}
+            onPress={handleDeleteDraft}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+          </TouchableOpacity>
+        }
       />
 
       {/* Indicador de AutoSave em Tempo Real no Topo (Seção 6 e 15.7) */}
@@ -1939,6 +2045,16 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             )}
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity 
+          style={styles.btnDeleteDraftBottom} 
+          onPress={handleDeleteDraft}
+          disabled={loading}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={17} color="#DC2626" />
+          <Text style={styles.btnDeleteDraftBottomText}>Excluir este Rascunho</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -3118,6 +3234,31 @@ const styles = StyleSheet.create({
   },
   saveTechInfoBtnText: {
     color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  deleteHeaderBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  btnDeleteDraftBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginTop: 10,
+    gap: 8,
+  },
+  btnDeleteDraftBottomText: {
+    color: '#DC2626',
     fontSize: 14,
     fontWeight: '700',
   },

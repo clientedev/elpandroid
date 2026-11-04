@@ -11,7 +11,7 @@ import {
   getLocalProjetoById, getLocalRelatorios, getLocalVisitas, getLocalLembretes, 
   saveLocalProjeto, addToSyncQueue, getLocalContatos, saveLocalContato,
   deleteLocalProjetoCascade, getLocalChecklistTemplate, getChecklistProgressoObra,
-  deleteLocalVisita
+  deleteLocalVisita, deleteLocalRelatorio
 } from '../../database/db';
 
 const DEFAULT_OBRA_CHECKLIST = [
@@ -348,6 +348,38 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         }
       ]
     );
+  }
+
+  async function handleDeleteReportItem(r: Relatorio) {
+    const isDraft = !r.status || r.status === 'em_andamento' || r.status === 'preenchimento' || r.status === 'Rascunho' || !r.numero || r.numero.startsWith('Rascunho') || r.numero.startsWith('TEMP-');
+    const title = isDraft ? 'Excluir Rascunho' : 'Excluir Relatório';
+    const message = isDraft
+      ? 'Tem certeza que deseja excluir permanentemente este rascunho? Esta ação não pode ser desfeita.'
+      : `Tem certeza que deseja excluir o relatório ${r.numero}? Esta ação não pode ser desfeita.`;
+
+    Alert.alert(title, message, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sim, Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteLocalRelatorio(r.id);
+            const payload = { user_id: currentUser?.id, is_master: isMasterOrAdmin };
+            if (isOnline) {
+              await apiClient.axios.delete(`/api/relatorios/${r.id}`, { data: payload }).catch(() => null);
+            } else {
+              await addToSyncQueue('relatorio', r.id, 'delete', `/api/relatorios/${r.id}`, 'DELETE', payload);
+            }
+            if (isOnline) triggerSync();
+            await loadDetails();
+            Alert.alert('Sucesso', isDraft ? 'Rascunho excluído com sucesso.' : 'Relatório excluído com sucesso.');
+          } catch (err: any) {
+            Alert.alert('Erro', err?.message || 'Falha ao excluir.');
+          }
+        }
+      }
+    ]);
   }
 
   if (!projeto) {
@@ -725,33 +757,48 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
                 <Text style={styles.emptyText}>Nenhum relatório criado para esta obra.</Text>
               </View>
             ) : (
-              relatorios.map(r => (
-                <TouchableOpacity
-                  key={r.id}
-                  style={styles.subItemCard}
-                  onPress={() => {
-                    if (r.status === 'em_andamento') {
-                      navigation.navigate('ReportFormScreen', { reportId: r.id });
-                    } else {
-                      navigation.navigate('ReportDetailScreen', { reportId: r.id });
-                    }
-                  }}
-                >
-                  <View style={styles.subHeader}>
-                    <Text style={styles.subNumber}>{r.numero}</Text>
-                    <SyncStatusBadge status={r.sync_status} />
+              relatorios.map(r => {
+                const isDraft = !r.status || r.status === 'em_andamento' || r.status === 'preenchimento' || r.status === 'Rascunho' || !r.numero || r.numero.startsWith('Rascunho') || r.numero.startsWith('TEMP-');
+                const isAuthor = Boolean(r.autor_id && currentUser?.id && r.autor_id === currentUser.id);
+                const canDelete = isMasterOrAdmin || (isAuthor && isDraft) || isDraft;
+
+                return (
+                  <View key={r.id} style={[styles.subItemCard, { flexDirection: 'row', alignItems: 'center' }]}>
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => {
+                        if (r.status === 'em_andamento' || isDraft) {
+                          navigation.navigate('ReportFormScreen', { reportId: r.id });
+                        } else {
+                          navigation.navigate('ReportDetailScreen', { reportId: r.id });
+                        }
+                      }}
+                    >
+                      <View style={styles.subHeader}>
+                        <Text style={styles.subNumber}>{r.numero}</Text>
+                        <SyncStatusBadge status={r.sync_status} />
+                      </View>
+                      <Text style={styles.subTitle}>{r.titulo}</Text>
+                      <View style={styles.subFooter}>
+                        <Text style={styles.subDate}>
+                          {r.data_relatorio ? new Date(r.data_relatorio).toLocaleDateString('pt-BR') : ''}
+                        </Text>
+                        <Text style={[styles.statusTagText, { color: isDraft ? '#D97706' : Colors.primary, fontWeight: 'bold' }]}>
+                          {isDraft ? 'Em Preenchimento (AutoSave)' : r.status}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    {canDelete && (
+                      <TouchableOpacity
+                        style={{ padding: 10, marginLeft: 8 }}
+                        onPress={() => handleDeleteReportItem(r)}
+                      >
+                        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  <Text style={styles.subTitle}>{r.titulo}</Text>
-                  <View style={styles.subFooter}>
-                    <Text style={styles.subDate}>
-                      {r.data_relatorio ? new Date(r.data_relatorio).toLocaleDateString('pt-BR') : ''}
-                    </Text>
-                    <Text style={[styles.statusTagText, { color: r.status === 'em_andamento' ? '#D97706' : Colors.primary, fontWeight: 'bold' }]}>
-                      {r.status === 'em_andamento' ? 'Em Preenchimento (AutoSave)' : r.status}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))
+                );
+              })
             )}
           </View>
         )}

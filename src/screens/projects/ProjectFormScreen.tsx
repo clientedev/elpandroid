@@ -300,12 +300,12 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     isOnline, setProjectId
   ]);
 
-  // Debounced AutoSave (1500ms)
+  // Debounced AutoSave (700ms - Espelhamento ágil com a nuvem)
   useEffect(() => {
     if (!nome.trim() && !construtora.trim()) return;
     const timer = setTimeout(() => {
       saveDraftImmediately();
-    }, 1500);
+    }, 700);
     return () => clearTimeout(timer);
   }, [
     nome, construtora, tipoObra, funcionario, responsavelId, emailPrincipal,

@@ -13879,6 +13879,14 @@ def api_projetos_collection():
                 projeto = Projeto(numero=official_numero)
                 db.session.add(projeto)
 
+            req_resp_id = data.get('responsavel_id')
+            if req_resp_id:
+                try:
+                    if User.query.get(int(req_resp_id)):
+                        responsavel_id = int(req_resp_id)
+                except Exception:
+                    pass
+
             projeto.nome = (data.get('nome') or 'Nova Obra').strip()
             projeto.tipo_obra = data.get('tipo_obra') or 'Edifício Residencial Multifamiliar'
             projeto.construtora = (data.get('construtora') or 'ELP Engenharia').strip()
@@ -13889,10 +13897,33 @@ def api_projetos_collection():
             projeto.endereco = data.get('endereco') or ''
             projeto.status = data.get('status') or 'Ativo'
 
-            if data.get('latitude') is not None:
-                projeto.latitude = float(data['latitude'])
-            if data.get('longitude') is not None:
-                projeto.longitude = float(data['longitude'])
+            lat_val = data.get('latitude')
+            if lat_val is not None and lat_val != '':
+                try:
+                    f_lat = float(lat_val)
+                    import math
+                    if not math.isnan(f_lat):
+                        projeto.latitude = f_lat
+                except Exception:
+                    pass
+
+            lon_val = data.get('longitude')
+            if lon_val is not None and lon_val != '':
+                try:
+                    f_lon = float(lon_val)
+                    import math
+                    if not math.isnan(f_lon):
+                        projeto.longitude = f_lon
+                except Exception:
+                    pass
+
+            num_ini = data.get('numeracao_inicial')
+            if num_ini is not None and num_ini != '':
+                try:
+                    projeto.numeracao_inicial = int(num_ini)
+                except Exception:
+                    projeto.numeracao_inicial = 1
+
             if data.get('data_inicio'):
                 projeto.data_inicio = _parse_iso_date(data.get('data_inicio'), as_date=True)
             if data.get('data_previsao_fim'):
@@ -14617,17 +14648,20 @@ def api_relatorio_detail_sync(relatorio_id):
                 data = request.form or {}
             user = _resolve_mobile_user(data)
             is_master = _is_request_master_or_admin(user, data)
-            if not is_master:
-                current_app.logger.warning(f"Tentativa negada de exclusao do relatorio {relatorio_id} por usuario sem privilégio Master")
+            is_author = bool(user and relatorio.autor_id and user.id == relatorio.autor_id)
+            is_draft = bool(not relatorio.status or relatorio.status in ['em_andamento', 'rascunho', 'preenchimento'] or not relatorio.numero or relatorio.numero.startswith('Rascunho') or relatorio.numero.startswith('TEMP-'))
+            can_delete = is_master or (is_author and is_draft) or (is_author and relatorio.status != 'Aprovado')
+            if not can_delete:
+                current_app.logger.warning(f"Tentativa negada de exclusao do relatorio {relatorio_id} por usuario {user.id if user else 'anon'} sem permissão")
                 return jsonify({
                     'success': False, 
-                    'error': 'Ação negada: A exclusão de relatórios é permitida exclusivamente para o perfil Master ou Administrador.'
+                    'error': 'Ação negada: A exclusão de relatórios finalizados é restrita a Administradores/Master ou ao criador do rascunho.'
                 }), 403
 
             FotoRelatorio.query.filter_by(relatorio_id=relatorio.id).delete()
             db.session.delete(relatorio)
             db.session.commit()
-            current_app.logger.info(f"🗑️ Relatório {relatorio.numero} (ID {relatorio_id}) excluído com sucesso por usuário Master/Admin")
+            current_app.logger.info(f"🗑️ Relatório {relatorio.numero} (ID {relatorio_id}) excluído com sucesso por {'Master/Admin' if is_master else 'Criador'}")
             return jsonify({'success': True, 'message': 'Relatório excluído com sucesso'}), 200
 
         if request.method in ['PUT', 'POST']:

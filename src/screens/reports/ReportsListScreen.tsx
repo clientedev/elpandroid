@@ -4,7 +4,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
-import { getLocalRelatorios, getLocalRelatoriosExpress } from '../../database/db';
+import { 
+  getLocalRelatorios, getLocalRelatoriosExpress,
+  deleteLocalRelatorio, deleteLocalRelatorioExpress, addToSyncQueue
+} from '../../database/db';
 import { Relatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 
@@ -199,6 +202,62 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
     }
   };
 
+  const isMasterOrAdmin = Boolean(
+    user?.is_master ||
+    user?.cargo?.toLowerCase() === 'administrador' ||
+    user?.cargo?.toLowerCase() === 'master' ||
+    user?.username?.toLowerCase() === 'admin'
+  );
+
+  const handleConfirmDeleteReport = (item: Relatorio) => {
+    const isDraft = !item.status || item.status === 'em_andamento' || item.status === 'preenchimento' || item.status === 'Rascunho' || !item.numero || item.numero.startsWith('Rascunho') || item.numero.startsWith('TEMP-');
+    const title = isDraft ? 'Excluir Rascunho' : 'Excluir Relatório';
+    const message = isDraft
+      ? 'Tem certeza que deseja excluir permanentemente este rascunho? Esta ação não pode ser desfeita.'
+      : `Tem certeza que deseja excluir o relatório ${item.numero}? Esta ação não pode ser desfeita.`;
+
+    Alert.alert(title, message, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sim, Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const isExpress = Boolean((item as any).is_express);
+            if (isExpress) {
+              await deleteLocalRelatorioExpress(item.id);
+              if (isOnline) {
+                await apiClient.axios.delete(`/api/relatorios-express/${item.id}`, {
+                  data: { user_id: user?.id, is_master: isMasterOrAdmin }
+                }).catch(() => null);
+              } else {
+                await addToSyncQueue('relatorio_express', item.id, 'delete', `/api/relatorios-express/${item.id}`, 'DELETE', { user_id: user?.id, is_master: isMasterOrAdmin });
+              }
+            } else {
+              await deleteLocalRelatorio(item.id);
+              if (isOnline) {
+                await apiClient.axios.delete(`/api/relatorios/${item.id}`, {
+                  data: { user_id: user?.id, is_master: isMasterOrAdmin }
+                }).catch(() => null);
+              } else {
+                await addToSyncQueue('relatorio', item.id, 'delete', `/api/relatorios/${item.id}`, 'DELETE', { user_id: user?.id, is_master: isMasterOrAdmin });
+              }
+            }
+
+            setRelatorios(prev => {
+              const updated = prev.filter(r => !(r.id === item.id && Boolean((r as any).is_express) === isExpress));
+              filterReports(updated, search, selectedStatus);
+              return updated;
+            });
+            Alert.alert('Sucesso', isDraft ? 'Rascunho excluído com sucesso.' : 'Relatório excluído com sucesso.');
+          } catch (err: any) {
+            Alert.alert('Erro', err?.message || 'Falha ao excluir.');
+          }
+        }
+      }
+    ]);
+  };
+
   // Contadores dinâmicos para as abas minimalistas
   const countTotal = relatorios.length;
   const countAprovacao = relatorios.filter(r => r.status === 'Aguardando Aprovação').length;
@@ -316,7 +375,9 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
           </View>
         }
         renderItem={({ item }) => {
-          const isDraft = item.status === 'em_andamento' || item.status === 'preenchimento' || !item.status;
+          const isDraft = !item.status || item.status === 'em_andamento' || item.status === 'preenchimento' || item.status === 'Rascunho' || !item.numero || item.numero.startsWith('Rascunho') || item.numero.startsWith('TEMP-');
+          const isAuthor = Boolean(item.autor_id && user?.id && item.autor_id === user.id);
+          const canDelete = isMasterOrAdmin || (isAuthor && isDraft) || isDraft;
           const hasOfficialNum = item.numero && item.numero.startsWith('REL-');
           const dateStr = formatReportDate(item);
           const rawFotos = (item as any).fotos;
@@ -381,9 +442,20 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                     </Text>
                   </View>
                 </View>
-                {dateStr ? (
-                  <Text style={styles.cardDate}>{dateStr}</Text>
-                ) : null}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  {dateStr ? (
+                    <Text style={styles.cardDate}>{dateStr}</Text>
+                  ) : null}
+                  {canDelete && (
+                    <TouchableOpacity
+                      onPress={() => handleConfirmDeleteReport(item)}
+                      style={{ padding: 4, marginLeft: 8 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={17} color="#EF4444" />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               {/* Título Principal */}
