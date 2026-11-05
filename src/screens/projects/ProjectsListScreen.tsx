@@ -193,7 +193,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     const unsubscribeFocus = navigation.addListener('focus', () => {
       loadProjetos();
       const now = Date.now();
-      if (now - lastSyncTimeRef.current > 45000) {
+      if (now - lastSyncTimeRef.current > 120000) {
         lastSyncTimeRef.current = now;
         syncService.syncAll().catch(() => null);
       }

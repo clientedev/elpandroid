@@ -255,58 +255,29 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
       // 1. Salva no SQLite local
       await saveLocalProjeto(projData, isServerId ? 'synced' : 'pending');
 
-      // 2. Garante pastas da obra
-      await ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
-
-      // 3. Espelhamento online imediato na nuvem
+      // 2. Espelhamento online imediato na nuvem se conectado
       try {
         if (isServerId) {
-          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 10000 });
+          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 8000 });
           await saveLocalProjeto({ ...projData, sync_status: 'synced' }, 'synced');
         } else {
-          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 10000 });
+          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 8000 });
           if (res?.data?.id) {
             const serverId = Number(res.data.id);
             const serverNumero = res.data.numero || projData.numero;
             const oldId = rid;
-            setProjectId(serverId);
-            if (serverNumero) setNumero(serverNumero);
-            if (oldId !== serverId) {
+            if (serverId !== oldId) {
+              setProjectId(serverId);
               await migrateLocalProjetoId(oldId, serverId, serverNumero);
+            }
+            if (serverNumero && serverNumero !== numero) {
+              setNumero(serverNumero);
             }
             await saveLocalProjeto({ ...projData, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
           }
         }
       } catch (netSaveErr) {
-        console.warn('[ProjectForm] AutoSave online aviso (mantido offline e enfileirado):', netSaveErr);
-        if (isServerId) {
-          try {
-            const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 10000 });
-            if (res?.data?.id) {
-              const serverId = Number(res.data.id);
-              const serverNumero = res.data.numero || projData.numero;
-              const oldId = rid;
-              setProjectId(serverId);
-              if (serverNumero) setNumero(serverNumero);
-              if (oldId !== serverId) {
-                await migrateLocalProjetoId(oldId, serverId, serverNumero);
-              }
-              await saveLocalProjeto({ ...projData, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
-              return;
-            }
-          } catch {}
-        }
-        // Adiciona à fila de sincronização para garantir envio posterior
-        const curRid = projectIdRef.current;
-        const curIsServer = curRid > 0 && curRid < 2000000000;
-        await addToSyncQueue(
-          'projeto',
-          curRid,
-          curIsServer ? 'update' : 'create',
-          curIsServer ? `/api/projetos/${curRid}` : '/api/projetos',
-          curIsServer ? 'PUT' : 'POST',
-          { ...projData, id: curRid }
-        ).catch(() => null);
+        console.warn('[ProjectForm] AutoSave online aviso (mantido offline):', netSaveErr);
       }
 
       const d = new Date();
@@ -326,12 +297,12 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     setProjectId
   ]);
 
-  // Debounced AutoSave (700ms - Espelhamento ágil com a nuvem)
+  // Debounced AutoSave (3000ms - Fluidez máxima e espelhamento inteligente)
   useEffect(() => {
     if (!nome.trim() && !construtora.trim()) return;
     const timer = setTimeout(() => {
       saveDraftImmediately();
-    }, 700);
+    }, 3000);
     return () => clearTimeout(timer);
   }, [
     nome, construtora, tipoObra, funcionario, responsavelId, emailPrincipal,

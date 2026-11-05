@@ -365,21 +365,14 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       // 2. Salva no SQLite local
       await saveLocalRelatorio(draftObj, 'pending');
 
-      // 3. Persistir fotos atuais no SQLite
+      // 3. Persistir fotos atuais no SQLite (instantâneo, sem I/O pesado de disco)
       for (let i = 0; i < fotos.length; i++) {
-        let b64 = fotos[i].base64;
-        if (!b64 && fotos[i].uri_local && !fotos[i].uri_local?.startsWith('http')) {
-          try {
-            b64 = await readPhotoBase64(fotos[i].uri_local!);
-          } catch {}
-        }
         await saveLocalFoto({
           ...fotos[i],
           relatorio_id: rid,
           relatorio_uuid: reportUuid,
           ordem: i,
-          base64: b64,
-        }, 'pending');
+        }, fotos[i].sync_status === 'synced' ? 'synced' : 'pending');
       }
 
       // 4. Espelhamento online imediato do rascunho com a nuvem (Railway)
@@ -388,18 +381,19 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           const isServerId = rid > 0 && rid < 2000000000;
           const endpoint = isServerId ? `/api/relatorios/${rid}` : '/api/relatorios';
 
-          // Format fotos for payload
-          const enrichedFotos = fotos.map((f, idx) => ({
-            ...f,
-            relatorio_id: rid,
+          // Envia metadados leves das fotos no rascunho para não reenviar megabytes de base64
+          const lightweightFotos = fotos.map((f, idx) => ({
+            id: f.id,
+            filename: f.filename,
+            legenda: f.legenda,
+            local: f.local,
             ordem: idx,
-            base64: f.base64,
-            imagem_base64: f.base64,
+            url: f.url,
           }));
 
           const relPayload = {
             ...draftObj,
-            fotos: enrichedFotos,
+            fotos: lightweightFotos,
           };
 
           const res = isServerId
@@ -805,54 +799,36 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         // 1. Salva SEMPRE no SQLite local primeiro (garantia de persistência offline)
         await saveLocalRelatorio(draft, 'pending');
 
-        // 2. Persistir todas as fotos no SQLite com Base64 garantido
-        const preparedFotos: any[] = [];
+        // 2. Persistir fotos no SQLite (rápido, sem ler disco repetidamente)
         for (let i = 0; i < fotos.length; i++) {
-          let b64 = fotos[i].base64;
-          if (!b64 && fotos[i].uri_local && !fotos[i].uri_local?.startsWith('http')) {
-            try {
-              b64 = await readPhotoBase64(fotos[i].uri_local!);
-            } catch (b64Err) {
-              console.warn('[AutoSave] Erro ao ler base64 da foto:', b64Err);
-            }
-          }
-          const fObj: FotoRelatorio = {
+          await saveLocalFoto({
             ...fotos[i],
             relatorio_id: rid,
             relatorio_uuid: reportUuid,
             ordem: i,
-            base64: b64,
-          };
-          await saveLocalFoto(fObj, 'pending');
-          preparedFotos.push({
-            ...fObj,
-            imagem_base64: b64,
-          });
+          }, fotos[i].sync_status === 'synced' ? 'synced' : 'pending');
         }
 
         // 3. Sincronização em tempo real com o servidor Railway se conectado
         if (isOnline) {
           try {
             const isServerId = rid > 0 && rid < 2000000000;
+            const lightweightFotos = fotos.map((f, idx) => ({
+              id: f.id,
+              filename: f.filename,
+              legenda: f.legenda,
+              local: f.local,
+              ordem: idx,
+              url: f.url,
+            }));
+
             if (isServerId) {
-              const res = await apiClient.axios.put(`/api/relatorios/${rid}`, {
+              await apiClient.axios.put(`/api/relatorios/${rid}`, {
                 ...draft,
                 autor_id: user?.id,
-                fotos: preparedFotos,
-              }, { timeout: 12000 });
+                fotos: lightweightFotos,
+              }, { timeout: 8000 });
               await saveLocalRelatorio({ ...draft, sync_status: 'synced' }, 'synced');
-              if (res?.data?.fotos && Array.isArray(res.data.fotos)) {
-                const serverFotos = res.data.fotos;
-                setFotos(prev => prev.map((pf, idx) => {
-                  const sf = serverFotos.find((s: any) => (s.filename && pf.filename && s.filename === pf.filename) || s.ordem === idx);
-                  if (sf) {
-                    const updated = { ...pf, id: sf.id, relatorio_id: rid, url: sf.url || pf.url };
-                    saveLocalFoto({ ...updated, sync_status: 'synced' }, 'synced').catch(() => null);
-                    return updated;
-                  }
-                  return pf;
-                }));
-              }
             } else {
               const res = await apiClient.axios.post('/api/relatorios', {
                 ...draft,
@@ -860,38 +836,24 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                 uuid: reportUuid,
                 uuid_local: reportUuid,
                 autor_id: user?.id,
-                fotos: preparedFotos,
-              }, { timeout: 12000 });
+                fotos: lightweightFotos,
+              }, { timeout: 8000 });
 
               if (res?.data?.id) {
-                const serverId = res.data.id;
+                const serverId = Number(res.data.id);
                 const serverNumero = res.data.numero || draft.numero;
                 const oldId = rid;
+                currentReportIdRef.current = serverId;
                 setCurrentReportId(serverId);
-                setReportNumber(serverNumero);
+                if (serverNumero && serverNumero !== reportNumber) {
+                  setReportNumber(serverNumero);
+                }
                 if (oldId !== serverId) {
                   await migrateLocalFotosRelatorioId(oldId, serverId, reportUuid);
                   const db = await getDatabase();
                   await db.runAsync('DELETE FROM relatorios WHERE id = ?', [oldId]);
                 }
                 await saveLocalRelatorio({ ...draft, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
-
-                const serverFotos = res?.data?.fotos;
-                if (serverFotos && Array.isArray(serverFotos)) {
-                  setFotos(prev => prev.map((pf, idx) => {
-                    const sf = serverFotos.find((s: any) => (s.filename && pf.filename && s.filename === pf.filename) || s.ordem === idx);
-                    const officialId = sf ? sf.id : pf.id;
-                    const officialUrl = sf?.url || pf.url;
-                    const updated = { ...pf, id: officialId, relatorio_id: serverId, url: officialUrl };
-                    saveLocalFoto({ ...updated, sync_status: 'synced' }, 'synced').catch(() => null);
-                    return updated;
-                  }));
-                } else {
-                  setFotos(prev => prev.map(f => ({ ...f, relatorio_id: serverId })));
-                  for (const f of preparedFotos) {
-                    await saveLocalFoto({ ...f, relatorio_id: serverId, sync_status: 'synced' }, 'synced');
-                  }
-                }
               }
             }
           } catch (netSaveErr) {
@@ -906,12 +868,12 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       } finally {
         setIsAutoSaving(false);
       }
-    }), 2000);
+    }), 3000);
 
     return () => clearTimeout(timer);
   }, [
     selectedProjectId, titulo, dataVisita, descricao, observacoesFinais, checklist,
-    acompanhantesList, fotos, categoria, local, reportNumber, currentReportId, isOnline,
+    acompanhantesList, fotos.length, categoria, local, reportNumber, currentReportId, isOnline,
     techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco,
     techFormaAplicacaoArgamassa, techAcabamentosRevestimento, techAcabamentoPeitoris,
     techAcabamentoMuretas, techDefinicaoFrisosCor, techDefinicaoFaceInferiorAbas,

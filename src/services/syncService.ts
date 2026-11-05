@@ -55,7 +55,7 @@ class SyncService {
       }
     });
 
-    // 2. Heartbeat otimizado: verifica pendências a cada 45s sem travar CPU/banco
+    // 2. Heartbeat otimizado: verifica pendências a cada 120s sem travar CPU/banco
     if (this.autoSyncInterval) {
       clearInterval(this.autoSyncInterval);
     }
@@ -63,21 +63,24 @@ class SyncService {
       const online = await this.isOnline();
       if (online && !this.isSyncing) {
         const pending = await this.getPendingCount();
-        const shouldPeriodicPull = Date.now() - this.lastPullTimestamp > 90000;
+        const shouldPeriodicPull = Date.now() - this.lastPullTimestamp > 300000;
         if (pending > 0 || shouldPeriodicPull) {
           await this.syncAll(false);
         }
       }
-    }, 45000);
+    }, 120000);
 
-    // 3. Foreground resume listener (debouncado para pelo menos 60s)
+    // 3. Foreground resume listener (debouncado para pelo menos 120s)
     AppState.addEventListener('change', async (state: AppStateStatus) => {
       if (state === 'active') {
         const online = await this.isOnline();
         if (online && !this.isSyncing) {
           const now = Date.now();
-          if (now - this.lastSyncTimestamp > 60000) {
-            this.syncAll(false);
+          if (now - this.lastSyncTimestamp > 120000) {
+            const pending = await this.getPendingCount();
+            if (pending > 0 || now - this.lastPullTimestamp > 300000) {
+              this.syncAll(false);
+            }
           }
         }
       }
@@ -151,9 +154,14 @@ class SyncService {
       };
     }
 
+    let pendingCount = await this.getPendingCount();
+    const shouldPeriodicPull = manual || (Date.now() - this.lastPullTimestamp > 300000);
+    if (!manual && pendingCount === 0 && !shouldPeriodicPull) {
+      return { success: true, message: 'Tudo sincronizado.' };
+    }
+
     this.isSyncing = true;
     this.lastSyncTimestamp = Date.now();
-    let pendingCount = await this.getPendingCount();
     this.notify('syncing', pendingCount);
 
     let processedCount = 0;
@@ -593,7 +601,7 @@ class SyncService {
       }
 
       // 2. Process Inbound Sync (Railway Server -> SQLite Local)
-      const shouldPull = manual || processedCount > 0 || (Date.now() - this.lastPullTimestamp > 60000);
+      const shouldPull = manual || processedCount > 0 || (Date.now() - this.lastPullTimestamp > 300000);
       if (shouldPull) {
         this.lastPullTimestamp = Date.now();
         await this.pullFromServer();
@@ -691,7 +699,7 @@ class SyncService {
             console.warn('[SyncService] Aviso de reconciliação de obra:', recErr);
           }
           await saveLocalProjeto(p, 'synced');
-          await ensureProjectFolders(p.nome, p.numero || p.codigo).catch(() => null);
+          ensureProjectFolders(p.nome, p.numero || p.codigo).catch(() => null);
         }
       }
 
