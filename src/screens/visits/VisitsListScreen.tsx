@@ -125,25 +125,25 @@ export const VisitsListScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
       setVisitas(data);
       applyFilters(data, selectedFilter, searchQuery);
-
-      if (isOnline) {
-        syncService.syncAll().then(async () => {
-          const freshData = await getLocalVisitas().catch(() => []);
-          setVisitas(freshData);
-          applyFilters(freshData, selectedFilter, searchQuery);
-        }).catch(() => null);
-      }
     } catch (e) {
       console.warn('Erro ao carregar visitas:', e);
     }
-  }, [selectedFilter, searchQuery, applyFilters, isOnline]);
+  }, [selectedFilter, searchQuery, applyFilters]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
+    const unsubscribeFocus = navigation.addListener('focus', () => {
       loadVisitasAndAutoCheck();
     });
+    const unsubscribeSync = syncService.subscribe((state) => {
+      if (state === 'idle') {
+        loadVisitasAndAutoCheck();
+      }
+    });
     loadVisitasAndAutoCheck();
-    return unsubscribe;
+    return () => {
+      unsubscribeFocus();
+      unsubscribeSync();
+    };
   }, [navigation, loadVisitasAndAutoCheck]);
 
   const handleFilter = (filter: string) => {

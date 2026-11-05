@@ -14466,11 +14466,11 @@ def api_relatorios_collection():
             if rel_uuid:
                 existing = Relatorio.query.filter_by(uuid=rel_uuid).first()
 
-            # 2. Busca por ID numérico direto se fornecido (somente se for ID válido do banco, menor que 2.1 bilhões)
+            # 2. Busca por ID numérico direto se fornecido (somente se for ID válido do banco, menor que 1 bilhão)
             if not existing and data.get('id'):
                 try:
                     c_id = int(data['id'])
-                    if 0 < c_id < 2147483647:
+                    if 0 < c_id < 1000000000:
                         existing = Relatorio.query.get(c_id)
                 except Exception:
                     pass
@@ -15290,7 +15290,7 @@ def api_relatorios_express_sync():
                 pass
 
             existing = None
-            if req_id and req_id < 2000000000:
+            if req_id and req_id < 1000000000:
                 existing = RelatorioExpress.query.get(req_id)
             if not existing and numero:
                 candidate = RelatorioExpress.query.filter_by(numero=numero).first()

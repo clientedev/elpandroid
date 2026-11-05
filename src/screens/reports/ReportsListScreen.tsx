@@ -130,37 +130,19 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
       setRelatorios(combined);
       const activeStatus = route?.params?.filterStatus || selectedStatus;
       filterReports(combined, search, activeStatus);
-
-      if (isOnline) {
-        syncService.syncAll().then(async () => {
-          const fresh = await getLocalRelatorios(undefined, user).catch(() => []);
-          const freshExp = await getLocalRelatoriosExpress(user).catch(() => []);
-          const freshExpAdapted: Relatorio[] = (freshExp || []).map(exp => ({
-            id: exp.id,
-            numero: exp.numero,
-            titulo: exp.titulo || 'Relatório Express de Visita',
-            projeto_id: 0,
-            projeto_nome: exp.obra_nome || 'Obra Express',
-            projeto_construtora: exp.obra_construtora,
-            autor_id: exp.autor_id || 1,
-            autor_nome: exp.autor_nome || 'Fiscal',
-            data_relatorio: exp.data_relatorio,
-            data_criacao_local: exp.data_relatorio,
-            status: exp.status as any,
-            sync_status: exp.sync_status as any,
-            fotos_count: exp.fotos_count || 0,
-            observacoes_finais: exp.observacoes_finais,
-            is_express: true,
-          }));
-          const freshCombined = [...(fresh || []), ...freshExpAdapted];
-          setRelatorios(freshCombined);
-          filterReports(freshCombined, search, activeStatus);
-        }).catch(() => null);
-      }
     } catch (e) {
       console.warn('Erro ao carregar relatórios:', e);
     }
-  }, [search, selectedStatus, isOnline, route?.params?.filterStatus]);
+  }, [search, selectedStatus, route?.params?.filterStatus, user]);
+
+  useEffect(() => {
+    const unsub = syncService.subscribe((state) => {
+      if (state === 'idle') {
+        loadRelatorios();
+      }
+    });
+    return unsub;
+  }, [loadRelatorios]);
 
   useFocusEffect(
     useCallback(() => {

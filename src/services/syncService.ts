@@ -25,6 +25,7 @@ class SyncService {
   private listeners: ((state: SyncState, pendingCount: number) => void)[] = [];
   private autoSyncInterval: any = null;
   private lastSyncTimestamp: number = 0;
+  private lastPullTimestamp: number = 0;
   private wasOffline: boolean = false;
   private hasNotifiedOfflineSyncDone: boolean = false;
 
@@ -33,19 +34,18 @@ class SyncService {
   }
 
   /**
-   * Initializes automatic synchronization:
-   * 1. Detects internet connection recovery
-   * 2. Periodic sync check (heartbeat a cada 10s para tempo real)
-   * 3. Syncs when app returns from background
+   * Inicializa sincronização inteligente e eficiente:
+   * 1. Detecta recuperação de conexão com debounce
+   * 2. Heartbeat a cada 45s apenas para itens pendentes ou pull periódico
+   * 3. Sincroniza ao retornar ao primeiro plano (se decorrido mais de 60s)
    */
   private initAutoSync() {
     // 1. Connection change listener
     NetInfo.addEventListener((state: NetInfoState) => {
       const online = Boolean(state.isConnected && state.isInternetReachable !== false);
       if (online) {
-        // Debounce connection burst
         const now = Date.now();
-        if (now - this.lastSyncTimestamp > 3000) {
+        if (now - this.lastSyncTimestamp > 5000) {
           this.syncAll(false);
         }
       } else {
@@ -55,24 +55,28 @@ class SyncService {
       }
     });
 
-    // 2. Heartbeat check every 10 seconds (sincronização contínua e em tempo real entre todos os dispositivos)
+    // 2. Heartbeat otimizado: verifica pendências a cada 45s sem travar CPU/banco
     if (this.autoSyncInterval) {
       clearInterval(this.autoSyncInterval);
     }
     this.autoSyncInterval = setInterval(async () => {
       const online = await this.isOnline();
       if (online && !this.isSyncing) {
-        await this.syncAll(false);
+        const pending = await this.getPendingCount();
+        const shouldPeriodicPull = Date.now() - this.lastPullTimestamp > 90000;
+        if (pending > 0 || shouldPeriodicPull) {
+          await this.syncAll(false);
+        }
       }
-    }, 10000);
+    }, 45000);
 
-    // 3. Foreground resume listener
+    // 3. Foreground resume listener (debouncado para pelo menos 60s)
     AppState.addEventListener('change', async (state: AppStateStatus) => {
       if (state === 'active') {
         const online = await this.isOnline();
-        if (online) {
+        if (online && !this.isSyncing) {
           const now = Date.now();
-          if (now - this.lastSyncTimestamp > 5000) {
+          if (now - this.lastSyncTimestamp > 60000) {
             this.syncAll(false);
           }
         }
@@ -177,7 +181,14 @@ class SyncService {
 
           // Verificação inteligente para relatórios criados offline: se já foi sincronizado, evita duplicar POST
           if (item.entity_type === 'relatorio') {
-            const localRel = await getLocalRelatorioById(item.entity_id);
+            let localRel = await getLocalRelatorioById(item.entity_id);
+            if (!localRel && (payload.uuid || payload.uuid_local)) {
+              const db = await getDatabase();
+              localRel = await db.getFirstAsync<Relatorio>(
+                'SELECT * FROM relatorios WHERE uuid = ? OR uuid_local = ?',
+                [payload.uuid || payload.uuid_local, payload.uuid || payload.uuid_local]
+              );
+            }
             if (localRel) {
               payload.projeto_id = localRel.projeto_id;
               if (localRel.id < 2000000000 && localRel.sync_status === 'synced' && item.method === 'POST') {
@@ -358,6 +369,11 @@ class SyncService {
         );
         for (const lp of pendingProjs) {
           try {
+            const pEntityKey = `projeto_${lp.id}`;
+            if (syncedEntitiesInBatch.has(pEntityKey)) {
+              continue;
+            }
+
             const isTemp = lp.id >= 2000000000;
             const endpoint = isTemp ? '/api/projetos' : `/api/projetos/${lp.id}`;
             
@@ -396,6 +412,10 @@ class SyncService {
                 'UPDATE projetos SET sync_status = "synced", numero = COALESCE(?, numero) WHERE id = ?',
                 [serverNumero || null, serverId]
               );
+              await db.runAsync(
+                "UPDATE sync_queue SET status = 'completed' WHERE entity_type = 'projeto' AND (entity_id = ? OR entity_id = ?)",
+                [lp.id, serverId]
+              ).catch(() => null);
               console.log(`[SyncService] Proativo: Obra local ${lp.id} sincronizada no servidor com ID ${serverId} (${serverNumero})`);
             } else {
               await db.runAsync(
@@ -403,6 +423,7 @@ class SyncService {
                 [lp.id]
               );
             }
+            syncedEntitiesInBatch.add(pEntityKey);
             processedCount++;
           } catch (projSyncErr: any) {
             console.warn(`[SyncService] Proativo falhou para obra ${lp.id}:`, projSyncErr?.message);
@@ -420,6 +441,12 @@ class SyncService {
         );
         for (const lr of pendingRels) {
           try {
+            const entityKey = `relatorio_${lr.id}`;
+            const uuidKey = lr.uuid ? `relatorio_uuid_${lr.uuid}` : '';
+            if (syncedEntitiesInBatch.has(entityKey) || (uuidKey && syncedEntitiesInBatch.has(uuidKey))) {
+              continue;
+            }
+
             const isTemp = lr.id >= 2000000000;
             const endpoint = isTemp ? '/api/relatorios' : `/api/relatorios/${lr.id}`;
             const method = isTemp ? 'POST' : 'PUT';
@@ -460,12 +487,18 @@ class SyncService {
             const serverUuid = rRes?.data?.uuid || lr.uuid;
 
             if (isTemp && serverId) {
+              syncedEntitiesInBatch.add(`relatorio_${serverId}`);
+              if (serverUuid) syncedEntitiesInBatch.add(`relatorio_uuid_${serverUuid}`);
               await migrateLocalFotosRelatorioId(lr.id, serverId, serverUuid);
               await db.runAsync('DELETE FROM relatorios WHERE id = ?;', [serverId]);
               await db.runAsync(
                 'UPDATE relatorios SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", data_sincronizacao = ? WHERE id = ?',
                 [serverId, officialNumero || null, new Date().toISOString(), lr.id]
               );
+              await db.runAsync(
+                "UPDATE sync_queue SET status = 'completed' WHERE entity_type = 'relatorio' AND (entity_id = ? OR entity_id = ?)",
+                [lr.id, serverId]
+              ).catch(() => null);
               console.log(`[SyncService] Proativo: Relatório local ${lr.id} migrado para ID servidor ${serverId} (${officialNumero})`);
             } else {
               await db.runAsync(
@@ -473,6 +506,8 @@ class SyncService {
                 [new Date().toISOString(), lr.id]
               );
             }
+            syncedEntitiesInBatch.add(entityKey);
+            if (uuidKey) syncedEntitiesInBatch.add(uuidKey);
             processedCount++;
           } catch (relSyncErr: any) {
             console.warn(`[SyncService] Proativo falhou para relatório ${lr.id}:`, relSyncErr?.message);
@@ -490,6 +525,11 @@ class SyncService {
         );
         for (const exp of pendingExp) {
           try {
+            const expEntityKey = `relatorio_express_${exp.id}`;
+            if (syncedEntitiesInBatch.has(expEntityKey)) {
+              continue;
+            }
+
             const isTemp = exp.id >= 2000000000;
             const endpoint = '/api/relatorios-express/sync';
 
@@ -524,12 +564,17 @@ class SyncService {
             const officialNumero = expRes?.data?.numero;
 
             if (isTemp && serverId) {
+              syncedEntitiesInBatch.add(`relatorio_express_${serverId}`);
               await migrateLocalFotosRelatorioExpressId(exp.id, serverId);
               await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
               await db.runAsync(
                 'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
                 [serverId, officialNumero || null, new Date().toISOString(), exp.id]
               );
+              await db.runAsync(
+                "UPDATE sync_queue SET status = 'completed' WHERE entity_type = 'relatorio_express' AND (entity_id = ? OR entity_id = ?)",
+                [exp.id, serverId]
+              ).catch(() => null);
               console.log(`[SyncService] Proativo: Relatório Express local ${exp.id} migrado para ID servidor ${serverId}`);
             } else {
               await db.runAsync(
@@ -537,6 +582,7 @@ class SyncService {
                 [new Date().toISOString(), exp.id]
               );
             }
+            syncedEntitiesInBatch.add(expEntityKey);
             processedCount++;
           } catch (expSyncErr: any) {
             console.warn(`[SyncService] Proativo falhou para relatório express ${exp.id}:`, expSyncErr?.message);
@@ -547,7 +593,11 @@ class SyncService {
       }
 
       // 2. Process Inbound Sync (Railway Server -> SQLite Local)
-      await this.pullFromServer();
+      const shouldPull = manual || processedCount > 0 || (Date.now() - this.lastPullTimestamp > 60000);
+      if (shouldPull) {
+        this.lastPullTimestamp = Date.now();
+        await this.pullFromServer();
+      }
 
       pendingCount = await this.getPendingCount();
       this.notify('idle', pendingCount);

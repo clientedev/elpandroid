@@ -232,10 +232,13 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
   useEffect(() => {
     loadReports();
-    if (isOnline) {
-      syncService.syncAll().then(() => loadReports()).catch(() => null);
-    }
-  }, [loadReports, isOnline]);
+    const unsub = syncService.subscribe((state) => {
+      if (state === 'idle') {
+        loadReports();
+      }
+    });
+    return unsub;
+  }, [loadReports]);
 
   // Persistência segura do rascunho com todas as fotos anexadas (evita perda ao sair sem salvar)
   async function persistDraftToStorage(targetIdParam?: number, currentNumParam?: string) {

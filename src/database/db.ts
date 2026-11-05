@@ -650,6 +650,7 @@ export async function saveLocalRelatorio(r: Relatorio, syncStatus: 'synced' | 'p
       if (byUuid && byUuid.id) {
         // Migra fotos do registro duplicado para o atual
         await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [safeId, byUuid.id]);
+        await db.runAsync('UPDATE sync_queue SET entity_id = ? WHERE entity_type = "relatorio" AND entity_id = ?', [safeId, byUuid.id]).catch(() => null);
         await db.runAsync('DELETE FROM relatorios WHERE id = ?', [byUuid.id]);
         console.log(`[db] Dedup: registro ${byUuid.id} mesclado no ${safeId}`);
       }
@@ -836,8 +837,8 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
       }
     } catch {}
   }
-  // Se ainda não tiver base64 e tiver arquivo local, lê diretamente do arquivo para salvar no SQLite
-  if (!finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
+  // Se ainda não tiver base64 e for PENDENTE com arquivo local, lê diretamente do arquivo para salvar no SQLite
+  if (syncStatus === 'pending' && !finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
     try {
       const { readPhotoBase64 } = require('../services/imageService');
       const b64Read = await readPhotoBase64(f.uri_local);
@@ -901,7 +902,14 @@ export async function migrateLocalFotosRelatorioId(oldRelatorioId: number, newRe
     } else {
       await db.runAsync('UPDATE fotos_relatorio SET relatorio_id = ? WHERE relatorio_id = ?', [newRelatorioId, oldRelatorioId]);
     }
-    console.log(`[db] Fotos migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId} (uuid: ${uuid || 'none'})`);
+
+    // Atualiza também itens da sync_queue para o novo ID do relatório
+    await db.runAsync(
+      "UPDATE sync_queue SET entity_id = ?, endpoint = '/api/relatorios/' || ? WHERE entity_type = 'relatorio' AND entity_id = ?",
+      [newRelatorioId, newRelatorioId, oldRelatorioId]
+    ).catch(() => null);
+
+    console.log(`[db] Fotos e fila migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId} (uuid: ${uuid || 'none'})`);
   } catch (err) {
     console.warn('[db] Erro ao migrar fotos entre relatórios:', err);
   }
@@ -918,7 +926,14 @@ export async function migrateLocalFotosRelatorioExpressId(oldRelatorioId: number
       'UPDATE fotos_relatorio_express SET relatorio_express_id = ? WHERE relatorio_express_id = ? OR relatorio_express_id = ?',
       [numNew, numOld, String(oldRelatorioId)]
     );
-    console.log(`[db] Fotos express migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId}`);
+
+    // Atualiza itens na sync_queue para o relatório express
+    await db.runAsync(
+      "UPDATE sync_queue SET entity_id = ? WHERE entity_type = 'relatorio_express' AND (entity_id = ? OR entity_id = ?)",
+      [numNew, numOld, String(oldRelatorioId)]
+    ).catch(() => null);
+
+    console.log(`[db] Fotos express e fila migradas no SQLite de ${oldRelatorioId} para ${newRelatorioId}`);
   } catch (err) {
     console.warn('[db] Erro ao migrar fotos express:', err);
   }
@@ -1195,8 +1210,8 @@ export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 
       }
     } catch {}
   }
-  // Se ainda não tiver base64 e tiver arquivo local, lê diretamente do arquivo para salvar no SQLite
-  if (!finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
+  // Se ainda não tiver base64 e for PENDENTE com arquivo local, lê diretamente do arquivo para salvar no SQLite
+  if (syncStatus === 'pending' && !finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
     try {
       const { readPhotoBase64 } = require('../services/imageService');
       const b64Read = await readPhotoBase64(f.uri_local);
@@ -1614,9 +1629,9 @@ export async function addToSyncQueue(
 ): Promise<number> {
   const db = await getDatabase();
   
-  // Verifica se já existe um item pendente para a mesma entidade
+  // Verifica se já existe um item na fila para a mesma entidade (pendente, em processamento ou com falha temporária)
   const existing = await db.getFirstAsync<{ id: number; action: string; method: string }>(
-    "SELECT id, action, method FROM sync_queue WHERE entity_type = ? AND entity_id = ? AND status = 'pending' LIMIT 1",
+    "SELECT id, action, method FROM sync_queue WHERE entity_type = ? AND entity_id = ? AND status IN ('pending', 'processing', 'failed') LIMIT 1",
     [entityType, entityId]
   );
 
@@ -1624,7 +1639,7 @@ export async function addToSyncQueue(
     // Se nova ação é delete, prevalece o delete
     if (action === 'delete') {
       await db.runAsync(
-        "UPDATE sync_queue SET action = 'delete', endpoint = ?, method = 'DELETE', payload = ?, created_at = ? WHERE id = ?",
+        "UPDATE sync_queue SET action = 'delete', endpoint = ?, method = 'DELETE', payload = ?, status = 'pending', retries = 0, created_at = ? WHERE id = ?",
         [endpoint, JSON.stringify(payload), new Date().toISOString(), existing.id]
       );
       return existing.id;
@@ -1635,7 +1650,7 @@ export async function addToSyncQueue(
     const finalEndpoint = existing.action === 'create' ? endpoint : endpoint;
     
     await db.runAsync(
-      "UPDATE sync_queue SET action = ?, endpoint = ?, method = ?, payload = ?, created_at = ? WHERE id = ?",
+      "UPDATE sync_queue SET action = ?, endpoint = ?, method = ?, payload = ?, status = 'pending', retries = 0, created_at = ? WHERE id = ?",
       [finalAction, finalEndpoint, finalMethod, JSON.stringify(payload), new Date().toISOString(), existing.id]
     );
     return existing.id;
