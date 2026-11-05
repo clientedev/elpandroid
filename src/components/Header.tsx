@@ -204,7 +204,7 @@ export const Header: React.FC<HeaderProps> = ({
         {(!isOnline || pendingCount > 0) && (
           <TouchableOpacity 
             style={styles.syncIconButton} 
-            onPress={() => triggerSync()}
+            onPress={() => triggerSync(true)}
             disabled={!isOnline}
             activeOpacity={0.7}
           >

@@ -31,6 +31,7 @@ import { Colors, Shadows } from '../../theme/colors';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/api';
+import { syncService } from '../../services/syncService';
 
 export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { projectId } = route.params;
@@ -79,15 +80,18 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   }>({ total: 0, validados: 0, percent: 0, itens: [] });
   const [showChecklistDetails, setShowChecklistDetails] = useState(false);
 
-  useEffect(() => {
-    loadDetails();
-  }, [projectId]);
-
   const loadDetails = useCallback(async () => {
     try {
-      const p = await getLocalProjetoById(projectId);
+      const [p, r, v, l, c, template, progressoObra] = await Promise.all([
+        getLocalProjetoById(projectId),
+        getLocalRelatorios(projectId),
+        getLocalVisitas(projectId),
+        getLocalLembretes(projectId, false),
+        getLocalContatos(projectId),
+        getLocalChecklistTemplate(),
+        getChecklistProgressoObra(projectId),
+      ]);
       setProjeto(p);
-      const r = await getLocalRelatorios(projectId);
       r.sort((a, b) => {
         const timeA = new Date(a.updated_at || a.data_criacao_local || a.data_relatorio || 0).getTime();
         const timeB = new Date(b.updated_at || b.data_criacao_local || b.data_relatorio || 0).getTime();
@@ -95,11 +99,8 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
         return (b.id || 0) - (a.id || 0);
       });
       setRelatorios(r);
-      const v = await getLocalVisitas(projectId);
       setVisitas(v);
-      const l = await getLocalLembretes(projectId, false);
       setLembretes(l);
-      const c = await getLocalContatos(projectId);
       if (c && c.length > 0) {
         setContatos(c);
       } else if (p?.contatos && p.contatos.length > 0) {
@@ -115,12 +116,6 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       } else {
         setContatos([]);
       }
-
-      // Carrega o template e histórico cumulativo de checklist da obra
-      const [template, progressoObra] = await Promise.all([
-        getLocalChecklistTemplate(),
-        getChecklistProgressoObra(projectId),
-      ]);
 
       let baseItems: Array<{ id?: number; item: string; ordem: number }> = [];
       if (p?.checklist_data) {
@@ -202,6 +197,15 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
       console.warn('Erro ao carregar detalhes:', e);
     }
   }, [projectId]);
+
+  useEffect(() => {
+    const unsub = syncService.subscribe((status) => {
+      if (status === 'idle') {
+        loadDetails();
+      }
+    });
+    return unsub;
+  }, [loadDetails]);
 
   useFocusEffect(
     useCallback(() => {

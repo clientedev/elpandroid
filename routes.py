@@ -14333,7 +14333,12 @@ def _save_fotos_for_relatorio(relatorio_id, fotos_list, allow_delete=True):
 
         is_new = False
         if not foto:
+            raw_url = f_data.get('url') or ''
+            if not img_bytes and not (raw_url and ('/uploads/' in raw_url or raw_url.startswith('http'))):
+                continue
             foto = FotoRelatorio(relatorio_id=relatorio_id)
+            if raw_filename:
+                foto.filename = raw_filename
             is_new = True
 
         foto.titulo = f_data.get('titulo') or f"Foto {idx+1}"

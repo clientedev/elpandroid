@@ -211,12 +211,12 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   };
 
   // ================= AUTOSAVE EM TEMPO REAL =================
-  const saveDraftImmediately = useCallback(async () => {
+  const saveDraftImmediately = useCallback(async (localOnly: boolean = false) => {
     if (!nome.trim() && !construtora.trim()) return;
-    if (isSavingRef.current) return;
+    if (isSavingRef.current && !localOnly) return;
     isSavingRef.current = true;
     try {
-      setIsAutoSaving(true);
+      if (!localOnly) setIsAutoSaving(true);
       const numInicialParsed = parseInt(numeracaoInicial, 10);
       const rid = projectIdRef.current;
       const isServerId = rid > 0 && rid < 2000000000;
@@ -249,19 +249,23 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         outras_observacoes: outrasObs.trim(),
         contatos: contatos,
         checklist_data: JSON.stringify(checklistItems),
-        sync_status: isServerId ? 'synced' : 'pending',
+        sync_status: 'pending',
       };
 
-      // 1. Salva no SQLite local
-      await saveLocalProjeto(projData, isServerId ? 'synced' : 'pending');
+      // 1. Salva no SQLite local como pending até confirmar envio à nuvem
+      await saveLocalProjeto(projData, 'pending');
+
+      if (localOnly) {
+        return;
+      }
 
       // 2. Espelhamento online imediato na nuvem se conectado
       try {
         if (isServerId) {
-          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 8000 });
+          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 6000 });
           await saveLocalProjeto({ ...projData, sync_status: 'synced' }, 'synced');
         } else {
-          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 8000 });
+          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 6000 });
           if (res?.data?.id) {
             const serverId = Number(res.data.id);
             const serverNumero = res.data.numero || projData.numero;
@@ -277,7 +281,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
           }
         }
       } catch (netSaveErr) {
-        console.warn('[ProjectForm] AutoSave online aviso (mantido offline):', netSaveErr);
+        console.warn('[ProjectForm] AutoSave online aviso (mantido offline como pending):', netSaveErr);
       }
 
       const d = new Date();
@@ -285,7 +289,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     } catch (err) {
       console.warn('[ProjectForm] AutoSave erro:', err);
     } finally {
-      setIsAutoSaving(false);
+      if (!localOnly) setIsAutoSaving(false);
       isSavingRef.current = false;
     }
   }, [
@@ -301,7 +305,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
   useEffect(() => {
     if (!nome.trim() && !construtora.trim()) return;
     const timer = setTimeout(() => {
-      saveDraftImmediately();
+      saveDraftImmediately(false);
     }, 3000);
     return () => clearTimeout(timer);
   }, [
@@ -312,15 +316,15 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
     observacoesFachada, outrasObs, contatos, checklistItems, saveDraftImmediately
   ]);
 
-  // Forçar salvamento ao sair da tela
+  // Salvamento instantâneo ao sair da tela (sem travar navegação esperando rede)
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
       if (hasSavedRef.current) return;
+      hasSavedRef.current = true;
       e.preventDefault();
-      saveDraftImmediately().finally(() => {
-        hasSavedRef.current = true;
-        if (isOnline) triggerSync();
+      saveDraftImmediately(true).finally(() => {
         navigation.dispatch(e.data.action);
+        if (isOnline) triggerSync(false).catch(() => null);
       });
     });
     return unsubscribe;
@@ -657,20 +661,20 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         outras_observacoes: outrasObs.trim(),
         contatos: contatos,
         checklist_data: JSON.stringify(checklistItems),
-        sync_status: isServerId ? 'synced' : 'pending',
+        sync_status: 'pending',
       };
 
-      await saveLocalProjeto(projData, isServerId ? 'synced' : 'pending');
-      await ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
+      await saveLocalProjeto(projData, 'pending');
+      ensureProjectFolders(projData.nome, projData.numero).catch(() => null);
 
       let savedToServer = false;
       try {
         if (isServerId) {
-          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 12000 });
+          await apiClient.axios.put(`/api/projetos/${rid}`, projData, { timeout: 6000 });
           await saveLocalProjeto({ ...projData, sync_status: 'synced' }, 'synced');
           savedToServer = true;
         } else {
-          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 12000 });
+          const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 6000 });
           if (res?.data?.id) {
             const serverId = Number(res.data.id);
             const serverNumero = res.data.numero || projData.numero;
@@ -690,7 +694,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         console.warn('[ProjectForm] Falha ao enviar diretamente para o servidor no salvamento final:', serverErr);
         if (isServerId) {
           try {
-            const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 12000 });
+            const res = await apiClient.axios.post('/api/projetos', projData, { timeout: 6000 });
             if (res?.data?.id) {
               const serverId = Number(res.data.id);
               const serverNumero = res.data.numero || projData.numero;
@@ -722,11 +726,11 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         );
       }
 
-      triggerSync().catch(() => null);
+      triggerSync(false).catch(() => null);
 
       Alert.alert(
         'Sucesso', 
-        `Obra ${isServerId ? 'atualizada' : 'cadastrada'} com sucesso e sincronizada com a nuvem!`,
+        `Obra ${isServerId ? 'atualizada' : 'cadastrada'} com sucesso!`,
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
@@ -744,11 +748,7 @@ export const ProjectFormScreen: React.FC<{ route?: any; navigation: any }> = ({ 
         title={existingProject ? "Editar Obra" : "Nova Obra"} 
         subtitle="Cadastro Técnico da Edificação"
         showBack 
-        onBack={async () => {
-          await saveDraftImmediately();
-          if (isOnline) triggerSync();
-          navigation.goBack();
-        }} 
+        onBack={() => navigation.goBack()} 
       />
       <OfflineBanner />
 

@@ -18,6 +18,7 @@ import { Projeto, Visita, Relatorio } from '../../types';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Shadows } from '../../theme/colors';
 import { screenConfigService, ScreenSectionConfig } from '../../services/screenConfigService';
+import { syncService } from '../../services/syncService';
 
 const WIDGETS_CONFIG_KEY = '@elp_dashboard_widgets_v2';
 
@@ -176,22 +177,24 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
 
   const loadData = useCallback(async () => {
     try {
-      const p = await getLocalProjetos().catch(e => {
-        console.warn('Erro ao carregar projetos locais:', e);
-        return [];
-      });
-      const v = await getLocalVisitas().catch(e => {
-        console.warn('Erro ao carregar visitas locais:', e);
-        return [];
-      });
-      const r = await getLocalRelatorios().catch(e => {
-        console.warn('Erro ao carregar relatórios locais:', e);
-        return [];
-      });
-      const expR = await getLocalRelatoriosExpress().catch(e => {
-        console.warn('Erro ao carregar relatórios express locais:', e);
-        return [];
-      });
+      const [p, v, r, expR] = await Promise.all([
+        getLocalProjetos().catch(e => {
+          console.warn('Erro ao carregar projetos locais:', e);
+          return [];
+        }),
+        getLocalVisitas().catch(e => {
+          console.warn('Erro ao carregar visitas locais:', e);
+          return [];
+        }),
+        getLocalRelatorios().catch(e => {
+          console.warn('Erro ao carregar relatórios locais:', e);
+          return [];
+        }),
+        getLocalRelatoriosExpress().catch(e => {
+          console.warn('Erro ao carregar relatórios express locais:', e);
+          return [];
+        }),
+      ]);
 
       const expressAdapted: Relatorio[] = (expR || []).map(exp => ({
         id: exp.id,
@@ -227,18 +230,20 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   }, [user]);
 
   useEffect(() => {
-    loadData();
-    if (isOnline) {
-      triggerSync().then(() => loadData()).catch(() => null);
-    }
-  }, [loadData, isOnline, triggerSync]);
+    const unsub = syncService.subscribe((status) => {
+      if (status === 'idle') {
+        loadData();
+      }
+    });
+    return unsub;
+  }, [loadData]);
 
   useFocusEffect(
     useCallback(() => {
       loadServerConfig();
       loadData();
       if (isOnline) {
-        triggerSync().then(() => loadData()).catch(() => null);
+        triggerSync(false).then(() => loadData()).catch(() => null);
       }
     }, [loadServerConfig, loadData, isOnline, triggerSync])
   );
@@ -247,7 +252,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
     setRefreshing(true);
     if (isOnline) {
       await screenConfigService.syncFromServer().catch(() => null);
-      await triggerSync();
+      await triggerSync(true);
     }
     await loadServerConfig();
     await loadData();

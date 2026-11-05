@@ -38,6 +38,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
 
   // Estados de Localização Real GPS & Ordenação por Proximidade
   const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const userCoordsRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'loading' | 'available' | 'denied' | 'disabled'>('loading');
   const [sortByProximity, setSortByProximity] = useState(false);
 
@@ -74,7 +75,8 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
         return null;
       }
       const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-      setUserCoords(coords);
+      userCoordsRef.current = coords;
+      setUserCoords(prev => (!prev || Math.abs(prev.latitude - coords.latitude) > 0.0002 || Math.abs(prev.longitude - coords.longitude) > 0.0002) ? coords : prev);
       setLocationStatus('available');
       return coords;
     } catch (err) {
@@ -95,7 +97,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     fResponsavel: string,
     uList: User[],
     currentProximitySort = sortByProximity,
-    currentCoords = userCoords
+    currentCoords = userCoordsRef.current
   ) => {
     let result = [...data];
 
@@ -160,7 +162,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     }
 
     setFilteredProjetos(result);
-  }, [sortByProximity, userCoords]);
+  }, [sortByProximity]);
 
   const loadProjetos = useCallback(async () => {
     try {
@@ -176,7 +178,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
       }
       setRelatoriosCounts(counts);
       setProjetos(data);
-      filterList(data, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers, sortByProximity, userCoords);
+      filterList(data, search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, localUsers, sortByProximity, userCoordsRef.current);
 
       // 2. OBTENÇÃO DA LOCALIZAÇÃO REAL EM SEGUNDO PLANO
       refreshUserLocation().then(coords => {
@@ -187,7 +189,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
     } catch (e) {
       console.warn('Erro ao carregar projetos:', e);
     }
-  }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList, refreshUserLocation, sortByProximity, userCoords, isOnline]);
+  }, [search, selectedStatus, filterTipo, filterConstrutora, filterFuncionario, filterResponsavel, filterList, refreshUserLocation, sortByProximity]);
 
   useEffect(() => {
     const unsubscribeFocus = navigation.addListener('focus', () => {
@@ -231,7 +233,7 @@ export const ProjectsListScreen: React.FC<{ navigation: any }> = ({ navigation }
   const onRefresh = async () => {
     setRefreshing(true);
     if (isOnline) {
-      await syncService.syncAll().catch(() => null);
+      await syncService.syncAll(true).catch(() => null);
     }
     await loadProjetos();
     setRefreshing(false);

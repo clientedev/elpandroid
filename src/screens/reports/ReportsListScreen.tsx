@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, Alert 
+import {
+  View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, RefreshControl, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Header } from '../../components/Header';
-import { 
+import {
   getLocalRelatorios, getLocalRelatoriosExpress,
   deleteLocalRelatorio, deleteLocalRelatorioExpress, addToSyncQueue
 } from '../../database/db';
@@ -257,11 +257,11 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
 
   return (
     <View style={styles.container}>
-      <Header 
-        title="Relatórios" 
+      <Header
+        title="Relatórios"
         subtitle={`${filteredRelatorios.length} de ${relatorios.length} ${relatorios.length === 1 ? 'relatório' : 'relatórios'}`}
         rightAction={
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.addBtn}
             onPress={() => navigation.navigate('ReportFormScreen')}
             activeOpacity={0.8}
@@ -292,8 +292,8 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
 
       {/* Segmento de Filtros Minimalista com Contadores */}
       <View style={styles.filterSection}>
-        <ScrollView 
-          horizontal 
+        <ScrollView
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterScrollContent}
         >
@@ -338,16 +338,16 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                 : 'Você ainda não possui relatórios criados.'}
             </Text>
             {selectedStatus !== 'Todos' ? (
-              <TouchableOpacity 
-                style={styles.emptyResetBtn} 
+              <TouchableOpacity
+                style={styles.emptyResetBtn}
                 onPress={() => handleStatusFilter('Todos')}
               >
                 <Ionicons name="filter-outline" size={14} color="#2563EB" />
                 <Text style={styles.emptyResetBtnText}>Limpar Filtro</Text>
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity 
-                style={styles.emptyCreateBtn} 
+              <TouchableOpacity
+                style={styles.emptyCreateBtn}
                 onPress={() => navigation.navigate('ReportFormScreen')}
               >
                 <Ionicons name="add" size={16} color="#FFFFFF" />
@@ -366,7 +366,7 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
           const photoCount = item.fotos_count || (Array.isArray(rawFotos) ? rawFotos.length : 0);
 
           return (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.card}
               activeOpacity={0.7}
               onPress={async () => {
@@ -382,7 +382,7 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                         );
                         return;
                       }
-                    } catch {}
+                    } catch { }
                   }
                   if ((item as any).is_express) {
                     navigation.navigate('ReportDetailScreen', { reportId: item.id, isExpress: true });
@@ -403,22 +403,22 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                     </Text>
                   </View>
                   <View style={[
-                    styles.statusPill, 
-                    item.status === 'Aprovado' ? styles.statusApproved : 
-                    item.status === 'Aguardando Aprovação' ? styles.statusWaiting : 
-                    item.status === 'Rejeitado' ? styles.statusRejected : styles.statusDraft
+                    styles.statusPill,
+                    item.status === 'Aprovado' ? styles.statusApproved :
+                      item.status === 'Aguardando Aprovação' ? styles.statusWaiting :
+                        item.status === 'Rejeitado' ? styles.statusRejected : styles.statusDraft
                   ]}>
                     <View style={[
                       styles.statusDot,
                       item.status === 'Aprovado' ? { backgroundColor: '#10B981' } :
-                      item.status === 'Aguardando Aprovação' ? { backgroundColor: '#F59E0B' } :
-                      item.status === 'Rejeitado' ? { backgroundColor: '#EF4444' } : { backgroundColor: '#64748B' }
+                        item.status === 'Aguardando Aprovação' ? { backgroundColor: '#F59E0B' } :
+                          item.status === 'Rejeitado' ? { backgroundColor: '#EF4444' } : { backgroundColor: '#64748B' }
                     ]} />
                     <Text style={[
                       styles.statusPillText,
                       item.status === 'Aprovado' ? { color: '#065F46' } :
-                      item.status === 'Aguardando Aprovação' ? { color: '#92400E' } :
-                      item.status === 'Rejeitado' ? { color: '#991B1B' } : { color: '#475569' }
+                        item.status === 'Aguardando Aprovação' ? { color: '#92400E' } :
+                          item.status === 'Rejeitado' ? { color: '#991B1B' } : { color: '#475569' }
                     ]}>
                       {isDraft ? 'Em aberto' : item.status}
                     </Text>
@@ -452,7 +452,7 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
                   Criado por: <Text style={styles.cardAuthorName}>{item.autor_nome || 'Responsável'}</Text>
                 </Text>
               </View>
-              
+
               {/* Rodapé do Card: Obra e Indicadores */}
               <View style={styles.cardBottomRow}>
                 <View style={styles.projectInfo}>
@@ -490,8 +490,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchContainer: { 
-    paddingHorizontal: 16, 
+  searchContainer: {
+    paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 6,
   },
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchInput: { flex: 1, fontSize: 13.5, color: '#1E293B' },
-  
+
   // Seção de Filtros Minimalista
   filterSection: {
     paddingVertical: 6,
@@ -527,16 +527,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  filterChipActive: { 
-    backgroundColor: '#1E293B', 
+  filterChipActive: {
+    backgroundColor: '#1E293B',
     borderColor: '#1E293B',
   },
-  filterText: { 
-    fontSize: 12, 
-    fontWeight: '600', 
+  filterText: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#64748B',
   },
-  filterTextActive: { 
+  filterTextActive: {
     color: '#FFFFFF',
   },
   filterCountBadge: {
@@ -558,9 +558,9 @@ const styles = StyleSheet.create({
   },
 
   // Lista & Cards Minimalistas
-  listContent: { 
-    paddingHorizontal: 16, 
-    paddingTop: 4, 
+  listContent: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
     paddingBottom: 24,
   },
   card: {
@@ -627,10 +627,10 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '500',
   },
-  cardTitle: { 
-    fontSize: 14.5, 
-    fontWeight: '700', 
-    color: '#0F172A', 
+  cardTitle: {
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: '#0F172A',
     lineHeight: 19,
     marginBottom: 5,
   },
@@ -690,9 +690,9 @@ const styles = StyleSheet.create({
   },
 
   // Empty State
-  emptyContainer: { 
-    padding: 36, 
-    alignItems: 'center', 
+  emptyContainer: {
+    padding: 36,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   emptyIconCircle: {
@@ -704,16 +704,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  emptyTitle: { 
-    fontSize: 15, 
-    fontWeight: '700', 
-    color: '#1E293B', 
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1E293B',
     marginBottom: 4,
   },
-  emptySub: { 
-    fontSize: 12.5, 
-    color: '#64748B', 
-    textAlign: 'center', 
+  emptySub: {
+    fontSize: 12.5,
+    color: '#64748B',
+    textAlign: 'center',
     marginBottom: 16,
     lineHeight: 18,
   },

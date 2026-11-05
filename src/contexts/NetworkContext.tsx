@@ -6,7 +6,7 @@ interface NetworkContextData {
   isOnline: boolean;
   syncState: SyncState;
   pendingCount: number;
-  triggerSync: () => Promise<{ success: boolean; message: string }>;
+  triggerSync: (manual?: boolean) => Promise<{ success: boolean; message: string }>;
 }
 
 const NetworkContext = createContext<NetworkContextData>({} as NetworkContextData);
@@ -60,8 +60,8 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
-  const triggerSync = useCallback(async () => {
-    return await syncService.syncAll(true);
+  const triggerSync = useCallback(async (manual: boolean = false) => {
+    return await syncService.syncAll(manual);
   }, []);
 
   const value = useMemo(() => ({

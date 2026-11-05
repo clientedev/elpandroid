@@ -212,7 +212,7 @@ export async function takePhoto(projectName?: string): Promise<CapturedPhoto | n
 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.88,
+      quality: 0.75,
       base64: true,
       allowsEditing: false,
       exif: false,
@@ -269,7 +269,7 @@ export async function pickImage(projectName?: string): Promise<CapturedPhoto | n
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.88,
+      quality: 0.75,
       base64: true,
       allowsEditing: false,
     });

@@ -363,7 +363,11 @@ export async function getStoredPhysicalFiles(): Promise<{
 /**
  * Garante que as pastas internas de fallback existam.
  */
+let internalDirsVerified = false;
+const verifiedProjectFoldersCache = new Set<string>();
+
 async function ensureInternalDirs(): Promise<void> {
+  if (internalDirsVerified) return;
   try {
     const infoRoot = await FileSystem.getInfoAsync(INTERNAL_ROOT);
     if (!infoRoot.exists) {
@@ -377,6 +381,7 @@ async function ensureInternalDirs(): Promise<void> {
     if (!infoRels.exists) {
       await FileSystem.makeDirectoryAsync(INTERNAL_RELATORIOS, { intermediates: true });
     }
+    internalDirsVerified = true;
   } catch {}
 }
 
@@ -573,11 +578,16 @@ export async function ensureProjectFolders(projectName: string, projectCode?: st
   imagensDir: string;
   pdfsDir: string;
 }> {
-  await ensureInternalDirs();
   const folderName = cleanFolderName(projectName);
   const pDir = `${INTERNAL_OBRAS}${folderName}/`;
   const iDir = `${pDir}Imagens/`;
   const rDir = `${pDir}Relatorios/`;
+
+  if (verifiedProjectFoldersCache.has(folderName)) {
+    return { projectDir: pDir, imagensDir: iDir, pdfsDir: rDir };
+  }
+
+  await ensureInternalDirs();
 
   try {
     for (const d of [pDir, iDir, rDir]) {
@@ -586,6 +596,7 @@ export async function ensureProjectFolders(projectName: string, projectCode?: st
         await FileSystem.makeDirectoryAsync(d, { intermediates: true });
       }
     }
+    verifiedProjectFoldersCache.add(folderName);
   } catch {}
 
   return { projectDir: pDir, imagensDir: iDir, pdfsDir: rDir };

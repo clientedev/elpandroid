@@ -34,7 +34,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     dbInitPromise = (async () => {
       try {
         const rawDb = await SQLite.openDatabaseAsync('obraflow.db');
-        await rawDb.execAsync('PRAGMA foreign_keys = ON;');
+        await rawDb.execAsync('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA temp_store = MEMORY; PRAGMA foreign_keys = ON;');
 
         // Intercepta prepareAsync / runAsync / getAllAsync / getFirstAsync para blindar contra qualquer parâmetro 'undefined' ou query nula
         const origPrepare = rawDb.prepareAsync.bind(rawDb);
@@ -203,22 +203,45 @@ async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
   try {
     await db.execAsync('ALTER TABLE relatorios ADD COLUMN informacoes_tecnicas TEXT;');
   } catch {}
+
+  // Índices de alta performance para consultas instantâneas (<1ms)
+  try {
+    await db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_projetos_sync ON projetos(sync_status);
+      CREATE INDEX IF NOT EXISTS idx_relatorios_projeto_id ON relatorios(projeto_id);
+      CREATE INDEX IF NOT EXISTS idx_relatorios_uuid ON relatorios(uuid);
+      CREATE INDEX IF NOT EXISTS idx_relatorios_sync ON relatorios(sync_status);
+      CREATE INDEX IF NOT EXISTS idx_fotos_relatorio_rel_id ON fotos_relatorio(relatorio_id);
+      CREATE INDEX IF NOT EXISTS idx_fotos_relatorio_uuid ON fotos_relatorio(relatorio_uuid);
+      CREATE INDEX IF NOT EXISTS idx_fotos_express_rel_id ON fotos_relatorio_express(relatorio_express_id);
+      CREATE INDEX IF NOT EXISTS idx_visitas_projeto_id ON visitas(projeto_id);
+      CREATE INDEX IF NOT EXISTS idx_visitas_sync ON visitas(sync_status);
+      CREATE INDEX IF NOT EXISTS idx_visita_part_visita_id ON visita_participantes(visita_id);
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status, entity_type, entity_id);
+    `);
+  } catch {}
+
+  // Limpa base64 redundante de fotos já sincronizadas que possuem arquivo local ou URL remota (evita sobrecarga de memória no SQLite)
+  try {
+    await db.execAsync(`
+      UPDATE fotos_relatorio SET base64 = '' WHERE sync_status = 'synced' AND base64 IS NOT NULL AND base64 != '' AND ((uri_local IS NOT NULL AND uri_local != '') OR (url IS NOT NULL AND url != ''));
+      UPDATE fotos_relatorio_express SET base64 = '' WHERE sync_status = 'synced' AND base64 IS NOT NULL AND base64 != '' AND ((uri_local IS NOT NULL AND uri_local != '') OR (url IS NOT NULL AND url != ''));
+    `);
+  } catch {}
   
-  // Seed/Sync legendas predefinidas garantindo todas as 12 categorias tecnicas solicitadas
-  for (const leg of SEED_LEGENDAS) {
-    try {
-      const exists = await db.getFirstAsync<{ id: number }>(
-        'SELECT id FROM legendas_predefinidas WHERE texto = ? LIMIT 1',
-        [leg.texto]
-      );
-      if (!exists) {
+  // Seed/Sync legendas predefinidas em lote único
+  try {
+    const existingLegendas = await db.getAllAsync<{ texto: string }>('SELECT texto FROM legendas_predefinidas');
+    const existingSet = new Set(existingLegendas.map(l => l.texto));
+    for (const leg of SEED_LEGENDAS) {
+      if (!existingSet.has(leg.texto)) {
         await db.runAsync(
           'INSERT INTO legendas_predefinidas (categoria, texto, ordem) VALUES (?, ?, ?)',
           [leg.categoria, leg.texto, leg.ordem]
-        );
+        ).catch(() => null);
       }
-    } catch {}
-  }
+    }
+  } catch {}
 
   // Seed initial checklist template if empty and remove duplicate rows
   try {
@@ -533,17 +556,26 @@ export async function getLocalVisitas(projetoId?: number): Promise<Visita[]> {
   }
   query += ' ORDER BY data_inicio DESC';
   const rows = await db.getAllAsync<any>(query, params);
-  
-  const visits: Visita[] = [];
-  for (const r of rows) {
-    const parts = await getVisitaParticipantes(r.id);
-    visits.push({
-      ...r,
-      is_pessoal: Boolean(r.is_pessoal),
-      participantes_detalhes: parts
-    });
-  }
-  return visits;
+  if (!rows || rows.length === 0) return [];
+
+  // Carrega todos os participantes em uma única query para eliminar N+1
+  const partsMap = new Map<number, VisitaParticipanteItem[]>();
+  try {
+    const allParts = await db.getAllAsync<VisitaParticipanteItem & { visita_id: number }>(
+      'SELECT id, visita_id, user_id, nome, funcao, tipo FROM visita_participantes ORDER BY id ASC'
+    );
+    for (const p of allParts) {
+      const list = partsMap.get(p.visita_id) || [];
+      list.push({ id: p.id, user_id: p.user_id, nome: p.nome, funcao: p.funcao, tipo: p.tipo });
+      partsMap.set(p.visita_id, list);
+    }
+  } catch {}
+
+  return rows.map(r => ({
+    ...r,
+    is_pessoal: Boolean(r.is_pessoal),
+    participantes_detalhes: partsMap.get(r.id) || []
+  }));
 }
 
 export async function getLocalVisitaById(id: number): Promise<Visita | null> {
@@ -828,31 +860,15 @@ export async function getLocalFotos(relatorioId: number, relatorioUuid?: string)
 
 export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
-  let finalBase64 = f.base64 || '';
-  if (!finalBase64 && f.id) {
-    try {
-      const existing = await db.getFirstAsync<{ base64?: string }>('SELECT base64 FROM fotos_relatorio WHERE id = ?', [f.id]);
-      if (existing?.base64) {
-        finalBase64 = existing.base64;
-      }
-    } catch {}
-  }
-  // Se ainda não tiver base64 e for PENDENTE com arquivo local, lê diretamente do arquivo para salvar no SQLite
-  if (syncStatus === 'pending' && !finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
-    try {
-      const { readPhotoBase64 } = require('../services/imageService');
-      const b64Read = await readPhotoBase64(f.uri_local);
-      if (b64Read) {
-        finalBase64 = b64Read;
-      }
-    } catch {}
-  }
-
   const safeId = Number(f.id) || Date.now();
   const safeRelId = Number(f.relatorio_id) || 0;
+  const effectiveStatus = String(syncStatus || f.sync_status || 'pending');
+  const hasFileOrUrl = Boolean((f.uri_local && f.uri_local.length > 4) || (f.url && f.url.length > 4));
 
-  // Se já existe foto com mesmo filename e ID diferente para este relatório (ex: ID temporário sendo substituído por ID do servidor),
-  // limpa a duplicata para evitar linhas duplicadas no SQLite
+  // Quando sincronizado e com arquivo local ou URL remota, não armazena megabytes de base64 no SQLite
+  const b64ToSave = (effectiveStatus === 'synced' && hasFileOrUrl) ? '' : String(f.base64 || '');
+
+  // Se já existe foto com mesmo filename e ID diferente para este relatório, limpa a duplicata
   try {
     if (safeRelId && f.filename && f.filename.length > 5) {
       await db.runAsync(
@@ -868,7 +884,11 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
     `INSERT OR REPLACE INTO fotos_relatorio (
       id, relatorio_id, relatorio_uuid, url, filename, uri_local, titulo, legenda, descricao,
       tipo_servico, local, ordem, anotacoes_dados, base64, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      CASE WHEN ? = 'synced' THEN '' ELSE COALESCE(NULLIF(?, ''), (SELECT base64 FROM fotos_relatorio WHERE id = ?), '') END,
+      ?
+    )`,
     [
       safeId,
       safeRelId,
@@ -883,8 +903,10 @@ export async function saveLocalFoto(f: FotoRelatorio, syncStatus: 'synced' | 'pe
       String(f.local || ''),
       Number(f.ordem) || 0,
       String(f.anotacoes_dados || ''),
-      String(finalBase64 || ''),
-      String(syncStatus || f.sync_status || 'pending')
+      effectiveStatus,
+      b64ToSave,
+      safeId,
+      effectiveStatus
     ]
   );
 }
@@ -1200,38 +1222,25 @@ export async function getLocalFotosExpress(relatorioExpressId: number | string):
 
 export async function saveLocalFotoExpress(f: FotoRelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
   const db = await getDatabase();
-
-  let finalBase64 = f.base64 || '';
-  if (!finalBase64 && f.id) {
-    try {
-      const existing = await db.getFirstAsync<{ base64?: string }>('SELECT base64 FROM fotos_relatorio_express WHERE id = ?', [f.id]);
-      if (existing?.base64) {
-        finalBase64 = existing.base64;
-      }
-    } catch {}
-  }
-  // Se ainda não tiver base64 e for PENDENTE com arquivo local, lê diretamente do arquivo para salvar no SQLite
-  if (syncStatus === 'pending' && !finalBase64 && f.uri_local && !f.uri_local.startsWith('http')) {
-    try {
-      const { readPhotoBase64 } = require('../services/imageService');
-      const b64Read = await readPhotoBase64(f.uri_local);
-      if (b64Read) {
-        finalBase64 = b64Read;
-      }
-    } catch {}
-  }
-
   const safeId = Number(f.id) || Date.now();
   const safeRelId = Number(f.relatorio_express_id) || 0;
+  const effectiveStatus = String(syncStatus || f.sync_status || 'pending');
+  const hasFileOrUrl = Boolean((f.uri_local && f.uri_local.length > 4) || (f.url && f.url.length > 4));
+  const b64ToSave = (effectiveStatus === 'synced' && hasFileOrUrl) ? '' : String(f.base64 || '');
 
   await db.runAsync(
     `INSERT OR REPLACE INTO fotos_relatorio_express (
       id, relatorio_express_id, url, filename, uri_local, titulo, legenda, descricao, local, base64, anotacoes_dados, ordem, sync_status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (
+      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      CASE WHEN ? = 'synced' THEN '' ELSE COALESCE(NULLIF(?, ''), (SELECT base64 FROM fotos_relatorio_express WHERE id = ?), '') END,
+      ?, ?, ?
+    )`,
     [
       safeId, safeRelId, String(f.url || ''), String(f.filename || ''), String(f.uri_local || ''),
-      String(f.titulo || ''), String(f.legenda || ''), String(f.descricao || ''), String(f.local || ''), String(finalBase64 || ''),
-      String(f.anotacoes_dados || ''), Number(f.ordem) || 0, String(syncStatus || f.sync_status || 'pending')
+      String(f.titulo || ''), String(f.legenda || ''), String(f.descricao || ''), String(f.local || ''),
+      effectiveStatus, b64ToSave, safeId,
+      String(f.anotacoes_dados || ''), Number(f.ordem) || 0, effectiveStatus
     ]
   );
 }
@@ -1682,12 +1691,45 @@ export async function updateSyncQueueItem(id: number, status: 'pending' | 'proce
 export async function getPendingSyncCount(): Promise<number> {
   const db = await getDatabase();
   try {
-    const row = await db.getFirstAsync<{ count: number }>(
-      "SELECT COUNT(*) as count FROM sync_queue WHERE status = 'pending'"
-    );
+    const row = await db.getFirstAsync<{ count: number }>(`
+      SELECT (
+        (SELECT COUNT(*) FROM sync_queue WHERE status = 'pending' OR (status = 'failed' AND retries < 3)) +
+        (SELECT COUNT(*) FROM projetos WHERE sync_status = 'pending') +
+        (SELECT COUNT(*) FROM relatorios WHERE sync_status = 'pending') +
+        (SELECT COUNT(*) FROM visitas WHERE sync_status = 'pending') +
+        (SELECT COUNT(*) FROM relatorios_express WHERE sync_status = 'pending')
+      ) as count
+    `);
     return row?.count || 0;
   } catch {
     return 0;
+  }
+}
+
+export async function migrateLocalVisitaId(oldId: number, newId: number, newNumero?: string): Promise<void> {
+  if (!oldId || !newId || oldId === newId) return;
+  const db = await getDatabase();
+  try {
+    const existing = await db.getFirstAsync<{ id: number }>('SELECT id FROM visitas WHERE id = ?', [newId]);
+    if (existing) {
+      await db.runAsync('DELETE FROM visitas WHERE id = ?', [oldId]);
+      if (newNumero) {
+        await db.runAsync('UPDATE visitas SET numero = ?, sync_status = "synced" WHERE id = ?', [newNumero, newId]);
+      }
+    } else {
+      await db.runAsync(
+        'UPDATE visitas SET id = ?, numero = COALESCE(?, numero), sync_status = "synced" WHERE id = ?',
+        [newId, newNumero || null, oldId]
+      );
+    }
+    await db.runAsync('UPDATE visita_participantes SET visita_id = ? WHERE visita_id = ?', [newId, oldId]).catch(() => null);
+    await db.runAsync('UPDATE relatorios SET visita_id = ? WHERE visita_id = ?', [newId, oldId]).catch(() => null);
+    await db.runAsync(
+      "UPDATE sync_queue SET entity_id = ?, endpoint = '/api/visits/' || ? WHERE entity_type = 'visita' AND entity_id = ?",
+      [newId, newId, oldId]
+    ).catch(() => null);
+  } catch (err) {
+    console.warn('[db] Erro ao migrar ID de visita:', err);
   }
 }
 

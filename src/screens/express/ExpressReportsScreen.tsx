@@ -341,13 +341,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     // Salva imediatamente no SQLite local para persistir com segurança
     await saveLocalRelatorioExpress(expDraft, 'pending');
 
-    // Persistir fotos no SQLite com ID estável e propriedades preservadas
+    // Persistir fotos no SQLite sem reler base64 de fotos já sincronizadas
+    const enrichedFotos: any[] = [];
     for (let i = 0; i < attachedPhotos.length; i++) {
       const ap = attachedPhotos[i];
-      let b64 = ap.base64;
-      if (!b64 && ap.uri_local && !ap.uri_local.startsWith('http')) {
+      const alreadySynced = ap.sync_status === 'synced' && ap.id < 2000000000 && Boolean(ap.url && (ap.url.includes('/uploads/') || ap.url.startsWith('http')));
+      let b64 = alreadySynced ? undefined : ap.base64;
+      if (!alreadySynced && !b64 && ap.uri_local && !ap.uri_local.startsWith('http')) {
         b64 = await readPhotoBase64(ap.uri_local).catch(() => undefined);
-        if (b64) ap.base64 = b64;
       }
       const fotoObj: FotoRelatorioExpress = {
         ...ap,
@@ -355,23 +356,22 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         relatorio_express_id: targetId,
         ordem: i,
         base64: b64,
-        sync_status: 'pending',
+        sync_status: alreadySynced ? 'synced' : 'pending',
       };
-      await saveLocalFotoExpress(fotoObj, 'pending');
+      await saveLocalFotoExpress(fotoObj, alreadySynced ? 'synced' : 'pending');
+      enrichedFotos.push({
+        ...ap,
+        id: ap.id,
+        relatorio_express_id: targetId,
+        ordem: i,
+        base64: b64,
+        imagem_base64: b64,
+      });
     }
 
     // Espelhamento online imediato do rascunho express com a nuvem (Railway)
     if (isOnline) {
       try {
-        const enrichedFotos = attachedPhotos.map((ap, i) => ({
-          ...ap,
-          id: ap.id,
-          relatorio_express_id: targetId,
-          ordem: i,
-          base64: ap.base64,
-          imagem_base64: ap.base64,
-        }));
-
         const expPayload = {
           ...expDraft,
           fotos: enrichedFotos,
@@ -397,6 +397,16 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               sync_status: 'synced',
             }, 'synced');
           }
+          const finalExpId = serverId || targetId;
+          const db = await getDatabase();
+          await db.runAsync(
+            "UPDATE fotos_relatorio_express SET sync_status = 'synced', base64 = '' WHERE relatorio_express_id = ? AND uri_local IS NOT NULL AND uri_local != ''",
+            [finalExpId]
+          ).catch(() => null);
+          for (const ap of attachedPhotos) {
+            ap.sync_status = 'synced';
+            ap.base64 = undefined;
+          }
         }
       } catch (cloudErr) {
         console.warn('[Express] Falha no autosave online do rascunho express (mantido local):', cloudErr);
@@ -407,7 +417,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     return targetId;
   }
 
-  // Autosave contínuo para Relatório Express: assim que abrir e preencher qualquer dado, entra como Rascunho no SQLite
+  // Autosave contínuo para Relatório Express (debounce de 3000ms)
   useEffect(() => {
     if (!modalVisible) return;
 
@@ -420,14 +430,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       } finally {
         setIsAutoSaving(false);
       }
-    }, 1500);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [
     modalVisible, titulo, numero, dataVisita, obraConstrutora, obraNome, obraEndereco, acompanhantes, observacoes,
     techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa,
     techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor,
-    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist, attachedPhotos
+    techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, checklist, attachedPhotos.length
   ]);
 
   async function handleClearDraft() {
@@ -732,25 +742,17 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               );
 
               const targetFotosDb = await getLocalFotosExpress(item.id);
-              const fotosPayload = await Promise.all((targetFotosDb || [])
-                .map(async (f, idx) => {
-                  let b64 = f.base64;
-                  if (!b64 && f.uri_local && !f.uri_local.startsWith('http')) {
-                    b64 = await readPhotoBase64(f.uri_local).catch(() => undefined);
-                  }
-                  return {
-                    id: f.id,
-                    filename: f.filename,
-                    uri_local: f.uri_local,
-                    url: f.url,
-                    base64: b64,
-                    imagem_base64: b64,
-                    titulo: f.titulo,
-                    legenda: f.legenda,
-                    anotacoes_dados: f.anotacoes_dados,
-                    ordem: (f.ordem !== undefined && f.ordem !== null) ? f.ordem : idx,
-                  };
-                }));
+              const fotosPayload = (targetFotosDb || []).map((f, idx) => ({
+                id: f.id,
+                filename: f.filename,
+                uri_local: f.uri_local,
+                url: f.url,
+                titulo: f.titulo,
+                legenda: f.legenda,
+                anotacoes_dados: f.anotacoes_dados,
+                ordem: (f.ordem !== undefined && f.ordem !== null) ? f.ordem : idx,
+                sync_status: f.sync_status,
+              }));
 
               await addToSyncQueue(
                 'relatorio_express',
@@ -766,8 +768,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               );
 
               if (isOnline) {
-                triggerSync();
-                syncService.syncAll().catch(() => null);
+                triggerSync(false).catch(() => null);
               }
               await loadReports();
               Alert.alert('Sucesso', `Relatório Express ${item.numero} enviado para aprovação!`);
@@ -1171,14 +1172,14 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       };
       await saveLocalRelatorioExpress(newExp, 'pending');
 
-      // 2. Salva todas as fotos no SQLite com base64 garantido
+      // 2. Salva todas as fotos no SQLite (sem reler base64 de fotos já sincronizadas)
       const savedFotosList: any[] = [];
       for (let i = 0; i < attachedPhotos.length; i++) {
         const ap = attachedPhotos[i];
-        let b64 = ap.base64;
-        if (!b64 && ap.uri_local && !ap.uri_local.startsWith('http')) {
+        const alreadySynced = ap.sync_status === 'synced' && ap.id < 2000000000 && Boolean(ap.url && (ap.url.includes('/uploads/') || ap.url.startsWith('http')));
+        let b64 = alreadySynced ? undefined : ap.base64;
+        if (!alreadySynced && !b64 && ap.uri_local && !ap.uri_local.startsWith('http')) {
           b64 = await readPhotoBase64(ap.uri_local).catch(() => undefined);
-          ap.base64 = b64;
         }
 
         const fotoObj: FotoRelatorioExpress = {
@@ -1187,22 +1188,21 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
           relatorio_express_id: expId,
           ordem: i,
           base64: b64,
-          sync_status: 'pending',
+          sync_status: alreadySynced ? 'synced' : 'pending',
         };
-        await saveLocalFotoExpress(fotoObj, 'pending');
+        await saveLocalFotoExpress(fotoObj, alreadySynced ? 'synced' : 'pending');
 
         savedFotosList.push({
           id: fotoObj.id,
           url: fotoObj.url,
           filename: fotoObj.filename,
           uri_local: fotoObj.uri_local,
-          base64: b64,
-          imagem_base64: b64,
           titulo: fotoObj.titulo || `Foto ${i + 1} - ${obraNome.trim() || 'Registro'}`,
           legenda: fotoObj.legenda || '',
           local: fotoObj.local || obraNome.trim(),
           anotacoes_dados: fotoObj.anotacoes_dados,
           ordem: i,
+          sync_status: fotoObj.sync_status,
         });
       }
 
@@ -1232,8 +1232,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       setLastAutoSaveTime(null);
 
       if (isOnline) {
-        triggerSync();
-        syncService.syncAll().catch(() => null);
+        triggerSync(false).catch(() => null);
       }
 
       setEditingReportId(null);

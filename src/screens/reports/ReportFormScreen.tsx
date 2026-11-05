@@ -301,10 +301,10 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   }, [selectedProjectId, techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco, techFormaAplicacaoArgamassa, techAcabamentosRevestimento, techAcabamentoPeitoris, techAcabamentoMuretas, techDefinicaoFrisosCor, techDefinicaoFaceInferiorAbas, techObservacoesFachada, techOutrasObservacoes, isOnline]);
 
   // Função central para persistência imediata de rascunho
-  const saveDraftImmediatelyInner = useCallback(async () => {
+  const saveDraftImmediatelyInner = useCallback(async (localOnly: boolean = false) => {
     if (hasSavedAndExitingRef.current) return;
     try {
-      setIsAutoSaving(true);
+      if (!localOnly) setIsAutoSaving(true);
       const rid = currentReportIdRef.current;
       if (!selectedProjectId) return; // nunca salva rascunho sem obra definida (evita vincular à obra errada)
       const proj = projetosRef.current.find(p => p.id === selectedProjectId) || (await getLocalProjetoById(selectedProjectId)) || undefined;
@@ -330,10 +330,8 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         };
         techInfoJson = JSON.stringify(infoPayload);
         await updateLocalProjetoInfoTecnica(selectedProjectId, infoPayload);
-        if (isOnline) {
+        if (!localOnly && isOnline) {
           apiClient.axios.put(`/api/projetos/${selectedProjectId}`, infoPayload).catch(() => null);
-        } else {
-          await addToSyncQueue('projeto', selectedProjectId, 'update', `/api/projetos/${selectedProjectId}`, 'PUT', infoPayload);
         }
       }
 
@@ -366,13 +364,20 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
       await saveLocalRelatorio(draftObj, 'pending');
 
       // 3. Persistir fotos atuais no SQLite (instantâneo, sem I/O pesado de disco)
+      let hasUnsyncedPhotos = false;
       for (let i = 0; i < fotos.length; i++) {
+        const isPhotoSynced = fotos[i].sync_status === 'synced' && fotos[i].id < 2000000000 && Boolean(fotos[i].url);
+        if (!isPhotoSynced) hasUnsyncedPhotos = true;
         await saveLocalFoto({
           ...fotos[i],
           relatorio_id: rid,
           relatorio_uuid: reportUuid,
           ordem: i,
-        }, fotos[i].sync_status === 'synced' ? 'synced' : 'pending');
+        }, isPhotoSynced ? 'synced' : 'pending');
+      }
+
+      if (localOnly) {
+        return;
       }
 
       // 4. Espelhamento online imediato do rascunho com a nuvem (Railway)
@@ -381,7 +386,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           const isServerId = rid > 0 && rid < 2000000000;
           const endpoint = isServerId ? `/api/relatorios/${rid}` : '/api/relatorios';
 
-          // Envia metadados leves das fotos no rascunho para não reenviar megabytes de base64
+          // Envia metadados leves das fotos no rascunho para não reenviar megabytes de base64 durante digitação
           const lightweightFotos = fotos.map((f, idx) => ({
             id: f.id,
             filename: f.filename,
@@ -393,33 +398,44 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
 
           const relPayload = {
             ...draftObj,
+            projeto_numero: proj?.numero,
+            uuid: reportUuid,
+            uuid_local: reportUuid,
+            autor_id: user?.id,
             fotos: lightweightFotos,
           };
 
           const res = isServerId
-            ? await apiClient.axios.put(endpoint, relPayload, { timeout: 8000 })
-            : await apiClient.axios.post(endpoint, relPayload, { timeout: 8000 });
+            ? await apiClient.axios.put(endpoint, relPayload, { timeout: 6000 })
+            : await apiClient.axios.post(endpoint, relPayload, { timeout: 6000 });
 
           if (res?.data?.id) {
             const serverId = Number(res.data.id);
             const serverNumero = res.data.numero;
+            // Se ainda há fotos novas aguardando upload de imagem, mantém 'pending' para o syncService enviá-las
+            const nextSyncStatus = hasUnsyncedPhotos ? 'pending' : 'synced';
             if (serverId && !isServerId) {
               currentReportIdRef.current = serverId;
               setCurrentReportId(serverId);
+              if (serverNumero && serverNumero !== reportNumber) {
+                setReportNumber(serverNumero);
+              }
               await migrateLocalFotosRelatorioId(rid, serverId, reportUuid);
+              const db = await getDatabase();
+              await db.runAsync('DELETE FROM relatorios WHERE id = ?', [rid]).catch(() => null);
               await saveLocalRelatorio({
                 ...draftObj,
                 id: serverId,
                 numero: serverNumero || draftObj.numero,
-                sync_status: 'synced',
+                sync_status: nextSyncStatus,
                 data_sincronizacao: new Date().toISOString()
-              }, 'synced');
+              }, nextSyncStatus);
             } else {
               await saveLocalRelatorio({
                 ...draftObj,
-                sync_status: 'synced',
+                sync_status: nextSyncStatus,
                 data_sincronizacao: new Date().toISOString()
-              }, 'synced');
+              }, nextSyncStatus);
             }
           }
         } catch (cloudErr) {
@@ -433,7 +449,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     } catch (e) {
       console.warn('Erro ao salvar rascunho imediatamente:', e);
     } finally {
-      setIsAutoSaving(false);
+      if (!localOnly) setIsAutoSaving(false);
     }
   }, [
     currentReportId, reportUuid, reportNumber, titulo, selectedProjectId,
@@ -446,7 +462,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   ]);
 
   const saveDraftImmediately = useCallback(
-    () => runSerialized(saveDraftImmediatelyInner),
+    (localOnly: boolean = false) => runSerialized(() => saveDraftImmediatelyInner(localOnly)),
     [runSerialized, saveDraftImmediatelyInner]
   );
 
@@ -464,30 +480,30 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
   useEffect(() => {
     if (!initialReportId && !initializedDraftRef.current && (selectedProjectId || projetos.length > 0)) {
       initializedDraftRef.current = true;
-      saveDraftImmediately();
+      saveDraftImmediately(false);
     }
   }, [selectedProjectId, initialReportId, projetos, saveDraftImmediately]);
 
-  // Intercepta qualquer saída da navegação (incluindo deslizar o dedo na tela, botão físico do Android ou botão voltar)
-  // Forçando salvamento e sincronização antes de trocar de janela
+  // Intercepta qualquer saída da navegação: salva no SQLite local instantaneamente (<5ms),
+  // libera a transição de tela sem travar e dispara a sincronização na nuvem em background
   useEffect(() => {
     const unsub = navigation.addListener('beforeRemove', (e: any) => {
       if (hasSavedAndExitingRef.current) return;
+      hasSavedAndExitingRef.current = true;
       e.preventDefault();
-      saveDraftImmediately().finally(() => {
-        hasSavedAndExitingRef.current = true;
-        const targetId = currentReportId || initialReportId;
+      saveDraftImmediately(true).finally(() => {
+        navigation.dispatch(e.data.action);
+        const targetId = currentReportIdRef.current || initialReportId;
         if (targetId && isOnline) {
           apiClient.axios
             .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
             .catch(() => null);
         }
-        if (isOnline) triggerSync();
-        navigation.dispatch(e.data.action);
+        if (isOnline) triggerSync(false).catch(() => null);
       });
     });
     return unsub;
-  }, [navigation, saveDraftImmediately, initialReportId, currentReportId, isOnline, user, triggerSync]);
+  }, [navigation, saveDraftImmediately, initialReportId, isOnline, user, triggerSync]);
 
   // Bloqueio Colaborativo: Impede entrar no relatório se outro usuário estiver preenchendo
   useEffect(() => {
@@ -735,140 +751,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     }
   }, [selectedProjectId, initialReportId, loadChecklistForProject]);
 
-  // Mecanismo de AutoSave a cada 2 segundos após parar de digitar (debounce de 2000ms conforme Regra do Manual)
+  // Mecanismo de AutoSave após parar de digitar (debounce de 3000ms)
   useEffect(() => {
     if (!selectedProjectId) return;
 
-    const timer = setTimeout(() => runSerialized(async () => {
-      if (hasSavedAndExitingRef.current) return;
-      try {
-        setIsAutoSaving(true);
-        const rid = currentReportIdRef.current;
-        const proj = projetosRef.current.find(p => p.id === selectedProjectId) || (await getLocalProjetoById(selectedProjectId)) || undefined;
-
-        // 0. Salva informações técnicas da obra no SQLite se houver obra selecionada
-        let techInfoJson: string | undefined = undefined;
-        if (selectedProjectId) {
-          const infoPayload = {
-            elementos_construtivos_base: techElementosBase.trim(),
-            especificacao_chapisco_colante: techChapiscoColante.trim(),
-            especificacao_chapisco_alvenaria: techChapiscoAlvenaria.trim(),
-            especificacao_argamassa_emboco: techArgamassaEmboco.trim(),
-            forma_aplicacao_argamassa: techFormaAplicacaoArgamassa.trim(),
-            acabamentos_revestimento: techAcabamentosRevestimento.trim(),
-            acabamento_peitoris: techAcabamentoPeitoris.trim(),
-            acabamento_muretas: techAcabamentoMuretas.trim(),
-            definicao_frisos_cor: techDefinicaoFrisosCor.trim(),
-            definicao_face_inferior_abas: techDefinicaoFaceInferiorAbas.trim(),
-            observacoes_projeto_fachada: techObservacoesFachada.trim(),
-            outras_observacoes: techOutrasObservacoes.trim(),
-          };
-          techInfoJson = JSON.stringify(infoPayload);
-          await updateLocalProjetoInfoTecnica(selectedProjectId, infoPayload);
-          if (isOnline) {
-            apiClient.axios.put(`/api/projetos/${selectedProjectId}`, infoPayload).catch(() => null);
-          } else {
-            await addToSyncQueue('projeto', selectedProjectId, 'update', `/api/projetos/${selectedProjectId}`, 'PUT', infoPayload);
-          }
-        }
-
-        const draft: Relatorio = {
-          id: rid,
-          uuid: reportUuid,
-          uuid_local: reportUuid,
-          data_criacao_local: new Date().toISOString(),
-          numero: reportNumber && reportNumber.startsWith('REL-') ? reportNumber : 'Rascunho',
-          titulo: titulo.trim() || 'Rascunho de Relatório',
-          projeto_id: selectedProjectId,
-          projeto_nome: proj?.nome || 'Obra',
-          visita_id: preSelectedVisitId || null,
-          autor_id: user?.id || 1,
-          autor_nome: user?.nome_completo || user?.username || 'Responsável',
-          data_relatorio: brToISO(dataVisita),
-          descricao: descricao.trim(),
-          observacoes_finais: observacoesFinais.trim(),
-          informacoes_tecnicas: techInfoJson,
-          checklist_data: JSON.stringify(checklist),
-          acompanhantes: JSON.stringify(acompanhantesList),
-          categoria: categoria,
-          local: local,
-          status: originalStatusRef.current as any,
-          sync_status: 'pending',
-        };
-
-        // 1. Salva SEMPRE no SQLite local primeiro (garantia de persistência offline)
-        await saveLocalRelatorio(draft, 'pending');
-
-        // 2. Persistir fotos no SQLite (rápido, sem ler disco repetidamente)
-        for (let i = 0; i < fotos.length; i++) {
-          await saveLocalFoto({
-            ...fotos[i],
-            relatorio_id: rid,
-            relatorio_uuid: reportUuid,
-            ordem: i,
-          }, fotos[i].sync_status === 'synced' ? 'synced' : 'pending');
-        }
-
-        // 3. Sincronização em tempo real com o servidor Railway se conectado
-        if (isOnline) {
-          try {
-            const isServerId = rid > 0 && rid < 2000000000;
-            const lightweightFotos = fotos.map((f, idx) => ({
-              id: f.id,
-              filename: f.filename,
-              legenda: f.legenda,
-              local: f.local,
-              ordem: idx,
-              url: f.url,
-            }));
-
-            if (isServerId) {
-              await apiClient.axios.put(`/api/relatorios/${rid}`, {
-                ...draft,
-                autor_id: user?.id,
-                fotos: lightweightFotos,
-              }, { timeout: 8000 });
-              await saveLocalRelatorio({ ...draft, sync_status: 'synced' }, 'synced');
-            } else {
-              const res = await apiClient.axios.post('/api/relatorios', {
-                ...draft,
-                projeto_numero: proj?.numero,
-                uuid: reportUuid,
-                uuid_local: reportUuid,
-                autor_id: user?.id,
-                fotos: lightweightFotos,
-              }, { timeout: 8000 });
-
-              if (res?.data?.id) {
-                const serverId = Number(res.data.id);
-                const serverNumero = res.data.numero || draft.numero;
-                const oldId = rid;
-                currentReportIdRef.current = serverId;
-                setCurrentReportId(serverId);
-                if (serverNumero && serverNumero !== reportNumber) {
-                  setReportNumber(serverNumero);
-                }
-                if (oldId !== serverId) {
-                  await migrateLocalFotosRelatorioId(oldId, serverId, reportUuid);
-                  const db = await getDatabase();
-                  await db.runAsync('DELETE FROM relatorios WHERE id = ?', [oldId]);
-                }
-                await saveLocalRelatorio({ ...draft, id: serverId, numero: serverNumero, sync_status: 'synced' }, 'synced');
-              }
-            }
-          } catch (netSaveErr) {
-            console.warn('[ReportForm] AutoSave online aviso (continuando offline):', netSaveErr);
-          }
-        }
-
-        const d = new Date();
-        setLastSavedTime(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      } catch (err) {
-        console.warn('Erro ao salvar rascunho automático em tempo real:', err);
-      } finally {
-        setIsAutoSaving(false);
-      }
-    }), 3000);
+    const timer = setTimeout(() => {
+      saveDraftImmediately(false);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [
@@ -877,7 +766,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
     techElementosBase, techChapiscoColante, techChapiscoAlvenaria, techArgamassaEmboco,
     techFormaAplicacaoArgamassa, techAcabamentosRevestimento, techAcabamentoPeitoris,
     techAcabamentoMuretas, techDefinicaoFrisosCor, techDefinicaoFaceInferiorAbas,
-    techObservacoesFachada, techOutrasObservacoes
+    techObservacoesFachada, techOutrasObservacoes, saveDraftImmediately
   ]);
 
   async function handleAddPhotoCamera() {
@@ -1175,11 +1064,13 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         }
       }
 
-      // 2. Save all Photos to SQLite
+      // 2. Save all Photos to SQLite & prepare payload (read base64 only for photos not yet on server)
+      const preparedFotos: any[] = [];
       for (let i = 0; i < fotos.length; i++) {
         const f = fotos[i];
-        let b64 = f.base64;
-        if (!b64 && f.uri_local && !f.uri_local.startsWith('http')) {
+        const alreadyOnServer = f.sync_status === 'synced' && f.id < 2000000000 && Boolean(f.url && (f.url.includes('/uploads/') || f.url.startsWith('http')));
+        let b64 = alreadyOnServer ? undefined : f.base64;
+        if (!alreadyOnServer && !b64 && f.uri_local && !f.uri_local.startsWith('http')) {
           b64 = await readPhotoBase64(f.uri_local).catch(() => undefined);
         }
         await saveLocalFoto({
@@ -1188,23 +1079,24 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           relatorio_uuid: reportUuid,
           ordem: i,
           base64: b64,
-        }, 'pending');
+        }, alreadyOnServer ? 'synced' : 'pending');
+        preparedFotos.push({
+          ...f,
+          relatorio_id: reportId,
+          relatorio_uuid: reportUuid,
+          ordem: i,
+          base64: b64,
+          imagem_base64: b64,
+        });
       }
 
       // 3. Sincronização ou enfileiramento inteligente
       let savedNumero = finalReportNumber;
       const isServerId = reportId > 0 && reportId < 2000000000;
-      const preparedFotos = fotos.map((f, i) => ({
-        ...f,
-        relatorio_id: reportId,
-        relatorio_uuid: reportUuid,
-        ordem: i,
-        imagem_base64: f.base64,
-      }));
-      const relPayload: any = { 
+      const queueSafePayload: any = { 
         ...relData, 
         projeto_numero: projForSave?.numero,
-        fotos: preparedFotos,
+        fotos: preparedFotos.map(({ base64, imagem_base64, ...rest }) => rest),
       };
 
       if (isOnline) {
@@ -1214,7 +1106,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               ...relData,
               autor_id: user?.id,
               fotos: preparedFotos,
-            }, { timeout: 12000 });
+            }, { timeout: 10000 });
             await saveLocalRelatorio({ ...relData, sync_status: 'synced' }, 'synced');
             if (res?.data?.fotos && Array.isArray(res.data.fotos)) {
               for (const sf of res.data.fotos) {
@@ -1238,7 +1130,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
               uuid_local: reportUuid,
               autor_id: user?.id,
               fotos: preparedFotos,
-            }, { timeout: 12000 });
+            }, { timeout: 10000 });
 
             if (res?.data?.id) {
               const serverId = res.data.id;
@@ -1272,8 +1164,9 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             isServerId ? 'update' : 'create',
             isServerId ? `/api/relatorios/${reportId}` : '/api/relatorios',
             isServerId ? 'PUT' : 'POST',
-            relPayload
+            queueSafePayload
           );
+          triggerSync(false).catch(() => null);
         }
       } else {
         await addToSyncQueue(
@@ -1282,7 +1175,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
           isServerId ? 'update' : 'create',
           isServerId ? `/api/relatorios/${reportId}` : '/api/relatorios',
           isServerId ? 'PUT' : 'POST',
-          relPayload
+          queueSafePayload
         );
       }
 
@@ -1383,16 +1276,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
         title="Relatório de Obra" 
         subtitle={reportNumber} 
         showBack 
-        onBack={async () => {
-          await saveDraftImmediately();
-          const targetId = currentReportId || initialReportId;
-          if (targetId && isOnline) {
-            apiClient.axios
-              .post(`/api/relatorios/${targetId}/unlock`, { user_id: user?.id }, { timeout: 3000 })
-              .catch(() => null);
-          }
-          navigation.goBack();
-        }} 
+        onBack={() => navigation.goBack()} 
         rightAction={
           <TouchableOpacity
             style={styles.deleteHeaderBtn}

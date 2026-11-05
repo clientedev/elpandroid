@@ -219,7 +219,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   async function handleManualSync() {
     setLoadingSync(true);
     try {
-      const res = await triggerSync();
+      const res = await triggerSync(true);
       await loadDiagnostics();
       if (res && res.success) {
         Alert.alert('Sincronização Concluída ✅', res.message || 'Dados sincronizados com o servidor Railway com sucesso!');
