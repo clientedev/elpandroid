@@ -9,10 +9,11 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { SyncStatusBadge } from '../../components/SyncStatusBadge';
 import { 
   getLocalRelatorios, updateLocalRelatorioStatus, addToSyncQueue,
-  getLocalFotos, saveBatchChecklistProgressoObra,
+  getLocalFotos, getLocalFotosExpress, saveBatchChecklistProgressoObra,
   getLocalRelatoriosExpress, updateLocalRelatorioExpressStatus
 } from '../../database/db';
 import { generateReportPDF } from '../../services/pdfService';
+import { syncService } from '../../services/syncService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Relatorio } from '../../types';
@@ -67,6 +68,12 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
 
   useEffect(() => {
     loadPending();
+    const unsub = syncService.subscribe((state) => {
+      if (state === 'idle') {
+        loadPending();
+      }
+    });
+    return () => unsub();
   }, [loadPending]);
 
   async function handleConfirmAction() {
@@ -78,36 +85,21 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
 
     try {
       const isExpress = (selectedReport as any).is_express;
+      const effectiveComment = comment.trim() || (modalAction === 'Aprovado' ? 'Relatório aprovado em conformidade técnica.' : 'Necessita correções');
       if (isExpress) {
-        await updateLocalRelatorioExpressStatus(
+        await syncService.syncExpressReportApprovalNow(
           selectedReport.id,
+          selectedReport.numero,
           modalAction,
-          comment.trim(),
+          effectiveComment,
           user?.id,
-          user?.username,
-          'pending'
-        );
-
-        await addToSyncQueue(
-          'relatorio_express',
-          selectedReport.id,
-          modalAction === 'Aprovado' ? 'approve' : 'reject',
-          '/api/relatorios-express',
-          'POST',
-          {
-            id: selectedReport.id,
-            numero: selectedReport.numero,
-            status: modalAction,
-            comentario: comment.trim(),
-            comentario_aprovacao: comment.trim(),
-            aprovador_id: user?.id,
-          }
+          user?.nome_completo || user?.username
         );
       } else {
         await updateLocalRelatorioStatus(
           selectedReport.id,
           modalAction,
-          comment.trim(),
+          effectiveComment,
           user?.id,
           user?.username,
           'pending'
@@ -119,13 +111,14 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
           modalAction === 'Aprovado' ? 'approve' : 'reject',
           `/api/relatorios/${selectedReport.id}/status`,
           'POST',
-          { status: modalAction, comentario: comment.trim(), aprovador_id: user?.id }
+          { status: modalAction, comentario: effectiveComment, aprovador_id: user?.id }
         );
+        if (isOnline) triggerSync();
       }
 
       // Se for aprovado, salva histórico do checklist e PDF em background
       if (modalAction === 'Aprovado') {
-        if (selectedReport.checklist_data) {
+        if (selectedReport.checklist_data && selectedReport.projeto_id) {
           try {
             const chkItems = typeof selectedReport.checklist_data === 'string'
               ? JSON.parse(selectedReport.checklist_data)
@@ -151,12 +144,29 @@ export const ApprovalDashboardScreen: React.FC<{ navigation: any }> = ({ navigat
         }
 
         // Gera PDF em segundo plano sem travar nem exibir alertas modais
-        getLocalFotos(selectedReport.id, selectedReport.uuid)
-          .then(fotos => generateReportPDF({ ...selectedReport, status: 'Aprovado' }, fotos))
-          .catch(() => null);
+        if (isExpress) {
+          getLocalFotosExpress(selectedReport.id)
+            .then(fotosExp => {
+              const mappedFotos: any[] = (fotosExp || []).map(ef => ({
+                id: ef.id,
+                relatorio_id: ef.relatorio_express_id,
+                uri_local: ef.uri_local,
+                url: ef.url,
+                base64: ef.base64,
+                titulo: ef.titulo,
+                legenda: ef.legenda,
+                ordem: ef.ordem,
+                anotacoes_dados: ef.anotacoes_dados,
+              }));
+              return generateReportPDF({ ...selectedReport, status: 'Aprovado' }, mappedFotos);
+            })
+            .catch(() => null);
+        } else {
+          getLocalFotos(selectedReport.id, selectedReport.uuid)
+            .then(fotos => generateReportPDF({ ...selectedReport, status: 'Aprovado' }, fotos))
+            .catch(() => null);
+        }
       }
-
-      if (isOnline) triggerSync();
 
       setShowModal(false);
       setComment('');

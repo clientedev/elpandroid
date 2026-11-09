@@ -732,44 +732,12 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
               }
 
               setLoading(true);
-              await updateLocalRelatorioExpressStatus(
+              await syncService.syncExpressReportApprovalNow(
                 item.id,
+                item.numero,
                 'Aguardando Aprovação',
-                '',
-                undefined,
-                undefined,
-                'pending'
+                ''
               );
-
-              const targetFotosDb = await getLocalFotosExpress(item.id);
-              const fotosPayload = (targetFotosDb || []).map((f, idx) => ({
-                id: f.id,
-                filename: f.filename,
-                uri_local: f.uri_local,
-                url: f.url,
-                titulo: f.titulo,
-                legenda: f.legenda,
-                anotacoes_dados: f.anotacoes_dados,
-                ordem: (f.ordem !== undefined && f.ordem !== null) ? f.ordem : idx,
-                sync_status: f.sync_status,
-              }));
-
-              await addToSyncQueue(
-                'relatorio_express',
-                item.id,
-                'update',
-                '/api/relatorios-express',
-                'POST',
-                {
-                  ...item,
-                  status: 'Aguardando Aprovação',
-                  fotos: fotosPayload,
-                }
-              );
-
-              if (isOnline) {
-                triggerSync(false).catch(() => null);
-              }
               await loadReports();
               Alert.alert('Sucesso', `Relatório Express ${item.numero} enviado para aprovação!`);
             } catch (e: any) {
@@ -808,34 +776,16 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
     try {
       const approverName = user?.nome_completo || user?.username || 'Responsável Técnico';
       const comment = approvalComment.trim() || (approvalAction === 'Aprovado' ? 'Relatório aprovado em conformidade técnica.' : 'Necessita correções');
-      
-      await updateLocalRelatorioExpressStatus(
+
+      await syncService.syncExpressReportApprovalNow(
         reportToApprove.id,
+        reportToApprove.numero,
         approvalAction,
         comment,
         user?.id,
-        approverName,
-        'pending'
+        approverName
       );
 
-      await addToSyncQueue(
-        'relatorio_express',
-        reportToApprove.id,
-        approvalAction === 'Aprovado' ? 'approve' : 'reject',
-        '/api/relatorios-express',
-        'POST',
-        {
-          id: reportToApprove.id,
-          numero: reportToApprove.numero,
-          status: approvalAction,
-          comentario: comment,
-          comentario_aprovacao: comment,
-          aprovador_id: user?.id,
-          aprovador_nome: approverName,
-        }
-      );
-
-      if (isOnline) triggerSync();
       setApprovalModalVisible(false);
       const affectedNum = reportToApprove.numero;
       setReportToApprove(null);

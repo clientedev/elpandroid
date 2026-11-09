@@ -3,12 +3,12 @@ import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import * as FileSystem from 'expo-file-system/legacy';
 import { apiClient } from './api';
 import { readPhotoBase64 } from './imageService';
-import { 
-  getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue, getPendingSyncCount,
-  saveLocalProjeto, saveLocalVisita, saveLocalRelatorio, 
-  saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato, 
-  getLocalFotos, saveLocalFoto, 
-  getLocalFotosExpress, saveLocalFotoExpress,
+import {
+  getPendingSyncQueue, updateSyncQueueItem, clearCompletedSyncQueue, getPendingSyncCount, addToSyncQueue,
+  saveLocalProjeto, saveLocalVisita, saveLocalRelatorio,
+  saveLocalRelatorioExpress, saveLocalLembrete, saveLocalContato,
+  getLocalFotos, saveLocalFoto,
+  getLocalFotosExpress, saveLocalFotoExpress, getLocalRelatorioExpressById, updateLocalRelatorioExpressStatus,
   updateLocalRelatorioNumero, migrateLocalFotosRelatorioId, migrateLocalFotosRelatorioExpressId, getDatabase,
   getLocalProjetos, getLocalRelatorios, getLocalRelatorioById, getLocalVisitas, deleteLocalProjetoCascade,
   getDeletedEntityIds, clearDeletedEntityLocally, migrateLocalProjetoId, migrateLocalVisitaId, saveLocalVisitante, saveLocalUsers
@@ -122,6 +122,142 @@ class SyncService {
   }
 
   /**
+   * Atualiza o status (Aprovado/Rejeitado) de um Relatório Express localmente
+   * e tenta sincronizar imediatamente com a nuvem se online, caindo para a fila offline apenas se necessário.
+   */
+  async syncExpressReportApprovalNow(
+    id: number,
+    numero: string | undefined,
+    status: string,
+    comentario: string,
+    aprovadorId?: number,
+    aprovadorNome?: string
+  ): Promise<boolean> {
+    const updatedRow = await updateLocalRelatorioExpressStatus(
+      id,
+      status,
+      comentario,
+      aprovadorId,
+      aprovadorNome,
+      'pending',
+      numero
+    );
+
+    const effectiveId = updatedRow?.id || id;
+    const effectiveNumero = updatedRow?.numero || numero || '';
+    const fullPayload: any = {
+      ...(updatedRow || {}),
+      id: effectiveId,
+      numero: effectiveNumero,
+      status,
+      comentario,
+      comentario_aprovacao: comentario,
+      aprovador_id: aprovadorId,
+      aprovador_nome: aprovadorNome,
+    };
+
+    try {
+      const online = await this.isOnline();
+      if (online) {
+        // Se o relatório ainda tinha ID provisório ou fotos pendentes, anexa fotos não sincronizadas
+        const fotosExp = await getLocalFotosExpress(effectiveId);
+        if (fotosExp && fotosExp.length > 0) {
+          fullPayload.fotos = await Promise.all(
+            fotosExp.map(async (f: any) => {
+              const alreadyOnServer = f.sync_status === 'synced' && f.id < 2000000000 && f.url && f.url.length > 4;
+              if (alreadyOnServer) {
+                return {
+                  id: f.id,
+                  relatorio_express_id: f.relatorio_express_id,
+                  filename: f.filename,
+                  url: f.url,
+                  titulo: f.titulo,
+                  legenda: f.legenda,
+                  descricao: f.descricao,
+                  local: f.local,
+                  ordem: f.ordem,
+                  anotacoes_dados: f.anotacoes_dados,
+                };
+              }
+              let base64Data = f.base64 || f.imagem_base64;
+              if (!base64Data && f.uri_local && !f.uri_local.startsWith('http')) {
+                base64Data = await readPhotoBase64(f.uri_local).catch(() => undefined);
+              }
+              return {
+                ...f,
+                base64: base64Data,
+                imagem_base64: base64Data,
+              };
+            })
+          );
+        }
+
+        const res = await apiClient.axios.post('/api/relatorios-express/sync', fullPayload, { timeout: 12000 });
+        if (res && (res.status === 200 || res.status === 201)) {
+          const serverId = Number(res.data?.id) || effectiveId;
+          const officialNumero = res.data?.numero || effectiveNumero;
+          const db = await getDatabase();
+
+          if (serverId && serverId !== effectiveId) {
+            await migrateLocalFotosRelatorioExpressId(effectiveId, serverId);
+            const existingTempRow = await db.getFirstAsync<{ id: number }>(
+              'SELECT id FROM relatorios_express WHERE id = ?',
+              [effectiveId]
+            );
+            if (existingTempRow) {
+              await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
+              await db.runAsync(
+                'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), status = ?, comentario_aprovacao = ?, sync_status = "synced", updated_at = ? WHERE id = ?',
+                [serverId, officialNumero || null, status, comentario, new Date().toISOString(), effectiveId]
+              );
+            } else {
+              await db.runAsync(
+                'UPDATE relatorios_express SET numero = COALESCE(?, numero), status = ?, comentario_aprovacao = ?, sync_status = "synced", updated_at = ? WHERE id = ?',
+                [officialNumero || null, status, comentario, new Date().toISOString(), serverId]
+              );
+            }
+          } else {
+            await db.runAsync(
+              'UPDATE relatorios_express SET status = ?, comentario_aprovacao = ?, sync_status = "synced", updated_at = ? WHERE id = ? OR (numero IS NOT NULL AND numero != "" AND numero = ?)',
+              [status, comentario, new Date().toISOString(), serverId, officialNumero]
+            );
+          }
+
+          await db.runAsync(
+            "UPDATE fotos_relatorio_express SET sync_status = 'synced', base64 = '' WHERE relatorio_express_id = ? AND ((uri_local IS NOT NULL AND uri_local != '') OR (url IS NOT NULL AND url != ''))",
+            [serverId]
+          ).catch(() => null);
+
+          await db.runAsync(
+            "UPDATE sync_queue SET status = 'completed' WHERE entity_type = 'relatorio_express' AND (entity_id = ? OR entity_id = ?)",
+            [effectiveId, serverId]
+          ).catch(() => null);
+
+          const pending = await this.getPendingCount();
+          this.notify('idle', pending);
+          return true;
+        }
+      }
+    } catch (directErr: any) {
+      console.warn('[SyncService] Envio direto da aprovação express falhou, enfileirando:', directErr?.message);
+    }
+
+    await addToSyncQueue(
+      'relatorio_express',
+      effectiveId,
+      status === 'Aprovado' ? 'approve' : 'reject',
+      '/api/relatorios-express/sync',
+      'POST',
+      fullPayload
+    );
+
+    const pending = await this.getPendingCount();
+    this.notify('idle', pending);
+    this.syncAll(false).catch(() => null);
+    return false;
+  }
+
+  /**
    * Main synchronization routine:
    * Works 100% offline first, pushes pending local SQLite items to Railway,
    * and pulls remote records down to SQLite.
@@ -137,14 +273,14 @@ class SyncService {
     try {
       const db = await getDatabase();
       await db.runAsync("UPDATE sync_queue SET status = 'pending' WHERE status IN ('processing', 'failed');");
-    } catch {}
+    } catch { }
 
     let online = await this.isOnline();
     if (!online && manual) {
       try {
         const ping = await apiClient.axios.get('/api/ping', { timeout: 4000 });
         if (ping.status === 200) online = true;
-      } catch {}
+      } catch { }
     }
 
     if (!online) {
@@ -152,9 +288,9 @@ class SyncService {
       this.hasNotifiedOfflineSyncDone = false;
       const pending = await this.getPendingCount();
       this.notify('offline', pending);
-      return { 
-        success: false, 
-        message: 'Dispositivo sem internet. Dados salvos 100% no celular e serão sincronizados automaticamente assim que conectar à rede.' 
+      return {
+        success: false,
+        message: 'Dispositivo sem internet. Dados salvos 100% no celular e serão sincronizados automaticamente assim que conectar à rede.'
       };
     }
 
@@ -182,8 +318,15 @@ class SyncService {
           const entityKey = `${item.entity_type}_${item.entity_id}`;
           const uuidKey = payload.uuid ? `${item.entity_type}_uuid_${payload.uuid}` : '';
 
-          // Deduplicação: se a mesma entidade já foi processada neste lote, conclui o item redundante
-          if (syncedEntitiesInBatch.has(entityKey) || (uuidKey && syncedEntitiesInBatch.has(uuidKey))) {
+          // Deduplicação: nunca pular ações críticas de aprovação/rejeição/status ou exclusão
+          const isStatusOrDeleteAction =
+            item.action === 'approve' ||
+            item.action === 'reject' ||
+            item.action === 'update_status' ||
+            item.action === 'delete' ||
+            item.method === 'DELETE';
+
+          if (!isStatusOrDeleteAction && (syncedEntitiesInBatch.has(entityKey) || (uuidKey && syncedEntitiesInBatch.has(uuidKey)))) {
             console.log(`[SyncService] Pulando item redundante na fila já processado: ${entityKey}`);
             await updateSyncQueueItem(item.id, 'completed');
             continue;
@@ -203,7 +346,7 @@ class SyncService {
             }
             if (localRel) {
               payload.projeto_id = localRel.projeto_id;
-              if (localRel.id < 2000000000 && localRel.sync_status === 'synced' && item.method === 'POST') {
+              if (localRel.id < 2000000000 && localRel.sync_status === 'synced' && item.method === 'POST' && item.endpoint === '/api/relatorios') {
                 item.method = 'PUT';
                 item.endpoint = `/api/relatorios/${localRel.id}`;
               }
@@ -252,6 +395,33 @@ class SyncService {
 
           if (item.entity_type === 'relatorio_express' && item.method !== 'DELETE') {
             try {
+              const localExp = await getLocalRelatorioExpressById(item.entity_id, payload.numero);
+              if (localExp) {
+                const effectiveStatus =
+                  (localExp.status === 'Aprovado' || localExp.status === 'Rejeitado')
+                    ? localExp.status
+                    : (payload.status || localExp.status);
+                const effectiveComment =
+                  payload.comentario_aprovacao || payload.comentario || localExp.comentario_aprovacao || '';
+                const effectiveAprovadorId =
+                  payload.aprovador_id || localExp.aprovador_id || undefined;
+                const effectiveAprovadorNome =
+                  payload.aprovador_nome || localExp.aprovador_nome || undefined;
+
+                payload = {
+                  ...localExp,
+                  ...payload,
+                  id: localExp.id,
+                  numero: localExp.numero || payload.numero,
+                  status: effectiveStatus,
+                  comentario: effectiveComment,
+                  comentario_aprovacao: effectiveComment,
+                  aprovador_id: effectiveAprovadorId,
+                  aprovador_nome: effectiveAprovadorNome,
+                };
+                item.entity_id = localExp.id;
+              }
+
               let fotosExp = await getLocalFotosExpress(item.entity_id);
               if (!fotosExp || fotosExp.length === 0) {
                 fotosExp = payload.fotos || [];
@@ -374,14 +544,32 @@ class SyncService {
 
             if (serverId && serverId !== item.entity_id) {
               await migrateLocalFotosRelatorioExpressId(item.entity_id, serverId);
-              await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
-              await db.runAsync(
-                'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
-                [serverId, officialNumero || null, new Date().toISOString(), item.entity_id]
+              const existingTempRow = await db.getFirstAsync<{ id: number }>(
+                'SELECT id FROM relatorios_express WHERE id = ?',
+                [item.entity_id]
               );
+              if (existingTempRow) {
+                await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
+                await db.runAsync(
+                  'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
+                  [serverId, officialNumero || null, new Date().toISOString(), item.entity_id]
+                );
+              } else {
+                await db.runAsync(
+                  'UPDATE relatorios_express SET numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
+                  [officialNumero || null, new Date().toISOString(), serverId]
+                );
+              }
+              await db.runAsync(
+                "UPDATE sync_queue SET entity_id = ? WHERE entity_type = 'relatorio_express' AND entity_id = ? AND status = 'pending'",
+                [serverId, item.entity_id]
+              ).catch(() => null);
               console.log(`[SyncService] Relatório Express local ${item.entity_id} migrado para ID servidor ${serverId}`);
             } else {
-              await db.runAsync('UPDATE relatorios_express SET sync_status = "synced" WHERE id = ?', [item.entity_id]);
+              await db.runAsync(
+                'UPDATE relatorios_express SET sync_status = "synced", updated_at = ? WHERE id = ? OR (numero IS NOT NULL AND numero != "" AND numero = ?)',
+                [new Date().toISOString(), targetExpId, officialNumero || payload.numero || '']
+              );
             }
             await db.runAsync(
               "UPDATE fotos_relatorio_express SET sync_status = 'synced', base64 = '' WHERE relatorio_express_id = ? AND ((uri_local IS NOT NULL AND uri_local != '') OR (url IS NOT NULL AND url != ''))",
@@ -438,10 +626,10 @@ class SyncService {
 
             const isTemp = lp.id >= 2000000000;
             const endpoint = isTemp ? '/api/projetos' : `/api/projetos/${lp.id}`;
-            
+
             let contatosArr = [];
             if (typeof lp.contatos === 'string') {
-              try { contatosArr = JSON.parse(lp.contatos); } catch {}
+              try { contatosArr = JSON.parse(lp.contatos); } catch { }
             } else if (Array.isArray(lp.contatos)) {
               contatosArr = lp.contatos;
             }
@@ -452,7 +640,7 @@ class SyncService {
 
             let pRes: any;
             try {
-              pRes = isTemp 
+              pRes = isTemp
                 ? await apiClient.axios.post(endpoint, projPayload, { timeout: 12000 })
                 : await apiClient.axios.put(endpoint, projPayload, { timeout: 12000 });
             } catch (firstErr: any) {
@@ -463,7 +651,7 @@ class SyncService {
                 throw firstErr;
               }
             }
-            
+
             if (pRes?.data?.id) {
               const serverId = Number(pRes.data.id);
               const serverNumero = pRes.data.numero || lp.numero;
@@ -686,23 +874,52 @@ class SyncService {
             const serverId = expRes?.data?.id || exp.id;
             const officialNumero = expRes?.data?.numero;
 
+            // Verifica se o status mudou localmente (ex: aprovado pelo Admin enquanto o upload ocorria)
+            const latestLocal = await db.getFirstAsync<{ status: string }>(
+              'SELECT status FROM relatorios_express WHERE id = ? OR id = ?',
+              [exp.id, serverId]
+            );
+            const statusChangedDuringSync = Boolean(latestLocal && latestLocal.status !== exp.status);
+            const nextSyncStatus = statusChangedDuringSync ? 'pending' : 'synced';
+            if (statusChangedDuringSync) {
+              this.pendingResync = true;
+            }
+
             if (isTemp && serverId && serverId !== exp.id) {
               syncedEntitiesInBatch.add(`relatorio_express_${serverId}`);
               await migrateLocalFotosRelatorioExpressId(exp.id, serverId);
-              await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
-              await db.runAsync(
-                'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = "synced", updated_at = ? WHERE id = ?',
-                [serverId, officialNumero || null, new Date().toISOString(), exp.id]
+              const existingTempRow = await db.getFirstAsync<{ id: number }>(
+                'SELECT id FROM relatorios_express WHERE id = ?',
+                [exp.id]
               );
+              if (existingTempRow) {
+                await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [serverId]);
+                await db.runAsync(
+                  'UPDATE relatorios_express SET id = ?, numero = COALESCE(?, numero), sync_status = ?, updated_at = ? WHERE id = ?',
+                  [serverId, officialNumero || null, nextSyncStatus, new Date().toISOString(), exp.id]
+                );
+              } else {
+                await db.runAsync(
+                  'UPDATE relatorios_express SET numero = COALESCE(?, numero), sync_status = ?, updated_at = ? WHERE id = ?',
+                  [officialNumero || null, nextSyncStatus, new Date().toISOString(), serverId]
+                );
+              }
+              // Atualiza o entity_id de itens pendentes de aprovação/rejeição sem descartá-los
               await db.runAsync(
-                "UPDATE sync_queue SET status = 'completed' WHERE entity_type = 'relatorio_express' AND (entity_id = ? OR entity_id = ?)",
-                [exp.id, serverId]
+                "UPDATE sync_queue SET entity_id = ? WHERE entity_type = 'relatorio_express' AND entity_id = ? AND status = 'pending'",
+                [serverId, exp.id]
               ).catch(() => null);
+              if (!statusChangedDuringSync) {
+                await db.runAsync(
+                  "UPDATE sync_queue SET status = 'completed' WHERE entity_type = 'relatorio_express' AND (entity_id = ? OR entity_id = ?) AND action NOT IN ('approve', 'reject', 'update_status')",
+                  [exp.id, serverId]
+                ).catch(() => null);
+              }
               console.log(`[SyncService] Proativo: Relatório Express local ${exp.id} migrado para ID servidor ${serverId}`);
             } else {
               await db.runAsync(
-                'UPDATE relatorios_express SET sync_status = "synced", updated_at = ? WHERE id = ?',
-                [new Date().toISOString(), exp.id]
+                'UPDATE relatorios_express SET sync_status = ?, updated_at = ? WHERE id = ?',
+                [nextSyncStatus, new Date().toISOString(), exp.id]
               );
             }
             if (serverId) {
@@ -732,7 +949,7 @@ class SyncService {
       pendingCount = await this.getPendingCount();
       this.notify('idle', pendingCount);
 
-      const msg = processedCount > 0 
+      const msg = processedCount > 0
         ? `Sincronização concluída! ${processedCount} alteração(ões) enviada(s) com sucesso para o servidor.`
         : 'Sincronização concluída! Todos os dados estão atualizados no servidor.';
 
@@ -929,8 +1146,8 @@ class SyncService {
             }
 
             for (const f of r.fotos) {
-              const fullUrl = f.url?.startsWith('http') 
-                ? f.url 
+              const fullUrl = f.url?.startsWith('http')
+                ? f.url
                 : `https://elpandroid-production.up.railway.app${f.url?.startsWith('/') ? '' : '/'}${f.url}`;
               let targetUri = fullUrl;
               const existingFoto = localFotoById.get(f.id) || (f.filename ? localFotoByFilename.get(f.filename) : undefined);
@@ -982,18 +1199,40 @@ class SyncService {
         const serverExpress = expressRes.data;
         const serverExpressIds = new Set(serverExpress.map((exp: any) => exp.id));
 
-        const localExpress = await db.getAllAsync<{ id: number; sync_status: string }>('SELECT id, sync_status FROM relatorios_express');
+        const localExpress = await db.getAllAsync<{ id: number; numero?: string; sync_status: string }>(
+          'SELECT id, numero, sync_status FROM relatorios_express'
+        );
+        const pendingExpressQueue = await db.getAllAsync<{ entity_id: number; payload: string }>(
+          "SELECT entity_id, payload FROM sync_queue WHERE entity_type = 'relatorio_express' AND status IN ('pending', 'processing')"
+        ).catch(() => []);
+
         const pendingExpressIds = new Set<number>();
+        const pendingExpressNumeros = new Set<string>();
+
         for (const le of localExpress) {
-          if (le.sync_status === 'pending') pendingExpressIds.add(le.id);
+          if (le.sync_status === 'pending') {
+            pendingExpressIds.add(le.id);
+            if (le.numero) pendingExpressNumeros.add(le.numero.trim().toUpperCase());
+          }
           if (le.sync_status === 'synced' && le.id < 2000000000 && !serverExpressIds.has(le.id)) {
             await db.runAsync('DELETE FROM fotos_relatorio_express WHERE relatorio_express_id = ?;', [le.id]);
             await db.runAsync('DELETE FROM relatorios_express WHERE id = ?;', [le.id]);
           }
         }
+        for (const pq of pendingExpressQueue) {
+          if (pq.entity_id) pendingExpressIds.add(Number(pq.entity_id));
+          try {
+            const parsed = JSON.parse(pq.payload || '{}');
+            if (parsed.id) pendingExpressIds.add(Number(parsed.id));
+            if (parsed.numero) pendingExpressNumeros.add(String(parsed.numero).trim().toUpperCase());
+          } catch {}
+        }
 
         for (const exp of serverExpress) {
-          if (pendingExpressIds.has(exp.id)) continue;
+          const expNumNorm = exp.numero ? String(exp.numero).trim().toUpperCase() : '';
+          if (pendingExpressIds.has(exp.id) || (expNumNorm && pendingExpressNumeros.has(expNumNorm))) {
+            continue;
+          }
           await saveLocalRelatorioExpress(exp, 'synced');
           if (Array.isArray(exp.fotos)) {
             const existingExpFotos = await db.getAllAsync<{ id: number; filename?: string; ordem?: number; uri_local?: string; anotacoes_dados?: string }>(

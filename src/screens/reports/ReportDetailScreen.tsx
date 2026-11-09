@@ -17,6 +17,7 @@ import {
 } from '../../database/db';
 import { generateReportPDF, shareReportPDF } from '../../services/pdfService';
 import { apiClient } from '../../services/api';
+import { syncService } from '../../services/syncService';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Relatorio, FotoRelatorio } from '../../types';
@@ -42,6 +43,15 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     }, [reportId])
   );
 
+  useEffect(() => {
+    const unsub = syncService.subscribe((state) => {
+      if (state === 'idle') {
+        loadReport();
+      }
+    });
+    return () => unsub();
+  }, [reportId]);
+
   async function loadReport() {
     try {
       setFotos([]);
@@ -50,7 +60,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
       let isExpress = isRouteExpress;
 
       if (isRouteExpress) {
-        const exp = await getLocalRelatorioExpressById(reportId);
+        const exp = await getLocalRelatorioExpressById(reportId, relatorio?.numero);
         if (exp) {
           isExpress = true;
           r = {
@@ -63,6 +73,9 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
             projeto_endereco: exp.obra_endereco,
             autor_id: exp.autor_id || 1,
             autor_nome: exp.autor_nome || 'Fiscal Técnico',
+            aprovador_id: exp.aprovador_id,
+            aprovador_nome: exp.aprovador_nome,
+            comentario_aprovacao: exp.comentario_aprovacao,
             data_relatorio: exp.data_relatorio,
             status: exp.status as any,
             sync_status: exp.sync_status as any,
@@ -77,7 +90,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
       } else {
         r = await getLocalRelatorioById(reportId);
         if (!r) {
-          const exp = await getLocalRelatorioExpressById(reportId);
+          const exp = await getLocalRelatorioExpressById(reportId, relatorio?.numero);
           if (exp) {
             isExpress = true;
             r = {
@@ -90,6 +103,9 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
               projeto_endereco: exp.obra_endereco,
               autor_id: exp.autor_id || 1,
               autor_nome: exp.autor_nome || 'Fiscal Técnico',
+              aprovador_id: exp.aprovador_id,
+              aprovador_nome: exp.aprovador_nome,
+              comentario_aprovacao: exp.comentario_aprovacao,
               data_relatorio: exp.data_relatorio,
               status: exp.status as any,
               sync_status: exp.sync_status as any,
@@ -192,29 +208,13 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     setApproving(true);
     try {
       if ((relatorio as any)?.is_express) {
-        await updateLocalRelatorioExpressStatus(
+        await syncService.syncExpressReportApprovalNow(
           relatorio.id,
+          relatorio.numero,
           'Aprovado',
           'Relatório aprovado pelo responsável',
           user?.id,
-          user?.nome_completo || user?.username,
-          'pending'
-        );
-        await addToSyncQueue(
-          'relatorio_express',
-          relatorio.id,
-          'approve',
-          '/api/relatorios-express',
-          'POST',
-          {
-            id: relatorio.id,
-            numero: relatorio.numero,
-            status: 'Aprovado',
-            comentario: 'Relatório aprovado pelo responsável',
-            comentario_aprovacao: 'Relatório aprovado pelo responsável',
-            aprovador_id: user?.id,
-            aprovador_nome: user?.nome_completo || user?.username,
-          }
+          user?.nome_completo || user?.username
         );
       } else {
         await updateLocalRelatorioStatus(
@@ -233,6 +233,7 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           'POST',
           { status: 'Aprovado', aprovador_id: user?.id }
         );
+        if (isOnline) triggerSync();
       }
 
       // 1. Grava no histórico cumulativo da obra todos os itens que foram aprovados nesta vistoria
@@ -262,7 +263,6 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
         }
       }
 
-      if (isOnline) triggerSync();
       // Salva automaticamente o PDF do relatório aprovado na pasta da obra no dispositivo
       generateReportPDF({ ...relatorio, status: 'Aprovado' }, fotos).catch(() => null);
       await loadReport();
@@ -282,29 +282,13 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
     setApproving(true);
     try {
       if ((relatorio as any)?.is_express) {
-        await updateLocalRelatorioExpressStatus(
+        await syncService.syncExpressReportApprovalNow(
           relatorio.id,
+          relatorio.numero,
           'Rejeitado',
           rejectComment.trim(),
           user?.id,
-          user?.nome_completo || user?.username,
-          'pending'
-        );
-        await addToSyncQueue(
-          'relatorio_express',
-          relatorio.id,
-          'reject',
-          '/api/relatorios-express',
-          'POST',
-          {
-            id: relatorio.id,
-            numero: relatorio.numero,
-            status: 'Rejeitado',
-            comentario: rejectComment.trim(),
-            comentario_aprovacao: rejectComment.trim(),
-            aprovador_id: user?.id,
-            aprovador_nome: user?.nome_completo || user?.username,
-          }
+          user?.nome_completo || user?.username
         );
       } else {
         await updateLocalRelatorioStatus(
@@ -323,8 +307,8 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
           'POST',
           { status: 'Rejeitado', comentario: rejectComment.trim(), aprovador_id: user?.id }
         );
+        if (isOnline) triggerSync();
       }
-      if (isOnline) triggerSync();
       setShowRejectBox(false);
       setRejectComment('');
       await loadReport();

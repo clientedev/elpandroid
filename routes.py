@@ -15298,9 +15298,13 @@ def api_relatorios_express_sync():
             if req_id and req_id < 1000000000:
                 existing = RelatorioExpress.query.get(req_id)
             if not existing and numero:
-                candidate = RelatorioExpress.query.filter_by(numero=numero).first()
+                candidate = RelatorioExpress.query.filter(
+                    db.func.lower(db.func.trim(RelatorioExpress.numero)) == numero.lower()
+                ).first()
                 if candidate:
                     existing = candidate
+
+            status_anterior = existing.status if existing else None
 
             if existing:
                 rel = existing
@@ -15360,11 +15364,37 @@ def api_relatorios_express_sync():
                 rel.checklist_data = data.get('checklist_data')
             if 'status' in data and data.get('status'):
                 rel.status = data.get('status')
-            if data.get('comentario') or data.get('comentario_aprovacao'):
-                rel.comentario_aprovacao = data.get('comentario') or data.get('comentario_aprovacao')
-            if data.get('aprovador_id'):
-                rel.aprovador_id = data.get('aprovador_id')
+            if data.get('comentario') is not None or data.get('comentario_aprovacao') is not None:
+                rel.comentario_aprovacao = data.get('comentario') or data.get('comentario_aprovacao') or ''
+
+            # Resolver aprovador_id com validação contra FK users.id no PostgreSQL
+            resolved_aprovador_id = None
+            raw_aprov_id = data.get('aprovador_id')
+            if raw_aprov_id is not None:
+                try:
+                    cand_id = int(raw_aprov_id)
+                    if 0 < cand_id < 1000000000 and User.query.get(cand_id):
+                        resolved_aprovador_id = cand_id
+                except Exception:
+                    pass
+            if not resolved_aprovador_id and data.get('aprovador_nome'):
+                aprov_name = str(data.get('aprovador_nome')).strip()
+                aprov_u = User.query.filter(
+                    db.or_(
+                        db.func.lower(User.nome_completo) == aprov_name.lower(),
+                        db.func.lower(User.username) == aprov_name.lower()
+                    )
+                ).first()
+                if aprov_u:
+                    resolved_aprovador_id = aprov_u.id
+            if not resolved_aprovador_id and rel.status in ('Aprovado', 'Rejeitado') and user:
+                resolved_aprovador_id = user.id
+
+            if resolved_aprovador_id:
+                rel.aprovador_id = resolved_aprovador_id
+            if rel.status == 'Aprovado' and not rel.data_aprovacao:
                 rel.data_aprovacao = brazil_now()
+            rel.updated_at = brazil_now()
 
             # Processar acompanhantes com segurança para coluna JSONB
             acomp_raw = data.get('acompanhantes')
@@ -15391,14 +15421,15 @@ def api_relatorios_express_sync():
 
             db.session.commit()
 
-            if rel.status == 'Aguardando Aprovação':
+            status_mudou = (status_anterior != rel.status)
+            if status_mudou and rel.status == 'Aguardando Aprovação':
                 try:
                     from notification_service import notification_service
                     notification_service.criar_notificacao_express_pendente(rel.id)
                     current_app.logger.info(f"🔔 Notificação disparada para relatório express {rel.numero}")
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de express pendente: {notif_err}")
-            elif rel.status == 'Aprovado':
+            elif status_mudou and rel.status == 'Aprovado':
                 try:
                     from notification_service import notification_service
                     notification_service.criar_notificacao_express_aprovado(rel.id, rel.aprovador_id or 1)
@@ -15406,21 +15437,40 @@ def api_relatorios_express_sync():
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de aprovação express: {notif_err}")
 
-                # Gerar PDF e disparar emails em background/síncrono
+                # Gerar PDF e disparar emails em thread de background para não bloquear a resposta HTTP do mobile
                 try:
-                    from pdf_generator_express import gerar_pdf_relatorio_express
-                    from email_service_unified import get_email_service
-                    res_pdf = gerar_pdf_relatorio_express(rel.id, salvar_arquivo=True)
-                    if res_pdf.get('success'):
-                        pdf_path = res_pdf.get('path')
-                        if pdf_path and os.path.exists(pdf_path):
-                            email_service = get_email_service()
-                            email_service.send_approval_email(rel, pdf_path)
-                            current_app.logger.info(f"✅ Email e PDF de aprovação express {rel.numero} gerados/enviados")
-                except Exception as post_aprov_err:
-                    current_app.logger.warning(f"Aviso no pós-aprovação do express: {post_aprov_err}")
+                    import threading
+                    app_obj = current_app._get_current_object()
+                    rel_id_bg = rel.id
+                    rel_num_bg = rel.numero
 
-            elif rel.status == 'Rejeitado':
+                    def _bg_pdf_and_email_express(app_ctx, exp_id, exp_num):
+                        with app_ctx.app_context():
+                            try:
+                                from pdf_generator_express import gerar_pdf_relatorio_express
+                                from email_service_unified import get_email_service
+                                rel_bg = RelatorioExpress.query.get(exp_id)
+                                if not rel_bg:
+                                    return
+                                res_pdf = gerar_pdf_relatorio_express(exp_id, salvar_arquivo=True)
+                                if res_pdf.get('success'):
+                                    pdf_path = res_pdf.get('path')
+                                    if pdf_path and os.path.exists(pdf_path):
+                                        email_service = get_email_service()
+                                        email_service.send_approval_email(rel_bg, pdf_path)
+                                        app_ctx.logger.info(f"✅ Email e PDF de aprovação express {exp_num} gerados/enviados em background")
+                            except Exception as bg_err:
+                                app_ctx.logger.warning(f"Aviso no pós-aprovação background do express {exp_num}: {bg_err}")
+
+                    threading.Thread(
+                        target=_bg_pdf_and_email_express,
+                        args=(app_obj, rel_id_bg, rel_num_bg),
+                        daemon=True
+                    ).start()
+                except Exception as post_aprov_err:
+                    current_app.logger.warning(f"Aviso ao iniciar thread pós-aprovação do express: {post_aprov_err}")
+
+            elif status_mudou and rel.status == 'Rejeitado':
                 try:
                     from notification_service import notification_service
                     notification_service.criar_notificacao_express_reprovado(rel.id, rel.comentario_aprovacao)
@@ -15428,7 +15478,14 @@ def api_relatorios_express_sync():
                 except Exception as notif_err:
                     current_app.logger.warning(f"Aviso ao criar notificação de rejeição express: {notif_err}")
 
-            return jsonify({'success': True, 'id': rel.id, 'numero': rel.numero}), 201
+            return jsonify({
+                'success': True,
+                'id': rel.id,
+                'numero': rel.numero,
+                'status': rel.status,
+                'comentario_aprovacao': rel.comentario_aprovacao or '',
+                'aprovador_id': rel.aprovador_id,
+            }), 201
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Erro em Relatorio Express API: {e}")
@@ -15475,6 +15532,20 @@ def api_relatorios_express_sync():
                     'ordem': f.ordem or 0
                 })
 
+            aprovador_nome = ''
+            if r.aprovador:
+                aprovador_nome = getattr(r.aprovador, 'nome_completo', None) or r.aprovador.username or ''
+
+            acomp_serialized = '[]'
+            if r.acompanhantes is not None:
+                if isinstance(r.acompanhantes, str):
+                    acomp_serialized = r.acompanhantes
+                else:
+                    try:
+                        acomp_serialized = json.dumps(r.acompanhantes, ensure_ascii=False)
+                    except Exception:
+                        acomp_serialized = '[]'
+
             result.append({
                 'id': r.id,
                 'numero': r.numero,
@@ -15484,19 +15555,124 @@ def api_relatorios_express_sync():
                 'titulo': r.titulo,
                 'autor_id': r.autor_id,
                 'autor_nome': getattr(r.autor, 'nome_completo', r.autor.username) if r.autor else '',
+                'aprovador_id': r.aprovador_id,
+                'aprovador_nome': aprovador_nome,
                 'status': r.status,
+                'comentario_aprovacao': r.comentario_aprovacao or '',
+                'data_aprovacao': r.data_aprovacao.isoformat() if r.data_aprovacao else None,
                 'data_visita': r.data_visita.isoformat() if r.data_visita else None,
                 'data_relatorio': r.data_relatorio.isoformat() if r.data_relatorio else None,
                 'informacoes_tecnicas': r.informacoes_tecnicas or '',
                 'checklist_data': r.checklist_data or '',
                 'observacoes_finais': r.observacoes_finais or '',
+                'acompanhantes': acomp_serialized,
                 'created_at': r.created_at.isoformat() if r.created_at else None,
+                'updated_at': r.updated_at.isoformat() if r.updated_at else None,
                 'fotos': fotos_list
             })
         return jsonify(result), 200
     except Exception as e:
         current_app.logger.error(f"Erro ao listar relatorios express: {e}")
         return jsonify([]), 200
+
+
+@app.route('/api/relatorios-express/<int:report_id>/status', methods=['POST', 'PUT'])
+@csrf.exempt
+def api_update_relatorio_express_status(report_id):
+    """Atualiza diretamente o status (aprovar/rejeitar/enviar) de um Relatório Express"""
+    try:
+        data = request.get_json(silent=True) or {}
+        numero = (data.get('numero') or '').strip()
+        rel = None
+        if report_id and report_id < 1000000000:
+            rel = RelatorioExpress.query.get(report_id)
+        if not rel and numero:
+            rel = RelatorioExpress.query.filter(
+                db.func.lower(db.func.trim(RelatorioExpress.numero)) == numero.lower()
+            ).first()
+        if not rel:
+            # Se ainda não existe pelo ID, delega para api_relatorios_express_sync se tiver dados suficientes
+            if data.get('obra_nome') or data.get('numero'):
+                return api_relatorios_express_sync()
+            return jsonify({'success': False, 'error': 'Relatório Express não encontrado no servidor'}), 404
+
+        status_anterior = rel.status
+        user = _resolve_mobile_user(data)
+        novo_status = data.get('status', rel.status)
+        rel.status = novo_status
+
+        if data.get('comentario') is not None or data.get('comentario_aprovacao') is not None:
+            rel.comentario_aprovacao = data.get('comentario') or data.get('comentario_aprovacao') or ''
+
+        resolved_aprovador_id = None
+        raw_aprov_id = data.get('aprovador_id')
+        if raw_aprov_id is not None:
+            try:
+                cand_id = int(raw_aprov_id)
+                if 0 < cand_id < 1000000000 and User.query.get(cand_id):
+                    resolved_aprovador_id = cand_id
+            except Exception:
+                pass
+        if not resolved_aprovador_id and user:
+            resolved_aprovador_id = user.id
+        if resolved_aprovador_id:
+            rel.aprovador_id = resolved_aprovador_id
+
+        if novo_status == 'Aprovado':
+            rel.data_aprovacao = brazil_now()
+        rel.updated_at = brazil_now()
+        db.session.commit()
+
+        if status_anterior != novo_status:
+            if novo_status == 'Aprovado':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_express_aprovado(rel.id, rel.aprovador_id or 1)
+                except Exception:
+                    pass
+                try:
+                    import threading
+                    app_obj = current_app._get_current_object()
+                    rel_id_bg = rel.id
+                    rel_num_bg = rel.numero
+
+                    def _bg_pdf_email(app_ctx, exp_id, exp_num):
+                        with app_ctx.app_context():
+                            try:
+                                from pdf_generator_express import gerar_pdf_relatorio_express
+                                from email_service_unified import get_email_service
+                                rel_bg = RelatorioExpress.query.get(exp_id)
+                                if not rel_bg:
+                                    return
+                                res_pdf = gerar_pdf_relatorio_express(exp_id, salvar_arquivo=True)
+                                if res_pdf.get('success'):
+                                    pdf_path = res_pdf.get('path')
+                                    if pdf_path and os.path.exists(pdf_path):
+                                        get_email_service().send_approval_email(rel_bg, pdf_path)
+                            except Exception as bg_e:
+                                app_ctx.logger.warning(f"Aviso pós-aprovação status express {exp_num}: {bg_e}")
+
+                    threading.Thread(target=_bg_pdf_email, args=(app_obj, rel_id_bg, rel_num_bg), daemon=True).start()
+                except Exception:
+                    pass
+            elif novo_status == 'Rejeitado':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_express_reprovado(rel.id, rel.comentario_aprovacao)
+                except Exception:
+                    pass
+
+        return jsonify({
+            'success': True,
+            'id': rel.id,
+            'numero': rel.numero,
+            'status': rel.status,
+            'comentario_aprovacao': rel.comentario_aprovacao or '',
+            'aprovador_id': rel.aprovador_id,
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/relatorios-express/<int:report_id>', methods=['DELETE', 'POST'])
 @csrf.exempt

@@ -1155,13 +1155,21 @@ export async function getLocalRelatoriosExpress(currentUser?: User | null): Prom
   }
 }
 
-export async function getLocalRelatorioExpressById(id: number | string): Promise<RelatorioExpress | null> {
+export async function getLocalRelatorioExpressById(id: number | string, numero?: string): Promise<RelatorioExpress | null> {
   const db = await getDatabase();
   const numId = Number(id);
-  return await db.getFirstAsync<RelatorioExpress>(
+  const byId = await db.getFirstAsync<RelatorioExpress>(
     'SELECT * FROM relatorios_express WHERE id = ? OR id = ? LIMIT 1',
     [numId, String(id)]
   );
+  if (byId) return byId;
+  if (numero && numero.trim()) {
+    return await db.getFirstAsync<RelatorioExpress>(
+      'SELECT * FROM relatorios_express WHERE LOWER(TRIM(numero)) = LOWER(TRIM(?)) LIMIT 1',
+      [numero.trim()]
+    );
+  }
+  return null;
 }
 
 export async function saveLocalRelatorioExpress(r: RelatorioExpress, syncStatus: 'synced' | 'pending' = 'synced'): Promise<void> {
@@ -1264,15 +1272,27 @@ export async function updateLocalRelatorioExpressStatus(
   comentario: string = '',
   aprovadorId?: number,
   aprovadorNome?: string,
-  syncStatus: 'synced' | 'pending' = 'pending'
-): Promise<void> {
+  syncStatus: 'synced' | 'pending' = 'pending',
+  numero?: string
+): Promise<RelatorioExpress | null> {
   const db = await getDatabase();
-  await db.runAsync(
-    `UPDATE relatorios_express SET status = ?, comentario_aprovacao = ?, aprovador_id = COALESCE(?, aprovador_id),
-     aprovador_nome = COALESCE(?, aprovador_nome), sync_status = ?, updated_at = ?
-     WHERE id = ?`,
-    [status, comentario, aprovadorId || null, aprovadorNome || null, syncStatus, new Date().toISOString(), id]
-  );
+  const nowIso = new Date().toISOString();
+  if (numero && numero.trim()) {
+    await db.runAsync(
+      `UPDATE relatorios_express SET status = ?, comentario_aprovacao = ?, aprovador_id = COALESCE(?, aprovador_id),
+       aprovador_nome = COALESCE(?, aprovador_nome), sync_status = ?, updated_at = ?
+       WHERE id = ? OR LOWER(TRIM(numero)) = LOWER(TRIM(?))`,
+      [status, comentario, aprovadorId || null, aprovadorNome || null, syncStatus, nowIso, id, numero.trim()]
+    );
+  } else {
+    await db.runAsync(
+      `UPDATE relatorios_express SET status = ?, comentario_aprovacao = ?, aprovador_id = COALESCE(?, aprovador_id),
+       aprovador_nome = COALESCE(?, aprovador_nome), sync_status = ?, updated_at = ?
+       WHERE id = ?`,
+      [status, comentario, aprovadorId || null, aprovadorNome || null, syncStatus, nowIso, id]
+    );
+  }
+  return await getLocalRelatorioExpressById(id, numero);
 }
 
 // ================= LOCK COLABORATIVO DE RELATÓRIOS =================
