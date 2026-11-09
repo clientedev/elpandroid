@@ -13535,8 +13535,14 @@ def api_mobile_login():
         if not username or not password:
             return jsonify({'success': False, 'message': 'Informe usuario e senha.'}), 400
 
-        user = User.query.filter_by(username=username).first()
-        if user and user.ativo and check_password_hash(user.password_hash, password):
+        # Aceita usuário OU e-mail, sem diferenciar maiúsculas/minúsculas (a tela do app pede "usuário ou e-mail")
+        from sqlalchemy import func, or_
+        ident = username.lower()
+        candidatos = User.query.filter(or_(func.lower(User.username) == ident, func.lower(User.email) == ident)).all()
+        user = next((u for u in candidatos if u.password_hash and check_password_hash(u.password_hash, password)), None)
+        if user and not user.ativo:
+            return jsonify({'success': False, 'message': 'Usuário desativado. Fale com o administrador.'}), 401
+        if user and user.ativo:
             login_user(user, remember=True)
             is_dev = getattr(user, 'is_developer', False) or (user.cargo and user.cargo.lower() == 'desenvolvedor')
             from mobile_auth import generate_mobile_token
