@@ -22,8 +22,9 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [focusedInput, setFocusedInput] = useState<'username' | 'password' | null>(null);
 
-  // Forgot password modal
+  // Modal Esqueci Minha Senha
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotInput, setForgotInput] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
@@ -45,7 +46,7 @@ export const LoginScreen: React.FC = () => {
 
   async function handleLogin() {
     if (!username.trim() || !password) {
-      setErrorMessage('Por favor, informe usuário e senha.');
+      setErrorMessage('Por favor, informe seu usuário e senha.');
       return;
     }
 
@@ -61,10 +62,10 @@ export const LoginScreen: React.FC = () => {
 
       const res = await login(username, password);
       if (!res.success) {
-        setErrorMessage(res.message || 'Falha na autenticação.');
+        setErrorMessage(res.message || 'Usuário ou senha incorretos.');
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro inesperado.');
+      setErrorMessage(err.message || 'Erro ao conectar. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ export const LoginScreen: React.FC = () => {
 
   async function handleSendForgotPassword() {
     if (!forgotInput.trim()) {
-      Alert.alert('Atenção', 'Informe seu e-mail ou nome de usuário.');
+      Alert.alert('Atenção', 'Informe seu e-mail ou nome de usuário corporativo.');
       return;
     }
 
@@ -85,8 +86,8 @@ export const LoginScreen: React.FC = () => {
       setShowForgotModal(false);
       setForgotInput('');
       Alert.alert('Recuperação de Senha', res.data?.message || 'Instruções enviadas com sucesso!');
-    } catch (err: any) {
-      Alert.alert('Aviso', 'Se a conta existir, as instruções serão encaminhadas para o e-mail cadastrado.');
+    } catch {
+      Alert.alert('Aviso', 'Se a conta existir, as instruções foram encaminhadas para o e-mail cadastrado.');
       setShowForgotModal(false);
     } finally {
       setForgotLoading(false);
@@ -98,8 +99,12 @@ export const LoginScreen: React.FC = () => {
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Header Logo */}
+      <ScrollView 
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Top Header / Branding */}
         <View style={styles.header}>
           <View style={styles.logoBadge}>
             <Image 
@@ -108,26 +113,26 @@ export const LoginScreen: React.FC = () => {
               resizeMode="contain" 
             />
           </View>
-          <Text style={styles.brandTitle}>ELP</Text>
-          <Text style={styles.brandSubtitle}>Sistema Integrado de Gestão de Obras</Text>
+          <Text style={styles.brandTitle}>ELP ENGENHARIA</Text>
+          <Text style={styles.brandSubtitle}>Sistema Integrado de Gestão & Diagnóstico de Obras</Text>
 
-          {/* Network Pill */}
+          {/* Status de Conexão Clean */}
           <View style={[styles.networkPill, isOnline ? styles.onlinePill : styles.offlinePill]}>
             <View style={[styles.pillDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
             <Text style={[styles.pillText, isOnline ? styles.onlineText : styles.offlineText]}>
-              {isOnline ? 'Conectado à Nuvem' : 'Modo Offline'}
+              {isOnline ? 'Nuvem Conectada' : 'Modo Offline Ativo'}
             </Text>
           </View>
         </View>
 
-        {/* Card Form */}
+        {/* Card de Login Clean & Profissional */}
         <View style={styles.card}>
           <View style={styles.cardHeaderArea}>
-            <View style={styles.helmetCircle}>
-              <Ionicons name="construct" size={28} color="#0891B2" />
+            <View style={styles.iconCircle}>
+              <Ionicons name="shield-checkmark" size={26} color="#0891B2" />
             </View>
-            <Text style={styles.cardTitle}>Sistema de Obras</Text>
-            <Text style={styles.cardSubtitle}>ELP Consultoria e Engenharia Diagnóstica</Text>
+            <Text style={styles.cardTitle}>Acesso Corporativo</Text>
+            <Text style={styles.cardSubtitle}>Entre com suas credenciais para continuar</Text>
           </View>
 
           {errorMessage ? (
@@ -137,112 +142,153 @@ export const LoginScreen: React.FC = () => {
             </View>
           ) : null}
 
-          {/* Username Input */}
+          {/* Campo Usuário */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Usuário *</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="person-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+            <Text style={styles.label}>Usuário ou E-mail</Text>
+            <View style={[
+              styles.inputWrapper, 
+              focusedInput === 'username' && styles.inputWrapperFocused
+            ]}>
+              <Ionicons 
+                name="person-outline" 
+                size={20} 
+                color={focusedInput === 'username' ? Colors.primary : Colors.textMuted} 
+                style={styles.inputIcon} 
+              />
               <TextInput
                 style={styles.input}
-                placeholder="Informe seu usuário corporativo"
+                placeholder="Ex: engenheiro.obra"
                 placeholderTextColor={Colors.textMuted}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
                 autoCorrect={false}
+                onFocus={() => setFocusedInput('username')}
+                onBlur={() => setFocusedInput(null)}
               />
+              {username.length > 0 && (
+                <TouchableOpacity onPress={() => setUsername('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          {/* Password Input with Eye Icon */}
+          {/* Campo Senha com Botão de Revelar Senha */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Senha *</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+            <Text style={styles.label}>Senha de Acesso</Text>
+            <View style={[
+              styles.inputWrapper, 
+              focusedInput === 'password' && styles.inputWrapperFocused
+            ]}>
+              <Ionicons 
+                name="lock-closed-outline" 
+                size={20} 
+                color={focusedInput === 'password' ? Colors.primary : Colors.textMuted} 
+                style={styles.inputIcon} 
+              />
               <TextInput
                 style={styles.input}
-                placeholder="Digite sua senha de acesso"
+                placeholder="Digite sua senha"
                 placeholderTextColor={Colors.textMuted}
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={setPassword}
                 autoCapitalize="none"
+                onFocus={() => setFocusedInput('password')}
+                onBlur={() => setFocusedInput(null)}
               />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+              <TouchableOpacity 
+                onPress={() => setShowPassword(!showPassword)} 
+                style={styles.eyeButton}
+                activeOpacity={0.7}
+                accessibilityLabel={showPassword ? "Ocultar senha" : "Ver senha"}
+              >
                 <Ionicons 
                   name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                  size={20} 
-                  color={Colors.textSecondary} 
+                  size={21} 
+                  color={showPassword ? Colors.primary : Colors.textSecondary} 
                 />
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Remember Me & Forgot Password Row */}
+          {/* Linha Permanecer Conectado & Esqueci Senha */}
           <View style={styles.rememberRow}>
             <TouchableOpacity 
               style={styles.rememberCheckboxRow}
               onPress={() => setRememberMe(!rememberMe)}
+              activeOpacity={0.8}
             >
-              <Ionicons 
-                name={rememberMe ? "checkbox" : "square-outline"} 
-                size={18} 
-                color={rememberMe ? Colors.primary : Colors.textMuted} 
-              />
-              <Text style={styles.rememberText}>Lembrar-me</Text>
+              <View style={[styles.checkboxContainer, rememberMe && styles.checkboxContainerChecked]}>
+                {rememberMe && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+              </View>
+              <Text style={styles.rememberText}>Permanecer conectado</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => setShowForgotModal(true)}>
-              <Text style={styles.forgotText}>Esqueci minha senha</Text>
+            <TouchableOpacity 
+              onPress={() => setShowForgotModal(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.forgotText}>Esqueceu a senha?</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Submit Button - 100% width py-2 fw-bold */}
+          {/* Botão Entrar */}
           <TouchableOpacity 
             style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
             onPress={handleLogin}
             disabled={loading}
+            activeOpacity={0.85}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
               <>
-                <Text style={styles.submitText}>Entrar</Text>
+                <Text style={styles.submitText}>Entrar no Sistema</Text>
                 <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
               </>
             )}
           </TouchableOpacity>
 
-          {/* Server Info (Fixed) */}
+          {/* Selo de Segurança e Servidor */}
           <View style={styles.fixedServerBox}>
-            <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
+            <Ionicons name="shield-checkmark-outline" size={15} color="#10B981" />
             <Text style={styles.fixedServerText}>
-              Servidor Central Conectado
+              Ambiente Criptografado & Protegido
             </Text>
           </View>
         </View>
 
-        {/* Footer info */}
+        {/* Rodapé Corporativo */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Aplicativo Nativo Android • Sincronização Automática em Nuvem
+            ObraFlow • Sistema Corporativo Android
+          </Text>
+          <Text style={styles.footerSubtext}>
+            ELP Consultoria e Engenharia Diagnóstica
           </Text>
         </View>
       </ScrollView>
 
-      {/* Forgot Password Modal */}
+      {/* Modal Esqueci Minha Senha */}
       <Modal visible={showForgotModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Recuperar Senha</Text>
-              <TouchableOpacity onPress={() => setShowForgotModal(false)}>
-                <Ionicons name="close" size={22} color={Colors.text} />
+              <View style={styles.modalHeaderLeft}>
+                <View style={styles.modalIconBox}>
+                  <Ionicons name="key-outline" size={18} color="#0284C7" />
+                </View>
+                <Text style={styles.modalTitle}>Recuperar Senha</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowForgotModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={22} color={Colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
             <Text style={styles.modalDesc}>
-              Informe seu e-mail cadastrado ou nome de usuário para receber as instruções de redefinição de senha:
+              Informe seu e-mail cadastrado ou nome de usuário corporativo para enviarmos as instruções de redefinição:
             </Text>
 
             <TextInput
@@ -285,42 +331,46 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#0B132B',
   },
   scroll: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 32,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 26,
   },
   logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: '#1E293B',
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    backgroundColor: '#1C2541',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderWidth: 1.5,
+    borderColor: '#3A506B',
+    ...Shadows.md,
   },
   logoImage: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
   },
   brandTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
   },
   brandSubtitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#94A3B8',
     marginTop: 4,
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
   networkPill: {
     flexDirection: 'row',
@@ -331,14 +381,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   onlinePill: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderColor: 'rgba(16, 185, 129, 0.35)',
   },
   offlinePill: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderColor: 'rgba(245, 158, 11, 0.35)',
   },
   pillDot: {
     width: 6,
@@ -353,8 +403,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F59E0B',
   },
   pillText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   onlineText: {
     color: '#10B981',
@@ -364,34 +415,40 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 26,
     ...Shadows.lg,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   cardHeaderArea: {
     alignItems: 'center',
     marginBottom: 20,
   },
-  helmetCircle: {
+  iconCircle: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#ECFEFF',
+    backgroundColor: '#E0F2FE',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 19,
+    fontWeight: '800',
     color: '#0F172A',
     textAlign: 'center',
+    letterSpacing: -0.2,
   },
   cardSubtitle: {
-    fontSize: 12,
+    fontSize: 12.5,
     color: '#64748B',
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 3,
   },
   errorBox: {
     flexDirection: 'row',
@@ -399,83 +456,117 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderWidth: 1,
     borderColor: '#FCA5A5',
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     marginBottom: 16,
     gap: 8,
   },
   errorText: {
     flex: 1,
-    color: Colors.danger,
-    fontSize: 13,
+    color: '#DC2626',
+    fontSize: 12.5,
+    fontWeight: '600',
   },
   inputGroup: {
     marginBottom: 16,
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 12.5,
+    fontWeight: '700',
     color: '#334155',
     marginBottom: 6,
+    letterSpacing: 0.2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 48,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 50,
+  },
+  inputWrapperFocused: {
+    borderColor: '#0284C7',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   inputIcon: {
     marginRight: 10,
   },
   input: {
     flex: 1,
-    fontSize: 14,
-    color: Colors.text,
+    fontSize: 14.5,
+    color: '#0F172A',
+    fontWeight: '500',
   },
   eyeButton: {
-    padding: 4,
+    padding: 6,
   },
   rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 18,
+    marginBottom: 20,
+    marginTop: 2,
   },
   rememberCheckboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+  },
+  checkboxContainer: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxContainerChecked: {
+    backgroundColor: '#0284C7',
+    borderColor: '#0284C7',
   },
   rememberText: {
     fontSize: 13,
     color: '#475569',
-  },
-  forgotText: {
-    fontSize: 12,
-    color: Colors.primary,
     fontWeight: '600',
   },
+  forgotText: {
+    fontSize: 12.5,
+    color: '#0284C7',
+    fontWeight: '700',
+  },
   submitButton: {
-    backgroundColor: Colors.primary,
-    height: 48,
-    borderRadius: 8,
+    backgroundColor: '#0284C7',
+    height: 50,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    ...Shadows.md,
+    shadowColor: '#0284C7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   submitButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.65,
   },
   submitText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   fixedServerBox: {
     flexDirection: 'row',
@@ -488,22 +579,27 @@ const styles = StyleSheet.create({
     borderTopColor: '#F1F5F9',
   },
   fixedServerText: {
-    fontSize: 11,
+    fontSize: 11.5,
     color: '#64748B',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
     marginTop: 24,
+    gap: 2,
   },
   footerText: {
-    fontSize: 11,
+    fontSize: 11.5,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  footerSubtext: {
+    fontSize: 10.5,
     color: '#64748B',
-    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(11, 19, 43, 0.75)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -512,41 +608,55 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 18,
+    padding: 22,
     ...Shadows.lg,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
+  },
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#E0F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.text,
+    fontSize: 16.5,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   modalDesc: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: '#64748B',
     lineHeight: 18,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   modalInput: {
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
     paddingHorizontal: 12,
-    height: 44,
+    height: 46,
     fontSize: 14,
-    color: Colors.text,
-    marginBottom: 16,
+    color: '#0F172A',
+    marginBottom: 18,
   },
   modalBtnRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: 10,
   },
   modalCancelBtn: {
@@ -555,20 +665,20 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     color: '#64748B',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 13,
   },
   modalConfirmBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#0284C7',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingVertical: 11,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalConfirmText: {
     color: '#FFFFFF',
-    fontWeight: 'bold',
+    fontWeight: '800',
     fontSize: 13,
   },
 });
