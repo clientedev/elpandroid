@@ -846,6 +846,11 @@ class NotificationService:
                 if ap.id != relatorio.autor_id:
                     destinatarios_ids.add(ap.id)
             
+            # Se não houver outros aprovadores (ex: autor é o único aprovador/admin cadastrado)
+            if not destinatarios_ids and todos_aprovadores:
+                for ap in todos_aprovadores:
+                    destinatarios_ids.add(ap.id)
+            
             if not destinatarios_ids:
                 first_admin = User.query.filter_by(is_master=True).first() or User.query.filter_by(username='admin').first()
                 if first_admin:

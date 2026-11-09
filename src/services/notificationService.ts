@@ -7,7 +7,17 @@ import {
 } from '../database/db';
 import { apiClient } from './api';
 
-export type NotificationType = 'sistema' | 'relatorio' | 'sincronizacao' | 'aprovacao' | 'lembrete';
+export type NotificationType = 
+  | 'sistema' 
+  | 'relatorio' 
+  | 'sincronizacao' 
+  | 'aprovacao' 
+  | 'lembrete'
+  | 'relatorio_express'
+  | 'relatorio_express_pendente'
+  | 'relatorio_express_aprovado'
+  | 'relatorio_express_reprovado'
+  | (string & {});
 
 export interface ToastPayload {
   titulo: string;
@@ -337,25 +347,29 @@ class NotificationService {
     reportNumber?: string;
     projetoNome?: string;
     userId?: number;
+    isExpress?: boolean;
   }): Promise<boolean> {
-    const key = `approval_${opts.reportNumber || opts.reportId}`;
+    const key = `approval_${opts.isExpress ? 'exp_' : ''}${opts.reportNumber || opts.reportId}`;
     if (this.notifiedKeys.has(key)) {
       return false;
     }
     this.notifiedKeys.add(key);
     this.saveNotifiedKeys().catch(() => null);
 
-    const num = opts.reportNumber || 'Relatório';
+    const num = opts.reportNumber || (opts.isExpress ? 'Relatório Express' : 'Relatório');
     const obra = opts.projetoNome || 'Obra';
+    const isExp = Boolean(opts.isExpress);
 
     await this.notify({
-      titulo: '📋 Relatório Enviado para Aprovação',
-      mensagem: `O relatório ${num} da obra "${obra}" foi submetido para aprovação técnica com sucesso.`,
-      tipo: 'relatorio',
+      titulo: isExp ? '📋 Relatório Express Enviado para Aprovação' : '📋 Relatório Enviado para Aprovação',
+      mensagem: isExp
+        ? `O Relatório Express ${num} da obra "${obra}" foi submetido para aprovação com sucesso.`
+        : `O relatório ${num} da obra "${obra}" foi submetido para aprovação técnica com sucesso.`,
+      tipo: isExp ? 'relatorio_express_pendente' : 'relatorio',
       userId: opts.userId || 1,
       silent: false,
       showToast: false,
-      link: `/reports/${opts.reportId}`,
+      link: isExp ? `/relatorio-express/${opts.reportId}` : `/reports/${opts.reportId}`,
     });
     return true;
   }

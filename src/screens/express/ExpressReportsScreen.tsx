@@ -20,6 +20,7 @@ import {
 } from '../../database/db';
 import { takePhoto, pickImage, readPhotoBase64 } from '../../services/imageService';
 import { generateReportPDF } from '../../services/pdfService';
+import { notificationService } from '../../services/notificationService';
 import { apiClient } from '../../services/api';
 import { syncService } from '../../services/syncService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -739,6 +740,19 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                 ''
               );
               await loadReports();
+
+              // Dispara notificação nativa para o usuário apenas uma única vez
+              notificationService.notifyOnceForReportApproval({
+                reportId: item.id,
+                reportNumber: item.numero,
+                projetoNome: item.obra_nome,
+                userId: user?.id,
+                isExpress: true,
+              }).catch(() => null);
+
+              // Salva o PDF permanentemente na pasta física da obra no aparelho
+              saveExpressPdfToDevice({ ...item, status: 'Aguardando Aprovação' }).catch(() => null);
+
               Alert.alert('Sucesso', `Relatório Express ${item.numero} enviado para aprovação!`);
             } catch (e: any) {
               Alert.alert('Erro', e.message || 'Falha ao enviar para aprovação.');
@@ -749,6 +763,44 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         }
       ]
     );
+  }
+
+  async function saveExpressPdfToDevice(item: RelatorioExpress, fotos?: FotoRelatorioExpress[]) {
+    try {
+      const fotosExp = fotos && fotos.length > 0 ? fotos : await getLocalFotosExpress(item.id);
+      const convertedFotos: FotoRelatorio[] = (fotosExp || []).map((f, i) => ({
+        id: f.id,
+        relatorio_id: f.relatorio_express_id,
+        uri_local: f.uri_local,
+        url: f.url,
+        base64: f.base64,
+        titulo: f.titulo || `Foto ${i + 1}`,
+        legenda: f.legenda,
+        ordem: f.ordem ?? i,
+      }));
+
+      const mockRel: Relatorio = {
+        id: item.id,
+        numero: item.numero,
+        titulo: item.titulo,
+        autor_id: item.autor_id || user?.id || 1,
+        autor_nome: item.autor_nome || user?.nome_completo || 'Fiscal',
+        data_relatorio: item.data_relatorio,
+        status: item.status,
+        projeto_id: 0,
+        projeto_nome: item.obra_nome,
+        projeto_construtora: item.obra_construtora,
+        projeto_endereco: item.obra_endereco,
+        acompanhantes: item.acompanhantes,
+        observacoes_finais: item.observacoes_finais,
+        checklist_data: item.checklist_data,
+        fotos_count: convertedFotos.length,
+      };
+
+      await generateReportPDF(mockRel, convertedFotos);
+    } catch (err) {
+      console.warn('[ExpressReportsScreen] Erro ao salvar PDF físico:', err);
+    }
   }
 
   function handleOpenApproveModal(item: RelatorioExpress) {
@@ -785,6 +837,11 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
         user?.id,
         approverName
       );
+
+      // Ao aprovar, gera e salva o PDF atualizado com status de Aprovado na pasta física da obra
+      if (approvalAction === 'Aprovado') {
+        saveExpressPdfToDevice({ ...reportToApprove, status: 'Aprovado' }).catch(() => null);
+      }
 
       setApprovalModalVisible(false);
       const affectedNum = reportToApprove.numero;
@@ -1180,6 +1237,20 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
       await AsyncStorage.removeItem(`@elp_express_report_draft_${expId}`).catch(() => null);
       await AsyncStorage.removeItem('@elp_express_report_draft').catch(() => null);
       setLastAutoSaveTime(null);
+
+      // Dispara notificação nativa para o usuário se enviado para aprovação
+      if (status === 'Aguardando Aprovação') {
+        notificationService.notifyOnceForReportApproval({
+          reportId: expId,
+          reportNumber: currentNumber.trim(),
+          projetoNome: obraNome.trim(),
+          userId: user?.id,
+          isExpress: true,
+        }).catch(() => null);
+      }
+
+      // Salva o PDF permanentemente na pasta física da obra no aparelho
+      saveExpressPdfToDevice(newExp, attachedPhotos).catch(() => null);
 
       if (isOnline) {
         triggerSync(false).catch(() => null);

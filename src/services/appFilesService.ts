@@ -4,7 +4,7 @@ import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as IntentLauncher from 'expo-intent-launcher';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getLocalProjetos } from '../database/db';
+import { getLocalProjetos, getLocalRelatoriosExpress } from '../database/db';
 
 const StorageAccessFramework =
   (LegacyFileSystem as any)?.StorageAccessFramework ||
@@ -603,12 +603,27 @@ export async function ensureProjectFolders(projectName: string, projectCode?: st
 }
 
 /**
- * Garante que todas as obras no SQLite tenham suas pastas internas criadas.
+ * Garante que todas as obras no SQLite (incluindo obras exclusivas do Relatório Express) tenham suas pastas internas criadas.
  */
 export async function ensureAllProjectsFolders(): Promise<void> {
   try {
     await ensureInternalDirs();
     const projetos = await getLocalProjetos('Todos');
+    const expressRels = await getLocalRelatoriosExpress().catch(() => []);
+    const nomesObras = new Set(projetos.map(p => (p.nome || '').trim().toLowerCase()));
+    for (const exp of expressRels) {
+      const expNome = (exp.obra_nome || '').trim();
+      if (expNome && !nomesObras.has(expNome.toLowerCase())) {
+        nomesObras.add(expNome.toLowerCase());
+        projetos.push({
+          id: -exp.id,
+          nome: expNome,
+          numero: exp.numero || 'EXP',
+          status: 'Ativo',
+        } as any);
+      }
+    }
+
     for (const p of projetos) {
       if (p.nome) {
         await ensureProjectFolders(p.nome, (p as any).codigo || p.numero);
@@ -624,6 +639,21 @@ export async function ensureAllProjectsFolders(): Promise<void> {
  */
 export async function getProjectsFoldersSummary(): Promise<ProjectFolderSummary[]> {
   const projetos = await getLocalProjetos('Todos');
+  const expressRels = await getLocalRelatoriosExpress().catch(() => []);
+  const nomesObras = new Set(projetos.map(p => (p.nome || '').trim().toLowerCase()));
+  for (const exp of expressRels) {
+    const expNome = (exp.obra_nome || '').trim();
+    if (expNome && !nomesObras.has(expNome.toLowerCase())) {
+      nomesObras.add(expNome.toLowerCase());
+      projetos.push({
+        id: -exp.id,
+        nome: expNome,
+        numero: exp.numero || 'EXP',
+        status: 'Ativo',
+      } as any);
+    }
+  }
+
   const { imagens: legacyImgs, relatorios: legacyRels } = await getStoredPhysicalFiles();
   const summaries: ProjectFolderSummary[] = [];
 

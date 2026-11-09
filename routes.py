@@ -15661,6 +15661,12 @@ def api_update_relatorio_express_status(report_id):
                     notification_service.criar_notificacao_express_reprovado(rel.id, rel.comentario_aprovacao)
                 except Exception:
                     pass
+            elif novo_status == 'Aguardando Aprovação':
+                try:
+                    from notification_service import notification_service
+                    notification_service.criar_notificacao_express_pendente(rel.id)
+                except Exception:
+                    pass
 
         return jsonify({
             'success': True,

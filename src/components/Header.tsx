@@ -118,6 +118,11 @@ export const Header: React.FC<HeaderProps> = ({
 
     try {
       if (item.link) {
+        const matchExp = item.link.match(/\/relatorio-express\/(\d+)/i);
+        if (matchExp) {
+          navigation.navigate('ExpressReportsScreen');
+          return;
+        }
         const matchRel = item.link.match(/\/relatorios?\/(\d+)/i);
         if (matchRel) {
           navigation.navigate('ReportDetailScreen', { reportId: parseInt(matchRel[1], 10) });
@@ -136,7 +141,15 @@ export const Header: React.FC<HeaderProps> = ({
       }
 
       // Direcionamento por tipo da notificação
-      if (item.tipo === 'relatorio_pendente' || item.tipo === 'aprovacao') {
+      if (
+        item.tipo === 'relatorio_express_pendente' ||
+        item.tipo === 'relatorio_express_aprovado' ||
+        item.tipo === 'relatorio_express_reprovado' ||
+        item.tipo === 'relatorio_express'
+      ) {
+        navigation.navigate('ExpressReportsScreen');
+        return;
+      } else if (item.tipo === 'relatorio_pendente' || item.tipo === 'aprovacao') {
         navigation.navigate('PendentesTab', { filterStatus: 'Aguardando Aprovação' });
       } else if (item.tipo === 'relatorio_rejeitado' || item.tipo === 'rejeicao') {
         navigation.navigate('PendentesTab', { filterStatus: 'Rejeitado' });
