@@ -818,6 +818,8 @@ def api_current_user():
         'is_master': current_user.is_master or is_dev,
         'is_developer': is_dev,
         'is_aprovador': current_user.is_aprovador,
+        'is_aprovador_express': bool(getattr(current_user, 'is_aprovador_express', False)) or is_dev,
+        'ativo': bool(getattr(current_user, 'ativo', True)),
         'nome_completo': getattr(current_user, 'nome_completo', None),
         'cargo': getattr(current_user, 'cargo', None),
         'can_view_others_drafts': bool(getattr(current_user, 'can_view_others_drafts', False)),
@@ -1660,15 +1662,10 @@ def limpar_todas_notificacoes():
         user_id = user.id if (user and user.is_authenticated) else None
         is_master = bool(user and getattr(user, 'is_master', False))
 
-        if not user_id:
-            raw_uid = (data.get('user_id') or request.args.get('user_id') or request.headers.get('X-User-Id'))
-            if raw_uid:
-                try:
-                    user_id = int(raw_uid)
-                except Exception:
-                    pass
 
-        resultado = notification_service.limpar_todas_notificacoes(user_id=user_id, is_master=True)
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+        resultado = notification_service.limpar_todas_notificacoes(user_id=user_id, is_master=is_master)
         return jsonify(resultado), 200
     
     except Exception as e:
@@ -1689,15 +1686,10 @@ def deletar_notificacao_endpoint(notificacao_id):
         user_id = user.id if (user and user.is_authenticated) else None
         is_master = bool(user and getattr(user, 'is_master', False))
 
-        if not user_id:
-            raw_uid = (data.get('user_id') or request.args.get('user_id') or request.headers.get('X-User-Id'))
-            if raw_uid:
-                try:
-                    user_id = int(raw_uid)
-                except Exception:
-                    pass
 
-        resultado = notification_service.deletar_notificacao(notificacao_id, user_id=user_id, is_master=True)
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Não autenticado'}), 401
+        resultado = notification_service.deletar_notificacao(notificacao_id, user_id=user_id, is_master=is_master)
         return jsonify(resultado), (200 if resultado.get('success') else 404)
     except Exception as e:
         current_app.logger.error(f"❌ Erro ao deletar notificação #{notificacao_id}: {e}")
@@ -2914,7 +2906,7 @@ def get_apk_info():
         base_dir = os.path.dirname(os.path.abspath(__file__))
         version_json_path = os.path.join(base_dir, 'version.json')
         if os.path.exists(version_json_path):
-            with open(version_json_path, 'r', encoding='utf-8') as f:
+            with open(version_json_path, 'r', encoding='utf-8', errors='replace') as f:
                 vdata = json.load(f)
                 if 'version' in vdata:
                     app_version = str(vdata['version'])
@@ -9999,87 +9991,30 @@ def api_visits_list():
         return jsonify([]), 200
 
 def _resolve_mobile_user(data=None):
-    """Auxiliar para identificar o usuario da operacao mobile (autenticado, via headers, query params ou payload)"""
+    """Usuário da requisição: sessão web ou token do APK (mobile_auth).
+    Nunca confia em IDs enviados pelo cliente; no modo de transição "legacy"
+    aceita apenas o cabeçalho X-User-Id dos APKs antigos."""
     if current_user and current_user.is_authenticated:
         return current_user
-    try:
-        header_uid = request.headers.get('X-User-Id')
-        if header_uid:
-            u = User.query.get(int(header_uid))
-            if u:
-                return u
-        header_un = request.headers.get('X-Username')
-        if header_un:
-            u = User.query.filter_by(username=header_un.strip()).first()
-            if u:
-                return u
-    except Exception:
-        pass
-    try:
-        args_uid = request.args.get('user_id') or request.args.get('autor_id')
-        if args_uid:
-            u = User.query.get(int(args_uid))
-            if u:
-                return u
-        args_un = request.args.get('username')
-        if args_un:
-            u = User.query.filter_by(username=args_un.strip()).first()
-            if u:
-                return u
-    except Exception:
-        pass
-    if not data:
-        data = request.get_json(silent=True) if request.is_json else None
-    if not data:
-        data = request.form or {}
-    if data:
-        uid = data.get('autor_id') or data.get('responsavel_id') or data.get('usuario_id') or data.get('user_id')
-        if uid:
-            try:
-                u = User.query.get(int(uid))
-                if u:
-                    return u
-            except Exception:
-                pass
-        un = data.get('username') or data.get('autor_nome') or data.get('responsavel_nome')
-        if un:
-            u = User.query.filter_by(username=un.strip()).first()
-            if u:
-                return u
-    master = User.query.filter_by(is_master=True).first()
-    if master:
-        return master
-    admin = User.query.filter_by(username='admin').first()
-    if admin:
-        return admin
-    return User.query.filter_by(ativo=True).first()
+    from mobile_auth import legacy_header_user
+    return legacy_header_user()
+
+def _user_has_full_access(user):
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    return bool(
+        getattr(user, 'is_master', False) or getattr(user, 'is_developer', False)
+        or (user.cargo and user.cargo.lower() in ['desenvolvedor', 'master', 'administrador'])
+        or (user.username and user.username.lower() in ['admin', 'master', 'desenvolvedor'])
+    )
+
 
 def _is_request_master_or_admin(user=None, data=None):
-    """Verifica se a requisicao possui privilegio Master, Administrador ou Desenvolvedor (Acesso Total)"""
-    if user and (getattr(user, 'is_master', False) or getattr(user, 'is_developer', False) or (user.cargo and user.cargo.lower() == 'desenvolvedor') or (user.username and user.username.lower() in ['admin', 'master', 'desenvolvedor'])):
+    """Master, Administrador ou Desenvolvedor (Acesso Total).
+    Decide somente pelo usuário autenticado - nunca por cabeçalhos, parâmetros ou payload."""
+    if _user_has_full_access(user):
         return True
-    if current_user and current_user.is_authenticated and (getattr(current_user, 'is_master', False) or getattr(current_user, 'is_developer', False) or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor') or (current_user.username and current_user.username.lower() in ['admin', 'master', 'desenvolvedor'])):
-        return True
-    try:
-        h_dev = str(request.headers.get('X-Is-Developer', '')).strip().lower()
-        if h_dev in ['true', '1']:
-            return True
-        h_master = str(request.headers.get('X-Is-Master', '')).strip().lower()
-        if h_master in ['true', '1']:
-            return True
-        a_dev = str(request.args.get('is_developer', '')).strip().lower()
-        if a_dev in ['true', '1']:
-            return True
-        a_master = str(request.args.get('is_master', '')).strip().lower()
-        if a_master in ['true', '1']:
-            return True
-        if data and (data.get('is_developer') is True or str(data.get('is_developer', '')).strip().lower() in ['true', '1']):
-            return True
-        if data and (data.get('is_master') is True or str(data.get('is_master', '')).strip().lower() in ['true', '1']):
-            return True
-    except Exception:
-        pass
-    return False
+    return _user_has_full_access(current_user)
 
 @app.route('/api/visits/<int:visit_id>', methods=['PUT', 'POST', 'DELETE'])
 @csrf.exempt
@@ -13538,7 +13473,7 @@ def get_app_version_info():
         ]
         for cfg_path in candidates:
             if os.path.exists(cfg_path):
-                with open(cfg_path, 'r', encoding='utf-8') as f:
+                with open(cfg_path, 'r', encoding='utf-8', errors='replace') as f:
                     data = json.load(f)
                     if 'version' in data and 'expo' not in data:
                         current_v = str(data['version'])
@@ -13604,9 +13539,11 @@ def api_mobile_login():
         if user and user.ativo and check_password_hash(user.password_hash, password):
             login_user(user, remember=True)
             is_dev = getattr(user, 'is_developer', False) or (user.cargo and user.cargo.lower() == 'desenvolvedor')
+            from mobile_auth import generate_mobile_token
             return jsonify({
                 'success': True,
                 'message': 'Autenticado com sucesso.',
+                'token': generate_mobile_token(current_app._get_current_object(), user),
                 'user': {
                     'id': user.id,
                     'username': user.username,

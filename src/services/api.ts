@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_URL_KEY = 'obraflow_api_base_url';
 const AUTH_COOKIE_KEY = 'obraflow_auth_cookie';
 const USER_SESSION_KEY = 'obraflow_user_session';
+export const AUTH_TOKEN_KEY = 'elp_auth_token';
 
 // Default fixed base URL - Railway production backend (fixed & unconfigurable)
 export const DEFAULT_API_URL = 'https://elpandroid-production.up.railway.app';
@@ -14,6 +15,8 @@ class ApiClient {
   private readonly currentBaseUrl: string = DEFAULT_API_URL;
   private sessionCookie: string | null = null;
   private currentMobileUser: any = null;
+  private authToken: string | null = null;
+  private unauthorizedHandler: (() => void) | null = null;
 
   constructor() {
     this.instance = axios.create({
@@ -30,17 +33,9 @@ class ApiClient {
       if (this.sessionCookie) {
         config.headers.Cookie = this.sessionCookie;
       }
-      if (this.currentMobileUser) {
-        if (this.currentMobileUser.id) config.headers['X-User-Id'] = String(this.currentMobileUser.id);
-        if (this.currentMobileUser.username) config.headers['X-Username'] = this.currentMobileUser.username;
-        const isMaster = this.currentMobileUser.is_master || this.currentMobileUser.username?.toLowerCase() === 'admin';
-        const isDev = this.currentMobileUser.is_developer || this.currentMobileUser.cargo?.toLowerCase() === 'desenvolvedor' || this.currentMobileUser.username?.toLowerCase() === 'desenvolvedor';
-        if (isMaster || isDev) {
-          config.headers['X-Is-Master'] = 'true';
-        }
-        if (isDev) {
-          config.headers['X-Is-Developer'] = 'true';
-        }
+      // Identificação SOMENTE pelo token assinado do servidor (nada de X-User-Id / X-Is-Master)
+      if (this.authToken) {
+        config.headers.Authorization = `Bearer ${this.authToken}`;
       }
       return config;
     });
@@ -57,6 +52,11 @@ class ApiClient {
         return response;
       },
       (error) => {
+        const status = error?.response?.status;
+        const authRequired = error?.response?.data?.auth_required;
+        if (status === 401 && authRequired && this.authToken && this.unauthorizedHandler) {
+          this.unauthorizedHandler();
+        }
         return Promise.reject(error);
       }
     );
@@ -69,6 +69,7 @@ class ApiClient {
       // Clean up legacy custom URLs to guarantee fixed production URL
       await AsyncStorage.removeItem(API_URL_KEY);
       this.sessionCookie = await SecureStore.getItemAsync(AUTH_COOKIE_KEY);
+      this.authToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
       const rawUser = await AsyncStorage.getItem('obraflow_current_user');
       if (rawUser) {
         this.currentMobileUser = JSON.parse(rawUser);
@@ -82,6 +83,22 @@ class ApiClient {
     this.currentMobileUser = user;
   }
 
+  async setAuthToken(token: string | null): Promise<void> {
+    this.authToken = token;
+    if (token) await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+    else await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+  }
+
+  async getAuthToken(): Promise<string | null> {
+    if (!this.authToken) this.authToken = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+    return this.authToken;
+  }
+
+  /** Chamado quando o servidor recusa o token (expirado, senha trocada, usuário desativado) */
+  onUnauthorized(handler: (() => void) | null) {
+    this.unauthorizedHandler = handler;
+  }
+
   async setBaseUrl(_url: string): Promise<void> {
     // Backend URL is permanently fixed to production Railway
     this.instance.defaults.baseURL = DEFAULT_API_URL;
@@ -93,7 +110,9 @@ class ApiClient {
 
   async clearSession(): Promise<void> {
     this.sessionCookie = null;
+    this.authToken = null;
     await SecureStore.deleteItemAsync(AUTH_COOKIE_KEY);
+    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await AsyncStorage.removeItem(USER_SESSION_KEY);
   }
 

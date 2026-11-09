@@ -1,7 +1,8 @@
+import os
 from sqlalchemy import create_engine, text
 
 # URL fornecida pelo usuário
-DATABASE_URL = "postgresql://postgres:KgyYkEmMztCNMSPHVbOpWLTiKZFXYwpB@switchback.proxy.rlwy.net:17107/railway"
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 def update_alembic_version():
     print("🔌 Conectando ao banco de dados...")

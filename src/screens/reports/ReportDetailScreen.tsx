@@ -22,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Relatorio, FotoRelatorio } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { hasFullAccess, canApproveReport, canWrite } from '../../auth/permissions';
 
 
 export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
@@ -173,21 +174,10 @@ export const ReportDetailScreen: React.FC<{ route: any; navigation: any }> = ({ 
   }
 
   const isAuthor = Boolean(user && relatorio && user.id === relatorio.autor_id);
-  const isMasterOrAdmin = Boolean(
-    user?.is_master || 
-    (user as any)?.is_admin || 
-    (user as any)?.role === 'admin' || 
-    (user as any)?.role === 'master' ||
-    user?.username?.toLowerCase() === 'admin'
-  );
-  const hasApproverPrivilege = Boolean(
-    isMasterOrAdmin || 
-    (user as any)?.is_aprovador || 
-    user?.is_aprovador_express || 
-    (user as any)?.role === 'aprovador'
-  );
+  const isMasterOrAdmin = hasFullAccess(user);
   // Master/Admin pode aprovar qualquer relatório; Aprovador comum não pode aprovar o próprio
-  const isApprover = isMasterOrAdmin || (hasApproverPrivilege && !isAuthor);
+  const isApprover = canApproveReport(user, relatorio?.autor_id);
+  const canWriteContent = canWrite(user);
 
 
   async function handleExportPDF() {

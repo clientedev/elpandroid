@@ -227,6 +227,10 @@ def load_user(user_id):
         app.logger.error(f"Error loading user {user_id}: {e}")
         return None
 
+# Autenticação do APK (token) + trava global das rotas /api
+from mobile_auth import init_mobile_auth
+init_mobile_auth(app, login_manager)
+
 # HTTPS enforcement for production (Railway)
 @app.before_request
 def enforce_https():

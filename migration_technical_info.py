@@ -18,7 +18,7 @@ def run_migration():
     """Adiciona os campos de informações técnicas à tabela projetos"""
     
     # Usar DATABASE_URL diretamente
-    database_url = "postgresql://postgres:KgyYkEmMztCNMSPHVbOpWLTiKZFXYwpB@switchback.proxy.rlwy.net:17107/railway"
+    database_url = os.environ["DATABASE_URL"]
     
     print("📊 Conectando ao banco de dados Railway...")
     conn = psycopg2.connect(database_url)

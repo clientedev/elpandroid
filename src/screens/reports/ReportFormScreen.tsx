@@ -27,6 +27,7 @@ import { todayBR, isoToBR, brToISO, maskBR, isValidBR } from '../../utils/dateBR
 import { Projeto, Relatorio, FotoRelatorio, LegendaPredefinida, Lembrete, ChecklistProgressoObra, Visitante } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 import * as Location from 'expo-location';
+import { canWrite } from '../../auth/permissions';
 
 export interface ChecklistItemState {
   id: number;
@@ -1243,19 +1244,11 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
             const rid = currentReportIdRef.current;
             await deleteLocalRelatorio(rid);
             
-            const isMasterOrAdmin = Boolean(
-              user?.is_master ||
-              user?.cargo?.toLowerCase() === 'administrador' ||
-              user?.cargo?.toLowerCase() === 'master' ||
-              user?.username?.toLowerCase() === 'admin'
-            );
-
             if (isOnline) {
-              await apiClient.axios.delete(`/api/relatorios/${rid}`, {
-                data: { user_id: user?.id, is_master: isMasterOrAdmin }
-              }).catch(() => null);
+              // O servidor identifica o usuário pelo token; não enviamos perfil no corpo
+              await apiClient.axios.delete(`/api/relatorios/${rid}`).catch(() => null);
             } else {
-              await addToSyncQueue('relatorio', rid, 'delete', `/api/relatorios/${rid}`, 'DELETE', { user_id: user?.id, is_master: isMasterOrAdmin });
+              await addToSyncQueue('relatorio', rid, 'delete', `/api/relatorios/${rid}`, 'DELETE', {});
             }
 
             Alert.alert('Sucesso', isDraft ? 'Rascunho excluído com sucesso.' : 'Relatório excluído com sucesso.');

@@ -1,3 +1,4 @@
+import os
 """
 Script to create user_devices table directly in PostgreSQL database
 Run this to bypass Alembic migration issues
@@ -5,7 +6,7 @@ Run this to bypass Alembic migration issues
 import psycopg2
 
 # Database connection
-DATABASE_URL = "postgresql://postgres:KgyYkEmMztCNMSPHVbOpWLTiKZFXYwpB@switchback.proxy.rlwy.net:17107/railway"
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 def create_user_devices_table():
     try:

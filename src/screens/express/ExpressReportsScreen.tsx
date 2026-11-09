@@ -27,6 +27,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { RelatorioExpress, FotoRelatorioExpress, FotoRelatorio, Visitante, Relatorio, LegendaPredefinida } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { hasFullAccess, canWrite, canApproveReport, READ_ONLY_MESSAGE } from '../../auth/permissions';
 
 export type AttachedExpressPhoto = FotoRelatorioExpress;
 
@@ -116,20 +117,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   const [approvalAction, setApprovalAction] = useState<'Aprovado' | 'Rejeitado'>('Aprovado');
   const [approvalComment, setApprovalComment] = useState('');
 
-  const isMasterOrAdmin = Boolean(
-    user?.is_master || 
-    (user as any)?.is_admin || 
-    (user as any)?.role === 'admin' || 
-    (user as any)?.role === 'master' ||
-    user?.username?.toLowerCase() === 'admin'
-  );
-  const hasApproverPrivilege = Boolean(
-    isMasterOrAdmin || 
-    (user as any)?.is_aprovador || 
-    user?.is_aprovador_express || 
-    (user as any)?.role === 'aprovador'
-  );
-  const canApprove = isMasterOrAdmin || hasApproverPrivilege;
+  const isMasterOrAdmin = hasFullAccess(user);
+  const canWriteContent = canWrite(user);
+  // Aprovador comum não aprova o próprio Express
+  const canApproveItem = (autorId?: number | string | null) => canApproveReport(user, autorId);
 
   // Form state:
   const [titulo, setTitulo] = useState('Relatório Express EXP-0000');
@@ -494,6 +485,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   }
 
   async function handleOpenNew() {
+    if (!canWriteContent) {
+      Alert.alert('Acesso somente leitura', READ_ONLY_MESSAGE);
+      return;
+    }
     let nextNum = 'EXP-0000';
     try {
       nextNum = await getNextExpressReportNumber();
@@ -629,6 +624,10 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
   }
 
   async function handleEditReport(item: RelatorioExpress) {
+    if (!canWriteContent) {
+      Alert.alert('Acesso somente leitura', READ_ONLY_MESSAGE);
+      return;
+    }
     setAttachedPhotos([]);
     setEditingReportId(item.id);
     editingReportIdRef.current = item.id;
@@ -1467,7 +1466,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
                   </TouchableOpacity>
 
                   {/* Ações de Aprovação / Rejeição diretas no Card */}
-                  {item.status === 'Aguardando Aprovação' && canApprove && (
+                  {item.status === 'Aguardando Aprovação' && canApproveItem(item.autor_id) && (
                     <>
                       <TouchableOpacity 
                         style={styles.cardApproveBtn} 
@@ -2012,7 +2011,7 @@ export const ExpressReportsScreen: React.FC<{ navigation: any }> = ({ navigation
 
               {/* Botões Inferiores: Salvar Rascunho, Enviar Aprovação e Aprovar */}
               <View style={styles.modalExpressFooterRow}>
-                {editingReportId && expressList.find(r => r.id === editingReportId)?.status === 'Aguardando Aprovação' && canApprove && (
+                {editingReportId && expressList.find(r => r.id === editingReportId)?.status === 'Aguardando Aprovação' && canApproveItem(expressList.find(r => r.id === editingReportId)?.autor_id) && (
                   <TouchableOpacity
                     style={[styles.btnExpressApproveModal, loading && { opacity: 0.6 }]}
                     onPress={() => {

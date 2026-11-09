@@ -19,6 +19,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Colors, Shadows } from '../../theme/colors';
 import { screenConfigService, ScreenSectionConfig } from '../../services/screenConfigService';
 import { syncService } from '../../services/syncService';
+import { canApprove, hasFullAccess, canWrite } from '../../auth/permissions';
 
 const WIDGETS_CONFIG_KEY = '@elp_dashboard_widgets_v2';
 
@@ -265,8 +266,9 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
   const relatoriosRascunho = relatorios.filter(r => r.status === 'em_andamento' || r.status === 'preenchimento' || r.status === 'Rascunho' || !r.status).length;
   const relatoriosAprovados = relatorios.filter(r => r.status === 'Aprovado').length;
 
-  const isApprover = Boolean(user?.is_master || (user as any)?.is_aprovador || user?.is_aprovador_express);
-  const isMasterOrAdmin = Boolean(user?.is_master || user?.username === 'admin');
+  const isApprover = canApprove(user);
+  const isMasterOrAdmin = hasFullAccess(user);
+  const canWriteContent = canWrite(user);
 
   const [modalTab, setModalTab] = useState<'order' | 'visibility'>('order');
 
@@ -445,6 +447,7 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         if (!widgetsConfig.showAcoesRapidas) return null;
         const qaCfg = serverSections.find(s => s.id === 'quickActions');
         if (qaCfg && !qaCfg.visible) return null;
+        if (!canWriteContent) return null;
         return (
           <View key="quickActions">
             <View style={styles.sectionHeader}>

@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from './api';
+import { hasFullAccess, canApprove } from '../auth/permissions';
 
 const SCREEN_CONFIG_CACHE_KEY = '@elp_server_screen_configs_v1';
 
@@ -178,8 +179,8 @@ class ScreenConfigService {
     const roleRule = section.allowed_roles || 'all';
     if (roleRule === 'all') return true;
 
-    const isMaster = !!user?.is_master;
-    const isApprover = !!user?.is_aprovador_express || isMaster || (user?.cargo && /aprovad|master|admin/i.test(user.cargo));
+    const isMaster = hasFullAccess(user);
+    const isApprover = canApprove(user);
 
     if (roleRule === 'master_only') return isMaster;
     if (roleRule === 'approver_only') return isApprover;

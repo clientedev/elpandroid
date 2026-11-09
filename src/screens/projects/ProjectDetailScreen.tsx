@@ -32,6 +32,7 @@ import { useNetwork } from '../../contexts/NetworkContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/api';
 import { syncService } from '../../services/syncService';
+import { hasFullAccess } from '../../auth/permissions';
 
 export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { projectId } = route.params;
@@ -56,9 +57,7 @@ export const ProjectDetailScreen: React.FC<{ route: any; navigation: any }> = ({
   const [deleteCountdown, setDeleteCountdown] = useState(5);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const isMasterOrAdmin = Boolean(
-    currentUser?.is_master || currentUser?.username === 'admin'
-  );
+  const isMasterOrAdmin = hasFullAccess(currentUser);
 
   const isReportCreationBlocked = Boolean(
     projeto?.status && ['Não Iniciado', 'Concluído', 'Pausado', 'Cancelado'].includes(projeto.status)

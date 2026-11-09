@@ -2,7 +2,7 @@ import os
 from sqlalchemy import create_engine, text, inspect
 
 # URL fornecida pelo usuário
-DATABASE_URL = "postgresql://postgres:KgyYkEmMztCNMSPHVbOpWLTiKZFXYwpB@switchback.proxy.rlwy.net:17107/railway"
+DATABASE_URL = os.environ["DATABASE_URL"]
 
 def fix_db():
     print(f"🔌 Conectando ao banco de dados...")

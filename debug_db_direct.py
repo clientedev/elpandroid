@@ -2,7 +2,7 @@ import psycopg2
 import os
 import json
 
-db_url = "postgresql://postgres:KgyYkEmMztCNMSPHVbOpWLTiKZFXYwpB@switchback.proxy.rlwy.net:17107/railway"
+db_url = os.environ["DATABASE_URL"]
 
 try:
     conn = psycopg2.connect(db_url)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator, Platform } from 'react-native';
+import { View, ActivityIndicator, Platform, Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -32,6 +32,7 @@ import LegendSettingsScreen from '../screens/settings/LegendSettingsScreen';
 import AppFilesScreen from '../screens/settings/AppFilesScreen';
 import NotificationsSettingsScreen from '../screens/settings/NotificationsSettingsScreen';
 import { VisitorsSettingsScreen } from '../screens/settings/VisitorsSettingsScreen';
+import { canWrite, READ_ONLY_MESSAGE } from '../auth/permissions';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -124,6 +125,27 @@ function TabNavigator() {
   );
 }
 
+/** Visualizador (somente leitura) não abre telas de criação/edição */
+function requireWrite<P extends { navigation: any }>(Screen: React.ComponentType<P>) {
+  const Guarded: React.FC<P> = (props) => {
+    const { user } = useAuth();
+    const allowed = canWrite(user);
+    React.useEffect(() => {
+      if (!allowed) {
+        Alert.alert('Acesso somente leitura', READ_ONLY_MESSAGE);
+        props.navigation?.goBack?.();
+      }
+    }, [allowed]);
+    if (!allowed) return null;
+    return <Screen {...props} />;
+  };
+  return Guarded;
+}
+
+const GuardedProjectForm = requireWrite(ProjectFormScreen as any);
+const GuardedVisitForm = requireWrite(VisitFormScreen as any);
+const GuardedReportForm = requireWrite(ReportFormScreen as any);
+
 export const AppNavigator: React.FC = () => {
   const { user, loading } = useAuth();
 
@@ -144,11 +166,11 @@ export const AppNavigator: React.FC = () => {
           <>
             <Stack.Screen name="MainTabs" component={TabNavigator} />
             <Stack.Screen name="ProjectDetailScreen" component={ProjectDetailScreen} />
-            <Stack.Screen name="ProjectFormScreen" component={ProjectFormScreen} />
+            <Stack.Screen name="ProjectFormScreen" component={GuardedProjectForm} />
             <Stack.Screen name="VisitDetailScreen" component={VisitDetailScreen} />
-            <Stack.Screen name="VisitFormScreen" component={VisitFormScreen} />
+            <Stack.Screen name="VisitFormScreen" component={GuardedVisitForm} />
             <Stack.Screen name="ReportDetailScreen" component={ReportDetailScreen} />
-            <Stack.Screen name="ReportFormScreen" component={ReportFormScreen} />
+            <Stack.Screen name="ReportFormScreen" component={GuardedReportForm} />
             <Stack.Screen name="ExpressReportsScreen" component={ExpressReportsScreen} />
             <Stack.Screen name="ApprovalDashboardScreen" component={ApprovalDashboardScreen} />
             <Stack.Screen name="LembretesScreen" component={RemindersScreen} />

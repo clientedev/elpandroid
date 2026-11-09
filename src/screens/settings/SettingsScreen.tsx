@@ -25,6 +25,7 @@ import {
   getPendingSyncQueue,
 } from '../../database/db';
 import { Colors } from '../../theme/colors';
+import { hasFullAccess, isDeveloper } from '../../auth/permissions';
 
 const WIDGETS_CONFIG_KEY = '@elp_dashboard_widgets_v2';
 const APP_PREFS_KEY = '@elp_app_preferences';
@@ -89,17 +90,8 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   const [loadingDevUsers, setLoadingDevUsers] = useState(false);
   const [devUsersList, setDevUsersList] = useState<any[]>([]);
 
-  const isDevUser = Boolean(
-    user?.is_developer ||
-    user?.cargo?.toLowerCase() === 'desenvolvedor' ||
-    user?.username?.toLowerCase() === 'desenvolvedor'
-  );
-
-  const isMasterUser = Boolean(
-    user?.is_master ||
-    user?.cargo?.toLowerCase() === 'master' ||
-    user?.cargo?.toLowerCase() === 'administrador'
-  );
+  const isDevUser = isDeveloper(user);
+  const isMasterUser = hasFullAccess(user) && !isDevUser;
 
   useEffect(() => {
     loadDiagnostics();

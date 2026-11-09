@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/api';
 import { Visita } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { hasFullAccess, canWrite } from '../../auth/permissions';
 
 export const VisitDetailScreen: React.FC<{ route: any; navigation: any }> = ({ route, navigation }) => {
   const { visitId } = route.params;
@@ -17,12 +18,8 @@ export const VisitDetailScreen: React.FC<{ route: any; navigation: any }> = ({ r
   const { user } = useAuth();
   const [visita, setVisita] = useState<Visita | null>(null);
 
-  const isMasterOrAdmin = Boolean(
-    user?.is_master || 
-    (user as any)?.role === 'admin' || 
-    (user as any)?.role === 'master' ||
-    user?.username?.toLowerCase() === 'admin'
-  );
+  const isMasterOrAdmin = hasFullAccess(user);
+  const canWriteContent = canWrite(user);
 
   useEffect(() => {
     loadVisit();

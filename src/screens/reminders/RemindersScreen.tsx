@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Lembrete, Projeto } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
+import { canWrite, READ_ONLY_MESSAGE } from '../../auth/permissions';
 
 export const RemindersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
@@ -128,7 +129,7 @@ export const RemindersScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         rightAction={
           <TouchableOpacity 
             style={styles.addBtn}
-            onPress={() => setModalVisible(true)}
+            onPress={() => canWrite(user) ? setModalVisible(true) : Alert.alert('Acesso somente leitura', READ_ONLY_MESSAGE)}
           >
             <Ionicons name="add" size={24} color="#FFFFFF" />
           </TouchableOpacity>

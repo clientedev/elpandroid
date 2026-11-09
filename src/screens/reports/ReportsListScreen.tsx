@@ -17,6 +17,7 @@ import { apiClient } from '../../services/api';
 import { syncService } from '../../services/syncService';
 import { useFocusEffect } from '@react-navigation/native';
 import { ScrollView } from 'react-native';
+import { hasFullAccess, canWrite } from '../../auth/permissions';
 
 export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ navigation, route }) => {
   const { isOnline } = useNetwork();
@@ -184,12 +185,7 @@ export const ReportsListScreen: React.FC<{ navigation: any; route?: any }> = ({ 
     }
   };
 
-  const isMasterOrAdmin = Boolean(
-    user?.is_master ||
-    user?.cargo?.toLowerCase() === 'administrador' ||
-    user?.cargo?.toLowerCase() === 'master' ||
-    user?.username?.toLowerCase() === 'admin'
-  );
+  const isMasterOrAdmin = hasFullAccess(user);
 
   const handleConfirmDeleteReport = (item: Relatorio) => {
     const isDraft = !item.status || item.status === 'em_andamento' || item.status === 'preenchimento' || item.status === 'Rascunho' || !item.numero || item.numero.startsWith('Rascunho') || item.numero.startsWith('TEMP-');

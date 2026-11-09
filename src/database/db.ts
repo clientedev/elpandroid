@@ -7,6 +7,7 @@ import {
   SyncQueueItem, User, ChecklistCustomItem, ChecklistProgressoObra,
   VisitaParticipanteItem, ContatoObraItem
 } from '../types';
+import { canViewOthersDrafts } from '../auth/permissions';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -632,13 +633,7 @@ export async function getLocalRelatorios(projetoId?: number, currentUser?: User 
     conditions.push("(r.projeto_id = ? OR (r.projeto_nome IS NOT NULL AND r.projeto_nome != '' AND LOWER(TRIM(r.projeto_nome)) = LOWER(TRIM(COALESCE((SELECT nome FROM projetos WHERE id = ?), '__sem_obra__')))))");
     params.push(projetoId, projetoId);
   }
-  const isMasterOrAdmin = Boolean(
-    currentUser?.is_master ||
-    currentUser?.cargo?.toLowerCase() === 'administrador' ||
-    currentUser?.cargo?.toLowerCase() === 'master' ||
-    currentUser?.username?.toLowerCase() === 'admin'
-  );
-  if (currentUser && !isMasterOrAdmin && !currentUser.can_view_others_drafts) {
+  if (currentUser && !canViewOthersDrafts(currentUser)) {
     conditions.push("(r.status NOT IN ('em_andamento', 'preenchimento', 'Rascunho') OR r.autor_id = ?)");
     params.push(currentUser.id);
   }
@@ -1137,13 +1132,7 @@ export async function getLocalRelatoriosExpress(currentUser?: User | null): Prom
       LEFT JOIN fotos_relatorio_express f ON r.id = f.relatorio_express_id 
     `;
     const params: any[] = [];
-    const isMasterOrAdmin = Boolean(
-      currentUser?.is_master ||
-      currentUser?.cargo?.toLowerCase() === 'administrador' ||
-      currentUser?.cargo?.toLowerCase() === 'master' ||
-      currentUser?.username?.toLowerCase() === 'admin'
-    );
-    if (currentUser && !isMasterOrAdmin && !currentUser.can_view_others_drafts) {
+    if (currentUser && !canViewOthersDrafts(currentUser)) {
       query += ` WHERE (r.status NOT IN ('Rascunho', 'Em preenchimento', 'em_andamento') OR r.autor_id = ? OR r.autor_id = ? OR r.sync_status = 'pending') `;
       params.push(Number(currentUser.id) || 0, String(currentUser.id));
     }

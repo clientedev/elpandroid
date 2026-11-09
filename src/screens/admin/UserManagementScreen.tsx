@@ -12,6 +12,7 @@ import { useNetwork } from '../../contexts/NetworkContext';
 import { User } from '../../types';
 import { Colors, Shadows } from '../../theme/colors';
 import { getLocalUsers, saveLocalUsers } from '../../database/db';
+import { canManageUsers } from '../../auth/permissions';
 
 type TipoAcesso = 'admin' | 'master' | 'aprovador' | 'funcionario' | 'visualizador';
 
@@ -121,9 +122,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
     sistema: true,
   });
 
-  const isMasterOrAdmin = Boolean(
-    currentUser?.is_master || currentUser?.username === 'admin'
-  );
+  const isMasterOrAdmin = canManageUsers(currentUser);
 
   const fetchHierarchy = useCallback(async () => {
     if (!isOnline) return;

@@ -4,15 +4,17 @@ import {
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
 import { Colors, Shadows } from '../../theme/colors';
 
 const REMEMBER_KEY = '@elp_remember_login';
+const SECURE_REMEMBER_KEY = 'elp_remember_login';
 
 export const LoginScreen: React.FC = () => {
-  const { login } = useAuth();
+  const { login, sessionMessage } = useAuth();
   const { isOnline } = useNetwork();
 
   const [username, setUsername] = useState('');
@@ -24,7 +26,9 @@ export const LoginScreen: React.FC = () => {
   const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(REMEMBER_KEY).then(val => {
+    // Remove cópia antiga em texto aberto (versões <= 1.0.67) e lê do armazenamento criptografado
+    AsyncStorage.removeItem(REMEMBER_KEY).catch(() => null);
+    SecureStore.getItemAsync(SECURE_REMEMBER_KEY).then(val => {
       if (val) {
         try {
           const parsed = JSON.parse(val);
@@ -49,9 +53,9 @@ export const LoginScreen: React.FC = () => {
 
     try {
       if (rememberMe) {
-        await AsyncStorage.setItem(REMEMBER_KEY, JSON.stringify({ username, password }));
+        await SecureStore.setItemAsync(SECURE_REMEMBER_KEY, JSON.stringify({ username, password }));
       } else {
-        await AsyncStorage.removeItem(REMEMBER_KEY);
+        await SecureStore.deleteItemAsync(SECURE_REMEMBER_KEY);
       }
 
       const res = await login(username, password);
@@ -106,6 +110,11 @@ export const LoginScreen: React.FC = () => {
             <Text style={styles.cardSubtitle}>Entre com suas credenciais para continuar</Text>
           </View>
 
+          {!errorMessage && sessionMessage ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{sessionMessage}</Text>
+            </View>
+          ) : null}
           {errorMessage ? (
             <View style={styles.errorBox}>
               <Ionicons name="alert-circle" size={18} color={Colors.danger} />
