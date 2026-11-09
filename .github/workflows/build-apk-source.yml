@@ -52,7 +52,9 @@ jobs:
         working-directory: android
         run: |
           # O build anterior travou com OutOfMemoryError: Metaspace
-          sed -i '/^org.gradle.jvmargs=/d;/^org.gradle.parallel=/d;/^kotlin.daemon.jvmargs=/d' gradle.properties
+          sed -i '/^org.gradle.jvmargs=/d;/^org.gradle.parallel=/d;/^kotlin.daemon.jvmargs=/d;/^reactNativeArchitectures=/d' gradle.properties
+          # O arquivo gerado nao termina com quebra de linha: sem isto a 1a linha nova gruda na ultima
+          echo "" >> gradle.properties
           {
             echo 'org.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=2g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8'
             echo 'org.gradle.parallel=false'
