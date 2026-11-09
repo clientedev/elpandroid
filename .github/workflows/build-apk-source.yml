@@ -49,15 +49,26 @@ jobs:
       - name: Gerar projeto Android (expo prebuild)
         run: npx expo prebuild --platform android --clean --no-install
 
+      - name: Ajustar memoria do Gradle
+        working-directory: android
+        run: |
+          # O build anterior travou com OutOfMemoryError: Metaspace
+          sed -i '/^org.gradle.jvmargs=/d;/^org.gradle.parallel=/d;/^kotlin.daemon.jvmargs=/d' gradle.properties
+          {
+            echo 'org.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=2g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8'
+            echo 'org.gradle.parallel=false'
+            echo 'org.gradle.workers.max=2'
+            echo 'kotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g'
+            echo 'reactNativeArchitectures=arm64-v8a,armeabi-v7a'
+          } >> gradle.properties
+          cat gradle.properties
+
       - name: Compilar APK (release)
         working-directory: android
         run: |
           chmod +x gradlew
-          # Só as arquiteturas de celulares reais (x86 é apenas emulador) — corta o tempo pela metade
-          ./gradlew assembleRelease --no-daemon --stacktrace \
-            -PreactNativeArchitectures=arm64-v8a,armeabi-v7a \
-            -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1g" \
-            -Dorg.gradle.parallel=true
+          # Só arquiteturas de celulares reais (x86 é emulador); lint de release dispensado (falha por bug no lint do expo-log-box)
+          ./gradlew assembleRelease --no-daemon --stacktrace -x lintVitalAnalyzeRelease -x lintVitalReportRelease -x lintVitalRelease
 
       - name: Conferir assinatura
         run: |
