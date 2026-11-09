@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, Image, Modal 
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image 
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { apiClient } from '../../services/api';
 import { Colors, Shadows } from '../../theme/colors';
 
 const REMEMBER_KEY = '@elp_remember_login';
@@ -16,18 +15,13 @@ export const LoginScreen: React.FC = () => {
   const { login } = useAuth();
   const { isOnline } = useNetwork();
 
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [focusedInput, setFocusedInput] = useState<'username' | 'password' | null>(null);
-
-  // Modal Esqueci Minha Senha
-  const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotInput, setForgotInput] = useState('');
-  const [forgotLoading, setForgotLoading] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
     AsyncStorage.getItem(REMEMBER_KEY).then(val => {
@@ -68,29 +62,6 @@ export const LoginScreen: React.FC = () => {
       setErrorMessage(err.message || 'Erro ao conectar. Tente novamente.');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleSendForgotPassword() {
-    if (!forgotInput.trim()) {
-      Alert.alert('Atenção', 'Informe seu e-mail ou nome de usuário corporativo.');
-      return;
-    }
-
-    setForgotLoading(true);
-    try {
-      const res = await apiClient.axios.post('/api/forgot-password', {
-        email: forgotInput.trim(),
-        username: forgotInput.trim(),
-      });
-      setShowForgotModal(false);
-      setForgotInput('');
-      Alert.alert('Recuperação de Senha', res.data?.message || 'Instruções enviadas com sucesso!');
-    } catch {
-      Alert.alert('Aviso', 'Se a conta existir, as instruções foram encaminhadas para o e-mail cadastrado.');
-      setShowForgotModal(false);
-    } finally {
-      setForgotLoading(false);
     }
   }
 
@@ -145,26 +116,29 @@ export const LoginScreen: React.FC = () => {
           {/* Campo Usuário */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Usuário ou E-mail</Text>
-            <View style={[
-              styles.inputWrapper, 
-              focusedInput === 'username' && styles.inputWrapperFocused
-            ]}>
+            <View style={styles.inputWrapper}>
               <Ionicons 
                 name="person-outline" 
                 size={20} 
-                color={focusedInput === 'username' ? Colors.primary : Colors.textMuted} 
+                color={Colors.textMuted} 
                 style={styles.inputIcon} 
               />
               <TextInput
                 style={styles.input}
-                placeholder="Ex: engenheiro.obra"
+                placeholder="Digite seu usuário ou e-mail"
                 placeholderTextColor={Colors.textMuted}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
                 autoCorrect={false}
-                onFocus={() => setFocusedInput('username')}
-                onBlur={() => setFocusedInput(null)}
+                keyboardType="email-address"
+                autoComplete="username"
+                textContentType="username"
+                importantForAutofill="yes"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                editable={!loading}
               />
               {username.length > 0 && (
                 <TouchableOpacity onPress={() => setUsername('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -177,17 +151,15 @@ export const LoginScreen: React.FC = () => {
           {/* Campo Senha com Botão de Revelar Senha */}
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Senha de Acesso</Text>
-            <View style={[
-              styles.inputWrapper, 
-              focusedInput === 'password' && styles.inputWrapperFocused
-            ]}>
+            <View style={styles.inputWrapper}>
               <Ionicons 
                 name="lock-closed-outline" 
                 size={20} 
-                color={focusedInput === 'password' ? Colors.primary : Colors.textMuted} 
+                color={Colors.textMuted} 
                 style={styles.inputIcon} 
               />
               <TextInput
+                ref={passwordRef}
                 style={styles.input}
                 placeholder="Digite sua senha"
                 placeholderTextColor={Colors.textMuted}
@@ -195,8 +167,13 @@ export const LoginScreen: React.FC = () => {
                 value={password}
                 onChangeText={setPassword}
                 autoCapitalize="none"
-                onFocus={() => setFocusedInput('password')}
-                onBlur={() => setFocusedInput(null)}
+                autoCorrect={false}
+                autoComplete="password"
+                textContentType="password"
+                importantForAutofill="yes"
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
+                editable={!loading}
               />
               <TouchableOpacity 
                 onPress={() => setShowPassword(!showPassword)} 
@@ -213,7 +190,7 @@ export const LoginScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Linha Permanecer Conectado & Esqueci Senha */}
+          {/* Linha Permanecer Conectado */}
           <View style={styles.rememberRow}>
             <TouchableOpacity 
               style={styles.rememberCheckboxRow}
@@ -224,13 +201,6 @@ export const LoginScreen: React.FC = () => {
                 {rememberMe && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
               </View>
               <Text style={styles.rememberText}>Permanecer conectado</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              onPress={() => setShowForgotModal(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.forgotText}>Esqueceu a senha?</Text>
             </TouchableOpacity>
           </View>
 
@@ -270,60 +240,6 @@ export const LoginScreen: React.FC = () => {
           </Text>
         </View>
       </ScrollView>
-
-      {/* Modal Esqueci Minha Senha */}
-      <Modal visible={showForgotModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                <View style={styles.modalIconBox}>
-                  <Ionicons name="key-outline" size={18} color="#0284C7" />
-                </View>
-                <Text style={styles.modalTitle}>Recuperar Senha</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowForgotModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalDesc}>
-              Informe seu e-mail cadastrado ou nome de usuário corporativo para enviarmos as instruções de redefinição:
-            </Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="seu.email@empresa.com.br"
-              placeholderTextColor={Colors.textMuted}
-              value={forgotInput}
-              onChangeText={setForgotInput}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity 
-                style={styles.modalCancelBtn}
-                onPress={() => setShowForgotModal(false)}
-              >
-                <Text style={styles.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.modalConfirmBtn}
-                onPress={handleSendForgotPassword}
-                disabled={forgotLoading}
-              >
-                {forgotLoading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.modalConfirmText}>Enviar Instruções</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -502,6 +418,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    height: '100%',
+    paddingVertical: 0,
     fontSize: 14.5,
     color: '#0F172A',
     fontWeight: '500',
