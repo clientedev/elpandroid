@@ -1,0 +1,55 @@
+--------- beginning of main
+11-10 16:55:18.240 D/StatusBarIconController(  833): ignoring old pipeline callback because the new wifi icon is enabled
+11-10 16:55:18.591 I/BgTaskExecutorImpl( 1792): Starting EXCLUSIVE background task UPLOAD_ASSISTANT_DEVICE_SETTINGS.
+11-10 16:55:18.594 I/NetworkRecognitionRnr( 1792): Using pair HTTP connection
+11-10 16:55:18.595 I/A       ( 1792): [Upload] Connected
+11-10 16:55:18.596 W/LocationOracle( 1792): getBestLocation(): no location is available
+11-10 16:55:18.598 W/CronetNetworkRqstWrppr( 1792): Upload request without a content type.
+11-10 16:55:18.599 W/LocationOracle( 1792): No location returned by GMS core getLastLocation()
+11-10 16:55:18.600 E/A       ( 1792): onError
+11-10 16:55:18.600 E/A       ( 1792): com.google.android.apps.gsa.shared.speech.a.m: errorCode: 65561, engine: 2
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.staticplugins.dc.a.e.a(PG:3)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.s3.n.hh(PG:1)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.cd.g.a.f.e(PG:2)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.speech.k.a.g.d(PG:22)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.speech.k.a.g.ks(PG:6)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.s3.o.e(PG:14)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.s3.p.run(PG:1)
+11-10 16:55:18.600 E/A       ( 1792): 	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:487)
+11-10 16:55:18.600 E/A       ( 1792): 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.shared.util.c.a.e.run(PG:2)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.shared.util.c.a.bi.run(PG:1)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.shared.util.c.a.bi.run(PG:1)
+11-10 16:55:18.600 E/A       ( 1792): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-10 16:55:18.600 E/A       ( 1792): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-10 16:55:18.600 E/A       ( 1792): 	at java.lang.Thread.run(Thread.java:1012)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.shared.util.c.a.l.run(PG:5)
+11-10 16:55:18.600 E/A       ( 1792): Caused by: com.google.android.apps.gsa.shared.speech.a.o: errorCode: 65586, engine: 2
+11-10 16:55:18.600 E/A       ( 1792): 	... 15 more
+11-10 16:55:18.600 E/A       ( 1792): Caused by: com.google.android.apps.gsa.shared.speech.a.k: errorCode: 401, engine: 2
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.assistant.shared.n.h.a(PG:5)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.s3.producers.j.hE(PG:2)
+11-10 16:55:18.600 E/A       ( 1792): 	at com.google.android.apps.gsa.speech.k.a.g.d(PG:16)
+11-10 16:55:18.600 E/A       ( 1792): 	... 12 more
+11-10 16:55:18.600 I/NetworkRecognitionRnr( 1792): Using pair HTTP connection
+11-10 16:55:18.604 I/A       ( 1792): [Upload] Connected
+11-10 16:55:18.605 W/A       ( 1792): Failed to sync device settings.
+11-10 16:55:18.605 I/A       ( 1792): Retrying to sync device settings.
+11-10 16:55:18.607 W/A       ( 1792): Failed to get connectivityLock in 4000 ms
+11-10 16:55:18.607 W/CronetNetworkRqstWrppr( 1792): Upload request without a content type.
+11-10 16:55:18.623 I/ChimeraConfigurator( 5960): Starting update, reason: 4 urgentFeatures: vision.ocr:-1
+--------- beginning of system
+11-10 16:55:18.627 W/JobScheduler(  518): Job didn't exist in JobStore: a9b183 #u0a132/-353 com.google.android.googlequicksearchbox/com.google.android.apps.gsa.tasks.BackgroundTasksJobService
+11-10 16:55:18.628 W/SearchServiceCore( 1792): Abort, client detached.
+11-10 16:55:18.628 W/SearchServiceCore( 1792): Abort, client detached.
+11-10 16:55:18.628 W/SearchServiceCore( 1792): Abort, client detached.
+11-10 16:55:18.659 I/ChimeraConfigurator( 5960): Detected pending changes for urgent request: [vision.ocr]. Pending module sets: container:2318189190800+mlkit.ocr.common,tflite_dynamite:2640104055100800+tflite_dynamite,vision_ocr:2316024025100000+vision.ocr
+11-10 16:55:18.677 I/GmsDebugLogger( 5960): [73] 1801
+11-10 16:55:18.683 W/ZappDownloader( 5960): No successful module downloads for requested features [vision.ocr].
+11-10 16:55:18.684 I/GmsDebugLogger( 5960): [30] [VisionOcrDynamite.integ:231602402100000],[TfliteDynamiteDynamite.integ:264010405100800],[MlkitOcrCommon.optional:231818100800]
+11-10 16:55:18.708 W/ChimeraConfigService( 5960): Retry attempt was throttled. [CONTEXT service_id=264 ]
+11-10 16:55:18.708 I/GmsDebugLogger( 5960): [83] 1 [vision.ocr]
+11-10 16:55:18.709 W/Vision  ( 5960): Request for optional module download of ocr failed. Request again.
+11-10 16:55:18.709 W/Vision  ( 5960): Would have logged:
+11-10 16:55:18.709 W/Vision  ( 5960): # dsae@37884fe7
+11-10 16:55:18.709 I/Vision  ( 5960): Schedule retrying download ocr at 166751 with backoff 20 seconds
