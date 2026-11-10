@@ -1,0 +1,35 @@
+appId: com.obraflow.app
+name: "01 - Abas principais (logado)"
+---
+- runFlow:
+    when:
+      true: ${USER != ''}
+    file: _login.yaml
+- runFlow:
+    when:
+      true: ${USER != ''}
+    commands:
+      - takeScreenshot: 01-01-inicio
+      - scroll
+      - takeScreenshot: 01-02-inicio-rolado
+      - scroll
+      - takeScreenshot: 01-03-inicio-rolado-2
+      - tapOn: "Obras"
+      - waitForAnimationToEnd
+      - takeScreenshot: 02-01-obras-lista
+      - tapOn: "Express"
+      - waitForAnimationToEnd
+      - takeScreenshot: 03-01-express-lista
+      - tapOn: "Relatórios"
+      - waitForAnimationToEnd
+      - takeScreenshot: 04-01-relatorios-lista
+      - tapOn: "Agenda"
+      - waitForAnimationToEnd
+      - takeScreenshot: 05-01-agenda-lista
+      - tapOn: "Ajustes"
+      - waitForAnimationToEnd
+      - takeScreenshot: 06-01-ajustes
+      - scroll
+      - takeScreenshot: 06-02-ajustes-rolado
+      - scroll
+      - takeScreenshot: 06-03-ajustes-rolado-2

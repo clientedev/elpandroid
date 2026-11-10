@@ -9,7 +9,7 @@ on:
       flows:
         description: 'Roteiros a rodar (glob dentro de .maestro/manual)'
         required: false
-        default: '*.yaml'
+        default: '[0-9]*.yaml'
   push:
     branches: [main]
     paths:
@@ -48,7 +48,7 @@ jobs:
         env:
           MANUAL_USER: ${{ secrets.MANUAL_USER }}
           MANUAL_PASS: ${{ secrets.MANUAL_PASS }}
-          FLOWS: ${{ github.event.inputs.flows || '*.yaml' }}
+          FLOWS: ${{ github.event.inputs.flows || '[0-9]*.yaml' }}
         with:
           api-level: 34
           target: google_apis

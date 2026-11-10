@@ -9,7 +9,7 @@ adb shell pm grant com.obraflow.app android.permission.POST_NOTIFICATIONS || tru
 adb logcat -c
 
 status=0
-for flow in .maestro/manual/${FLOWS:-*.yaml}; do
+for flow in .maestro/manual/${FLOWS:-[0-9]*.yaml}; do
   [ -f "$flow" ] || continue
   name=$(basename "$flow" .yaml)
   echo "::group::roteiro $name"

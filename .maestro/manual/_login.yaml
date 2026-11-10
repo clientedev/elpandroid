@@ -1,0 +1,19 @@
+appId: com.obraflow.app
+name: "subroteiro: entrar com a conta de teste"
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Entrar"
+    timeout: 60000
+- tapOn: "seu.usuario ou email@empresa.com"
+- inputText: ${USER}
+- tapOn: "Sua senha"
+- inputText: ${PASS}
+- hideKeyboard
+- tapOn: "Entrar"
+- extendedWaitUntil:
+    visible: "Início"
+    timeout: 90000
+- waitForAnimationToEnd:
+    timeout: 15000
