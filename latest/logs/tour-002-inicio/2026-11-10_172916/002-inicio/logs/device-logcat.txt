@@ -1,0 +1,26 @@
+--------- beginning of system
+11-10 17:29:23.320 D/WindowManager(  520): captureDisplay
+--------- beginning of main
+11-10 17:29:23.337 I/hwservicemanager(  136): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+--------- beginning of kernel
+11-10 17:29:23.539 I/servicemanager(    0): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-10 17:29:23.337 I/Gralloc4( 8375): mapper 4.x is not supported
+11-10 17:29:23.371 D/libEGL  ( 8375): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-10 17:29:23.373 D/libEGL  ( 8375): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-10 17:29:23.374 D/libEGL  ( 8375): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-10 17:29:23.392 W/OpenGLRenderer( 8375): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-10 17:29:23.776 D/WindowManager(  520): captureDisplay
+11-10 17:29:23.793 W/System  ( 8375): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-10 17:29:23.793 W/System  ( 8375): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-10 17:29:23.793 W/System  ( 8375): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-10 17:29:23.793 W/System  ( 8375): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-10 17:29:23.793 W/System  ( 8375): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-10 17:29:23.793 W/System  ( 8375): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-10 17:29:23.793 W/System  ( 8375): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-10 17:29:23.793 W/System  ( 8375): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-10 17:29:23.793 W/System  ( 8375): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-10 17:29:23.793 W/System  ( 8375): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-10 17:29:24.116 D/StatusBarIconController(  837): ignoring old pipeline callback because the new wifi icon is enabled
+11-10 17:29:24.224 D/ActivityManager(  520): freezing 2751 com.android.chrome
+11-10 17:29:24.234 D/ActivityManager(  520): freezing 2196 com.google.android.documentsui
+11-10 17:29:24.367 D/ActivityManager(  520): freezing 2079 android.process.media
