@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
         await AsyncStorage.setItem('@elp_welcomed_v1', 'true');
         await saveLocalNotificacao({
           user_id: user?.id || 1,
-          titulo: 'Bem-vindo ao ObraFlow / ELP',
+          titulo: 'Bem-vindo ao ELP',
           mensagem: 'Sistema sincronizado e pronto para vistorias em campo com AutoSave ativo.',
           tipo: 'sistema',
           lida: false,

@@ -7,11 +7,11 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
   Modal,
   Switch,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -244,7 +244,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
 
       {/* Header */}
@@ -409,10 +409,10 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
                 <Ionicons name="eye-outline" size={22} color="#DC2626" />
               </View>
               <View style={styles.menuTextWrap}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.menuTitle}>Visão de Todos os Usuários</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text style={styles.menuTitle} numberOfLines={1}>Visão de Todos os Usuários</Text>
                   <View style={styles.devMiniBadge}>
-                    <Text style={styles.devMiniBadgeText}>DEV VISÃO TOTAL</Text>
+                    <Text style={styles.devMiniBadgeText}>DEV</Text>
                   </View>
                 </View>
               </View>
@@ -516,7 +516,7 @@ export const SettingsScreen: React.FC<{ navigation: any }> = ({ navigation }) =>
         </TouchableOpacity>
 
         <View style={styles.versionFooter}>
-          <Text style={styles.versionText}>ObraFlow Mobile • Solução Especializada para Engenharia</Text>
+          <Text style={styles.versionText}>GLSystems • ELP Engenharia</Text>
         </View>
       </ScrollView>
 

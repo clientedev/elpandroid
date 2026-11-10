@@ -7,10 +7,10 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { getLocalProjetos } from '../../database/db';
@@ -185,7 +185,7 @@ export default function AppFilesScreen() {
             {item.numero ? `[${item.numero}] ` : ''}{item.nome}
           </Text>
           <Text style={styles.projectClient} numberOfLines={1}>
-            {item.construtora || 'ObraFlow'} • {item.tipo_obra || 'Edificação'}
+            {item.construtora || 'Construtora não informada'} • {item.tipo_obra || 'Edificação'}
           </Text>
 
           <View style={styles.subfolderTags}>
@@ -221,7 +221,7 @@ export default function AppFilesScreen() {
   const totalRelatorios = physicalFiles.relatorios.length;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
 
       {/* Header */}

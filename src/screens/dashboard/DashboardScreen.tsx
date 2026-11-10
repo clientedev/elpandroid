@@ -114,8 +114,8 @@ export const DashboardScreen: React.FC<{ navigation: any }> = ({ navigation }) =
       navigation.navigate('VisitasTab');
     } else if (actionStr === 'ReportCreate' || actionStr === 'ReportFormScreen') {
       navigation.navigate('ReportFormScreen');
-    } else if (actionStr === 'ProjectForm') {
-      navigation.navigate('ProjectForm');
+    } else if (actionStr === 'ProjectForm' || actionStr === 'ProjectFormScreen') {
+      navigation.navigate('ProjectFormScreen');
     } else if (actionStr === 'VisitForm') {
       navigation.navigate('VisitFormScreen');
     }

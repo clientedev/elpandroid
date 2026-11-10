@@ -1320,7 +1320,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                   {selectedProj?.numero ? `[${selectedProj.numero}] ` : ''}{selectedProj?.nome || 'Toque para selecionar a obra...'}
                 </Text>
                 <Text style={styles.fixedProjectSub} numberOfLines={1}>
-                  {selectedProj?.construtora || 'ObraFlow'} • {selectedProj?.tipo_obra || 'Edificação'}
+                  {selectedProj?.construtora || 'Construtora não informada'} • {selectedProj?.tipo_obra || 'Edificação'}
                 </Text>
               </View>
               <View style={[styles.fixedProjectLockBadge, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
@@ -2111,7 +2111,7 @@ export const ReportFormScreen: React.FC<{ route?: any; navigation: any }> = ({ r
                         {item.numero ? `[${item.numero}] ` : ''}{item.nome}
                       </Text>
                       <Text style={styles.projectModalItemSub}>
-                        {item.construtora || 'ObraFlow'} • {item.tipo_obra || 'Edificação'}
+                        {item.construtora || 'Construtora não informada'} • {item.tipo_obra || 'Edificação'}
                         {distKm !== null ? ` • 📍 ${distKm.toFixed(1)} km` : ''}
                       </Text>
                     </View>

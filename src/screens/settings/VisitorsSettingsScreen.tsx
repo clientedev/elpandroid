@@ -275,7 +275,7 @@ export const VisitorsSettingsScreen: React.FC<{ navigation: any }> = ({ navigati
                 <Text style={styles.inputLabel}>Empresa / Construtora</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ex: Construtora Cyrela / ObraFlow"
+                  placeholder="Ex: Construtora Cyrela"
                   placeholderTextColor="#94A3B8"
                   value={empresa}
                   onChangeText={setEmpresa}

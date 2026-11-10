@@ -759,7 +759,7 @@ export const UserManagementScreen: React.FC<{ navigation: any }> = ({ navigation
                   {editingUser ? `Editar: @${editingUser.username}` : 'Cadastrar Novo Usuário'}
                 </Text>
                 <Text style={styles.modalSubtitle}>
-                  Atribua permissões e nível de acesso no ObraFlow / ELP
+                  Atribua permissões e nível de acesso no ELP
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>

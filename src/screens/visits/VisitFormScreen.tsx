@@ -347,7 +347,7 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
               </Text>
               {typeof selectedProjectId === 'number' && projetos.find(p => p.id === selectedProjectId) && (
                 <Text style={styles.dropdownTriggerSub} numberOfLines={1}>
-                  {projetos.find(p => p.id === selectedProjectId)?.construtora || 'ObraFlow'} • {projetos.find(p => p.id === selectedProjectId)?.tipo_obra || 'Edificação'}
+                  {projetos.find(p => p.id === selectedProjectId)?.construtora || 'Construtora não informada'} • {projetos.find(p => p.id === selectedProjectId)?.tipo_obra || 'Edificação'}
                 </Text>
               )}
             </View>
@@ -751,7 +751,7 @@ export const VisitFormScreen: React.FC<{ route?: any; navigation: any }> = ({ ro
                           {p.numero ? `[${p.numero}] ` : ''}{p.nome}
                         </Text>
                         <Text style={styles.dropdownItemSub}>
-                          {p.construtora || 'ObraFlow'} • {p.tipo_obra || 'Edificação'}
+                          {p.construtora || 'Construtora não informada'} • {p.tipo_obra || 'Edificação'}
                         </Text>
                       </View>
                       {isSelected && (

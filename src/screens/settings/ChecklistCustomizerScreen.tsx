@@ -9,9 +9,9 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import {
@@ -134,7 +134,7 @@ export default function ChecklistCustomizerScreen() {
   const handleResetDefault = () => {
     Alert.alert(
       'Restaurar Checklist Padrão',
-      'Isso restaurará a lista original de etapas técnicas de engenharia do ObraFlow. Deseja continuar?',
+      'Isso restaurará a lista original de etapas técnicas de engenharia do ELP. Deseja continuar?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -203,7 +203,7 @@ export default function ChecklistCustomizerScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
 
       {/* Header */}

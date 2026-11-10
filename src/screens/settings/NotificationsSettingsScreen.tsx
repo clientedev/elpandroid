@@ -7,9 +7,9 @@ import {
   FlatList,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,7 +48,7 @@ export default function NotificationsSettingsScreen() {
     if (!perm) {
       Alert.alert(
         'Permissão Necessária',
-        'Por favor, habilite as notificações do ObraFlow nas configurações do Android.',
+        'Por favor, habilite as notificações do ELP nas configurações do Android.',
         [
           { text: 'Cancelar', style: 'cancel' },
           { text: 'Abrir Configurações', onPress: () => notificationService.openSettings() },
@@ -58,7 +58,7 @@ export default function NotificationsSettingsScreen() {
     }
 
     await notificationService.notify({
-      titulo: 'Notificação de Teste - ObraFlow',
+      titulo: 'Notificação de Teste - ELP',
       mensagem: 'As notificações do aplicativo estão funcionando perfeitamente em seu aparelho!',
       tipo: 'sistema',
       userId: user?.id,
@@ -125,7 +125,7 @@ export default function NotificationsSettingsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
 
       {/* Header */}
