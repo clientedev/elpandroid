@@ -8,6 +8,46 @@ appId: com.obraflow.app
 - back
 - waitForAnimationToEnd:
     timeout: 5000
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
 - tapOn:
     text: "Obras"
 - waitForAnimationToEnd:
