@@ -24,6 +24,8 @@ jobs:
   capture:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -59,6 +61,25 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           disable-animations: true
           script: bash .maestro/run-manual.sh
+
+      - name: Publicar capturas na branch manual-capturas
+        if: always()
+        run: |
+          [ -d manual-out ] || exit 0
+          cp -r manual-out /tmp/manual-out
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin manual-capturas || true
+          if git rev-parse --verify -q origin/manual-capturas >/dev/null; then
+            git checkout -B manual-capturas origin/manual-capturas
+          else
+            git checkout --orphan manual-capturas && git rm -rq --cached . && find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          fi
+          RUN="run-${{ github.run_number }}"
+          rm -rf "$RUN" latest && mkdir -p "$RUN" && cp -r /tmp/manual-out/. "$RUN"/ && cp -r "$RUN" latest
+          git add -A "$RUN" latest
+          git commit -qm "capturas $RUN (${{ github.sha }})" || exit 0
+          git push -q origin manual-capturas
 
       - uses: actions/upload-artifact@v4
         if: always()

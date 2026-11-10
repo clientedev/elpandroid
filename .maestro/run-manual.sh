@@ -23,5 +23,9 @@ done
 # prints do Maestro (takeScreenshot grava no diretório atual)
 mv ./*.png manual-out/screens/ 2>/dev/null || true
 adb logcat -d -s ReactNativeJS:V ReactNative:V AndroidRuntime:E > manual-out/logs/logcat.txt || true
+# prints automáticos do Maestro em caso de falha
+find manual-out/logs -name "*.png" -exec cp {} manual-out/screens/ \; 2>/dev/null || true
+adb exec-out screencap -p > manual-out/screens/zz-estado-final.png || true
+echo "===== logcat (erros do app) ====="; grep -E "AndroidRuntime|FATAL|ReactNativeJS" manual-out/logs/logcat.txt | tail -60
 ls -la manual-out/screens
 exit $status
