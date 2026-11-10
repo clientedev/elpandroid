@@ -163,7 +163,7 @@
                                                 {% for email in projeto.emails_clientes %}
                                                 {% if email.ativo %}
                                                 <tr class="email-row" 
-                                                    data-email="{{ email.email.lower() }}"
+                                                    data-email="{{ (email.email or '').lower() }}"
                                                     data-relatorios="{{ 'true' if email.receber_relatorios else 'false' }}"
                                                     data-notificacoes="{{ 'true' if email.receber_notificacoes else 'false' }}">
                                                     <td>

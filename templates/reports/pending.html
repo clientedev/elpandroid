@@ -161,10 +161,13 @@
                                                     
                                                     <!-- Ações de administrador -->
                                                     {% if current_user.is_master %}
-                                                        <a href="{{ url_for('delete_report', id=report.id) }}" class="btn btn-sm btn-outline-danger w-100"
-                                                           onclick="return confirm('Excluir relatório {{ report.numero or 'este' }}? Esta ação não pode ser desfeita.')">
-                                                            <i class="fas fa-trash me-1"></i>Excluir
-                                                        </a>
+                                                        <form method="post" action="{{ url_for('delete_report', id=report.id) }}"
+                                                              onsubmit="return confirm('Excluir relatório {{ report.numero or 'este' }}? Esta ação não pode ser desfeita.')">
+                                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                                                                <i class="fas fa-trash me-1"></i>Excluir
+                                                            </button>
+                                                        </form>
                                                     {% endif %}
                                                 </div>
                                             </div>

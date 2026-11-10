@@ -1051,7 +1051,7 @@ body {
                                                     <span class="badge bg-success-subtle text-success border border-success-subtle">{{ r.status or 'Aprovado' }}</span>
                                                 </td>
                                                 <td>
-                                                    <a href="/relatorio/{{ r.id }}/pdf" target="_blank" class="btn btn-sm btn-outline-danger" title="Visualizar PDF">
+                                                    <a href="{{ url_for('generate_pdf_report', report_id=r.id) }}" target="_blank" class="btn btn-sm btn-outline-danger" title="Visualizar PDF">
                                                         <i class="fas fa-file-pdf"></i>
                                                     </a>
                                                 </td>

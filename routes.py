@@ -130,39 +130,6 @@ def health_check():
             'version': '1.0.5'
         }), 200
 
-@app.route('/debug/images-data')
-def debug_images_data():
-    """Debug para verificar dados das imagens - PÚBLICO PARA TESTE"""
-    try:
-        # Informações do banco de dados
-        db_url = app.config.get('SQLALCHEMY_DATABASE_URI', 'not set')[:100]
-        
-        # Buscar fotos
-        fotos = FotoRelatorio.query.order_by(FotoRelatorio.created_at.desc()).limit(20).all()
-        
-        debug_data = {
-            'database_url': db_url,
-            'total_fotos': FotoRelatorio.query.count(),
-            'fotos_com_imagem': FotoRelatorio.query.filter(FotoRelatorio.imagem.isnot(None)).count(),
-            'fotos_sem_imagem': FotoRelatorio.query.filter(FotoRelatorio.imagem.is_(None)).count(),
-            'fotos_recentes': []
-        }
-        
-        for foto in fotos:
-            debug_data['fotos_recentes'].append({
-                'id': foto.id,
-                'relatorio_id': foto.relatorio_id,
-                'filename': foto.filename,
-                'legenda': foto.legenda,
-                'imagem_presente': foto.imagem is not None,
-                'imagem_size': len(foto.imagem) if foto.imagem else 0,
-                'created_at': foto.created_at.isoformat() if foto.created_at else None
-            })
-        
-        return jsonify(debug_data)
-    except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
-
 @app.route('/debug/reports-data')
 @login_required
 def debug_reports_data():
@@ -5431,8 +5398,9 @@ def finalize_report(report_id):
         current_app.logger.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/reports/<int:id>/delete', methods=['GET', 'POST', 'DELETE'])
-@app.route('/reports/delete/<int:id>', methods=['GET', 'POST', 'DELETE']) # Rota alternativa para evitar conflitos
+# Exclusao so por POST/DELETE: um GET (link, pre-carregamento do navegador) nunca apaga dados
+@app.route('/reports/<int:id>/delete', methods=['POST', 'DELETE'])
+@app.route('/reports/delete/<int:id>', methods=['POST', 'DELETE'])
 @login_required
 def delete_report(id):
     """
@@ -6860,6 +6828,18 @@ def contact_new():
 @login_required
 def contact_edit(contact_id):
     contact = Contato.query.get_or_404(contact_id)
+    form = ContatoForm(obj=contact)
+    if form.validate_on_submit():
+        contact.nome = form.nome.data
+        contact.email = form.email.data
+        contact.telefone = form.telefone.data
+        contact.empresa = form.empresa.data
+        contact.cargo = form.cargo.data
+        contact.observacoes = form.observacoes.data
+        db.session.commit()
+        flash('Contato atualizado com sucesso!', 'success')
+        return redirect(url_for('contacts_list'))
+    return render_template('contacts/form.html', form=form, contact=contact)
 
 
 @app.route('/admin/diagnostico-imagens')
@@ -8701,7 +8681,7 @@ def request_reimbursement():
     projetos = Projeto.query.filter_by(status='Ativo').all()
     return render_template('reimbursements/request.html', projetos=projetos)
 
-@app.route('/reimbursements/<int:id>/approve')
+@app.route('/reimbursements/<int:id>/approve', methods=['POST'])
 @login_required
 def approve_reimbursement(id):
     """Aprovar solicitação de reembolso - apenas usuários master"""
@@ -8718,7 +8698,7 @@ def approve_reimbursement(id):
     flash(f'Reembolso aprovado com sucesso! PDF disponível para download.', 'success')
     return redirect(url_for('reimbursements_admin'))
 
-@app.route('/reimbursements/<int:id>/reject')
+@app.route('/reimbursements/<int:id>/reject', methods=['POST'])
 @login_required
 def reject_reimbursement(id):
     """Rejeitar solicitação de reembolso - apenas usuários master"""
@@ -8728,6 +8708,9 @@ def reject_reimbursement(id):
 
     reembolso = Reembolso.query.get_or_404(id)
     reembolso.status = 'Rejeitado'
+    motivo = (request.form.get('motivo_rejeicao') or '').strip()
+    if motivo and hasattr(reembolso, 'observacoes'):
+        reembolso.observacoes = ((reembolso.observacoes or '') + f"\nMotivo da rejeição: {motivo}").strip()
     reembolso.aprovado_por = current_user.id
     reembolso.data_aprovacao = now_brt()
 
@@ -8740,13 +8723,24 @@ def install_guide():
     """Página com instruções de instalação do PWA"""
     return render_template('pwa_install_guide.html')
 
-@app.route('/reimbursements/admin')
+@app.route('/reimbursements/admin', methods=['GET', 'POST'])
 @login_required
 def reimbursements_admin():
     """Painel administrativo de reembolsos - apenas usuários master"""
     if not current_user.is_master:
         flash('Acesso negado.', 'error')
         return redirect(url_for('reimbursements_list'))
+
+    if request.method == 'POST':
+        # Os botões Aprovar/Rejeitar da página postam aqui com action + reembolso_id
+        acao = request.form.get('action')
+        rid = request.form.get('reembolso_id', type=int)
+        if rid and acao == 'approve':
+            return approve_reimbursement(rid)
+        if rid and acao == 'reject':
+            return reject_reimbursement(rid)
+        flash('Ação inválida.', 'error')
+        return redirect(url_for('reimbursements_admin'))
 
     reembolsos = Reembolso.query.order_by(Reembolso.created_at.desc()).all()
     return render_template('reimbursements/admin.html', reembolsos=reembolsos)
@@ -8791,31 +8785,8 @@ def generate_reimbursement_pdf(id):
 @app.route('/reimbursements/new', methods=['GET', 'POST'])
 @login_required
 def reimbursement_new():
-    form = ReembolsoForm()
-
-    if form.validate_on_submit():
-        reembolso = Reembolso(
-            usuario_id=current_user.id,
-            projeto_id=form.projeto_id.data or None,
-            periodo_inicio=form.periodo_inicio.data,
-            periodo_fim=form.periodo_fim.data,
-            quilometragem=form.quilometragem.data or 0,
-            valor_km=form.valor_km.data or 0,
-            alimentacao=form.alimentacao.data or 0,
-            hospedagem=form.hospedagem.data or 0,
-            outros_gastos=form.outros_gastos.data or 0,
-            descricao_outros=form.descricao_outros.data,
-            observacoes=form.observacoes.data
-        )
-
-        reembolso.total = calculate_reimbursement_total(reembolso)
-
-        db.session.add(reembolso)
-        db.session.commit()
-        flash('Solicitação de reembolso criada com sucesso!', 'success')
-        return redirect(url_for('reimbursements_list'))
-
-    return render_template('reimbursement/form.html', form=form)
+    """Formulário antigo (campos que não existem mais no ReembolsoForm): usa a tela de solicitação atual."""
+    return redirect(url_for('request_reimbursement'))
 
 # File serving (unique function)
 @app.route('/uploads/<filename>')
@@ -12128,7 +12099,7 @@ def relatorio_enviar_email(relatorio_id):
             pdf_path = pdf_generator_weasy.gerar_pdf_relatorio(relatorio.id)
             if not pdf_path or not os.path.exists(pdf_path):
                 flash('Erro ao gerar o arquivo PDF do laudo.', 'error')
-                return render_template('email/enviar_relatorio.html', form=form, relatorio=relatorio, config=config_ativa)
+                return render_template('email/enviar_relatorio.html', form=form, relatorio=relatorio, config=config_ativa, config_ativa=config_ativa)
             
             import email_service_unified
             svc = email_service_unified.get_email_service()
@@ -12150,7 +12121,7 @@ def relatorio_enviar_email(relatorio_id):
         except Exception as e:
             flash(f'Erro interno no envio: {str(e)}', 'error')
 
-    return render_template('email/enviar_relatorio.html', form=form, relatorio=relatorio, config=config_ativa)
+    return render_template('email/enviar_relatorio.html', form=form, relatorio=relatorio, config=config_ativa, config_ativa=config_ativa)
 
 @app.route('/relatorio/<int:relatorio_id>/preview-email')
 @login_required
@@ -12169,7 +12140,7 @@ def relatorio_preview_email(relatorio_id):
 
     # Preparar dados do preview
     projeto = relatorio.projeto
-    data_visita = relatorio.data_visita.strftime('%d/%m/%Y') if relatorio.data_visita else 'N/A'
+    data_visita = relatorio.data_relatorio.strftime('%d/%m/%Y') if relatorio.data_relatorio else 'N/A'
     obra_nome = projeto.nome if projeto else "Obra"
     resp_nome = current_user.nome_completo or current_user.username
     num_rel = relatorio.numero or f"#{relatorio.id}"

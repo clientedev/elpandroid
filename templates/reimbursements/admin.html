@@ -70,7 +70,7 @@
                                     <td>{{ reembolso.data_solicitacao.strftime('%d/%m/%Y') if reembolso.data_solicitacao else 'N/A' }}</td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="{{ url_for('reimbursement_view', reembolso_id=reembolso.id) }}" 
+                                            <a href="{{ url_for('generate_reimbursement_pdf', id=reembolso.id) }}" target="_blank" 
                                                class="btn btn-sm btn-outline-primary" title="Visualizar">
                                                 <i class="fas fa-eye"></i>
                                             </a>

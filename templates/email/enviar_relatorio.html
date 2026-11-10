@@ -62,10 +62,10 @@
         <div>
             <h2><i class="fas fa-paper-plane me-2"></i>Enviar Relatório por E-mail</h2>
             <p class="mb-0">Projeto: <strong>{{ relatorio.projeto.nome }}</strong></p>
-            <p class="mb-0">Relatório: <strong>{{ relatorio.numero }}</strong> - {{ relatorio.data_visita.strftime('%d/%m/%Y') if relatorio.data_visita }}</p>
+            <p class="mb-0">Relatório: <strong>{{ relatorio.numero }}</strong> - {{ relatorio.data_relatorio.strftime('%d/%m/%Y') if relatorio.data_relatorio }}</p>
         </div>
         <div>
-            <a href="{{ url_for('report_detail', report_id=relatorio.id) }}" class="btn btn-light">
+            <a href="{{ url_for('view_report', report_id=relatorio.id) }}" class="btn btn-light">
                 <i class="fas fa-arrow-left me-2"></i>Voltar
             </a>
         </div>
@@ -195,7 +195,7 @@
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="fas fa-paper-plane me-2"></i>Enviar E-mails
                         </button>
-                        <a href="{{ url_for('report_detail', report_id=relatorio.id) }}" class="btn btn-secondary">
+                        <a href="{{ url_for('view_report', report_id=relatorio.id) }}" class="btn btn-secondary">
                             <i class="fas fa-times me-2"></i>Cancelar
                         </a>
                     </div>
