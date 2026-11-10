@@ -29,6 +29,29 @@ for flow in .maestro/manual/${FLOWS:-[0-9]*.yaml}; do
   echo "::endgroup::"
 done
 
+# ---- Tour: cada arquivo .maestro/tour/NNN-nome.yaml é um passo; depois de cada passo
+# salva print + hierarquia (elementos com posições) para as anotações do manual ----
+if [ -n "${MANUAL_USER:-}" ] && ls .maestro/tour/[0-9]*.yaml >/dev/null 2>&1; then
+  mkdir -p manual-out/tour
+  for step in .maestro/tour/${TOUR:-[0-9]*.yaml}; do
+    name=$(basename "$step" .yaml)
+    echo "::group::passo $name"
+    if maestro test "$step" -e USER="$MANUAL_USER" -e PASS="$MANUAL_PASS" --test-output-dir "manual-out/logs/tour-$name" > "manual-out/logs/tour-$name.txt" 2>&1; then
+      sleep 1
+      adb exec-out screencap -p > "manual-out/tour/$name.png"
+      maestro hierarchy > "manual-out/tour/$name.json" 2>/dev/null || true
+      echo "ok $name"
+    else
+      echo "::warning::passo $name falhou"; tail -5 "manual-out/logs/tour-$name.txt"
+      adb exec-out screencap -p > "manual-out/tour/$name-FALHOU.png"
+      maestro hierarchy > "manual-out/tour/$name-FALHOU.json" 2>/dev/null || true
+      status=1
+      [ "${TOUR_STOP_ON_FAIL:-1}" = "1" ] && break
+    fi
+    echo "::endgroup::"
+  done
+fi
+
 # prints do Maestro (takeScreenshot grava no diretório atual)
 mv ./*.png manual-out/screens/ 2>/dev/null || true
 adb logcat -d -s ReactNativeJS:V ReactNative:V AndroidRuntime:E > manual-out/logs/logcat.txt || true

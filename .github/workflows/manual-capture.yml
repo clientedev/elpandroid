@@ -10,10 +10,15 @@ on:
         description: 'Roteiros a rodar (glob dentro de .maestro/manual)'
         required: false
         default: '[0-9]*.yaml'
+      tour:
+        description: 'Passos do tour (glob dentro de .maestro/tour)'
+        required: false
+        default: '[0-9]*.yaml'
   push:
     branches: [main]
     paths:
       - '.maestro/manual/**'
+      - '.maestro/tour/**'
       - '.github/workflows/manual-capture.yml'
 
 concurrency:
@@ -104,6 +109,7 @@ jobs:
           MANUAL_USER: ${{ secrets.MANUAL_USER }}
           MANUAL_PASS: ${{ secrets.MANUAL_PASS }}
           FLOWS: ${{ github.event.inputs.flows || '[0-9]*.yaml' }}
+          TOUR: ${{ github.event.inputs.tour || '[0-9]*.yaml' }}
         with:
           api-level: 34
           target: google_apis
