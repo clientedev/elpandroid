@@ -1,0 +1,15 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "(?i)ok"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    below: "Motivo / Justificativa da Reprovação:"
+- inputText: "MANUAL - TESTE incluir foto panoramica da fachada"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 600
+    optional: true

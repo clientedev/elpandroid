@@ -1,0 +1,19 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "(?i)ok"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Digite a legenda da patologia..."
+    direction: UP
+    timeout: 30000
+- tapOn:
+    text: "Digite a legenda da patologia..."
+- inputText: "MANUAL - TESTE fissura diagonal no revestimento"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

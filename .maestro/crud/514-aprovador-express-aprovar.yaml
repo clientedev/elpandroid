@@ -1,0 +1,11 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Aprovar"
+    index: 0
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1200
+    optional: true

@@ -1,0 +1,27 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "(?i)ok"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Ex: Residencial Alphaville Horizon"
+    direction: UP
+    timeout: 30000
+- tapOn:
+    text: "Ex: Residencial Alphaville Horizon"
+- inputText: "MANUAL - TESTE Obra Residencial"
+- hideKeyboard
+- tapOn:
+    text: "Ex: Construtora Silva & Costa S/A"
+- inputText: "MANUAL - TESTE Construtora"
+- hideKeyboard
+- tapOn:
+    text: "Digite a rua ou capture pelo GPS"
+- inputText: "Avenida Paulista, 1000 - Sao Paulo"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

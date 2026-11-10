@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- scrollUntilVisible:
+    element: "Alterar Status"
+    direction: UP
+    timeout: 30000
+- tapOn:
+    text: "Alterar Status"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1200
+    optional: true

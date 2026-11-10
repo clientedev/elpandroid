@@ -1,0 +1,10 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Reprovar com Ajustes"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1000
+    optional: true

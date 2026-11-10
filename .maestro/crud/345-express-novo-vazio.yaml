@@ -1,0 +1,21 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Express"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- tapOn:
+    point: "92%,9%"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "1.  Título do Relatório.*"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true

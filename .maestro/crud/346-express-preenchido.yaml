@@ -1,0 +1,18 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    below: "1.  Título do Relatório.*"
+- inputText: "MANUAL - TESTE Express fachada norte"
+- hideKeyboard
+- tapOn:
+    text: "Nome da construtora ou cliente"
+- inputText: "MANUAL - TESTE Construtora"
+- hideKeyboard
+- tapOn:
+    text: "Ex: Edifício Horizonte"
+- inputText: "MANUAL - TESTE Obra Residencial"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

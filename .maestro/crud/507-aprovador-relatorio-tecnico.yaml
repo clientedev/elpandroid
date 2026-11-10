@@ -1,0 +1,37 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "(?i)ok"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- back
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Relatórios"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- tapOn:
+    text: "Aguardando.*"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: ".*Laudo do tecnico.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Detalhes do Relatório"
+    timeout: 20000
+- scrollUntilVisible:
+    element: "Reprovar com Ajustes"
+    direction: DOWN
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

@@ -1,0 +1,24 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Relatórios"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- tapOn:
+    point: "92%,9%"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Relatório de Obra|1.  Data da Visita.*"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2000
+    optional: true

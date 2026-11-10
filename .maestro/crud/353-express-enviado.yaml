@@ -1,0 +1,13 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "(?i)(enviar|confirmar|sim)"
+    optional: true
+- extendedWaitUntil:
+    visible: "(Sucesso.*|.*enviado.*)"
+    timeout: 30000
+    optional: true
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

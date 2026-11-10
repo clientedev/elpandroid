@@ -1,0 +1,17 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Aprovar Relatório"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "(?i)(aprovar|confirmar|sim)"
+    optional: true
+- extendedWaitUntil:
+    visible: "(Sucesso.*|.*aprovado.*)"
+    timeout: 40000
+    optional: true
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1000
+    optional: true

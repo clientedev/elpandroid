@@ -1,0 +1,29 @@
+appId: com.obraflow.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Entrar"
+    timeout: 60000
+- extendedWaitUntil:
+    visible: "Mais tarde"
+    timeout: 6000
+    optional: true
+- tapOn:
+    text: "Mais tarde"
+    optional: true
+- tapOn:
+    text: "seu.usuario ou email@empresa.com"
+- inputText: "${USER}"
+- tapOn:
+    text: "Sua senha"
+- inputText: "${PASS}"
+- hideKeyboard
+- tapOn:
+    text: "Entrar"
+- extendedWaitUntil:
+    visible: "(Ajustes|Usuário ou senha incorretos.*|Usuário desativado.*)"
+    timeout: 90000
+- tapOn:
+    text: "Mais tarde"
+    optional: true

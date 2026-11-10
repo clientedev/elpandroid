@@ -1,0 +1,12 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "MANUAL - TESTE Obra Residencial.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Detalhes da Obra"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2500
+    optional: true

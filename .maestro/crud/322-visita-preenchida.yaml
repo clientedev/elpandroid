@@ -1,0 +1,15 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: ".*MANUAL - TESTE Obra Residencial.*"
+    index: 0
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Descreva o objetivo da visita, tópicos a verificar ou notas importantes..."
+- inputText: "MANUAL - TESTE visita de inspecao de fachada"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

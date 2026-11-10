@@ -1,0 +1,10 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Filtrar obras por nome ou número..."
+- inputText: "MANUAL"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true

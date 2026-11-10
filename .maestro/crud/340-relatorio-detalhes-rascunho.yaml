@@ -1,0 +1,12 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: ".*MANUAL - TESTE.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Detalhes do Relatório"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2000
+    optional: true

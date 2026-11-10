@@ -1,0 +1,28 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "(?i)ok"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Ajustes"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- scrollUntilVisible:
+    element: "Sair da Conta"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Sair da Conta"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "(?i)sair"
+- extendedWaitUntil:
+    visible: "Entrar"
+    timeout: 30000

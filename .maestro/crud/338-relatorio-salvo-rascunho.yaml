@@ -1,0 +1,11 @@
+appId: com.obraflow.app
+---
+- scrollUntilVisible:
+    element: "Salvar / Concluir"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Salvar / Concluir"
+- extendedWaitUntil:
+    visible: "(Sucesso.*|Erro.*)"
+    timeout: 30000

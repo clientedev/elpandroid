@@ -1,0 +1,24 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Agenda"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- tapOn:
+    point: "92%,9%"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "Agendar Visita"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true

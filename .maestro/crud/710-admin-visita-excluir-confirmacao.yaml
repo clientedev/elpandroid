@@ -1,0 +1,20 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: ".*MANUAL - TESTE.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Detalhes da Visita"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Excluir Visita.*"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Excluir Visita.*"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

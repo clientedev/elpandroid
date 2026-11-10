@@ -1,0 +1,18 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Digite a legenda da patologia..."
+- inputText: "MANUAL - TESTE desplacamento de pastilha"
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Relate os pontos observados durante a vistoria..."
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Relate os pontos observados durante a vistoria..."
+- inputText: "MANUAL - TESTE vistoria rapida"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

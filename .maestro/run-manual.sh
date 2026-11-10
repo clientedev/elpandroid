@@ -8,6 +8,16 @@ adb install -r -g ELP-x86_64.apk
 adb shell pm grant com.obraflow.app android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
 
+# Foto de teste na galeria do emulador (usada nos relatórios do manual)
+adb push .maestro/assets/foto-teste.jpg /sdcard/Pictures/foto-teste.jpg >/dev/null 2>&1 || true
+adb push .maestro/assets/foto-teste.jpg /sdcard/DCIM/foto-teste-2.jpg >/dev/null 2>&1 || true
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/foto-teste.jpg >/dev/null 2>&1 || true
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/DCIM/foto-teste-2.jpg >/dev/null 2>&1 || true
+adb shell content call --method scan_volume --uri content://media --arg external_primary >/dev/null 2>&1 || true
+for perm in READ_MEDIA_IMAGES READ_EXTERNAL_STORAGE ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA; do
+  adb shell pm grant com.obraflow.app android.permission.$perm >/dev/null 2>&1 || true
+done
+
 # Barra de status limpa e fixa (modo demonstração do Android): 10:00, bateria cheia, sem notificações
 adb shell settings put global sysui_demo_allowed 1
 adb shell am broadcast -a com.android.systemui.demo -e command enter

@@ -1,0 +1,15 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: ".*MANUAL - TESTE Obra Residencial.*"
+    index: 0
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    below: "Título do Laudo"
+- inputText: "MANUAL - TESTE Laudo de fachada 01"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1000
+    optional: true

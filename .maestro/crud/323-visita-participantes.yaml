@@ -1,0 +1,10 @@
+appId: com.obraflow.app
+---
+- scrollUntilVisible:
+    element: "6.  Participantes da Visita"
+    direction: DOWN
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

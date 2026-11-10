@@ -1,0 +1,12 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: ".*Laudo de fachada 01.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Detalhes do Relatório"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true

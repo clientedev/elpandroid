@@ -1,0 +1,17 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Rejeitados.*"
+    optional: true
+- swipe:
+    direction: LEFT
+    start: "70%,17%"
+- tapOn:
+    text: "Rejeitados.*"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true

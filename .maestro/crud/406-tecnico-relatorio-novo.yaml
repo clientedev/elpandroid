@@ -1,0 +1,38 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Relatórios"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- tapOn:
+    point: "92%,9%"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "1.  Data da Visita.*"
+    timeout: 20000
+- tapOn:
+    text: "Toque para selecionar a obra..."
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Buscar por nome, número ou construtora..."
+- inputText: "MANUAL"
+- hideKeyboard
+- tapOn:
+    text: ".*MANUAL - TESTE Obra Residencial.*"
+    index: 0
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    below: "Título do Laudo"
+- inputText: "MANUAL - TESTE Laudo do tecnico"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

@@ -1,0 +1,29 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Ajustes"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- scrollUntilVisible:
+    element: "Sincronizar com o Servidor Agora"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Sincronizar com o Servidor Agora"
+- extendedWaitUntil:
+    visible: "(Sincronização Concluída.*|Aviso de Sincronização.*)"
+    timeout: 60000
+    optional: true
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2000
+    optional: true
+- tapOn:
+    text: "(?i)ok"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000

@@ -1,0 +1,17 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Diagnóstico pericial.*"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Diagnóstico pericial.*"
+- inputText: "MANUAL - TESTE fissuras localizadas, recomenda-se tratamento"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

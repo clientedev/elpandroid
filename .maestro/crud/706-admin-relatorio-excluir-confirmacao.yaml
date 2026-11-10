@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- scrollUntilVisible:
+    element: "Excluir Relatório.*"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Excluir Relatório.*"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1000
+    optional: true

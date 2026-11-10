@@ -84,7 +84,7 @@ jobs:
   capture:
     needs: build-x86
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 170
     permissions:
       contents: write
     steps:

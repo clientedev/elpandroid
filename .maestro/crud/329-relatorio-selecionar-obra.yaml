@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "Toque para selecionar a obra..."
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Buscar por nome, número ou construtora..."
+- inputText: "MANUAL"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1200
+    optional: true

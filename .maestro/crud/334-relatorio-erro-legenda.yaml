@@ -1,0 +1,11 @@
+appId: com.obraflow.app
+---
+- scrollUntilVisible:
+    element: "Enviar para Aprovação"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Enviar para Aprovação"
+- extendedWaitUntil:
+    visible: "Legenda Obrigatória"
+    timeout: 15000

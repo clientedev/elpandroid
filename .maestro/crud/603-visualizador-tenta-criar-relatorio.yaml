@@ -1,0 +1,16 @@
+appId: com.obraflow.app
+---
+- scrollUntilVisible:
+    element: ".*Novo Relatório"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: ".*Novo Relatório"
+    index: 0
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true

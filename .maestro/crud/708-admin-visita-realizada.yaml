@@ -1,0 +1,33 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "Agenda"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- tapOn:
+    text: ".*MANUAL - TESTE.*"
+    index: 0
+- extendedWaitUntil:
+    visible: "Detalhes da Visita"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Concluir e Marcar Como Realizada"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Concluir e Marcar Como Realizada"
+- extendedWaitUntil:
+    visible: "(Sucesso.*|.*Realizada.*)"
+    timeout: 20000
+    optional: true
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true
