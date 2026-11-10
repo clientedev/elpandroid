@@ -3,36 +3,21 @@ Running on test
 Press back... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
-Tap on "Ajustes"... FAILED
+Run flow when "Ajustes" is not visible... SKIPPED
+Tap on "Ajustes"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Element not found: Text matching regex: Ajustes
 
-Element with Text matching regex: Ajustes not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
-
-Possible causes:
-- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
-- Element may be temporarily unavailable due to loading state.
-- This could be a real regression that needs to be addressed.
-
-==== Debug output (logs & screenshots) ====
-
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-411-tecnico-sair/2026-11-10_205507
+ Warning: Assertion is false: "__aguarda__" is visible
+Scrolling DOWN until "Sair da Conta" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Tap on "Sair da Conta"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Tap on "(?i)sair"... COMPLETED
+Assert that "Entrar" is visible... COMPLETED

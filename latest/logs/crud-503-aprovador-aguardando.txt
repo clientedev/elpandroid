@@ -1,36 +1,22 @@
 Running on test
  > Flow 503-aprovador-aguardando
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
-Tap on "Relatórios"... FAILED
+Run flow when "Ajustes" is not visible... SKIPPED
+Tap on "Relatórios"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Element not found: Text matching regex: Relatórios
 
-Element with Text matching regex: Relatórios not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+ Warning: Assertion is false: "__aguarda__" is visible
+Tap on (Optional) "Aguardando.*"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Possible causes:
-- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
-- Element may be temporarily unavailable due to loading state.
-- This could be a real regression that needs to be addressed.
 
-==== Debug output (logs & screenshots) ====
-
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-503-aprovador-aguardando/2026-11-10_210007
+ Warning: Assertion is false: "__aguarda__" is visible

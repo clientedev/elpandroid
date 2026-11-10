@@ -3,30 +3,24 @@ Running on test
 Press back... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
+Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
-  Press back... COMPLETED
-  Wait for animation to end within 3000 ms... COMPLETED
-  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
-Run flow when "Ajustes" is not visible... COMPLETED
-Tap on "Agenda"... FAILED
+Run flow when "Ajustes" is not visible... SKIPPED
+Tap on "Agenda"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Element not found: Text matching regex: Agenda
 
-Element with Text matching regex: Agenda not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+ Warning: Assertion is false: "__aguarda__" is visible
+Tap on ".*MANUAL - TESTE.*", Index: 0... FAILED
+
+Element not found: Text matching regex: .*MANUAL - TESTE.*, Index: 0
+
+Element with Text matching regex: .*MANUAL - TESTE.*, Index: 0 not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
 
 Possible causes:
 - Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
@@ -35,4 +29,4 @@ Possible causes:
 
 ==== Debug output (logs & screenshots) ====
 
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-708-admin-visita-realizada/2026-11-10_212946
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-708-admin-visita-realizada/2026-11-10_231515
