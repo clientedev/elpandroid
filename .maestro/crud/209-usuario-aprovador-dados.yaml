@@ -1,0 +1,15 @@
+appId: com.obraflow.app
+---
+- tapOn: "Novo Usuário"
+- waitForAnimationToEnd
+- tapOn: "Ex: Gabriel Eduardo Silva"
+- inputText: "MANUAL - TESTE Aprovador"
+- tapOn: "gabriel.silva"
+- inputText: "manual.aprovador"
+- tapOn: "email@empresa.com"
+- inputText: "manual.aprovador@example.com"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

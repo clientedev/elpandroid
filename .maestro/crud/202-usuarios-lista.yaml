@@ -1,0 +1,16 @@
+appId: com.obraflow.app
+---
+- tapOn: "Ajustes"
+- waitForAnimationToEnd:
+    timeout: 8000
+- scrollUntilVisible:
+    element: "Gestão de Usuários"
+    direction: DOWN
+- tapOn: "Gestão de Usuários"
+- extendedWaitUntil:
+    visible: "Novo Usuário"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 4000
+    optional: true

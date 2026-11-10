@@ -1,0 +1,9 @@
+appId: com.obraflow.app
+---
+- tapOn: "Buscar por nome, login @, e-mail ou cargo..."
+- inputText: "manual"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2500
+    optional: true

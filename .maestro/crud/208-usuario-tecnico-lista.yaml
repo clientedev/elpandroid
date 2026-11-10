@@ -1,0 +1,12 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "(?i)ok"
+- waitForAnimationToEnd
+- tapOn:
+    text: "Cancelar"
+    optional: true
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2500
+    optional: true

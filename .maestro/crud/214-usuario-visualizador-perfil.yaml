@@ -1,0 +1,13 @@
+appId: com.obraflow.app
+---
+- tapOn: "Visualizador / Cliente"
+- scrollUntilVisible:
+    element: "Mínimo 6 caracteres"
+    direction: DOWN
+- tapOn: "Mínimo 6 caracteres"
+- inputText: "${TPASS}"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

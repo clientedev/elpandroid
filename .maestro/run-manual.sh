@@ -29,26 +29,38 @@ for flow in .maestro/manual/${FLOWS:-[0-9]*.yaml}; do
   echo "::endgroup::"
 done
 
-# ---- Tour: cada arquivo .maestro/tour/NNN-nome.yaml é um passo; depois de cada passo
-# salva print + hierarquia (elementos com posições) para as anotações do manual ----
-if [ -n "${MANUAL_USER:-}" ] && ls .maestro/tour/[0-9]*.yaml >/dev/null 2>&1; then
-  mkdir -p manual-out/tour
-  for step in .maestro/tour/${TOUR:-[0-9]*.yaml}; do
-    name=$(basename "$step" .yaml)
-    echo "::group::passo $name"
-    if maestro test "$step" -e USER="$MANUAL_USER" -e PASS="$MANUAL_PASS" --test-output-dir "manual-out/logs/tour-$name" > "manual-out/logs/tour-$name.txt" 2>&1; then
-      sleep 1
-      adb exec-out screencap -p > "manual-out/tour/$name.png"
-      maestro hierarchy > "manual-out/tour/$name.json" 2>/dev/null || true
-      echo "ok $name"
-    else
-      echo "::warning::passo $name falhou"; tail -5 "manual-out/logs/tour-$name.txt"
-      adb exec-out screencap -p > "manual-out/tour/$name-FALHOU.png"
-      maestro hierarchy > "manual-out/tour/$name-FALHOU.json" 2>/dev/null || true
-      status=1
-      [ "${TOUR_STOP_ON_FAIL:-0}" = "1" ] && break
-    fi
-    echo "::endgroup::"
+# ---- Roteiros por seção (.maestro/tour, .maestro/crud, ...): cada arquivo NNN-nome.yaml é um passo;
+# depois de cada passo salva print + hierarquia (elementos com posições) para as anotações do manual.
+# Um arquivo .maestro/<seção>/.glob define quais passos rodam (ex.: "2[0-9][0-9]*.yaml"; "nenhum" desliga a seção).
+# Senha dos usuários de teste: derivada do segredo, nunca gravada no repositório.
+TPASS="Mt-$(printf '%s' "${MANUAL_PASS:-x}manual-elp" | sha256sum | cut -c1-10)"
+if [ -n "${MANUAL_USER:-}" ]; then
+  for sec in ${SECTIONS:-tour crud}; do
+    dir=".maestro/$sec"
+    [ -d "$dir" ] || continue
+    glob='[0-9]*.yaml'
+    [ -f "$dir/.glob" ] && glob=$(tr -d '[:space:]' < "$dir/.glob")
+    [ "$sec" = "tour" ] && [ -n "${TOUR:-}" ] && [ "${TOUR}" != '[0-9]*.yaml' ] && glob="$TOUR"
+    mkdir -p "manual-out/$sec"
+    for step in $dir/$glob; do
+      [ -f "$step" ] || continue
+      name=$(basename "$step" .yaml)
+      echo "::group::$sec $name"
+      if maestro test "$step" -e USER="$MANUAL_USER" -e PASS="$MANUAL_PASS" -e TPASS="$TPASS" \
+           --test-output-dir "manual-out/logs/$sec-$name" > "manual-out/logs/$sec-$name.txt" 2>&1; then
+        sleep 1
+        adb exec-out screencap -p > "manual-out/$sec/$name.png"
+        maestro hierarchy > "manual-out/$sec/$name.json" 2>/dev/null || true
+        echo "ok $name"
+      else
+        echo "::warning::passo $sec/$name falhou"; tail -5 "manual-out/logs/$sec-$name.txt"
+        adb exec-out screencap -p > "manual-out/$sec/$name-FALHOU.png"
+        maestro hierarchy > "manual-out/$sec/$name-FALHOU.json" 2>/dev/null || true
+        status=1
+        [ "${TOUR_STOP_ON_FAIL:-0}" = "1" ] && break
+      fi
+      echo "::endgroup::"
+    done
   done
 fi
 
