@@ -21,7 +21,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # O ELP.apk oficial só traz código nativo ARM (celulares). Para o emulador x86_64,
+  # compila o MESMO commit só para x86_64 — mesmas telas, mesmo código JS.
+  build-x86:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-x86-${{ hashFiles('package-lock.json', 'app.json') }}
+          restore-keys: gradle-x86-
+      - run: npm ci
+      - run: npx expo prebuild --platform android --clean --no-install
+      - name: Memoria do Gradle
+        working-directory: android
+        run: |
+          sed -i '/^org.gradle.jvmargs=/d;/^org.gradle.parallel=/d;/^kotlin.daemon.jvmargs=/d;/^reactNativeArchitectures=/d' gradle.properties
+          echo "" >> gradle.properties
+          {
+            echo 'org.gradle.jvmargs=-Xmx5g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8'
+            echo 'org.gradle.parallel=false'
+            echo 'org.gradle.workers.max=2'
+            echo 'kotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g'
+            echo 'reactNativeArchitectures=x86_64'
+          } >> gradle.properties
+      - name: Compilar APK x86_64
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -x lintVitalAnalyzeRelease -x lintVitalReportRelease -x lintVitalRelease
+          cp app/build/outputs/apk/release/app-release.apk ../ELP-x86_64.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elp-x86_64
+          path: ELP-x86_64.apk
+          retention-days: 3
+
   capture:
+    needs: build-x86
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -39,6 +88,10 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: elp-x86_64
 
       - name: Instalar Maestro
         run: |

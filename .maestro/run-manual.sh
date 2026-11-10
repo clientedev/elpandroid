@@ -4,7 +4,7 @@ set -u
 mkdir -p manual-out/screens manual-out/logs
 adb shell settings put system screen_off_timeout 1800000
 adb shell locksettings set-disable true || true
-adb install -r -g ELP.apk
+adb install -r -g ELP-x86_64.apk
 adb shell pm grant com.obraflow.app android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
 
