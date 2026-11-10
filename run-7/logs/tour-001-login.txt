@@ -1,0 +1,20 @@
+Running on test
+ > Flow 001-login
+Launch app "com.obraflow.app" with clear state... COMPLETED
+Assert that "Entrar" is visible... COMPLETED
+Tap on "seu.usuario ou email@empresa.com"... COMPLETED
+Input text ${USER}... COMPLETED
+Tap on "Sua senha"... FAILED
+
+Element not found: Text matching regex: Sua senha
+
+Element with Text matching regex: Sua senha not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state.
+- This could be a real regression that needs to be addressed.
+
+==== Debug output (logs & screenshots) ====
+
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/tour-001-login/2026-11-10_175351
