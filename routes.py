@@ -13515,7 +13515,7 @@ def api_mobile_login():
                 }
             }), 200
 
-        return jsonify({'success': False, 'message': 'Usuario ou senha incorretos.'}), 401
+        return jsonify({'success': False, 'message': 'Usuário ou senha incorretos.'}), 401
     except Exception as e:
         current_app.logger.error(f'Erro em /api/login: {e}')
         return jsonify({'success': False, 'message': str(e)}), 500

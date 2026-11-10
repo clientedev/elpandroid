@@ -8,6 +8,15 @@ adb install -r -g ELP-x86_64.apk
 adb shell pm grant com.obraflow.app android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
 
+# Barra de status limpa e fixa (modo demonstração do Android): 10:00, bateria cheia, sem notificações
+adb shell settings put global sysui_demo_allowed 1
+adb shell am broadcast -a com.android.systemui.demo -e command enter
+adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 1000
+adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
+adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4
+adb shell am broadcast -a com.android.systemui.demo -e command network -e mobile show -e datatype none -e level 4
+adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false
+
 status=0
 for flow in .maestro/manual/${FLOWS:-[0-9]*.yaml}; do
   [ -f "$flow" ] || continue
