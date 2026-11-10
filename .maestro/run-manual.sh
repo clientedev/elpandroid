@@ -7,6 +7,15 @@ adb shell locksettings set-disable true || true
 adb install -r -g ELP-x86_64.apk
 adb shell pm grant com.obraflow.app android.permission.POST_NOTIFICATIONS || true
 adb logcat -c
+# Esconde diálogos de sistema ("X isn't responding") que cobrem o app no emulador do CI
+adb shell settings put global hide_error_dialogs 1 || true
+dismiss_anr() {
+  if adb shell dumpsys window 2>/dev/null | grep -qiE "Application Not Responding|isn't responding"; then
+    echo "fechando diálogo de sistema (ANR)"
+    adb shell input keyevent KEYCODE_BACK || true
+    sleep 2
+  fi
+}
 
 # Foto de teste na galeria do emulador (usada nos relatórios do manual)
 adb push .maestro/assets/foto-teste.jpg /sdcard/Pictures/foto-teste.jpg >/dev/null 2>&1 || true
@@ -56,8 +65,11 @@ if [ -n "${MANUAL_USER:-}" ]; then
       [ -f "$step" ] || continue
       name=$(basename "$step" .yaml)
       echo "::group::$sec $name"
-      if maestro test "$step" -e USER="$MANUAL_USER" -e PASS="$MANUAL_PASS" -e TPASS="$TPASS" \
-           --test-output-dir "manual-out/logs/$sec-$name" > "manual-out/logs/$sec-$name.txt" 2>&1; then
+      dismiss_anr
+      run_step() { maestro test "$step" -e USER="$MANUAL_USER" -e PASS="$MANUAL_PASS" -e TPASS="$TPASS" \
+           --test-output-dir "manual-out/logs/$sec-$name" > "manual-out/logs/$sec-$name.txt" 2>&1; }
+      # Passos com launchApp (login) podem ser repetidos com segurança se um diálogo de sistema atrapalhou
+      if run_step || { grep -q "launchApp" "$step" && { dismiss_anr; sleep 5; dismiss_anr; run_step; }; }; then
         sleep 1
         adb exec-out screencap -p > "manual-out/$sec/$name.png"
         maestro hierarchy > "manual-out/$sec/$name.json" 2>/dev/null || true

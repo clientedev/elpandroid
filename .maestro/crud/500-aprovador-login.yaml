@@ -2,9 +2,19 @@ appId: com.obraflow.app
 ---
 - launchApp:
     clearState: true
+- runFlow:
+    when:
+      visible: ".*(isn't responding|não está respondendo).*"
+    commands:
+      - tapOn: "(Wait|Aguardar)"
 - extendedWaitUntil:
     visible: "Entrar"
     timeout: 60000
+- runFlow:
+    when:
+      visible: ".*(isn't responding|não está respondendo).*"
+    commands:
+      - tapOn: "(Wait|Aguardar)"
 - extendedWaitUntil:
     visible: "Mais tarde"
     timeout: 6000

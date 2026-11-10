@@ -3,9 +3,19 @@ name: "subroteiro: entrar com a conta de teste"
 ---
 - launchApp:
     clearState: true
+- runFlow:
+    when:
+      visible: ".*(isn't responding|não está respondendo).*"
+    commands:
+      - tapOn: "(Wait|Aguardar)"
 - extendedWaitUntil:
     visible: "Entrar"
     timeout: 60000
+- runFlow:
+    when:
+      visible: ".*(isn't responding|não está respondendo).*"
+    commands:
+      - tapOn: "(Wait|Aguardar)"
 - tapOn: "seu.usuario ou email@empresa.com"
 - inputText: ${USER}
 - tapOn: "Sua senha"
