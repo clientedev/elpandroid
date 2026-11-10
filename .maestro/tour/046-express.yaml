@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd
+- tapOn:
+    text: "Descartar"
+    optional: true
+- tapOn: "Express"
+- waitForAnimationToEnd:
+    timeout: 8000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2000
+    optional: true

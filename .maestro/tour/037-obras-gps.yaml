@@ -1,0 +1,12 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd
+- tapOn: "Obras"
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn: "Ordenar por Proximidade (GPS)"
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 3000
+    optional: true

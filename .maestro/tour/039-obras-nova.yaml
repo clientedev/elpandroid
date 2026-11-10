@@ -1,0 +1,15 @@
+appId: com.obraflow.app
+---
+- tapOn:
+    text: "OK"
+    optional: true
+- tapOn: "Obras"
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn:
+    point: "92%,9%"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2500
+    optional: true

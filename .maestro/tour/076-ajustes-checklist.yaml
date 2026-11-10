@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- tapOn: "Ajustes"
+- waitForAnimationToEnd:
+    timeout: 8000
+- scrollUntilVisible:
+    element: "Personalizar Checklist"
+    direction: DOWN
+- tapOn: "Personalizar Checklist"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 3000
+    optional: true

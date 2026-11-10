@@ -33,24 +33,28 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      # APK x86_64 já compilado para este mesmo código do app? Reaproveita.
+      - id: apkcache
+        uses: actions/cache@v4
+        with:
+          path: ELP-x86_64.apk
+          key: elp-x86-${{ hashFiles('src/**', 'App.tsx', 'index.ts', 'app.json', 'package-lock.json', 'assets/**') }}
       - uses: actions/setup-node@v4
+        if: steps.apkcache.outputs.cache-hit != 'true'
         with:
           node-version: 22
           cache: npm
       - uses: actions/setup-java@v4
+        if: steps.apkcache.outputs.cache-hit != 'true'
         with:
           distribution: temurin
           java-version: 17
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-x86-${{ hashFiles('package-lock.json', 'app.json') }}
-          restore-keys: gradle-x86-
       - run: npm ci
+        if: steps.apkcache.outputs.cache-hit != 'true'
       - run: npx expo prebuild --platform android --clean --no-install
+        if: steps.apkcache.outputs.cache-hit != 'true'
       - name: Memoria do Gradle
+        if: steps.apkcache.outputs.cache-hit != 'true'
         working-directory: android
         run: |
           sed -i '/^org.gradle.jvmargs=/d;/^org.gradle.parallel=/d;/^kotlin.daemon.jvmargs=/d;/^reactNativeArchitectures=/d' gradle.properties
@@ -63,6 +67,7 @@ jobs:
             echo 'reactNativeArchitectures=x86_64'
           } >> gradle.properties
       - name: Compilar APK x86_64
+        if: steps.apkcache.outputs.cache-hit != 'true'
         working-directory: android
         run: |
           chmod +x gradlew

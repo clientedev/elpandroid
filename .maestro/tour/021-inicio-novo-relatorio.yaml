@@ -1,0 +1,16 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd
+- tapOn:
+    text: "Descartar"
+    optional: true
+- tapOn: "Início"
+- waitForAnimationToEnd:
+    timeout: 8000
+- tapOn: "+ Novo Relatório"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2500
+    optional: true

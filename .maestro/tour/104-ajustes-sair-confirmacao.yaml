@@ -1,0 +1,10 @@
+appId: com.obraflow.app
+---
+- tapOn: "Ajustes"
+- waitForAnimationToEnd:
+    timeout: 8000
+- scrollUntilVisible:
+    element: "Sair da Conta"
+    direction: DOWN
+- tapOn: "Sair da Conta"
+- waitForAnimationToEnd

@@ -46,7 +46,7 @@ if [ -n "${MANUAL_USER:-}" ] && ls .maestro/tour/[0-9]*.yaml >/dev/null 2>&1; th
       adb exec-out screencap -p > "manual-out/tour/$name-FALHOU.png"
       maestro hierarchy > "manual-out/tour/$name-FALHOU.json" 2>/dev/null || true
       status=1
-      [ "${TOUR_STOP_ON_FAIL:-1}" = "1" ] && break
+      [ "${TOUR_STOP_ON_FAIL:-0}" = "1" ] && break
     fi
     echo "::endgroup::"
   done

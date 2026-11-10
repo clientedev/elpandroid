@@ -1,0 +1,8 @@
+appId: com.obraflow.app
+---
+- tapOn: "Usuários"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 3000
+    optional: true

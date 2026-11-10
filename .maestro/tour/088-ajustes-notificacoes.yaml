@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- tapOn: "Ajustes"
+- waitForAnimationToEnd:
+    timeout: 8000
+- scrollUntilVisible:
+    element: "Notificações"
+    direction: DOWN
+- tapOn: "Notificações"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 3000
+    optional: true

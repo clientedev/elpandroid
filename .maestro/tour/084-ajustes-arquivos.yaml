@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- tapOn: "Ajustes"
+- waitForAnimationToEnd:
+    timeout: 8000
+- scrollUntilVisible:
+    element: "Arquivos do App"
+    direction: DOWN
+- tapOn: "Arquivos do App"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 3000
+    optional: true

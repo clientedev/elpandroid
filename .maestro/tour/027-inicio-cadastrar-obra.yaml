@@ -1,0 +1,14 @@
+appId: com.obraflow.app
+---
+- back
+- waitForAnimationToEnd
+- tapOn: "Início"
+- waitForAnimationToEnd:
+    timeout: 8000
+- scrollUntilVisible:
+    element: "Cadastrar Obra"
+- tapOn: "Cadastrar Obra"
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2500
+    optional: true
