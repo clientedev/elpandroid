@@ -1,17 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image 
+import {
+  View, Text, StyleSheet, TextInput, TouchableOpacity,
+  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNetwork } from '../../contexts/NetworkContext';
-import { Colors, Shadows } from '../../theme/colors';
 
 const REMEMBER_KEY = '@elp_remember_login';
 const SECURE_REMEMBER_KEY = 'elp_remember_login';
+
+// Paleta tirada do logo ELP: grafite (E/P) + azul (L)
+const C = {
+  bg: '#FFFFFF',
+  ink: '#121A20',      // grafite do E e do P
+  brand: '#00AEEF',    // azul do L
+  inkSoft: '#475569',
+  muted: '#94A3B8',
+  field: '#F6F8FB',
+  line: '#E5E9F0',
+  accent: '#0284C7',
+  accentSoft: '#E0F2FE',
+  danger: '#DC2626',
+  dangerSoft: '#FEF2F2',
+  warn: '#B45309',
+  warnSoft: '#FFFBEB',
+};
 
 export const LoginScreen: React.FC = () => {
   const { login, sessionMessage } = useAuth();
@@ -23,7 +41,10 @@ export const LoginScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [focused, setFocused] = useState<'user' | 'pass' | null>(null);
   const passwordRef = useRef<TextInput>(null);
+
+  const appVersion = Constants.expoConfig?.version ?? '';
 
   useEffect(() => {
     // Remove cópia antiga em texto aberto (versões <= 1.0.67) e lê do armazenamento criptografado
@@ -44,7 +65,7 @@ export const LoginScreen: React.FC = () => {
 
   async function handleLogin() {
     if (!username.trim() || !password) {
-      setErrorMessage('Por favor, informe seu usuário e senha.');
+      setErrorMessage('Informe seu usuário e senha.');
       return;
     }
 
@@ -69,153 +90,141 @@ export const LoginScreen: React.FC = () => {
     }
   }
 
+  const notice = errorMessage || sessionMessage || '';
+  const noticeIsError = Boolean(errorMessage);
+
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView 
+      <StatusBar style="dark" />
+      <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Top Header / Branding */}
-        <View style={styles.header}>
-          <View style={styles.logoBadge}>
-            <Image 
-              source={require('../../../assets/logo.png')} 
-              style={styles.logoImage} 
-              resizeMode="contain" 
+        <View style={styles.content}>
+          {/* Marca */}
+          <View style={styles.brand}>
+            <Image
+              source={require('../../../assets/logo-wordmark.png')}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityLabel="ELP"
             />
-          </View>
-          <Text style={styles.brandTitle}>ELP ENGENHARIA</Text>
-          <Text style={styles.brandSubtitle}>Sistema Integrado de Gestão & Diagnóstico de Obras</Text>
-
-          {/* Status de Conexão Clean */}
-          <View style={[styles.networkPill, isOnline ? styles.onlinePill : styles.offlinePill]}>
-            <View style={[styles.pillDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-            <Text style={[styles.pillText, isOnline ? styles.onlineText : styles.offlineText]}>
-              {isOnline ? 'Nuvem Conectada' : 'Modo Offline Ativo'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Card de Login Clean & Profissional */}
-        <View style={styles.card}>
-          <View style={styles.cardHeaderArea}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="shield-checkmark" size={26} color="#0891B2" />
-            </View>
-            <Text style={styles.cardTitle}>Acesso Corporativo</Text>
-            <Text style={styles.cardSubtitle}>Entre com suas credenciais para continuar</Text>
+            <Text style={styles.brandSubtitle}>Engenharia diagnóstica e gestão de obras</Text>
           </View>
 
-          {!errorMessage && sessionMessage ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{sessionMessage}</Text>
-            </View>
-          ) : null}
-          {errorMessage ? (
-            <View style={styles.errorBox}>
-              <Ionicons name="alert-circle" size={18} color={Colors.danger} />
-              <Text style={styles.errorText}>{errorMessage}</Text>
+          {/* Aviso / erro */}
+          {notice ? (
+            <View style={[styles.notice, noticeIsError ? styles.noticeError : styles.noticeInfo]}>
+              <Ionicons
+                name={noticeIsError ? 'alert-circle' : 'information-circle'}
+                size={18}
+                color={noticeIsError ? C.danger : C.accent}
+              />
+              <Text style={[styles.noticeText, { color: noticeIsError ? C.danger : C.inkSoft }]}>
+                {notice}
+              </Text>
             </View>
           ) : null}
 
-          {/* Campo Usuário */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Usuário ou E-mail</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons 
-                name="person-outline" 
-                size={20} 
-                color={Colors.textMuted} 
-                style={styles.inputIcon} 
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Digite seu usuário ou e-mail"
-                placeholderTextColor={Colors.textMuted}
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                autoComplete="username"
-                textContentType="username"
-                importantForAutofill="yes"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => passwordRef.current?.focus()}
-                editable={!loading}
-              />
-              {username.length > 0 && (
-                <TouchableOpacity onPress={() => setUsername('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          {/* Campo Senha com Botão de Revelar Senha */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Senha de Acesso</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons 
-                name="lock-closed-outline" 
-                size={20} 
-                color={Colors.textMuted} 
-                style={styles.inputIcon} 
-              />
-              <TextInput
-                ref={passwordRef}
-                style={styles.input}
-                placeholder="Digite sua senha"
-                placeholderTextColor={Colors.textMuted}
-                secureTextEntry={!showPassword}
-                value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="password"
-                textContentType="password"
-                importantForAutofill="yes"
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-                editable={!loading}
-              />
-              <TouchableOpacity 
-                onPress={() => setShowPassword(!showPassword)} 
-                style={styles.eyeButton}
-                activeOpacity={0.7}
-                accessibilityLabel={showPassword ? "Ocultar senha" : "Ver senha"}
+          {/* Usuário */}
+          <Text style={styles.label}>Usuário ou e-mail</Text>
+          <View style={[styles.field, focused === 'user' && styles.fieldFocused]}>
+            <Ionicons
+              name="person-outline"
+              size={19}
+              color={focused === 'user' ? C.accent : C.muted}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="seu.usuario ou email@empresa.com"
+              placeholderTextColor={C.muted}
+              value={username}
+              onChangeText={t => { setUsername(t); if (errorMessage) setErrorMessage(''); }}
+              onFocus={() => setFocused('user')}
+              onBlur={() => setFocused(null)}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              autoComplete="username"
+              textContentType="username"
+              importantForAutofill="yes"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              editable={!loading}
+            />
+            {username.length > 0 && !loading && (
+              <TouchableOpacity
+                onPress={() => setUsername('')}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityLabel="Limpar usuário"
               >
-                <Ionicons 
-                  name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                  size={21} 
-                  color={showPassword ? Colors.primary : Colors.textSecondary} 
-                />
+                <Ionicons name="close-circle" size={18} color={C.muted} />
               </TouchableOpacity>
-            </View>
+            )}
           </View>
 
-          {/* Linha Permanecer Conectado */}
-          <View style={styles.rememberRow}>
-            <TouchableOpacity 
-              style={styles.rememberCheckboxRow}
-              onPress={() => setRememberMe(!rememberMe)}
-              activeOpacity={0.8}
+          {/* Senha */}
+          <Text style={[styles.label, { marginTop: 18 }]}>Senha</Text>
+          <View style={[styles.field, focused === 'pass' && styles.fieldFocused]}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={19}
+              color={focused === 'pass' ? C.accent : C.muted}
+            />
+            <TextInput
+              ref={passwordRef}
+              style={styles.input}
+              placeholder="Sua senha"
+              placeholderTextColor={C.muted}
+              secureTextEntry={!showPassword}
+              value={password}
+              onChangeText={t => { setPassword(t); if (errorMessage) setErrorMessage(''); }}
+              onFocus={() => setFocused('pass')}
+              onBlur={() => setFocused(null)}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="password"
+              textContentType="password"
+              importantForAutofill="yes"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+              editable={!loading}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(v => !v)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityLabel={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
             >
-              <View style={[styles.checkboxContainer, rememberMe && styles.checkboxContainerChecked]}>
-                {rememberMe && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-              </View>
-              <Text style={styles.rememberText}>Permanecer conectado</Text>
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={showPassword ? C.accent : C.muted}
+              />
             </TouchableOpacity>
           </View>
 
-          {/* Botão Entrar */}
-          <TouchableOpacity 
-            style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+          {/* Manter conectado */}
+          <TouchableOpacity
+            style={styles.rememberRow}
+            onPress={() => setRememberMe(v => !v)}
+            activeOpacity={0.7}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: rememberMe }}
+          >
+            <View style={[styles.checkbox, rememberMe && styles.checkboxOn]}>
+              {rememberMe && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
+            </View>
+            <Text style={styles.rememberText}>Manter conectado</Text>
+          </TouchableOpacity>
+
+          {/* Entrar */}
+          <TouchableOpacity
+            style={[styles.button, loading && styles.buttonLoading]}
             onPress={handleLogin}
             disabled={loading}
             activeOpacity={0.85}
@@ -223,30 +232,27 @@ export const LoginScreen: React.FC = () => {
             {loading ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <>
-                <Text style={styles.submitText}>Entrar no Sistema</Text>
-                <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-              </>
+              <Text style={styles.buttonText}>Entrar</Text>
             )}
           </TouchableOpacity>
 
-          {/* Selo de Segurança e Servidor */}
-          <View style={styles.fixedServerBox}>
-            <Ionicons name="shield-checkmark-outline" size={15} color="#10B981" />
-            <Text style={styles.fixedServerText}>
-              Ambiente Criptografado & Protegido
-            </Text>
-          </View>
+          {/* Só aparece sem internet: muda o que é possível fazer */}
+          {!isOnline && (
+            <View style={styles.offline}>
+              <Ionicons name="cloud-offline-outline" size={15} color={C.warn} />
+              <Text style={styles.offlineText}>
+                Offline: só entra quem já usou este aparelho.
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Rodapé Corporativo */}
+        {/* Rodapé */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            ObraFlow • Sistema Corporativo Android
+          <Text style={styles.footerBrand}>
+            GL<Text style={styles.footerBrandAccent}>Systems</Text>
           </Text>
-          <Text style={styles.footerSubtext}>
-            ELP Consultoria e Engenharia Diagnóstica
-          </Text>
+          {appVersion ? <Text style={styles.footerVersion}>versão {appVersion}</Text> : null}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -256,356 +262,173 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B132B',
+    backgroundColor: C.bg,
   },
   scroll: {
     flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 28,
+    paddingTop: 56,
+    paddingBottom: 24,
+  },
+  content: {
+    width: '100%',
+    maxWidth: 420,
+    alignSelf: 'center',
+    flexGrow: 1,
     justifyContent: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 32,
   },
-  header: {
+
+  brand: {
     alignItems: 'center',
-    marginBottom: 26,
+    marginBottom: 40,
   },
-  logoBadge: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    backgroundColor: '#1C2541',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 1.5,
-    borderColor: '#3A506B',
-    ...Shadows.md,
-  },
-  logoImage: {
-    width: 46,
-    height: 46,
-  },
-  brandTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 1.5,
+  logo: {
+    width: 150,
+    height: 50, // proporção do wordmark (720 x 242)
   },
   brandSubtitle: {
-    fontSize: 12.5,
-    color: '#94A3B8',
-    marginTop: 4,
-    textAlign: 'center',
-    letterSpacing: 0.2,
+    marginTop: 16,
+    fontSize: 14,
+    color: C.inkSoft,
+    letterSpacing: 0.1,
   },
-  networkPill: {
+
+  notice: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    marginTop: 12,
-  },
-  onlinePill: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.35)',
-  },
-  offlinePill: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.35)',
-  },
-  pillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  onlineDot: {
-    backgroundColor: '#10B981',
-  },
-  offlineDot: {
-    backgroundColor: '#F59E0B',
-  },
-  pillText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  onlineText: {
-    color: '#10B981',
-  },
-  offlineText: {
-    color: '#F59E0B',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 22,
-    paddingVertical: 26,
-    ...Shadows.lg,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  cardHeaderArea: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#E0F2FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-  },
-  cardTitle: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#0F172A',
-    textAlign: 'center',
-    letterSpacing: -0.2,
-  },
-  cardSubtitle: {
-    fontSize: 12.5,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 3,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FCA5A5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    gap: 8,
-  },
-  errorText: {
-    flex: 1,
-    color: '#DC2626',
-    fontSize: 12.5,
-    fontWeight: '600',
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#334155',
-    marginBottom: 6,
-    letterSpacing: 0.2,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    gap: 10,
     borderRadius: 12,
     paddingHorizontal: 14,
-    height: 50,
+    paddingVertical: 12,
+    marginBottom: 20,
   },
-  inputWrapperFocused: {
-    borderColor: '#0284C7',
+  noticeError: {
+    backgroundColor: C.dangerSoft,
+  },
+  noticeInfo: {
+    backgroundColor: C.accentSoft,
+  },
+  noticeText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.ink,
+    marginBottom: 8,
+  },
+  field: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 54,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: C.field,
+    borderWidth: 1.5,
+    borderColor: C.field,
+  },
+  fieldFocused: {
     backgroundColor: '#FFFFFF',
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  inputIcon: {
-    marginRight: 10,
+    borderColor: C.accent,
   },
   input: {
     flex: 1,
     height: '100%',
     paddingVertical: 0,
-    fontSize: 14.5,
-    color: '#0F172A',
-    fontWeight: '500',
+    fontSize: 15,
+    color: C.ink,
   },
-  eyeButton: {
-    padding: 6,
-  },
+
   rememberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    marginTop: 2,
+    alignSelf: 'flex-start',
+    gap: 10,
+    marginTop: 18,
+    marginBottom: 26,
+    paddingVertical: 2,
   },
-  rememberCheckboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  checkboxContainer: {
+  checkbox: {
     width: 20,
     height: 20,
     borderRadius: 6,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
-  checkboxContainerChecked: {
-    backgroundColor: '#0284C7',
-    borderColor: '#0284C7',
+  checkboxOn: {
+    backgroundColor: C.accent,
+    borderColor: C.accent,
   },
   rememberText: {
-    fontSize: 13,
-    color: '#475569',
-    fontWeight: '600',
+    fontSize: 14,
+    color: C.inkSoft,
+    fontWeight: '500',
   },
-  forgotText: {
-    fontSize: 12.5,
-    color: '#0284C7',
-    fontWeight: '700',
-  },
-  submitButton: {
-    backgroundColor: '#0284C7',
-    height: 50,
-    borderRadius: 12,
-    flexDirection: 'row',
+
+  button: {
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: C.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+    elevation: 3,
   },
-  submitButtonDisabled: {
-    opacity: 0.65,
+  buttonLoading: {
+    opacity: 0.75,
   },
-  submitText: {
+  buttonText: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  fixedServerBox: {
+
+  offline: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    marginTop: 18,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: C.warnSoft,
   },
-  fixedServerText: {
-    fontSize: 11.5,
-    color: '#64748B',
+  offlineText: {
+    fontSize: 12.5,
+    color: C.warn,
     fontWeight: '600',
   },
+
   footer: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 32,
     gap: 2,
   },
-  footerText: {
+  footerBrand: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: C.ink,
+    letterSpacing: 0.4,
+  },
+  footerBrandAccent: {
+    color: C.brand,
+  },
+  footerVersion: {
     fontSize: 11.5,
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
-  footerSubtext: {
-    fontSize: 10.5,
-    color: '#64748B',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(11, 19, 43, 0.75)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 22,
-    ...Shadows.lg,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  modalHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  modalIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#E0F2FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalTitle: {
-    fontSize: 16.5,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  modalDesc: {
-    fontSize: 13,
-    color: '#64748B',
-    lineHeight: 18,
-    marginBottom: 16,
-  },
-  modalInput: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 46,
-    fontSize: 14,
-    color: '#0F172A',
-    marginBottom: 18,
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    gap: 10,
-  },
-  modalCancelBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  modalCancelText: {
-    color: '#64748B',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  modalConfirmBtn: {
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalConfirmText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
+    color: C.muted,
   },
 });
