@@ -1,5 +1,9 @@
 appId: com.obraflow.app
 ---
+- launchApp:
+    stopApp: false
+- waitForAnimationToEnd:
+    timeout: 5000
 - back
 - waitForAnimationToEnd
 - runFlow:
@@ -42,7 +46,7 @@ appId: com.obraflow.app
       - tapOn:
           text: "(?i)(descartar|sair sem salvar|ok)"
           optional: true
-- tapOn: "Obras"
+- tapOn: ".*, Obras"
 - waitForAnimationToEnd:
     timeout: 8000
 - tapOn: "Ordenar por Proximidade (GPS)"

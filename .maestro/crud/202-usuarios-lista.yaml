@@ -1,6 +1,10 @@
 appId: com.obraflow.app
 ---
-- tapOn: "Ajustes"
+- launchApp:
+    stopApp: false
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: ".*, Ajustes"
 - waitForAnimationToEnd:
     timeout: 8000
 - scrollUntilVisible:

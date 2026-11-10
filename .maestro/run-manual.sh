@@ -69,7 +69,7 @@ if [ -n "${MANUAL_USER:-}" ]; then
       run_step() { maestro test "$step" -e USER="$MANUAL_USER" -e PASS="$MANUAL_PASS" -e TPASS="$TPASS" \
            --test-output-dir "manual-out/logs/$sec-$name" > "manual-out/logs/$sec-$name.txt" 2>&1; }
       # Passos com launchApp (login) podem ser repetidos com segurança se um diálogo de sistema atrapalhou
-      if run_step || { grep -q "launchApp" "$step" && { dismiss_anr; sleep 5; dismiss_anr; run_step; }; }; then
+      if run_step || { grep -q "clearState" "$step" && { dismiss_anr; sleep 5; dismiss_anr; run_step; }; }; then
         sleep 1
         adb exec-out screencap -p > "manual-out/$sec/$name.png"
         maestro hierarchy > "manual-out/$sec/$name.json" 2>/dev/null || true

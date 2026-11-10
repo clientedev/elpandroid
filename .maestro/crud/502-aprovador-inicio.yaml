@@ -1,5 +1,9 @@
 appId: com.obraflow.app
 ---
+- launchApp:
+    stopApp: false
+- waitForAnimationToEnd:
+    timeout: 5000
 - runFlow:
     when:
       notVisible: "Ajustes"
@@ -41,7 +45,7 @@ appId: com.obraflow.app
           text: "(?i)(descartar|sair sem salvar|ok)"
           optional: true
 - tapOn:
-    text: "Início"
+    text: ".*, Início"
 - waitForAnimationToEnd:
     timeout: 5000
 - extendedWaitUntil:

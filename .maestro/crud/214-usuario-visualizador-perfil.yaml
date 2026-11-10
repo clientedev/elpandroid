@@ -1,5 +1,13 @@
 appId: com.obraflow.app
 ---
+- launchApp:
+    stopApp: false
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Visualizador / Cliente"
+    direction: DOWN
+    timeout: 30000
 - tapOn: "Visualizador / Cliente"
 - scrollUntilVisible:
     element: "Mínimo 6 caracteres"

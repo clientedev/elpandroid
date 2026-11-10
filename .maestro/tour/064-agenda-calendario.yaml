@@ -1,4 +1,8 @@
 appId: com.obraflow.app
 ---
+- launchApp:
+    stopApp: false
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn: "Calendário"
 - waitForAnimationToEnd

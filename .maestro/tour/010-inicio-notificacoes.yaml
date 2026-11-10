@@ -1,5 +1,9 @@
 appId: com.obraflow.app
 ---
+- launchApp:
+    stopApp: false
+- waitForAnimationToEnd:
+    timeout: 5000
 - tapOn:
     point: "69%,9%"
 - waitForAnimationToEnd
