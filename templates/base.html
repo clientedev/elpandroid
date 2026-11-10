@@ -37,228 +37,85 @@
         }
     </script>
 
-    <style>
-        :root {
-            --elp-cyan: #20c1e8;
-            --elp-dark: #0f172a;
-            --elp-darker: #090d16;
-        }
-
-        body {
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        main {
-            flex: 1;
-        }
-
-        .navbar-elp {
-            background-color: var(--elp-dark) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        .navbar-elp .nav-link {
-            color: #94a3b8 !important;
-            font-weight: 500;
-            padding: 0.5rem 0.85rem !important;
-            transition: color 0.2s;
-        }
-
-        .navbar-elp .nav-link:hover,
-        .navbar-elp .nav-link.active {
-            color: var(--elp-cyan) !important;
-        }
-
-        .footer-elp {
-            background-color: var(--elp-darker);
-            color: #64748b;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
-            padding: 1.5rem 0;
-            font-size: 0.85rem;
-        }
-
-        .footer-elp a {
-            color: #94a3b8;
-            text-decoration: none;
-        }
-
-        .footer-elp a:hover {
-            color: var(--elp-cyan);
-        }
-    </style>
+    <!-- Tema único ELP (mesmo padrão do app) -->
+    <link href="{{ url_for('static', filename='css/elp-theme.css') }}?v=2" rel="stylesheet">
 
     {% block extra_head %}{% endblock %}
 </head>
 
 <body>
-    <!-- Navbar Centralizada -->
-    <nav class="navbar navbar-expand-lg navbar-dark navbar-elp py-3 px-3 shadow-sm">
-        <div class="container-fluid">
-            <!-- Logo -->
-            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
-                <img src="{{ url_for('static', filename='logo_elp_navbar.png') }}" alt="ELP Logo" width="85" height="auto" class="me-2">
-                <span class="fw-bold text-white d-none d-sm-inline" style="letter-spacing: -0.02em;">ELP ENGENHARIA</span>
+    {% set ep = request.endpoint or '' %}
+    {% set is_admin_user = current_user.is_authenticated and (current_user.is_master or current_user.is_developer or current_user.username == 'admin' or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor')) %}
+    <nav class="navbar navbar-expand-lg elp-topbar">
+        <div class="container">
+            <a class="navbar-brand me-4" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='img/elp-wordmark.png') }}" alt="ELP">
             </a>
 
-            <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
-                aria-controls="navbarContent" aria-expanded="false" aria-label="Navegação">
+            <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
+                aria-controls="navbarContent" aria-expanded="false" aria-label="Abrir menu">
                 <i class="fas fa-bars"></i>
             </button>
 
             <div class="collapse navbar-collapse" id="navbarContent">
                 {% if current_user.is_authenticated %}
-                <!-- Links para usuário autenticado no painel -->
-                <ul class="navbar-nav mx-auto align-items-lg-center">
+                <ul class="navbar-nav me-auto gap-lg-1">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('painel_apk') }}">
-                            <i class="fas fa-th-large me-1"></i> Painel do APK
-                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'painel_apk' }}" href="{{ url_for('painel_apk') }}">Início</a>
                     </li>
-
                     <li class="nav-item">
-                        <a class="nav-link text-white fw-bold" href="{{ url_for('ajustes_apk_page') }}">
-                            <i class="fas fa-microchip text-primary me-1"></i> Central do APK
-                        </a>
+                        <a class="nav-link {{ 'active' if ep == 'ajustes_apk_page' }}" href="{{ url_for('ajustes_apk_page') }}">Central</a>
                     </li>
-
+                    {% if is_admin_user %}
                     <li class="nav-item">
-                        <a class="nav-link text-success fw-bold" href="{{ url_for('download_official_apk') }}">
-                            <i class="fab fa-android me-1"></i> Baixar APK
-                        </a>
-                    </li>
-
-                    {% if current_user.is_master or current_user.is_developer or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor') %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('users_list') }}">
-                            <i class="fas fa-users me-1"></i> Usuários
-                        </a>
+                        <a class="nav-link {{ 'active' if ep in ['users_list', 'user_edit', 'register'] }}" href="{{ url_for('users_list') }}">Usuários</a>
                     </li>
                     {% endif %}
-
-                    <!-- Ajustes do APK -->
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="ajustesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-sliders-h me-1"></i> Módulos do APK
-                        </a>
-                        <ul class="dropdown-menu shadow border-0" aria-labelledby="ajustesDropdown">
-                            <li>
-                                <a class="dropdown-item fw-bold text-primary" href="{{ url_for('ajustes_apk_page') }}">
-                                    <i class="fas fa-microchip text-primary me-2"></i>Central Inteligente do APK
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('ajustes_apk_page') }}#tab-email">
-                                    <i class="fas fa-envelope-open-text text-warning me-2"></i>Central de E-mails & Resend
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('admin_emails') }}">
-                                    <i class="fas fa-at text-info me-2"></i>E-mails de Clientes por Obra
-                                </a>
-                            </li>
-                            {% if current_user.is_master or current_user.is_developer or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor') %}
-                            <li>
-                                <a class="dropdown-item fw-bold text-primary" href="{{ url_for('admin_apk_screen_editor') }}">
-                                    <i class="fas fa-magic text-primary me-2"></i>Editor de Telas, PDFs & Publicador do APK
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item fw-bold text-success" href="{{ url_for('admin_user_app_customizer') }}">
-                                    <i class="fas fa-mobile-alt text-success me-2"></i>Visão de Cada Usuário & Simulador
-                                </a>
-                            </li>
-                            {% endif %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('admin_legendas') }}">
-                                    <i class="fas fa-tags text-info me-2"></i>Legendas Técnicas
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('admin_checklist_padrao') }}">
-                                    <i class="fas fa-tasks text-warning me-2"></i>Checklist Padrão
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('admin_aprovadores_padrao') }}">
-                                    <i class="fas fa-user-check text-success me-2"></i>Aprovadores Padrão
-                                </a>
-                            </li>
+                        <a class="nav-link dropdown-toggle {{ 'active' if ep.startswith('admin_legenda') or ep.startswith('admin_checklist') or ep.startswith('admin_aprovador') or ep == 'admin_emails' }}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Cadastros</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_legendas') }}"><i class="fas fa-tags me-2"></i>Legendas técnicas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_checklist_padrao') }}"><i class="fas fa-list-check me-2"></i>Checklist padrão</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_aprovadores_padrao') }}"><i class="fas fa-user-check me-2"></i>Aprovadores</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_emails') }}"><i class="fas fa-at me-2"></i>E-mails dos clientes</a></li>
                         </ul>
                     </li>
-
-                </ul>
-
-                <!-- Perfil & Logout -->
-                <ul class="navbar-nav ms-auto align-items-lg-center">
+                    {% if is_admin_user %}
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fas fa-user-circle me-1"></i>
-                            <span>{{ current_user.nome_completo or current_user.username }}</span>
-                            {% if current_user.is_developer or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor') %}
-                            <span class="badge bg-danger ms-2" style="font-size: 0.7rem;"><i class="fas fa-code me-1"></i>DEV</span>
-                            {% elif current_user.is_master %}
-                            <span class="badge bg-primary ms-2" style="font-size: 0.7rem;"><i class="fas fa-shield-alt me-1"></i>MASTER</span>
-                            {% endif %}
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end shadow border-0" aria-labelledby="userMenu">
-                            <li><span class="dropdown-item-text text-muted small fw-bold">{{ current_user.cargo or 'Vistoriador' }}</span></li>
-                            {% if current_user.is_developer or current_user.is_master or (current_user.cargo and current_user.cargo.lower() == 'desenvolvedor') %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item fw-bold text-success" href="{{ url_for('admin_user_app_customizer') }}">
-                                    <i class="fas fa-eye me-2"></i>Ver Visão de Cada Usuário
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item text-primary" href="{{ url_for('users_list') }}">
-                                    <i class="fas fa-users-cog me-2"></i>Gestão de Usuários
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('ajustes_apk_page') }}">
-                                    <i class="fas fa-sliders-h me-2"></i>Ajustes que Afetam o APK
-                                </a>
-                            </li>
-                            {% endif %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item text-success fw-bold" href="{{ url_for('download_official_apk') }}">
-                                    <i class="fab fa-android me-2"></i>Baixar ELP.apk
-                                </a>
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="{{ url_for('logout') }}">
-                                    <i class="fas fa-sign-out-alt me-2"></i>Sair
-                                </a>
-                            </li>
+                        <a class="nav-link dropdown-toggle {{ 'active' if ep in ['admin_apk_screen_editor', 'admin_user_app_customizer'] }}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Aplicativo</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('admin_apk_screen_editor') }}"><i class="fas fa-mobile-screen me-2"></i>Editor de telas</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin_user_app_customizer') }}"><i class="fas fa-eye me-2"></i>Visão de cada usuário</a></li>
                         </ul>
                     </li>
+                    {% endif %}
                 </ul>
 
+                <div class="d-flex align-items-center gap-2 mt-3 mt-lg-0">
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('download_official_apk') }}">
+                        <i class="fab fa-android me-1"></i>Baixar APK
+                    </a>
+                    <div class="dropdown">
+                        <a href="#" class="d-flex align-items-center gap-2 text-decoration-none" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu do usuário">
+                            <span class="elp-avatar">{{ ((current_user.nome_completo or current_user.username or '?')[:1]) | upper }}</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li class="px-3 py-2">
+                                <div class="fw-bold small">{{ current_user.nome_completo or current_user.username }}</div>
+                                <div class="text-muted small">{{ current_user.cargo or current_user.username }}</div>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="fas fa-arrow-right-from-bracket me-2"></i>Sair</a></li>
+                        </ul>
+                    </div>
+                </div>
                 {% else %}
-                <!-- Links públicos -->
-                <ul class="navbar-nav ms-auto align-items-lg-center gap-2">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('index') }}">Sobre o Sistema</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link text-success fw-bold" href="{{ url_for('download_official_apk') }}">
-                            <i class="fab fa-android me-1"></i> Baixar APK
-                        </a>
-                    </li>
-                    <li class="nav-item ms-lg-2">
-                        <a class="btn btn-outline-info btn-sm px-3" href="{{ url_for('login') }}">
-                            <i class="fas fa-lock me-1"></i> Acessar Sistema
-                        </a>
-                    </li>
-                </ul>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('download_official_apk') }}"><i class="fab fa-android me-1"></i>Baixar APK</a>
+                    <a class="btn btn-primary btn-sm" href="{{ url_for('login') }}">Entrar</a>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -279,19 +136,15 @@
     </div>
 
     <!-- Conteúdo Principal -->
-    <main class="container my-4">
+    <main class="container py-4 py-lg-5">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Rodapé -->
-    <footer class="footer-elp">
-        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-2 text-center text-md-start">
-            <p class="mb-0">&copy; 2026 ELP Consultoria e Engenharia. Todos os direitos reservados.</p>
-            <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
-                    <i class="fab fa-android me-1"></i>Web & APK: v{{ app_version }} (Build {{ app_version_code }})
-                </span>
-            </div>
+    <footer class="elp-footer">
+        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-1">
+            <span>ELP Consultoria e Engenharia</span>
+            <span><strong class="gl">GL<span>Systems</span></strong> · versão {{ app_version }}</span>
         </div>
     </footer>
 

@@ -254,34 +254,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid px-0 px-md-3 py-3">
-    <!-- Header Principal -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 pb-3 border-bottom gap-3">
+<div>
+    <div class="elp-page-head">
         <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <span class="badge bg-danger fw-bold px-2 py-1"><i class="fas fa-crown me-1"></i>EXCLUSIVO MASTER</span>
-                <span class="badge bg-primary">SERVER-DRIVEN UI</span>
-                <span class="badge bg-success" id="versionBadge">VERSÃO v{{ app_version }} (BUILD {{ app_version_code }})</span>
-            </div>
-            <h2 class="h3 fw-bold text-dark mb-0">
-                <i class="fas fa-magic text-primary me-2"></i>Construtor de Telas, Regras & Publicador do APK
-            </h2>
-            <p class="text-muted small mb-0 mt-1">
-                Visualize e altere todas as regras de cada página do APK, customize a formatação oficial dos laudos PDF e lance novas versões oficiais (1.0.29 .. 30 .. 31) em 1 clique.
-            </p>
+            <h1>Editor de telas</h1>
+            <p>Ordem, textos e visibilidade dos blocos de cada tela do app, e formatação dos laudos em PDF. As mudanças chegam aos celulares na próxima sincronização.</p>
         </div>
-
-        <div class="d-flex flex-wrap gap-2">
-            <button class="btn btn-success fw-bold px-3 shadow-sm" onclick="abrirModalPublicar()">
-                <i class="fas fa-rocket me-1"></i> Publicar Nova Atualização
-            </button>
-            <button class="btn btn-primary fw-bold" onclick="salvarConfiguracao()">
-                <i class="fas fa-save me-1"></i> Salvar Alterações
-            </button>
-            <a href="{{ url_for('ajustes_apk_page') }}" class="btn btn-outline-secondary">
-                <i class="fas fa-arrow-left me-1"></i> Voltar
-            </a>
-        </div>
+        <button class="btn btn-primary" onclick="salvarConfiguracao()">
+            <i class="fas fa-save me-1"></i> Salvar alterações
+        </button>
     </div>
 
     <!-- Seletor de Telas do APK + Aba de PDFs -->
@@ -355,7 +336,7 @@
             <div class="phone-mockup-wrapper">
                 <div class="text-center mb-2">
                     <span class="badge bg-dark text-white border px-3 py-1" id="simulatorBadge">
-                        <i class="fab fa-android text-success me-1"></i> Pré-visualização 100% Real do APK
+                        <i class="fab fa-android text-success me-1"></i> Pré-visualização
                     </span>
                 </div>
 
@@ -428,51 +409,8 @@
     </div>
 </div>
 
-<!-- Modal Publicar Nova Atualização do APK -->
-<div class="modal fade" id="modalPublicarAtualizacao" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title fw-bold">
-                    <i class="fas fa-rocket me-2"></i>Publicar Nova Atualização do APK
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body p-4">
-                <p class="text-muted small mb-3">
-                    Este assistente incrementará automaticamente a versão em todos os arquivos de configuração do aplicativo, compilará o novo instalador nativo oficial e fará o deploy em produção.
-                </p>
 
-                <div class="bg-light p-3 rounded-3 border mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="text-muted small">Versão Atual em Produção:</span>
-                        <span class="badge bg-secondary fs-6" id="modalCurrentVersion">{{ app_version }} (Build {{ app_version_code }})</span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold text-dark small">Nova Versão a ser Lançada:</span>
-                        <span class="badge bg-success fs-6" id="modalNextVersion">1.0.29 (Build 29)</span>
-                    </div>
-                </div>
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold small">Notas da Versão (Changelog exibido no app):</label>
-                    <textarea class="form-control" id="modalVersionNotes" rows="3" placeholder="Ex: Ajustes nas regras de exibição das telas, novas cores nos laudos PDF e melhorias de performance."></textarea>
-                </div>
-
-                <div class="alert alert-warning border-0 p-2 small mb-0 rounded-2">
-                    <i class="fas fa-exclamation-triangle me-1"></i>
-                    A compilação do APK nativo pode levar cerca de 1 a 2 minutos. Aguarde o aviso de conclusão.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success fw-bold" id="btnConfirmarPublicacao" onclick="executarPublicacaoAtualizacao()">
-                    <i class="fas fa-check-circle me-1"></i> Confirmar & Publicar Agora
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Modal Adicionar Bloco Customizado -->
 <div class="modal fade" id="modalAdicionarBloco" tabindex="-1">
@@ -569,7 +507,7 @@ function selecionarTela(screenKey) {
     } else {
         phoneFrame.classList.remove('d-none');
         pdfFrame.classList.add('d-none');
-        simBadge.innerHTML = '<i class="fab fa-android text-success me-1"></i> Pré-visualização 100% Real do APK';
+        simBadge.innerHTML = '<i class="fab fa-android text-success me-1"></i> Pré-visualização';
         btnAdd.style.display = 'inline-block';
 
         // Atualizar aba inferior

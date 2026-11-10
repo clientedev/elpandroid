@@ -4,414 +4,159 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Acesso ao Sistema | ELP Consultoria e Engenharia</title>
+    <title>Entrar · ELP</title>
 
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Bootstrap 5 & Font Awesome -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-
-    <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192x192.png') }}">
 
     <style>
         :root {
-            --bg-canvas: #090d16;
-            --card-surface: #111827;
-            --card-border: #1f293d;
-            --input-bg: #0b111e;
-            --input-border: #243049;
-            --text-primary: #f1f5f9;
-            --text-secondary: #94a3b8;
-            --text-muted: #64748b;
-            --brand-primary: #0284c7;
-            --brand-hover: #0369a1;
-            --brand-accent: #20c1e8;
+            --ink: #121A20; --ink-soft: #475569; --muted: #94A3B8;
+            --field: #F6F8FB; --line: #E5E9F0;
+            --brand: #00AEEF; --accent: #0284C7; --accent-dark: #0369A1; --accent-soft: #E0F2FE;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
         body {
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-canvas);
-            color: var(--text-primary);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 1.5rem 1rem;
-            position: relative;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(2, 132, 199, 0.08) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(15, 23, 42, 0.8) 0px, transparent 50%);
+            background: #FFFFFF; color: var(--ink);
+            display: flex; flex-direction: column;
+            -webkit-font-smoothing: antialiased;
         }
+        main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px 24px; }
+        .wrap { width: 100%; max-width: 380px; }
 
-        .login-wrapper {
-            width: 100%;
-            max-width: 440px;
-            margin: auto;
-        }
+        .brand { text-align: center; margin-bottom: 40px; }
+        .brand img { width: 150px; height: auto; display: block; margin: 0 auto; }
+        .brand p { margin: 16px 0 0; font-size: 14px; color: var(--ink-soft); }
 
-        .login-card {
-            background-color: var(--card-surface);
-            border: 1px solid var(--card-border);
-            border-radius: 14px;
-            padding: 2.25rem 2rem;
-            box-shadow: 0 20px 45px -15px rgba(0, 0, 0, 0.7);
+        .notice {
+            display: flex; gap: 10px; align-items: center;
+            border-radius: 12px; padding: 12px 14px; margin-bottom: 20px;
+            font-size: 13px; font-weight: 600; line-height: 1.4;
         }
+        .notice.error { background: #FEF2F2; color: #DC2626; }
+        .notice.info { background: var(--accent-soft); color: var(--accent-dark); }
 
-        .brand-header {
-            text-align: center;
-            margin-bottom: 1.75rem;
+        label { display: block; font-size: 13px; font-weight: 700; margin: 0 0 8px; }
+        .field {
+            display: flex; align-items: center; gap: 10px;
+            height: 54px; padding: 0 16px; border-radius: 14px;
+            background: var(--field); border: 1.5px solid var(--field);
+            transition: border-color .15s, background .15s;
         }
+        .field:focus-within { background: #FFFFFF; border-color: var(--accent); }
+        .field > i { color: var(--muted); width: 18px; text-align: center; }
+        .field:focus-within > i { color: var(--accent); }
+        .field input {
+            flex: 1; border: 0; background: transparent; outline: none;
+            font: inherit; font-size: 15px; color: var(--ink); height: 100%; min-width: 0;
+        }
+        .field input::placeholder { color: var(--muted); }
+        .field.invalid { border-color: #FCA5A5; }
+        .eye { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 8px; }
+        .eye:hover { color: var(--accent); }
+        .group + .group { margin-top: 18px; }
+        .err { color: #DC2626; font-size: 12px; margin-top: 6px; }
 
-        .brand-logo {
-            max-height: 44px;
-            width: auto;
-            margin-bottom: 1rem;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-        }
+        .remember { display: inline-flex; align-items: center; gap: 10px; margin: 18px 0 26px; font-size: 14px; color: var(--ink-soft); cursor: pointer; user-select: none; }
+        .remember input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
 
-        .portal-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            letter-spacing: -0.01em;
-            margin-bottom: 0.25rem;
+        .btn {
+            width: 100%; height: 54px; border: 0; border-radius: 14px;
+            background: var(--accent); color: #FFFFFF;
+            font: inherit; font-size: 16px; font-weight: 700; letter-spacing: .2px;
+            cursor: pointer; box-shadow: 0 8px 20px rgba(2, 132, 199, .22);
+            transition: background .15s;
         }
+        .btn:hover { background: var(--accent-dark); }
+        .btn:disabled { opacity: .75; cursor: progress; }
 
-        .portal-subtitle {
-            font-size: 0.825rem;
-            color: var(--text-secondary);
-            margin-bottom: 0;
-        }
+        .apk { display: block; text-align: center; margin-top: 18px; font-size: 14px; font-weight: 600; color: var(--accent); text-decoration: none; }
+        .apk:hover { color: var(--accent-dark); }
 
-        .form-label {
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: #cbd5e1;
-            margin-bottom: 0.4rem;
-        }
-
-        .input-group-custom {
-            position: relative;
-            display: flex;
-            align-items: stretch;
-            width: 100%;
-        }
-
-        .input-group-custom .input-icon {
-            position: absolute;
-            left: 0.875rem;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-            font-size: 0.875rem;
-            z-index: 4;
-            pointer-events: none;
-        }
-
-        .input-group-custom .form-control {
-            background-color: var(--input-bg);
-            border: 1px solid var(--input-border);
-            color: var(--text-primary);
-            padding: 0.65rem 0.875rem 0.65rem 2.4rem;
-            font-size: 0.9rem;
-            border-radius: 8px !important;
-            transition: all 0.15s ease-in-out;
-        }
-
-        .input-group-custom .form-control:focus {
-            background-color: #0d1527;
-            border-color: var(--brand-primary);
-            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
-            color: #ffffff;
-            outline: none;
-        }
-
-        .input-group-custom .form-control::placeholder {
-            color: #475569;
-        }
-
-        .toggle-password-btn {
-            position: absolute;
-            right: 0.75rem;
-            top: 50%;
-            transform: translateY(-50%);
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 0.25rem;
-            z-index: 5;
-            transition: color 0.15s;
-        }
-
-        .toggle-password-btn:hover {
-            color: var(--text-secondary);
-        }
-
-        .form-check-input {
-            background-color: var(--input-bg);
-            border-color: var(--input-border);
-            cursor: pointer;
-        }
-
-        .form-check-input:checked {
-            background-color: var(--brand-primary);
-            border-color: var(--brand-primary);
-        }
-
-        .form-check-label {
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-        }
-
-        .btn-submit {
-            background-color: var(--brand-primary);
-            border: 1px solid var(--brand-primary);
-            color: #ffffff;
-            font-weight: 600;
-            font-size: 0.9375rem;
-            padding: 0.7rem 1.25rem;
-            border-radius: 8px;
-            width: 100%;
-            transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-submit:hover {
-            background-color: var(--brand-hover);
-            border-color: var(--brand-hover);
-            color: #ffffff;
-        }
-
-        .btn-submit:active {
-            transform: scale(0.99);
-        }
-
-        .forgot-link {
-            font-size: 0.8125rem;
-            color: var(--brand-accent);
-            text-decoration: none;
-            transition: color 0.15s;
-        }
-
-        .forgot-link:hover {
-            color: #38bdf8;
-            text-decoration: underline;
-        }
-
-        .card-divider {
-            border: 0;
-            border-top: 1px solid var(--card-border);
-            margin: 1.5rem 0 1.25rem 0;
-        }
-
-        .apk-card {
-            background-color: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            padding: 0.85rem 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-        }
-
-        .apk-card-text {
-            font-size: 0.78rem;
-            color: var(--text-secondary);
-            line-height: 1.35;
-        }
-
-        .apk-card-text strong {
-            color: var(--text-primary);
-            display: block;
-            font-size: 0.8125rem;
-        }
-
-        .btn-apk {
-            background-color: transparent;
-            border: 1px solid #10b981;
-            color: #34d399;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.4rem 0.75rem;
-            border-radius: 6px;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.35rem;
-            white-space: nowrap;
-            transition: all 0.15s;
-        }
-
-        .btn-apk:hover {
-            background-color: rgba(16, 185, 129, 0.12);
-            color: #6ee7b7;
-            border-color: #34d399;
-        }
-
-        .footer-note {
-            text-align: center;
-            margin-top: 1.5rem;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            line-height: 1.4;
-        }
-
-        .alert-corporate {
-            background-color: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.25);
-            color: #fca5a5;
-            font-size: 0.8125rem;
-            padding: 0.65rem 0.85rem;
-            border-radius: 8px;
-            margin-bottom: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-        }
-
-        .alert-corporate-success {
-            background-color: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.25);
-            color: #6ee7b7;
-            font-size: 0.8125rem;
-            padding: 0.65rem 0.85rem;
-            border-radius: 8px;
-            margin-bottom: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-        }
+        footer { text-align: center; padding: 0 24px 24px; font-size: 12px; color: var(--muted); }
+        footer strong { color: var(--ink); font-weight: 800; letter-spacing: .4px; }
+        footer strong span { color: var(--brand); }
     </style>
 </head>
-
 <body>
-    <div class="login-wrapper">
-        <div class="login-card">
-            <!-- Cabeçalho Institucional Limpo -->
-            <div class="brand-header">
-                <img src="{{ url_for('static', filename='logo_elp_navbar.png') }}" alt="ELP Consultoria e Engenharia" class="brand-logo">
-                <h1 class="portal-title">ObraFlow</h1>
-                <p class="portal-subtitle">Portal Corporativo de Vistorias e Relatórios</p>
+    <main>
+        <div class="wrap">
+            <div class="brand">
+                <img src="{{ url_for('static', filename='img/elp-wordmark.png') }}" alt="ELP">
+                <p>Engenharia diagnóstica e gestão de obras</p>
             </div>
 
-            <!-- Alertas e Mensagens Flash -->
             {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        {% if category in ['error', 'danger'] %}
-                            <div class="alert-corporate">
-                                <i class="fas fa-circle-exclamation text-danger fs-6"></i>
-                                <div>{{ message }}</div>
-                            </div>
-                        {% else %}
-                            <div class="alert-corporate-success">
-                                <i class="fas fa-circle-check text-success fs-6"></i>
-                                <div>{{ message }}</div>
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                {% endif %}
+                {% for category, message in messages %}
+                <div class="notice {{ 'error' if category in ['error', 'danger', 'warning'] else 'info' }}" role="alert">
+                    <i class="fas {{ 'fa-circle-exclamation' if category in ['error', 'danger', 'warning'] else 'fa-circle-info' }}"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
             {% endwith %}
 
-            <!-- Formulário de Login -->
-            <form method="POST" action="">
+            <form method="POST" action="" id="loginForm" novalidate>
                 {{ form.hidden_tag() }}
 
-                <div class="mb-3">
-                    <label class="form-label" for="username">Usuário</label>
-                    <div class="input-group-custom">
-                        <i class="fas fa-user input-icon"></i>
-                        {{ form.username(id="username", class="form-control" + (" is-invalid" if form.username.errors else ""), placeholder="Digite seu usuário", autofocus=true, autocomplete="username") }}
+                <div class="group">
+                    <label for="username">Usuário ou e-mail</label>
+                    <div class="field {{ 'invalid' if form.username.errors }}">
+                        <i class="far fa-user"></i>
+                        {{ form.username(id="username", placeholder="seu.usuario ou email@empresa.com", autocomplete="username", autocapitalize="none", autocorrect="off", spellcheck="false", autofocus=True) }}
                     </div>
-                    {% for error in form.username.errors %}
-                        <div class="text-danger small mt-1" style="font-size: 0.75rem;">{{ error }}</div>
-                    {% endfor %}
+                    {% for error in form.username.errors %}<div class="err">{{ error }}</div>{% endfor %}
                 </div>
 
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label mb-0" for="password">Senha</label>
-                        <a href="{{ url_for('forgot_password') }}" class="forgot-link">Esqueceu a senha?</a>
-                    </div>
-                    <div class="input-group-custom">
-                        <i class="fas fa-lock input-icon"></i>
-                        {{ form.password(id="password", class="form-control" + (" is-invalid" if form.password.errors else ""), placeholder="Digite sua senha", autocomplete="current-password") }}
-                        <button type="button" class="toggle-password-btn" id="togglePasswordBtn" title="Mostrar/Ocultar senha" aria-label="Mostrar/Ocultar senha">
-                            <i class="fas fa-eye" id="eyeIcon"></i>
+                <div class="group">
+                    <label for="password">Senha</label>
+                    <div class="field {{ 'invalid' if form.password.errors }}">
+                        <i class="fas fa-lock"></i>
+                        {{ form.password(id="password", placeholder="Sua senha", autocomplete="current-password") }}
+                        <button type="button" class="eye" id="togglePassword" aria-label="Mostrar senha">
+                            <i class="far fa-eye"></i>
                         </button>
                     </div>
-                    {% for error in form.password.errors %}
-                        <div class="text-danger small mt-1" style="font-size: 0.75rem;">{{ error }}</div>
-                    {% endfor %}
+                    {% for error in form.password.errors %}<div class="err">{{ error }}</div>{% endfor %}
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div class="form-check">
-                        {{ form.remember_me(id="remember_me", class="form-check-input") }}
-                        <label class="form-check-label" for="remember_me">Lembrar acesso</label>
-                    </div>
-                </div>
+                <label class="remember" for="remember_me">
+                    {{ form.remember_me(id="remember_me") }}
+                    Manter conectado
+                </label>
 
-                <button type="submit" class="btn-submit">
-                    <i class="fas fa-right-to-bracket"></i>
-                    <span>Entrar no Sistema</span>
-                </button>
+                <button type="submit" class="btn" id="submitBtn">Entrar</button>
             </form>
 
-            <hr class="card-divider">
-
-            <!-- Acesso ao APK Oficial para Vistoriadores -->
-            <div class="apk-card">
-                <div class="apk-card-text">
-                    <strong>Aplicativo Móvel</strong>
-                    Vistorias em campo e relatórios offline
-                </div>
-                <a href="{{ url_for('download_official_apk') }}" class="btn-apk" title="Baixar instalador do Android">
-                    <i class="fab fa-android"></i> Baixar APK
-                </a>
-            </div>
+            <a class="apk" href="{{ url_for('download_official_apk') }}">
+                <i class="fab fa-android me-1"></i> Baixar o aplicativo Android
+            </a>
         </div>
+    </main>
 
-        <!-- Rodapé Corporativo -->
-        <div class="footer-note">
-            <div>ELP Consultoria e Engenharia LTDA</div>
-            <div class="mt-1">Acesso restrito e monitorado a engenheiros e técnicos autorizados.</div>
-        </div>
-    </div>
+    <footer>
+        <strong>GL<span>Systems</span></strong>{% if app_version %} · versão {{ app_version }}{% endif %}
+    </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const toggleBtn = document.getElementById('togglePasswordBtn');
-            const passwordInput = document.getElementById('password');
-            const eyeIcon = document.getElementById('eyeIcon');
-
-            if (toggleBtn && passwordInput && eyeIcon) {
-                toggleBtn.addEventListener('click', function() {
-                    const isPassword = passwordInput.getAttribute('type') === 'password';
-                    passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-                    eyeIcon.classList.toggle('fa-eye', !isPassword);
-                    eyeIcon.classList.toggle('fa-eye-slash', isPassword);
-                });
-            }
-        });
+        (function () {
+            var pwd = document.getElementById('password');
+            var toggle = document.getElementById('togglePassword');
+            toggle.addEventListener('click', function () {
+                var show = pwd.type === 'password';
+                pwd.type = show ? 'text' : 'password';
+                toggle.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha');
+                toggle.innerHTML = show ? '<i class="far fa-eye-slash"></i>' : '<i class="far fa-eye"></i>';
+            });
+            document.getElementById('loginForm').addEventListener('submit', function () {
+                var b = document.getElementById('submitBtn');
+                b.disabled = true; b.textContent = 'Entrando…';
+            });
+        })();
     </script>
 </body>
 </html>

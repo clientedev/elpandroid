@@ -2261,53 +2261,30 @@ def login():
 
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user and user.ativo and check_password_hash(user.password_hash, form.password.data):
+        # Usuário OU e-mail, sem diferenciar maiúsculas (igual ao app)
+        from sqlalchemy import func, or_
+        ident = (form.username.data or '').strip().lower()
+        candidatos = User.query.filter(or_(func.lower(User.username) == ident, func.lower(User.email) == ident)).all()
+        user = next((u for u in candidatos if u.password_hash and check_password_hash(u.password_hash, form.password.data)), None)
+        if user and not user.ativo:
+            flash('Usuário desativado. Fale com o administrador.', 'error')
+            return render_template('auth/login.html', form=form)
+        if user:
             login_user(user, remember=form.remember_me.data)
 
-            # --- Adicionar Notificações de Login ---
-            try:
-                from notification_service import NotificationService
-                notif_service = NotificationService()
-                
-                # 1. Notificação de Boas-vindas (Primeiro Login)
-                if hasattr(user, 'primeiro_login') and user.primeiro_login:
-                    # Enviar notificação de boas-vindas
-                    notif_service.criar_notificacao(
+            # Boas-vindas só no primeiro acesso (sem avisar outros usuários a cada login)
+            if getattr(user, 'primeiro_login', False):
+                try:
+                    from notification_service import NotificationService
+                    NotificationService().criar_notificacao(
                         user_id=user.id,
                         tipo='boas_vindas',
-                        titulo='Bem-vindo ao ELP Relatórios!',
-                        mensagem='Ficamos felizes em ter você aqui. Suas notificações já estão configuradas.',
+                        titulo='Bem-vindo ao ELP!',
+                        mensagem='Seu acesso está pronto.',
                         link_destino='/dashboard'
                     )
-                    # Não retornamos aqui ainda para permitir a notificação broadcast abaixo
-                else:
-                    # Notificação de boas-vindas geral (sempre que loga)
-                    notif_service.enviar_push_notification(
-                        token=user.fcm_token,
-                        titulo='Bem-vindo de volta!',
-                        corpo='Você entrou no sistema ELP Relatórios.',
-                        link='/dashboard'
-                    )
-
-                # 2. Notificação Broadcast para outros usuários logados
-                outros_usuarios = User.query.filter(
-                    User.id != user.id, 
-                    User.fcm_token.isnot(None), 
-                    User.ativo == True
-                ).all()
-                
-                for outro in outros_usuarios:
-                    notif_service.criar_notificacao(
-                        user_id=outro.id,
-                        tipo='usuario_online',
-                        titulo='Usuário Online',
-                        mensagem=f'{user.nome_completo} acabou de entrar no app.',
-                        link_destino='/dashboard'
-                    )
-            except Exception as e:
-                current_app.logger.error(f"Erro ao processar notificações de login: {e}")
-            # --- Fim das Notificações ---
+                except Exception as e:
+                    current_app.logger.error(f"Erro ao criar notificação de boas-vindas: {e}")
 
             # Verificar se é o primeiro login (redirecionamento original)
             if hasattr(user, 'primeiro_login') and user.primeiro_login:
@@ -2317,7 +2294,7 @@ def login():
             if not next_page or urlparse(next_page).netloc != '' or next_page == '/':
                 next_page = url_for('painel_apk')
             return redirect(next_page)
-        flash('Usuário ou senha inválidos.', 'error')
+        flash('Usuário ou senha incorretos.', 'error')
 
     return render_template('auth/login.html', form=form)
 
@@ -2949,11 +2926,22 @@ def painel_apk():
         aprovador_global = AprovadorPadrao.query.filter_by(is_global=True, ativo=True).first()
         aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Não definido"
         
+        try:
+            total_projetos = Projeto.query.count()
+            total_relatorios = Relatorio.query.count() + RelatorioExpress.query.count()
+            pendentes = (Relatorio.query.filter_by(status='Aguardando Aprovação').count()
+                         + RelatorioExpress.query.filter_by(status='Aguardando Aprovação').count())
+        except Exception:
+            total_projetos = total_relatorios = pendentes = 0
+
         stats = {
             'usuarios_ativos': usuarios_ativos,
             'total_legendas': total_legendas,
             'total_checklist': total_checklist,
-            'aprovador_global_nome': aprovador_global_nome
+            'aprovador_global_nome': aprovador_global_nome,
+            'total_projetos': total_projetos,
+            'total_relatorios': total_relatorios,
+            'pendentes': pendentes,
         }
     except Exception as e:
         print(f"Erro ao carregar dados do painel APK: {e}")
@@ -2987,7 +2975,7 @@ def ajustes_apk_page():
         total_legendas = LegendaPredefinida.query.filter_by(ativo=True).count()
         total_checklist = ChecklistPadrao.query.count()
         aprovador_global = AprovadorPadrao.query.filter_by(is_global=True, ativo=True).first()
-        aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Leopoldo"
+        aprovador_global_nome = aprovador_global.aprovador.nome_completo if (aprovador_global and aprovador_global.aprovador) else "Não definido"
         
         try:
             from models import Visitante
@@ -3017,7 +3005,7 @@ def ajustes_apk_page():
         print(f"Erro ao carregar dados da Central Inteligente: {e}")
         total_legendas = 0
         total_checklist = 0
-        aprovador_global_nome = "Leopoldo"
+        aprovador_global_nome = "Não definido"
         visitantes_list = []
         total_visitantes = 0
         projetos = []
@@ -3286,17 +3274,9 @@ def admin_apk_info_versao():
 @app.route('/admin/apk/publicar-atualizacao', methods=['POST'])
 @login_required
 def admin_apk_publicar_atualizacao():
-    """Lança uma nova versão oficial do APK incrementando todos os arquivos e publicando em produção"""
-    if not current_user.is_master:
-        return jsonify({'success': False, 'error': 'Acesso negado. Apenas o Master pode publicar versões do APK.'}), 403
-    
-    import publish_service
-    data = request.get_json() or {}
-    notes = data.get('notes')
-    
-    result = publish_service.execute_publish_pipeline(custom_notes=notes)
-    status_code = 200 if result.get('success') else 500
-    return jsonify(result), status_code
+    """Desativado: aumentava a versão sem gerar APK novo (os celulares baixavam o mesmo APK como 'atualização').
+    O APK agora é compilado e publicado pelo GitHub Actions a cada mudança no app."""
+    return jsonify({'success': False, 'error': 'Publicação pelo painel desativada. O APK é gerado automaticamente pelo GitHub.'}), 410
 
 @app.route('/admin/apk/salvar-pdf-config', methods=['POST'])
 @login_required

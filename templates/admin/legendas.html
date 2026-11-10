@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Gerenciar Legendas Pré-definidas{% endblock %}
+{% block title %}Gerenciar Legendas técnicas{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -31,7 +31,7 @@
         <div class="col-12">
             <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2">
                 <div>
-                    <h1 class="h3 mb-0">Legendas Pré-definidas</h1>
+                    <h1 class="h3 mb-0">Legendas técnicas</h1>
                     <p class="text-muted mb-0">Gerencie as legendas que aparecem nos relatórios</p>
                 </div>
                 <a href="{{ url_for('admin_legenda_nova') }}" class="btn btn-primary">
@@ -127,21 +127,7 @@
                 </div>
             </div>
 
-            <div class="row mb-3">
-                <div class="col-12">
-                    <div class="card bg-light">
-                        <div class="card-body py-2">
-                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                <span class="text-muted"><i class="fas fa-wifi me-1"></i>API:</span>
-                                <button id="testApiBtn" class="btn btn-sm btn-outline-primary" onclick="testMobileApi()">
-                                    Testar
-                                </button>
-                                <span id="apiStatus" class="text-muted small">Clique para testar</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
 
             {% set categorias = legendas|map(attribute='categoria')|unique|list %}
             {% for categoria in categorias %}
