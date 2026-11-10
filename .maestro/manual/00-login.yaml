@@ -1,0 +1,30 @@
+appId: com.obraflow.app
+name: "00 - Login (sem credenciais)"
+---
+- clearState
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Entrar"
+    timeout: 60000
+- waitForAnimationToEnd
+- takeScreenshot: 00-01-login-vazio
+- tapOn: "Entrar"
+- takeScreenshot: 00-02-login-campos-obrigatorios
+- tapOn:
+    text: "seu.usuario ou email@empresa.com"
+- inputText: "usuario.inexistente"
+- tapOn:
+    text: "Sua senha"
+- inputText: "senha-errada"
+- hideKeyboard
+- takeScreenshot: 00-03-login-preenchido
+- tapOn:
+    id: "toggle-password"
+    optional: true
+- tapOn: "Entrar"
+- extendedWaitUntil:
+    visible: "Usuário ou senha incorretos."
+    timeout: 30000
+    optional: true
+- takeScreenshot: 00-04-login-senha-incorreta

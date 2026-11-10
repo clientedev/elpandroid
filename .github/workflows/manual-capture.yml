@@ -1,0 +1,69 @@
+name: Manual - capturas do APK no emulador
+
+# Roda o ELP.apk oficial num emulador Android e executa roteiros do Maestro
+# (.maestro/manual/*.yaml) que navegam pelo app e tiram os prints do manual.
+# Credenciais da conta de teste vêm dos secrets MANUAL_USER / MANUAL_PASS.
+on:
+  workflow_dispatch:
+    inputs:
+      flows:
+        description: 'Roteiros a rodar (glob dentro de .maestro/manual)'
+        required: false
+        default: '*.yaml'
+  push:
+    branches: [main]
+    paths:
+      - '.maestro/manual/**'
+      - '.github/workflows/manual-capture.yml'
+
+concurrency:
+  group: manual-capture
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Instalar Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Emulador + roteiros
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          MANUAL_USER: ${{ secrets.MANUAL_USER }}
+          MANUAL_PASS: ${{ secrets.MANUAL_PASS }}
+          FLOWS: ${{ github.event.inputs.flows || '*.yaml' }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6000M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          disable-animations: true
+          script: bash .maestro/run-manual.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: manual-capturas
+          path: |
+            manual-out/
+          retention-days: 14
