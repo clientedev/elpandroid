@@ -2,7 +2,7 @@
   "expo": {
     "name": "ELP",
     "slug": "elp-android",
-    "version": "1.0.70",
+    "version": "1.0.71",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.obraflow.app",
-      "versionCode": 70,
+      "versionCode": 71,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png"
@@ -42,6 +42,15 @@
       "predictiveBackGestureEnabled": false
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/logo-wordmark.png",
+          "imageWidth": 170,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
       "expo-sqlite",
       "expo-sharing",
       "expo-secure-store",
