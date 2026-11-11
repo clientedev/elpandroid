@@ -5,7 +5,8 @@ appId: com.obraflow.app
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
-    text: "Toque para selecionar a obra..."
+    text: "(Dropdown|Toque para selecionar a obra.*)"
+    index: 0
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:

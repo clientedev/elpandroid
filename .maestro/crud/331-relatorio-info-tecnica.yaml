@@ -5,6 +5,14 @@ appId: com.obraflow.app
 - waitForAnimationToEnd:
     timeout: 5000
 - scrollUntilVisible:
+    element: "4. Informações Técnicas da Obra"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "4. Informações Técnicas da Obra"
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
     element: "Salvar Informações da Obra"
     direction: DOWN
     timeout: 30000

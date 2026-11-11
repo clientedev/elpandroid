@@ -4,6 +4,24 @@ appId: com.obraflow.app
     stopApp: false
 - waitForAnimationToEnd:
     timeout: 5000
+- tapOn:
+    text: "Salvar Informações da Obra"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    text: "(?i)ok"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "5. Checklist de Verificação.*"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "5. Checklist de Verificação.*"
+    index: 0
+- waitForAnimationToEnd:
+    timeout: 5000
 - scrollUntilVisible:
     element: "Progresso das Etapas Concluídas"
     direction: DOWN

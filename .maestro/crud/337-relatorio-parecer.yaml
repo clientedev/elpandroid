@@ -4,9 +4,15 @@ appId: com.obraflow.app
     stopApp: false
 - waitForAnimationToEnd:
     timeout: 5000
-- back
+- tapOn:
+    text: "Fissura superficial no revestimento.*"
+    index: 0
 - waitForAnimationToEnd:
     timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true
 - scrollUntilVisible:
     element: "Diagnóstico pericial.*"
     direction: DOWN

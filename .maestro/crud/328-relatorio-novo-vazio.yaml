@@ -4,9 +4,6 @@ appId: com.obraflow.app
     stopApp: false
 - waitForAnimationToEnd:
     timeout: 5000
-- back
-- waitForAnimationToEnd:
-    timeout: 5000
 - runFlow:
     when:
       notVisible: "Ajustes"
@@ -60,7 +57,7 @@ appId: com.obraflow.app
 - waitForAnimationToEnd:
     timeout: 5000
 - extendedWaitUntil:
-    visible: "Relatório de Obra|1.  Data da Visita.*"
+    visible: "Relatório de Obra|1. Data da Visita.*"
     timeout: 20000
 - extendedWaitUntil:
     visible: "__aguarda__"

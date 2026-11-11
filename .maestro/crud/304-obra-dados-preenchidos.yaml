@@ -27,5 +27,15 @@ appId: com.obraflow.app
 - hideKeyboard
 - extendedWaitUntil:
     visible: "__aguarda__"
+    timeout: 2500
+    optional: true
+- tapOn:
+    text: "1000, Avenida Paulista.*"
+    index: 0
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
     timeout: 800
     optional: true

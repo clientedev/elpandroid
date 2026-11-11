@@ -5,16 +5,8 @@ appId: com.obraflow.app
 - waitForAnimationToEnd:
     timeout: 5000
 - tapOn:
-    text: "(?i)ok"
-    optional: true
-- waitForAnimationToEnd:
-    timeout: 5000
-- scrollUntilVisible:
-    element: "Toque para selecionar a obra..."
-    direction: UP
-    timeout: 30000
-- tapOn:
-    text: "Toque para selecionar a obra..."
+    text: "(.OBRA-[0-9]+. .*|Toque para selecionar a obra.*)"
+    index: 0
 - waitForAnimationToEnd:
     timeout: 5000
 - extendedWaitUntil:
