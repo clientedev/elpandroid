@@ -1,0 +1,13 @@
+name: elp-fotos-check
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests pillow && sudo apt-get install -y -q poppler-utils >/dev/null
+      - env:
+          ADMIN_USER: ${{ secrets.MANUAL_USER }}
+          ADMIN_PASS: ${{ secrets.MANUAL_PASS }}
+        run: python scripts/elp_fotos_check.py
