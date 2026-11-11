@@ -1,9 +1,65 @@
 appId: com.obraflow.app
 ---
 - launchApp:
-    stopApp: false
+    stopApp: true
+- extendedWaitUntil:
+    visible: ".*, Ajustes"
+    timeout: 60000
+- tapOn:
+    text: "Mais tarde"
+    optional: true
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- tapOn:
+    text: ".*, Relatórios"
 - waitForAnimationToEnd:
     timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
 - tapOn:
     text: "Todos.*"
     optional: true
@@ -13,7 +69,7 @@ appId: com.obraflow.app
     text: ".*Laudo de fachada 01.*"
     index: 0
 - extendedWaitUntil:
-    visible: "Detalhes do Relatório"
+    visible: "Status do Fluxo:"
     timeout: 20000
 - extendedWaitUntil:
     visible: "__aguarda__"
