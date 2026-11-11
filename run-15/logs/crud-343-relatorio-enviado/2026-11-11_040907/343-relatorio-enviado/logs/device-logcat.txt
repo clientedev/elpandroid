@@ -1,0 +1,449 @@
+--------- beginning of system
+11-11 04:09:14.583 D/CompatibilityChangeReporter(  519): Compat change id reported: 161252188; UID 10192; state: DISABLED
+11-11 04:09:14.583 D/CompatibilityChangeReporter(  519): Compat change id reported: 244637991; UID 10363; state: ENABLED
+11-11 04:09:14.584 D/CompatibilityChangeReporter(  519): Compat change id reported: 265464455; UID 10192; state: DISABLED
+11-11 04:09:14.584 D/CompatibilityChangeReporter(  519): Compat change id reported: 265452344; UID 10192; state: DISABLED
+11-11 04:09:14.584 D/CompatibilityChangeReporter(  519): Compat change id reported: 266124927; UID 10192; state: DISABLED
+11-11 04:09:14.584 D/CompatibilityChangeReporter(  519): Compat change id reported: 265451093; UID 10192; state: DISABLED
+11-11 04:09:14.584 D/CompatibilityChangeReporter(  519): Compat change id reported: 265456536; UID 10192; state: DISABLED
+11-11 04:09:14.584 D/CompatibilityChangeReporter(  519): Compat change id reported: 255940284; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 236283604; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 263959004; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 264304459; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 264301586; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 254631730; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 273509367; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 263259275; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 174042980; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 174042936; UID 10192; state: DISABLED
+11-11 04:09:14.585 D/CompatibilityChangeReporter(  519): Compat change id reported: 181136395; UID 10192; state: DISABLED
+11-11 04:09:14.586 D/CompatibilityChangeReporter(  519): Compat change id reported: 194480991; UID 10192; state: ENABLED
+--------- beginning of main
+11-11 04:09:14.587 D/KeyguardService(  834): setOccluded(false)
+11-11 04:09:14.587 D/KeyguardViewMediator(  834): setOccluded(false)
+11-11 04:09:14.588 D/CompatibilityChangeReporter(  519): Compat change id reported: 194833441; UID 10192; state: ENABLED
+11-11 04:09:14.588 I/ActivityTaskManager(  519): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.obraflow.app cmp=com.obraflow.app/.MainActivity} with LAUNCH_SINGLE_TASK from uid 10363 (BAL_ALLOW_PERMISSION) result code=3
+11-11 04:09:14.588 W/unknown:BridgelessReact(24974): ReactHost{0}.onHostPause(activity)
+11-11 04:09:14.588 W/unknown:BridgelessReact(24974): ReactHost{0}.ReactContext.onHostPause()
+11-11 04:09:14.589 D/WindowManagerShell(  834): onActivityRestartAttempt: ComponentInfo{com.obraflow.app/com.obraflow.app.MainActivity}
+11-11 04:09:14.589 D/KeyguardViewMediator(  834): handleSetOccluded(false)
+11-11 04:09:14.589 W/unknown:BridgelessReact(24974): ReactHost{0}.onHostResume(activity)
+11-11 04:09:14.589 W/unknown:BridgelessReact(24974): ReactHost{0}.ReactContext.onHostResume()
+11-11 04:09:14.626 D/WindowManager(  519): captureDisplay
+--------- beginning of kernel
+11-11 04:09:14.838 I/servicemanager(    0): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-11 04:09:14.640 I/hwservicemanager(  134): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-11 04:09:14.641 I/Gralloc4( 2655): mapper 4.x is not supported
+11-11 04:09:14.669 D/libEGL  ( 2655): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-11 04:09:14.670 D/libEGL  ( 2655): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-11 04:09:14.671 D/libEGL  ( 2655): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-11 04:09:14.685 W/OpenGLRenderer( 2655): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-11 04:09:15.032 D/WindowManager(  519): captureDisplay
+11-11 04:09:15.050 W/System  ( 2655): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:09:15.050 W/System  ( 2655): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:09:15.050 W/System  ( 2655): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:09:15.050 W/System  ( 2655): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:09:15.050 W/System  ( 2655): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:09:15.050 W/System  ( 2655): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:09:15.050 W/System  ( 2655): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:09:15.050 W/System  ( 2655): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:09:15.050 W/System  ( 2655): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:09:15.050 W/System  ( 2655): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:09:15.510 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:15.512 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.512 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.546 D/Maestro ( 2667): View hierarchy received in 36 ms
+11-11 04:09:15.655 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:15.656 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.656 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.677 D/Maestro ( 2667): View hierarchy received in 22 ms
+11-11 04:09:15.742 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:15.743 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.743 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.764 D/Maestro ( 2667): View hierarchy received in 22 ms
+11-11 04:09:15.856 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:15.856 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.856 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.875 D/Maestro ( 2667): View hierarchy received in 19 ms
+11-11 04:09:15.923 D/ActivityManager(  519): freezing 2817 com.android.chrome
+11-11 04:09:15.924 D/ActivityManager(  519): freezing 3060 com.google.android.documentsui
+11-11 04:09:15.941 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:15.941 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.941 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:15.958 D/Maestro ( 2667): View hierarchy received in 17 ms
+11-11 04:09:15.958 D/ActivityManager(  519): freezing 2058 android.process.media
+11-11 04:09:16.052 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.053 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.053 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.069 D/Maestro ( 2667): View hierarchy received in 17 ms
+11-11 04:09:16.131 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.132 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.132 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.149 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:16.241 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.242 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.242 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.260 D/Maestro ( 2667): View hierarchy received in 19 ms
+11-11 04:09:16.319 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.320 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.320 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.341 D/Maestro ( 2667): View hierarchy received in 22 ms
+11-11 04:09:16.438 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.439 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.439 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.459 D/Maestro ( 2667): View hierarchy received in 21 ms
+11-11 04:09:16.521 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.522 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.522 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.549 D/Maestro ( 2667): View hierarchy received in 28 ms
+11-11 04:09:16.601 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.602 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.602 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.622 D/Maestro ( 2667): View hierarchy received in 21 ms
+11-11 04:09:16.681 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.681 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.681 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.699 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:16.754 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.754 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.754 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.770 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:16.786 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.786 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.786 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.803 D/Maestro ( 2667): View hierarchy received in 17 ms
+11-11 04:09:16.857 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.858 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.858 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.874 D/Maestro ( 2667): View hierarchy received in 17 ms
+11-11 04:09:16.892 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.892 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.893 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.914 D/Maestro ( 2667): View hierarchy received in 22 ms
+11-11 04:09:16.967 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:16.967 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.967 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:16.989 D/Maestro ( 2667): View hierarchy received in 22 ms
+11-11 04:09:17.007 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.007 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.007 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.026 D/Maestro ( 2667): View hierarchy received in 19 ms
+11-11 04:09:17.081 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.082 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.082 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.102 D/Maestro ( 2667): View hierarchy received in 21 ms
+11-11 04:09:17.117 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.118 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.118 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.137 D/Maestro ( 2667): View hierarchy received in 20 ms
+11-11 04:09:17.228 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.229 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.229 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.244 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:17.300 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.300 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.301 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.321 D/Maestro ( 2667): View hierarchy received in 21 ms
+11-11 04:09:17.413 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.414 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.414 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.430 D/Maestro ( 2667): View hierarchy received in 17 ms
+11-11 04:09:17.488 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.489 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.489 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.506 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:17.600 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.601 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.601 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.618 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:17.675 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.676 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.676 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.698 D/Maestro ( 2667): View hierarchy received in 23 ms
+11-11 04:09:17.793 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.793 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.794 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.809 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:17.863 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.863 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.864 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.882 D/Maestro ( 2667): View hierarchy received in 19 ms
+11-11 04:09:17.976 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:17.976 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.977 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:17.990 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:18.046 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.046 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.047 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.060 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:18.152 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.152 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.152 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.166 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:18.221 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.222 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.222 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.236 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:18.327 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.328 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.328 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.342 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:18.358 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.358 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.359 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.376 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:18.467 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.468 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.468 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.481 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:18.535 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.536 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.536 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.553 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:18.648 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.649 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.649 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.664 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:18.679 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.679 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.679 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.693 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:18.788 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.788 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.788 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.801 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:18.860 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.861 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.861 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.867 I/netd    (  335): tetherGetStats() -> {[]} <0.32ms>
+11-11 04:09:18.868 I/netd    (  335): bandwidthSetGlobalAlert(2097152) <0.09ms>
+11-11 04:09:18.875 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:18.927 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.927 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.927 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.942 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:18.954 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:18.955 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.955 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:18.972 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:19.065 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.065 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.066 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.081 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:19.126 I/ContentMaintenance( 5529): Internal cache bytes used: 0; limit: 100000000; download size: 0
+11-11 04:09:19.127 I/RealtimeCacheCleanup( 5529): Beginning Realtime garbage collection.
+11-11 04:09:19.128 I/RealtimeCacheCleanup( 5529): Finished Realtime garbage collection.
+11-11 04:09:19.135 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.136 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.137 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.160 D/Maestro ( 2667): View hierarchy received in 25 ms
+11-11 04:09:19.252 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.252 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.253 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.266 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:19.321 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.321 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.321 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.335 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:19.427 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.428 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.428 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.441 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:19.494 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.494 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.494 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.508 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:19.587 E/BLASTSyncEngine(  519): WM sent Transaction to organized, but never received commit callback. Application ANR likely to follow.
+11-11 04:09:19.601 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.602 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.602 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.616 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:19.630 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.631 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.631 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.645 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:19.697 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.698 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.698 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.713 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:19.767 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.768 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.768 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.783 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:19.878 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.878 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.878 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.892 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:19.944 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:19.945 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.945 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:19.957 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:20.048 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.049 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.049 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.061 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:20.118 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.118 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.118 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.131 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:20.223 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.224 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.224 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.235 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:20.289 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.289 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.289 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.301 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:20.393 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.393 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.394 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.406 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:20.463 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.464 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.464 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.478 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:20.531 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.531 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.531 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.548 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:20.561 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.562 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.562 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.578 D/Maestro ( 2667): View hierarchy received in 17 ms
+11-11 04:09:20.629 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.630 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.630 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.643 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:20.696 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.696 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.696 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.709 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:20.801 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.802 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.802 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.817 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:20.873 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.874 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.874 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.887 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:20.979 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:20.980 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.980 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:20.995 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:21.049 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.050 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.050 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.063 D/Maestro ( 2667): View hierarchy received in 14 ms
+11-11 04:09:21.155 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.156 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.156 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.172 D/Maestro ( 2667): View hierarchy received in 17 ms
+11-11 04:09:21.183 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.184 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.184 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.195 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:21.287 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.288 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.288 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.299 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:21.355 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.356 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.356 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.370 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:21.464 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.464 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.464 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.477 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:21.529 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.529 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.529 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.542 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:21.636 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.636 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.636 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.648 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:21.700 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.700 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.700 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.712 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:21.804 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.805 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.805 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.823 D/Maestro ( 2667): View hierarchy received in 19 ms
+11-11 04:09:21.873 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.873 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.874 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.885 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:21.979 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:21.980 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.980 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:21.992 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:22.046 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.047 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.047 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.058 D/Maestro ( 2667): View hierarchy received in 12 ms
+11-11 04:09:22.151 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.152 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.152 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.167 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:22.221 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.222 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.222 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.234 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:22.327 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.328 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.328 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.343 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:22.395 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.396 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.396 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.411 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:22.503 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.504 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.504 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.518 D/Maestro ( 2667): View hierarchy received in 15 ms
+11-11 04:09:22.574 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.574 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.575 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.590 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:22.683 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:22.684 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.684 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:22.696 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:22.727 I/WorkerManager( 1755): dispose()
+11-11 04:09:22.728 W/A       ( 1755): Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-11 04:09:22.883 I/keystore2(  156): system/security/keystore2/src/watchdog.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+11-11 04:09:22.885 D/WindowManager(  519): captureDisplay
+11-11 04:09:23.123 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:23.123 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.123 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.136 D/Maestro ( 2667): View hierarchy received in 13 ms
+11-11 04:09:23.228 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:23.229 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.229 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.247 D/Maestro ( 2667): View hierarchy received in 19 ms
+11-11 04:09:23.274 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:23.276 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.276 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.292 D/Maestro ( 2667): View hierarchy received in 18 ms
+11-11 04:09:23.354 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:23.354 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.355 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.376 D/Maestro ( 2667): View hierarchy received in 22 ms
+11-11 04:09:23.431 D/Maestro ( 2667): Requesting view hierarchy
+11-11 04:09:23.431 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.432 W/QueryController( 2667): Could not detect idle state.
+11-11 04:09:23.448 D/Maestro ( 2667): View hierarchy received in 16 ms
+11-11 04:09:23.495 D/WindowManager(  519): captureDisplay
+11-11 04:09:23.513 W/System  ( 2655): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:09:23.514 W/System  ( 2655): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:09:23.514 W/System  ( 2655): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:09:23.514 W/System  ( 2655): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:09:23.514 W/System  ( 2655): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:09:23.514 W/System  ( 2655): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:09:23.514 W/System  ( 2655): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:09:23.514 W/System  ( 2655): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:09:23.514 W/System  ( 2655): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:09:23.514 W/System  ( 2655): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:09:23.653 I/netd    (  335): tetherGetStats() -> {[]} <0.31ms>
+11-11 04:09:23.656 I/netd    (  335): bandwidthSetGlobalAlert(2097152) <0.10ms>

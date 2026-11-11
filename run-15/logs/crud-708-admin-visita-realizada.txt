@@ -1,0 +1,44 @@
+Running on test
+ > Flow 708-admin-visita-realizada
+Launch app "com.obraflow.app"... COMPLETED
+Assert that ".*, Ajustes" is visible... COMPLETED
+Tap on (Optional) "Mais tarde"... WARNED
+
+
+ Warning: Element not found: Text matching regex: Mais tarde
+Assert that (Optional) "__aguarda__" is visible... WARNED
+
+
+ Warning: Assertion is false: "__aguarda__" is visible
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Tap on ".*, Agenda"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
+
+
+ Warning: Assertion is false: "__aguarda__" is visible
+Tap on ".*MANUAL - TESTE.*", Index: 0... COMPLETED
+Assert that "Dados do Agendamento" is visible... COMPLETED
+Scrolling DOWN until "Concluir e Marcar Como Realizada" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... FAILED
+
+No visible element found: "Concluir e Marcar Como Realizada"
+
+Could not find a visible element matching selector: "Concluir e Marcar Como Realizada"
+Tip: Try adjusting the following settings to improve detection:
+- `timeout`: current = 30000ms → Increase if you need more time to find the element
+- `speed`: current = 40 (0-100 scale) → Increase for faster scrolling if element is far away
+- `waitToSettleTimeoutMs`: current = Not defined → Set this value (e.g., 500ms) if your UI updates frequently between scrolls
+- `visibilityPercentage`: current = 100% → Lower this value if you want to detect partially visible elements
+- `centerElement`: current = false → Enable if you want the element to be centered after finding it
+
+
+==== Debug output (logs & screenshots) ====
+
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-708-admin-visita-realizada/2026-11-11_044612

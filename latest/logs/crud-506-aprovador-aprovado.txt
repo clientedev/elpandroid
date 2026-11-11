@@ -2,17 +2,14 @@ Running on test
  > Flow 506-aprovador-aprovado
 Launch app "com.obraflow.app" without stopping app... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
-Tap on "Aprovar Relatório"... FAILED
+Tap on "Aprovar Relatório"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Tap on (Optional) "(?i)(aprovar|confirmar|sim)"... WARNED
 
-Element not found: Text matching regex: Aprovar Relatório
 
-Element with Text matching regex: Aprovar Relatório not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+ Warning: Element not found: Text matching regex: (?i)(aprovar|confirmar|sim)
+Assert that (Optional) "(Sucesso.*|.*aprovado.*)" is visible... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Possible causes:
-- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
-- Element may be temporarily unavailable due to loading state.
-- This could be a real regression that needs to be addressed.
 
-==== Debug output (logs & screenshots) ====
-
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-506-aprovador-aprovado/2026-11-11_030855
+ Warning: Assertion is false: "__aguarda__" is visible

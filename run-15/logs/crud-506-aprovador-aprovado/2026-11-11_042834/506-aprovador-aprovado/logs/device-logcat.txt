@@ -1,0 +1,641 @@
+--------- beginning of system
+11-11 04:28:41.200 D/CompatibilityChangeReporter(  519): Compat change id reported: 244637991; UID 10487; state: ENABLED
+--------- beginning of main
+11-11 04:28:41.202 D/KeyguardService(  834): setOccluded(false)
+11-11 04:28:41.202 D/KeyguardViewMediator(  834): setOccluded(false)
+11-11 04:28:41.203 I/ActivityTaskManager(  519): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.obraflow.app cmp=com.obraflow.app/.MainActivity} with LAUNCH_SINGLE_TASK from uid 10487 (BAL_ALLOW_PERMISSION) result code=3
+11-11 04:28:41.203 D/WindowManagerShell(  834): onActivityRestartAttempt: ComponentInfo{com.obraflow.app/com.obraflow.app.MainActivity}
+11-11 04:28:41.203 W/unknown:BridgelessReact(19472): ReactHost{0}.onHostPause(activity)
+11-11 04:28:41.203 W/unknown:BridgelessReact(19472): ReactHost{0}.ReactContext.onHostPause()
+11-11 04:28:41.204 D/KeyguardViewMediator(  834): handleSetOccluded(false)
+11-11 04:28:41.205 W/unknown:BridgelessReact(19472): ReactHost{0}.onHostResume(activity)
+11-11 04:28:41.205 W/unknown:BridgelessReact(19472): ReactHost{0}.ReactContext.onHostResume()
+11-11 04:28:41.272 D/WindowManager(  519): captureDisplay
+11-11 04:28:41.287 I/hwservicemanager(  134): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-11 04:28:41.287 I/Gralloc4(22897): mapper 4.x is not supported
+--------- beginning of kernel
+11-11 04:28:41.485 I/servicemanager(    0): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-11 04:28:41.312 D/libEGL  (22897): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-11 04:28:41.313 D/libEGL  (22897): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-11 04:28:41.314 D/libEGL  (22897): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-11 04:28:41.329 W/OpenGLRenderer(22897): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-11 04:28:41.701 D/WindowManager(  519): captureDisplay
+11-11 04:28:41.719 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:41.719 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:41.719 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:41.719 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:41.719 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:28:41.719 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:41.719 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:41.719 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:41.719 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:41.719 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:28:42.156 I/AidlLazyServiceRegistrar(22809): Process has 0 (of 1 available) client(s) in use after notification artd has clients: 0
+11-11 04:28:42.156 I/AidlLazyServiceRegistrar(22809): Trying to shut down the service. No clients in use for any service in process.
+11-11 04:28:42.357 I/servicemanager(    0): Notifying artd they don't (previously: do) have clients when we now have no record of a client
+11-11 04:28:42.359 I/servicemanager(    0): Unregistering artd
+11-11 04:28:42.360 I/BpBinder(    0): onLastStrongRef automatically unlinking death recipients:
+11-11 04:28:42.159 I/AidlLazyServiceRegistrar(22809): Unregistered all clients and exiting
+11-11 04:28:42.362 I/init    (    0): Service 'artd' (pid 22809) exited with status 0 oneshot service took 9.739000 seconds in background
+11-11 04:28:42.365 I/init    (    0): Sending signal 9 to service 'artd' (pid 22809) process group...
+11-11 04:28:42.366 I/libprocessgroup(    0): Successfully killed process cgroup uid 1082 pid 22809 in 0ms
+11-11 04:28:42.258 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:42.260 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:42.260 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:42.280 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@86aad; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: com.obraflow.app; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.280 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@866ec; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.285 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@88133; boundsInParent: Rect(0, 0 - 912, 194); boundsInScreen: Rect(84, 302 - 996, -2070); boundsInWindow: Rect(84, 302 - 996, -2070); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.285 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@89b7a; boundsInParent: Rect(0, 0 - 996, 1244); boundsInScreen: Rect(42, 302 - 1038, -816); boundsInWindow: Rect(42, 302 - 1038, -816); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.286 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9139a; boundsInParent: Rect(0, 0 - 523, 54); boundsInScreen: Rect(87, 302 - 610, -675); boundsInWindow: Rect(87, 302 - 610, -675); packageName: com.obraflow.app; className: android.widget.TextView; text: Checklist Técnico de Vistoria; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.287 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9175b; boundsInParent: Rect(0, 0 - 163, 59); boundsInScreen: Rect(831, 302 - 994, -657); boundsInWindow: Rect(831, 302 - 994, -657); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.288 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@91b1c; boundsInParent: Rect(0, 0 - 121, 43); boundsInScreen: Rect(852, 302 - 973, -666); boundsInWindow: Rect(852, 302 - 973, -666); packageName: com.obraflow.app; className: android.widget.TextView; text: 0/7 (0%); error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.288 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@91edd; boundsInParent: Rect(0, 0 - 906, 21); boundsInScreen: Rect(87, 302 - 993, -602); boundsInWindow: Rect(87, 302 - 993, -602); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.289 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9265f; boundsInParent: Rect(0, 0 - 906, 132); boundsInScreen: Rect(87, 302 - 993, -438); boundsInWindow: Rect(87, 302 - 993, -438); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.290 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@92a20; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -478); boundsInWindow: Rect(87, 302 - 140, -478); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.291 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@92de1; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -461); boundsInWindow: Rect(161, 302 - 995, -461); packageName: com.obraflow.app; className: android.widget.TextView; text: 1. Chapisco colante e regularização da base estrutural; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.291 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@931a2; boundsInParent: Rect(0, 0 - 906, 133); boundsInScreen: Rect(87, 302 - 993, -304); boundsInWindow: Rect(87, 302 - 993, -304); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.292 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@93563; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -345); boundsInWindow: Rect(87, 302 - 140, -345); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.293 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@93924; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -328); boundsInWindow: Rect(161, 302 - 995, -328); packageName: com.obraflow.app; className: android.widget.TextView; text: 2. Aplicação de tela metálica / fibra de reforço e ancoragem; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.293 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@93ce5; boundsInParent: Rect(0, 0 - 906, 133); boundsInScreen: Rect(87, 302 - 993, -172); boundsInWindow: Rect(87, 302 - 993, -172); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.294 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@940a6; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -213); boundsInWindow: Rect(87, 302 - 140, -213); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.295 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94467; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -196); boundsInWindow: Rect(161, 302 - 995, -196); packageName: com.obraflow.app; className: android.widget.TextView; text: 3. Aplicação e tempo de cura da argamassa de emboço; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.295 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94828; boundsInParent: Rect(0, 0 - 906, 132); boundsInScreen: Rect(87, 302 - 993, -40); boundsInWindow: Rect(87, 302 - 993, -40); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.296 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94be9; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -80); boundsInWindow: Rect(87, 302 - 140, -80); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.297 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94faa; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -63); boundsInWindow: Rect(161, 302 - 995, -63); packageName: com.obraflow.app; className: android.widget.TextView; text: 4. Assentamento de revestimentos cerâmicos / pastilhas de fachada; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.297 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9536b; boundsInParent: Rect(0, 0 - 906, 133); boundsInScreen: Rect(87, 302 - 993, 94); boundsInWindow: Rect(87, 302 - 993, 94); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.298 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9572c; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, 53); boundsInWindow: Rect(87, 302 - 140, 53); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.299 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@95aed; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, 70); boundsInWindow: Rect(161, 302 - 995, 70); packageName: com.obraflow.app; className: android.widget.TextView; text: 5. Selamento de juntas de dilatação, frisos e caimentos; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.299 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@95eae; boundsInParent: Rect(0, 0 - 906, 132); boundsInScreen: Rect(87, 302 - 993, 225); boundsInWindow: Rect(87, 302 - 993, 225); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.300 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9626f; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, 185); boundsInWindow: Rect(87, 302 - 140, 185); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.301 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@96630; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, 202); boundsInWindow: Rect(161, 302 - 995, 202); packageName: com.obraflow.app; className: android.widget.TextView; text: 6. Verificação de peitoris, pingadeiras, muretas e impermeabilização; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.302 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@96db2; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, 302); boundsInWindow: Rect(87, 302 - 140, 302); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.303 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@97173; boundsInParent: Rect(0, 0 - 834, 55); boundsInScreen: Rect(161, 302 - 995, 302); boundsInWindow: Rect(161, 302 - 995, 302); packageName: com.obraflow.app; className: android.widget.TextView; text: 7. Limpeza e desincrustação final da fachada; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:42.328 D/Maestro (22909): View hierarchy received in 70 ms
+11-11 04:28:42.434 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:42.437 D/UiDevice(22909): Waiting 500ms for window update of package com.obraflow.app.
+11-11 04:28:42.796 D/ActivityManager(  519): freezing 2817 com.android.chrome
+11-11 04:28:42.796 D/ActivityManager(  519): freezing 3060 com.google.android.documentsui
+11-11 04:28:42.824 D/ActivityManager(  519): freezing 2058 android.process.media
+11-11 04:28:42.939 W/UiDevice(22909): Timed out waiting 500ms on window update.
+11-11 04:28:42.939 W/UiDevice(22909): java.util.concurrent.TimeoutException: Expected event not received within: 500 ms among: []
+11-11 04:28:42.939 W/UiDevice(22909): 	at android.app.UiAutomation.executeAndWaitForEvent(UiAutomation.java:1071)
+11-11 04:28:42.939 W/UiDevice(22909): 	at androidx.test.uiautomator.UiDevice.waitForWindowUpdate(UiDevice.java:1253)
+11-11 04:28:42.939 W/UiDevice(22909): 	at dev.mobile.maestro.Service.isWindowUpdating(MaestroDriverService.kt:361)
+11-11 04:28:42.939 W/UiDevice(22909): 	at maestro_android.MaestroDriverGrpc$MethodHandlers.invoke(MaestroDriverGrpc.java:965)
+11-11 04:28:42.939 W/UiDevice(22909): 	at io.grpc.stub.ServerCalls$UnaryServerCallHandler$UnaryServerCallListener.onHalfClose(ServerCalls.java:182)
+11-11 04:28:42.939 W/UiDevice(22909): 	at io.grpc.internal.ServerCallImpl$ServerStreamListenerImpl.halfClosed(ServerCallImpl.java:355)
+11-11 04:28:42.939 W/UiDevice(22909): 	at io.grpc.internal.ServerImpl$JumpToApplicationThreadServerStreamListener$1HalfClosed.runInContext(ServerImpl.java:867)
+11-11 04:28:42.939 W/UiDevice(22909): 	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37)
+11-11 04:28:42.939 W/UiDevice(22909): 	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+11-11 04:28:42.939 W/UiDevice(22909): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-11 04:28:42.939 W/UiDevice(22909): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-11 04:28:42.939 W/UiDevice(22909): 	at java.lang.Thread.run(Thread.java:1012)
+11-11 04:28:42.996 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:42.998 D/UiDevice(22909): Waiting 500ms for window update of package com.obraflow.app.
+11-11 04:28:43.499 W/UiDevice(22909): Timed out waiting 500ms on window update.
+11-11 04:28:43.499 W/UiDevice(22909): java.util.concurrent.TimeoutException: Expected event not received within: 500 ms among: []
+11-11 04:28:43.499 W/UiDevice(22909): 	at android.app.UiAutomation.executeAndWaitForEvent(UiAutomation.java:1071)
+11-11 04:28:43.499 W/UiDevice(22909): 	at androidx.test.uiautomator.UiDevice.waitForWindowUpdate(UiDevice.java:1253)
+11-11 04:28:43.499 W/UiDevice(22909): 	at dev.mobile.maestro.Service.isWindowUpdating(MaestroDriverService.kt:361)
+11-11 04:28:43.499 W/UiDevice(22909): 	at maestro_android.MaestroDriverGrpc$MethodHandlers.invoke(MaestroDriverGrpc.java:965)
+11-11 04:28:43.499 W/UiDevice(22909): 	at io.grpc.stub.ServerCalls$UnaryServerCallHandler$UnaryServerCallListener.onHalfClose(ServerCalls.java:182)
+11-11 04:28:43.499 W/UiDevice(22909): 	at io.grpc.internal.ServerCallImpl$ServerStreamListenerImpl.halfClosed(ServerCallImpl.java:355)
+11-11 04:28:43.499 W/UiDevice(22909): 	at io.grpc.internal.ServerImpl$JumpToApplicationThreadServerStreamListener$1HalfClosed.runInContext(ServerImpl.java:867)
+11-11 04:28:43.499 W/UiDevice(22909): 	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37)
+11-11 04:28:43.499 W/UiDevice(22909): 	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:133)
+11-11 04:28:43.499 W/UiDevice(22909): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+11-11 04:28:43.499 W/UiDevice(22909): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+11-11 04:28:43.499 W/UiDevice(22909): 	at java.lang.Thread.run(Thread.java:1012)
+11-11 04:28:43.563 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:43.563 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:43.563 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:43.575 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@86aad; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: com.obraflow.app; className: android.widget.LinearLayout; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.576 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@866ec; boundsInParent: Rect(0, 0 - 1080, 0); boundsInScreen: Rect(0, 0 - 1080, 0); boundsInWindow: Rect(0, 0 - 1080, 0); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.580 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@88133; boundsInParent: Rect(0, 0 - 912, 194); boundsInScreen: Rect(84, 302 - 996, -2070); boundsInWindow: Rect(84, 302 - 996, -2070); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.581 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@89b7a; boundsInParent: Rect(0, 0 - 996, 1244); boundsInScreen: Rect(42, 302 - 1038, -816); boundsInWindow: Rect(42, 302 - 1038, -816); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.582 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9139a; boundsInParent: Rect(0, 0 - 523, 54); boundsInScreen: Rect(87, 302 - 610, -675); boundsInWindow: Rect(87, 302 - 610, -675); packageName: com.obraflow.app; className: android.widget.TextView; text: Checklist Técnico de Vistoria; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.582 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9175b; boundsInParent: Rect(0, 0 - 163, 59); boundsInScreen: Rect(831, 302 - 994, -657); boundsInWindow: Rect(831, 302 - 994, -657); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.583 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@91b1c; boundsInParent: Rect(0, 0 - 121, 43); boundsInScreen: Rect(852, 302 - 973, -666); boundsInWindow: Rect(852, 302 - 973, -666); packageName: com.obraflow.app; className: android.widget.TextView; text: 0/7 (0%); error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.584 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@91edd; boundsInParent: Rect(0, 0 - 906, 21); boundsInScreen: Rect(87, 302 - 993, -602); boundsInWindow: Rect(87, 302 - 993, -602); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.584 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9265f; boundsInParent: Rect(0, 0 - 906, 132); boundsInScreen: Rect(87, 302 - 993, -438); boundsInWindow: Rect(87, 302 - 993, -438); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.585 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@92a20; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -478); boundsInWindow: Rect(87, 302 - 140, -478); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.585 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@92de1; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -461); boundsInWindow: Rect(161, 302 - 995, -461); packageName: com.obraflow.app; className: android.widget.TextView; text: 1. Chapisco colante e regularização da base estrutural; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.586 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@931a2; boundsInParent: Rect(0, 0 - 906, 133); boundsInScreen: Rect(87, 302 - 993, -304); boundsInWindow: Rect(87, 302 - 993, -304); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.587 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@93563; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -345); boundsInWindow: Rect(87, 302 - 140, -345); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.587 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@93924; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -328); boundsInWindow: Rect(161, 302 - 995, -328); packageName: com.obraflow.app; className: android.widget.TextView; text: 2. Aplicação de tela metálica / fibra de reforço e ancoragem; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.588 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@93ce5; boundsInParent: Rect(0, 0 - 906, 133); boundsInScreen: Rect(87, 302 - 993, -172); boundsInWindow: Rect(87, 302 - 993, -172); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.589 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@940a6; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -213); boundsInWindow: Rect(87, 302 - 140, -213); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.589 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94467; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -196); boundsInWindow: Rect(161, 302 - 995, -196); packageName: com.obraflow.app; className: android.widget.TextView; text: 3. Aplicação e tempo de cura da argamassa de emboço; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.590 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94828; boundsInParent: Rect(0, 0 - 906, 132); boundsInScreen: Rect(87, 302 - 993, -40); boundsInWindow: Rect(87, 302 - 993, -40); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.591 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94be9; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, -80); boundsInWindow: Rect(87, 302 - 140, -80); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.591 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@94faa; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, -63); boundsInWindow: Rect(161, 302 - 995, -63); packageName: com.obraflow.app; className: android.widget.TextView; text: 4. Assentamento de revestimentos cerâmicos / pastilhas de fachada; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.592 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9536b; boundsInParent: Rect(0, 0 - 906, 133); boundsInScreen: Rect(87, 302 - 993, 94); boundsInWindow: Rect(87, 302 - 993, 94); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.592 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9572c; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, 53); boundsInWindow: Rect(87, 302 - 140, 53); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.593 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@95aed; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, 70); boundsInWindow: Rect(161, 302 - 995, 70); packageName: com.obraflow.app; className: android.widget.TextView; text: 5. Selamento de juntas de dilatação, frisos e caimentos; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.594 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@95eae; boundsInParent: Rect(0, 0 - 906, 132); boundsInScreen: Rect(87, 302 - 993, 225); boundsInWindow: Rect(87, 302 - 993, 225); packageName: com.obraflow.app; className: android.view.ViewGroup; text: null; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: false; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.594 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@9626f; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, 185); boundsInWindow: Rect(87, 302 - 140, 185); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.595 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@96630; boundsInParent: Rect(0, 0 - 834, 88); boundsInScreen: Rect(161, 302 - 995, 202); boundsInWindow: Rect(161, 302 - 995, 202); packageName: com.obraflow.app; className: android.widget.TextView; text: 6. Verificação de peitoris, pingadeiras, muretas e impermeabilização; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.596 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@96db2; boundsInParent: Rect(0, 0 - 53, 55); boundsInScreen: Rect(87, 302 - 140, 302); boundsInWindow: Rect(87, 302 - 140, 302); packageName: com.obraflow.app; className: android.widget.TextView; text: ; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.597 I/Maestro (22909): Skipping invisible child: android.view.accessibility.AccessibilityNodeInfo@97173; boundsInParent: Rect(0, 0 - 834, 55); boundsInScreen: Rect(161, 302 - 995, 302); boundsInWindow: Rect(161, 302 - 995, 302); packageName: com.obraflow.app; className: android.widget.TextView; text: 7. Limpeza e desincrustação final da fachada; error: null; maxTextLength: -1; stateDescription: null; contentDescription: null; tooltipText: null; containerTitle: null; viewIdResName: null; uniqueId: null; checkable: false; checked: false; focusable: false; focused: false; selected: false; clickable: false; longClickable: false; contextClickable: false; enabled: true; password: false; scrollable: false; importantForAccessibility: true; visible: false; actions: [AccessibilityAction: ACTION_SELECT - null, AccessibilityAction: ACTION_CLEAR_SELECTION - null, AccessibilityAction: ACTION_ACCESSIBILITY_FOCUS - null, AccessibilityAction: ACTION_NEXT_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_PREVIOUS_AT_MOVEMENT_GRANULARITY - null, AccessibilityAction: ACTION_SET_SELECTION - null, AccessibilityAction: ACTION_SHOW_ON_SCREEN - null]; isTextSelectable: false
+11-11 04:28:43.621 D/Maestro (22909): View hierarchy received in 58 ms
+11-11 04:28:43.721 D/TaplEvents( 6561): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=576.0, y[0]=1652.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=2812118, downTime=2812118, deviceId=-1, source=0x1002, displayId=0, eventId=-307343228 }
+11-11 04:28:43.782 D/EGL_emulation(19472): app_time_stats: avg=2460.16ms min=36.19ms max=21765.39ms count=9
+11-11 04:28:43.830 D/TaplEvents( 6561): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=576.0, y[0]=1652.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=2812252, downTime=2812118, deviceId=-1, source=0x1002, displayId=0, eventId=-190897904 }
+11-11 04:28:43.849 D/audioserver(  395): FGS Logger Transaction failed
+11-11 04:28:43.849 D/audioserver(  395): -129
+11-11 04:28:43.857 D/AudioFlinger(  395): mixer(0x77d34146b930) throttle end: throttle time(37)
+11-11 04:28:43.902 D/AudioFlinger(  395): mixer(0x77d34146b930) throttle end: throttle time(33)
+11-11 04:28:43.907 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:43.907 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:43.968 W/om.obraflow.app(19472): Weak pointer dereference blocked for 13 milliseconds.
+11-11 04:28:44.012 I/om.obraflow.app(19472): Background young concurrent copying GC freed 268246(11MB) AllocSpace objects, 0(0B) LOS objects, 29% free, 16MB/23MB, paused 18us,4.583ms total 132.420ms
+11-11 04:28:44.038 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:44.038 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:44.041 D/CompatibilityChangeReporter(  519): Compat change id reported: 161145287; UID 10192; state: ENABLED
+11-11 04:28:44.046 D/CompatibilityChangeReporter(  519): Compat change id reported: 135634846; UID 99005; state: DISABLED
+11-11 04:28:44.052 D/CompatibilityChangeReporter(19472): Compat change id reported: 183155436; UID 10192; state: ENABLED
+11-11 04:28:44.068 D/CompatibilityChangeReporter(  519): Compat change id reported: 143937733; UID 10192; state: ENABLED
+11-11 04:28:44.078 D/Zygote  ( 1003): Forked child process 23201
+11-11 04:28:44.092 I/ocessService0:0(23201): Using CollectorTypeCC GC.
+11-11 04:28:44.093 W/ocessService0:0(23201): Unexpected CPU variant for x86: x86_64.
+11-11 04:28:44.093 W/ocessService0:0(23201): Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+11-11 04:28:44.097 D/audioserver(  395): FGS Logger Transaction failed
+11-11 04:28:44.097 D/audioserver(  395): -129
+11-11 04:28:44.101 E/ocessService0:0(23201): Not starting debugger since process cannot load the jdwp agent.
+11-11 04:28:44.101 D/AutofillManager(19472): Fill dialog is enabled:false, hints=[password, passwordAuto, creditCardNumber, creditCardSecurityCode, creditCardExpirationDate]
+11-11 04:28:44.103 W/ActivityManager(  519): Slow operation: 57ms so far, now at startProcess: returned from zygote!
+11-11 04:28:44.103 W/ActivityManager(  519): Slow operation: 57ms so far, now at startProcess: done updating battery stats
+11-11 04:28:44.103 W/ActivityManager(  519): Slow operation: 57ms so far, now at startProcess: building log message
+11-11 04:28:44.103 I/ActivityManager(  519): Start proc 23201:com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0/u0i5 for  {com.obraflow.app/org.chromium.content.app.SandboxedProcessService0:0}
+11-11 04:28:44.103 W/ActivityManager(  519): Slow operation: 57ms so far, now at startProcess: starting to update pids map
+11-11 04:28:44.103 W/ActivityManager(  519): Slow operation: 57ms so far, now at startProcess: done updating pids map
+11-11 04:28:44.121 D/CompatibilityChangeReporter(23201): Compat change id reported: 171979766; UID 99005; state: ENABLED
+11-11 04:28:44.121 D/CompatibilityChangeReporter(23201): Compat change id reported: 242716250; UID 99005; state: ENABLED
+11-11 04:28:44.124 I/LoadedApk(23201): No resource references to update in package com.google.android.trichromelibrary
+11-11 04:28:44.125 I/cr_WebViewApkApp(23201): Launched version=113.0.5672.136 minSdkVersion=29 isBundle=false processName=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+11-11 04:28:44.125 I/ActivityManager(  519): Flag disabled. Ignoring finishAttachApplication from uid: 99005. pid: 23201
+11-11 04:28:44.128 W/SystemServiceRegistry(23201): No service published for: virtualdevice
+11-11 04:28:44.128 I/cr_ChildProcessService(23201): Creating new ChildProcessService pid=23201
+11-11 04:28:44.139 D/ActivityManager(  519): sync unfroze 31359 com.google.android.webview:webview_service for 6
+11-11 04:28:44.148 D/CompatibilityChangeReporter(19472): Compat change id reported: 214741472; UID 10192; state: ENABLED
+11-11 04:28:44.153 D/ConnectivityService(  519): requestNetwork for uid/pid:10192/19472 activeRequest: null callbackRequest: 197 [NetworkRequest [ REQUEST id=198, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: com.obraflow.app UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647
+11-11 04:28:44.154 D/ConnectivityService(  519): NetReassign [198 : null → 101] [c 0] [a 0] [i 1]
+11-11 04:28:44.155 D/WifiNetworkFactory(  519): got request NetworkRequest [ REQUEST id=198, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: com.obraflow.app UnderlyingNetworks: Null] ]
+11-11 04:28:44.155 D/UntrustedWifiNetworkFactory(  519): got request NetworkRequest [ REQUEST id=198, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: com.obraflow.app UnderlyingNetworks: Null] ]
+11-11 04:28:44.155 D/OemPaidWifiNetworkFactory(  519): got request NetworkRequest [ REQUEST id=198, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: com.obraflow.app UnderlyingNetworks: Null] ]
+11-11 04:28:44.155 D/MultiInternetWifiNetworkFactory(  519): got request NetworkRequest [ REQUEST id=198, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10192 RequestorUid: 10192 RequestorPkg: com.obraflow.app UnderlyingNetworks: Null] ]
+11-11 04:28:44.155 D/ConnectivityService(  519): NetReassign [no changes] [c 0] [a 0] [i 2]
+11-11 04:28:44.179 W/cr_media(19472): BLUETOOTH_CONNECT permission is missing.
+11-11 04:28:44.179 W/cr_media(19472): registerBluetoothIntentsIfNeeded: Requires BLUETOOTH permission
+11-11 04:28:44.185 I/cr_LibraryLoader(23201): Successfully loaded native library
+11-11 04:28:44.185 I/cr_CachingUmaRecorder(23201): Flushed 2 samples from 2 histograms.
+11-11 04:28:44.187 W/SystemServiceRegistry(23201): No service published for: uimode
+11-11 04:28:44.218 W/WindowOnBackDispatcher(19472): OnBackInvokedCallback is not enabled for the application.
+11-11 04:28:44.218 W/WindowOnBackDispatcher(19472): Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+11-11 04:28:44.265 I/FontLog ( 5397): Received query name=Google Sans&weight=700&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+11-11 04:28:44.265 I/FontLog ( 5397): Query [name=Google Sans&weight=700&besteffort=false] resolved to {Google Sans, wdth 100.0, wght 700, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+11-11 04:28:44.266 I/FontLog ( 5397): Fetch {Google Sans, wdth 100.0, wght 700, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+11-11 04:28:44.307 I/FontLog ( 5397): Pulling font file for id = 29, cache size = 5 [CONTEXT service_id=132 ]
+11-11 04:28:44.315 D/CoreBackPreview(  519): Window{4917965 u0 com.obraflow.app/com.obraflow.app.MainActivity}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@d562848, mPriority=0, mIsAnimationCallback=false}
+11-11 04:28:44.331 I/FontLog ( 5397): Received query name=Noto Color Emoji Compat&weight=400&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+11-11 04:28:44.331 I/FontLog ( 5397): Query [name=Noto Color Emoji Compat&weight=400&besteffort=false] resolved to {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+11-11 04:28:44.332 I/FontLog ( 5397): Fetch {Noto Color Emoji Compat, wdth 100.0, wght 400, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+11-11 04:28:44.374 I/FontLog ( 5397): Pulling font file for id = 30, cache size = 6 [CONTEXT service_id=132 ]
+11-11 04:28:44.385 I/FontLog ( 5397): Received query name=Google Sans&weight=400&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+11-11 04:28:44.386 I/FontLog ( 5397): Query [name=Google Sans&weight=400&besteffort=false] resolved to {Google Sans, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+11-11 04:28:44.395 I/FontLog ( 5397): Font PFD returned from cache for {Google Sans, wdth 100.0, wght 400, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+11-11 04:28:44.396 I/FontLog ( 5397): Fetch {Google Sans, wdth 100.0, wght 400, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+11-11 04:28:44.402 I/FontLog ( 5397): Pulling font file for id = 31, cache size = 6 [CONTEXT service_id=132 ]
+11-11 04:28:44.411 I/resolv  (  335): GetAddrInfoHandler::run: {101 101 101 983141 10192 0}
+11-11 04:28:44.412 I/FontLog ( 5397): Received query name=Google Sans&weight=500&besteffort=false, URI content://com.google.android.gms.fonts [CONTEXT service_id=132 ]
+11-11 04:28:44.413 I/FontLog ( 5397): Query [name=Google Sans&weight=500&besteffort=false] resolved to {Google Sans, wdth 100.0, wght 500, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+11-11 04:28:44.413 I/FontLog ( 5397): Font PFD returned from cache for {Google Sans, wdth 100.0, wght 500, ital 0.0, bestEffort false} [CONTEXT service_id=132 ]
+11-11 04:28:44.413 I/FontLog ( 5397): Fetch {Google Sans, wdth 100.0, wght 500, ital 0.0, bestEffort false} end status Status{statusCode=SUCCESS, resolution=null} [CONTEXT service_id=132 ]
+11-11 04:28:44.423 I/resolv  (  335): res_nmkquery: (QUERY, IN, A)
+11-11 04:28:44.423 I/resolv  (  335): resolv_cache_lookup: FOUND IN CACHE entry=0x78d7f4b39430
+11-11 04:28:44.423 I/resolv  (  335): doQuery: rcode=0, ancount=1, return value=70
+11-11 04:28:44.541 I/resolv  (  335): res_nmkquery: (QUERY, IN, AAAA)
+11-11 04:28:44.559 D/EGL_emulation(  834): app_time_stats: avg=70579.51ms min=18.20ms max=141140.81ms count=2
+11-11 04:28:44.598 I/FontLog ( 5397): Pulling font file for id = 32, cache size = 6 [CONTEXT service_id=132 ]
+11-11 04:28:44.630 I/resolv  (  335): res_nsend: used send_dg 54 terrno: 0
+11-11 04:28:44.630 I/resolv  (  335): doQuery: rcode=0, ancount=0, return value=54
+11-11 04:28:44.635 D/EGL_emulation(  834): app_time_stats: avg=11817.14ms min=101.32ms max=23532.96ms count=2
+11-11 04:28:44.740 I/om.obraflow.app(19472): Background concurrent copying GC freed 398471(13MB) AllocSpace objects, 6(164KB) LOS objects, 49% free, 18MB/36MB, paused 11.092ms,21us total 573.164ms
+11-11 04:28:44.753 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:44.754 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:44.790 D/EGL_emulation(19472): app_time_stats: avg=110.68ms min=37.93ms max=317.35ms count=9
+11-11 04:28:44.918 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:44.918 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:44.919 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:44.919 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:44.966 D/Maestro (22909): View hierarchy received in 48 ms
+11-11 04:28:44.984 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:44.984 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:45.128 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:45.129 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:45.129 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:45.176 D/Maestro (22909): View hierarchy received in 48 ms
+11-11 04:28:45.218 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:45.219 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:45.234 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:45.235 W/unknown:ReactNative(19472): StatusBarModule: Ignored status bar change, current activity is edge-to-edge.
+11-11 04:28:45.242 D/WindowManager(  519): captureDisplay
+11-11 04:28:45.709 D/TelephonyManager( 1038): requestModemActivityInfo: Sending result to app: ModemActivityInfo{ mTimestamp=2814134 mSleepTimeMs=0 mIdleTimeMs=2814051 mActivityStatsTechSpecificInfo=[{mRat=UNKNOWN,mFrequencyRange=UNKNOWN,mTxTimeMs[]=[0, 0, 0, 0, 0],mRxTimeMs=0}]}
+11-11 04:28:45.794 D/WindowManager(  519): captureDisplay
+11-11 04:28:45.849 D/EGL_emulation(19472): app_time_stats: avg=84.21ms min=36.53ms max=191.18ms count=12
+11-11 04:28:45.959 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:45.959 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:45.959 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:45.959 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:45.959 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:28:45.959 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:45.959 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:45.959 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:45.959 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:45.959 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:28:45.998 D/EGL_emulation(19472): app_time_stats: avg=398.84ms min=13.80ms max=1414.78ms count=4
+11-11 04:28:46.263 I/netd    (  335): tetherGetStats() -> {[]} <0.34ms>
+11-11 04:28:46.330 I/netd    (  335): bandwidthRemoveInterfaceQuota(eth0) <0.49ms>
+11-11 04:28:46.331 I/netd    (  335): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <0.26ms>
+11-11 04:28:46.332 I/netd    (  335): bandwidthSetGlobalAlert(2097152) <0.11ms>
+11-11 04:28:46.900 D/android.hardware.audio@7.1-impl.ranchu(  341): threadLoop: entering standby, frames: 16578944
+11-11 04:28:47.445 D/WindowManager(  519): captureDisplay
+11-11 04:28:47.741 D/WindowManager(  519): captureDisplay
+11-11 04:28:47.758 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:47.758 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:47.758 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:47.758 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:47.758 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:28:47.758 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:47.758 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:47.758 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:47.758 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:47.758 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:28:48.229 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.230 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.230 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.249 D/Maestro (22909): View hierarchy received in 20 ms
+11-11 04:28:48.309 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.310 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.310 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.326 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:48.419 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.420 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.420 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.437 D/Maestro (22909): View hierarchy received in 18 ms
+11-11 04:28:48.498 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.499 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.499 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.527 D/Maestro (22909): View hierarchy received in 29 ms
+11-11 04:28:48.622 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.623 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.623 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.639 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:48.698 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.699 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.699 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.715 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:48.807 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.808 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.808 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.826 D/Maestro (22909): View hierarchy received in 19 ms
+11-11 04:28:48.883 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.884 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.884 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.902 D/Maestro (22909): View hierarchy received in 19 ms
+11-11 04:28:48.997 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:48.997 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.998 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:48.999 I/netd    (  335): tetherGetStats() -> {[]} <0.30ms>
+11-11 04:28:49.002 I/netd    (  335): bandwidthSetGlobalAlert(2097152) <0.08ms>
+11-11 04:28:49.018 D/Maestro (22909): View hierarchy received in 21 ms
+11-11 04:28:49.074 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.074 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.075 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.093 D/Maestro (22909): View hierarchy received in 19 ms
+11-11 04:28:49.184 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.185 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.185 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.201 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:49.255 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.256 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.256 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.272 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:49.324 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.324 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.324 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.340 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:49.395 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.396 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.396 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.425 D/Maestro (22909): View hierarchy received in 30 ms
+11-11 04:28:49.472 I/WorkerManager( 1755): dispose()
+11-11 04:28:49.472 W/A       ( 1755): Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-11 04:28:49.517 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.518 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.518 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.543 D/Maestro (22909): View hierarchy received in 26 ms
+11-11 04:28:49.600 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.600 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.601 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.618 D/Maestro (22909): View hierarchy received in 18 ms
+11-11 04:28:49.632 I/keystore2(  156): system/security/keystore2/src/watchdog.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+11-11 04:28:49.712 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.713 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.713 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.728 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:49.783 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.783 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.784 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.799 I/ContentMaintenance( 5529): Internal cache bytes used: 0; limit: 100000000; download size: 0
+11-11 04:28:49.800 I/RealtimeCacheCleanup( 5529): Beginning Realtime garbage collection.
+11-11 04:28:49.800 I/RealtimeCacheCleanup( 5529): Finished Realtime garbage collection.
+11-11 04:28:49.801 D/Maestro (22909): View hierarchy received in 18 ms
+11-11 04:28:49.896 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.897 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.897 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.916 D/Maestro (22909): View hierarchy received in 20 ms
+11-11 04:28:49.969 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:49.969 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.969 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:49.985 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:50.076 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.076 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.076 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.094 D/Maestro (22909): View hierarchy received in 18 ms
+11-11 04:28:50.149 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.149 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.149 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.165 D/Maestro (22909): View hierarchy received in 15 ms
+11-11 04:28:50.256 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.256 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.256 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.273 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:50.329 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.330 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.330 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.343 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:50.436 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.436 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.437 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.449 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:50.501 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.502 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.502 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.517 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:50.608 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.608 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.609 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.624 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:50.679 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.679 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.679 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.695 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:50.789 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.789 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.790 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.806 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:50.863 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.864 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.864 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.879 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:50.975 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:50.975 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.976 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:50.990 D/Maestro (22909): View hierarchy received in 15 ms
+11-11 04:28:51.045 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.046 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.046 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.059 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:51.153 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.154 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.154 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.167 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:51.222 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.222 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.223 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.236 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:51.328 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.329 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.329 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.343 D/Maestro (22909): View hierarchy received in 15 ms
+11-11 04:28:51.397 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.397 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.397 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.410 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:51.503 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.503 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.503 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.516 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:51.568 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.569 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.569 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.582 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:51.676 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.677 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.677 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.689 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:51.743 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.743 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.744 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.756 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:51.849 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.849 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.849 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.863 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:51.918 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:51.919 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.919 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:51.932 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:52.023 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.023 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.024 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.036 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:52.088 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.088 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.089 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.104 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:52.197 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.198 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.198 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.219 D/Maestro (22909): View hierarchy received in 22 ms
+11-11 04:28:52.272 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.272 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.272 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.285 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:52.374 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.375 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.375 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.387 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:52.441 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.442 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.442 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.456 D/Maestro (22909): View hierarchy received in 15 ms
+11-11 04:28:52.551 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.551 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.551 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.564 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:52.617 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.617 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.618 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.634 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:52.728 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.729 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.729 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.741 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:52.792 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.793 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.793 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.804 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:52.896 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.896 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.896 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.910 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:52.964 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:52.964 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.964 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:52.975 D/Maestro (22909): View hierarchy received in 11 ms
+11-11 04:28:53.068 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.068 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.068 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.082 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:53.139 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.139 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.139 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.156 D/Maestro (22909): View hierarchy received in 17 ms
+11-11 04:28:53.248 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.248 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.248 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.261 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:53.314 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.315 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.315 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.326 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:53.418 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.419 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.419 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.430 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:53.484 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.485 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.485 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.496 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:53.587 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.587 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.587 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.599 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:53.654 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.654 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.654 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.665 D/Maestro (22909): View hierarchy received in 11 ms
+11-11 04:28:53.755 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.756 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.756 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.767 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:53.821 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.822 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.822 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.837 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:53.928 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.928 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.928 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.940 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:53.992 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:53.993 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:53.993 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.004 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:54.096 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.097 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.097 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.108 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:54.143 I/netd    (  335): tetherGetStats() -> {[]} <0.30ms>
+11-11 04:28:54.144 I/netd    (  335): bandwidthSetGlobalAlert(2097152) <0.07ms>
+11-11 04:28:54.161 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.162 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.162 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.174 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:54.310 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.311 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.311 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.322 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:54.353 D/ActivityManager(  519): freezing 31359 com.google.android.webview:webview_service
+11-11 04:28:54.376 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.377 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.377 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.388 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:54.479 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.480 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.480 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.493 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:54.519 D/CompatibilityChangeReporter(  519): Compat change id reported: 261072174; UID 10192; state: ENABLED
+11-11 04:28:54.544 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.545 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.545 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.556 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:54.647 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.648 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.648 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.659 D/Maestro (22909): View hierarchy received in 12 ms
+11-11 04:28:54.712 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.713 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.713 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.725 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:54.815 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.816 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.816 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.830 D/Maestro (22909): View hierarchy received in 15 ms
+11-11 04:28:54.884 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.884 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.884 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.903 D/Maestro (22909): View hierarchy received in 19 ms
+11-11 04:28:54.997 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:54.997 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:54.997 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.008 D/Maestro (22909): View hierarchy received in 11 ms
+11-11 04:28:55.065 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:55.066 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.066 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.078 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:55.171 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:55.172 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.172 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.187 D/Maestro (22909): View hierarchy received in 16 ms
+11-11 04:28:55.241 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:55.242 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.242 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.254 D/Maestro (22909): View hierarchy received in 13 ms
+11-11 04:28:55.346 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:55.347 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.347 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.357 D/Maestro (22909): View hierarchy received in 11 ms
+11-11 04:28:55.490 D/WindowManager(  519): captureDisplay
+11-11 04:28:55.793 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:55.794 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.794 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.807 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:55.858 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:55.858 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.858 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.869 D/Maestro (22909): View hierarchy received in 11 ms
+11-11 04:28:55.921 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:55.921 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.921 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:55.932 D/Maestro (22909): View hierarchy received in 11 ms
+11-11 04:28:56.022 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:56.023 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:56.023 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:56.033 D/Maestro (22909): View hierarchy received in 11 ms
+11-11 04:28:56.126 D/Maestro (22909): Requesting view hierarchy
+11-11 04:28:56.127 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:56.127 W/QueryController(22909): Could not detect idle state.
+11-11 04:28:56.140 D/Maestro (22909): View hierarchy received in 14 ms
+11-11 04:28:56.227 D/WindowManager(  519): captureDisplay
+11-11 04:28:56.245 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:56.245 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:56.245 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:56.245 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:56.245 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 04:28:56.245 W/System  (22897): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 04:28:56.245 W/System  (22897): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 04:28:56.245 W/System  (22897): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 04:28:56.245 W/System  (22897): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 04:28:56.245 W/System  (22897): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
