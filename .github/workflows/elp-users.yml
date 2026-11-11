@@ -1,0 +1,26 @@
+name: elp-users
+on:
+  workflow_dispatch:
+jobs:
+  users:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests
+      - name: Reorganizar usuários
+        env:
+          ADMIN_USER: ${{ secrets.MANUAL_USER }}
+          ADMIN_PASS: ${{ secrets.MANUAL_PASS }}
+        run: python scripts/elp_users.py "$RUNNER_TEMP/r.json"
+      - name: Criptografar resultado
+        run: |
+          cd "$RUNNER_TEMP"
+          openssl rand -hex 32 > k.txt
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in r.json -out r.json.enc -pass file:k.txt
+          openssl pkeyutl -encrypt -pubin -inkey "$GITHUB_WORKSPACE/scripts/elp_users_pub.pem" -pkeyopt rsa_padding_mode:oaep -in k.txt -out k.enc
+          mkdir out && mv r.json.enc k.enc out/ && rm -f r.json k.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: resultado
+          path: ${{ runner.temp }}/out
+          retention-days: 1
