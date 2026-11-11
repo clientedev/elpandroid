@@ -2,13 +2,11 @@ Running on test
  > Flow 322-visita-preenchida
 Launch app "com.obraflow.app" without stopping app... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
-Tap on ".*MANUAL - TESTE Obra Residencial.*", Index: 0... COMPLETED
-Wait for animation to end within 5000 ms... COMPLETED
-Tap on "Descreva o objetivo da visita, tópicos a verificar ou notas importantes..."... FAILED
+Tap on ".*MANUAL - TESTE Obra Residencial.*", Below "MANUAL", Index: 0... FAILED
 
-Element not found: Text matching regex: Descreva o objetivo da visita, tópicos a verificar ou notas importantes...
+Element not found: Text matching regex: .*MANUAL - TESTE Obra Residencial.*, Below: "MANUAL", Index: 0
 
-Element with Text matching regex: Descreva o objetivo da visita, tópicos a verificar ou notas importantes... not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+Element with Text matching regex: .*MANUAL - TESTE Obra Residencial.*, Below: "MANUAL", Index: 0 not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
 
 Possible causes:
 - Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
@@ -17,4 +15,4 @@ Possible causes:
 
 ==== Debug output (logs & screenshots) ====
 
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-322-visita-preenchida/2026-11-10_235115
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-322-visita-preenchida/2026-11-11_011121

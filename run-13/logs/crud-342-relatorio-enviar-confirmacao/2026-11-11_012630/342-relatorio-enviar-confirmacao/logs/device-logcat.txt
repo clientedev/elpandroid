@@ -1,0 +1,827 @@
+--------- beginning of system
+11-11 01:26:37.791 D/ActivityManager(  522): freezing 20606 com.google.process.gservices
+11-11 01:26:38.335 D/ActivityManager(  522): freezing 2768 com.android.chrome
+11-11 01:26:38.342 D/ActivityManager(  522): freezing 3081 com.google.android.documentsui
+11-11 01:26:38.445 D/ActivityManager(  522): freezing 2202 android.process.media
+11-11 01:26:39.200 D/CompatibilityChangeReporter(  522): Compat change id reported: 244637991; UID 10359; state: ENABLED
+--------- beginning of main
+11-11 01:26:39.203 W/unknown:BridgelessReact( 7250): ReactHost{0}.onHostPause(activity)
+11-11 01:26:39.204 W/unknown:BridgelessReact( 7250): ReactHost{0}.ReactContext.onHostPause()
+11-11 01:26:39.204 D/WindowManagerShell(  843): onActivityRestartAttempt: ComponentInfo{com.obraflow.app/com.obraflow.app.MainActivity}
+11-11 01:26:39.204 I/ActivityTaskManager(  522): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.obraflow.app cmp=com.obraflow.app/.MainActivity} with LAUNCH_SINGLE_TASK from uid 10359 (BAL_ALLOW_PERMISSION) result code=3
+11-11 01:26:39.204 D/KeyguardService(  843): setOccluded(false)
+11-11 01:26:39.204 D/KeyguardViewMediator(  843): setOccluded(false)
+11-11 01:26:39.204 D/KeyguardViewMediator(  843): handleSetOccluded(false)
+11-11 01:26:39.207 W/unknown:BridgelessReact( 7250): ReactHost{0}.onHostResume(activity)
+11-11 01:26:39.207 W/unknown:BridgelessReact( 7250): ReactHost{0}.ReactContext.onHostResume()
+11-11 01:26:39.252 D/WindowManager(  522): captureDisplay
+11-11 01:26:39.273 I/hwservicemanager(  134): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+--------- beginning of kernel
+11-11 01:26:39.824 I/servicemanager(    0): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-11 01:26:39.273 I/Gralloc4(32719): mapper 4.x is not supported
+11-11 01:26:39.319 D/libEGL  (32719): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-11 01:26:39.321 D/libEGL  (32719): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-11 01:26:39.322 D/libEGL  (32719): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-11 01:26:39.346 W/OpenGLRenderer(32719): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-11 01:26:39.735 D/WindowManager(  522): captureDisplay
+11-11 01:26:39.763 W/System  (32719): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 01:26:39.763 W/System  (32719): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 01:26:39.763 W/System  (32719): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 01:26:39.763 W/System  (32719): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 01:26:39.763 W/System  (32719): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 01:26:39.763 W/System  (32719): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 01:26:39.763 W/System  (32719): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 01:26:39.763 W/System  (32719): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 01:26:39.763 W/System  (32719): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 01:26:39.763 W/System  (32719): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 01:26:40.419 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:40.421 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.422 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.471 D/Maestro (32745): View hierarchy received in 52 ms
+11-11 01:26:40.579 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:40.580 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.580 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.612 D/Maestro (32745): View hierarchy received in 33 ms
+11-11 01:26:40.693 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:40.694 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.694 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.725 D/Maestro (32745): View hierarchy received in 32 ms
+11-11 01:26:40.783 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:40.784 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.784 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.817 D/Maestro (32745): View hierarchy received in 34 ms
+11-11 01:26:40.931 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:40.931 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.932 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:40.963 D/Maestro (32745): View hierarchy received in 32 ms
+11-11 01:26:41.063 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:41.063 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:41.064 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:41.093 D/Maestro (32745): View hierarchy received in 30 ms
+11-11 01:26:41.206 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1963291, downTime=1963291, deviceId=-1, source=0x1002, displayId=0, eventId=-355622233 }
+11-11 01:26:41.266 D/EGL_emulation( 7250): app_time_stats: avg=3233.80ms min=45.15ms max=25475.22ms count=8
+11-11 01:26:41.279 D/WifiNl80211Manager(  522): Scan result ready event
+11-11 01:26:41.279 D/WifiNative(  522): Scan result ready event
+11-11 01:26:41.608 D/StatusBarIconController(  843): ignoring old pipeline callback because the new wifi icon is enabled
+11-11 01:26:41.806 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1963892, downTime=1963291, deviceId=-1, source=0x1002, displayId=0, eventId=-703254202 }
+11-11 01:26:41.842 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:41.844 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:41.845 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:41.905 D/Maestro (32745): View hierarchy received in 63 ms
+11-11 01:26:41.972 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:41.973 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:41.974 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.003 D/Maestro (32745): View hierarchy received in 31 ms
+11-11 01:26:42.073 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:42.074 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.074 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.101 D/Maestro (32745): View hierarchy received in 28 ms
+11-11 01:26:42.218 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:42.219 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.219 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.244 D/Maestro (32745): View hierarchy received in 26 ms
+11-11 01:26:42.308 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:42.309 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.310 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.337 D/Maestro (32745): View hierarchy received in 29 ms
+11-11 01:26:42.437 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:42.438 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.439 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.464 D/Maestro (32745): View hierarchy received in 27 ms
+11-11 01:26:42.488 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:42.489 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.489 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.516 D/Maestro (32745): View hierarchy received in 28 ms
+11-11 01:26:42.615 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:42.615 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.616 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:42.643 D/Maestro (32745): View hierarchy received in 28 ms
+11-11 01:26:42.737 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1964822, downTime=1964822, deviceId=-1, source=0x1002, displayId=0, eventId=-760380310 }
+11-11 01:26:42.779 D/EGL_emulation( 7250): app_time_stats: avg=186.19ms min=31.83ms max=1033.53ms count=8
+11-11 01:26:43.343 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1965427, downTime=1964822, deviceId=-1, source=0x1002, displayId=0, eventId=-940423059 }
+11-11 01:26:43.384 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:43.385 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.385 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.439 D/Maestro (32745): View hierarchy received in 55 ms
+11-11 01:26:43.458 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:43.459 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.459 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.484 D/Maestro (32745): View hierarchy received in 26 ms
+11-11 01:26:43.549 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:43.550 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.550 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.577 D/Maestro (32745): View hierarchy received in 28 ms
+11-11 01:26:43.678 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:43.679 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.679 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.705 D/Maestro (32745): View hierarchy received in 27 ms
+11-11 01:26:43.727 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:43.728 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.729 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.759 D/Maestro (32745): View hierarchy received in 32 ms
+11-11 01:26:43.859 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:43.860 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.860 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.905 D/Maestro (32745): View hierarchy received in 46 ms
+11-11 01:26:43.929 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:43.930 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.930 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:43.970 D/Maestro (32745): View hierarchy received in 40 ms
+11-11 01:26:44.032 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:44.033 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:44.033 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:44.062 D/Maestro (32745): View hierarchy received in 30 ms
+11-11 01:26:44.122 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:44.123 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:44.123 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:44.149 D/Maestro (32745): View hierarchy received in 27 ms
+11-11 01:26:44.271 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1966356, downTime=1966356, deviceId=-1, source=0x1002, displayId=0, eventId=-575380919 }
+11-11 01:26:44.326 D/EGL_emulation( 7250): app_time_stats: avg=183.63ms min=33.24ms max=985.59ms count=8
+11-11 01:26:44.877 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1966963, downTime=1966356, deviceId=-1, source=0x1002, displayId=0, eventId=-835348790 }
+11-11 01:26:44.911 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:44.915 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:44.915 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:44.967 D/Maestro (32745): View hierarchy received in 56 ms
+11-11 01:26:45.026 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:45.027 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.027 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.050 D/Maestro (32745): View hierarchy received in 24 ms
+11-11 01:26:45.147 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:45.148 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.148 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.172 D/Maestro (32745): View hierarchy received in 25 ms
+11-11 01:26:45.230 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:45.231 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.231 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.254 D/Maestro (32745): View hierarchy received in 24 ms
+11-11 01:26:45.352 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:45.353 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.353 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.375 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:45.437 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:45.438 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.438 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.464 D/Maestro (32745): View hierarchy received in 27 ms
+11-11 01:26:45.559 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:45.560 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.560 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.589 D/Maestro (32745): View hierarchy received in 30 ms
+11-11 01:26:45.652 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:45.653 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.653 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:45.692 D/Maestro (32745): View hierarchy received in 40 ms
+11-11 01:26:45.809 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1967894, downTime=1967894, deviceId=-1, source=0x1002, displayId=0, eventId=-891718494 }
+11-11 01:26:45.861 D/EGL_emulation( 7250): app_time_stats: avg=188.09ms min=31.12ms max=1045.13ms count=8
+11-11 01:26:46.425 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1968511, downTime=1967894, deviceId=-1, source=0x1002, displayId=0, eventId=-1036615108 }
+11-11 01:26:46.459 I/netd    (  334): tetherGetStats() -> {[]} <10.35ms>
+11-11 01:26:46.474 I/netd    (  334): bandwidthRemoveInterfaceQuota(eth0) <0.74ms>
+11-11 01:26:46.475 I/netd    (  334): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <0.46ms>
+11-11 01:26:46.477 I/netd    (  334): bandwidthRemoveInterfaceQuota(eth0) <0.59ms>
+11-11 01:26:46.478 I/netd    (  334): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <0.41ms>
+11-11 01:26:46.478 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:46.479 I/netd    (  334): bandwidthSetGlobalAlert(2097152) <0.11ms>
+11-11 01:26:46.481 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.481 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.511 I/WorkerManager( 1733): dispose()
+11-11 01:26:46.512 W/A       ( 1733): Queue length for executor EventBus is now 11. Perhaps some tasks are too long, or the pool is too small.
+11-11 01:26:46.521 D/Maestro (32745): View hierarchy received in 43 ms
+11-11 01:26:46.585 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:46.585 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.586 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.630 D/Maestro (32745): View hierarchy received in 45 ms
+11-11 01:26:46.651 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:46.651 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.652 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.675 D/Maestro (32745): View hierarchy received in 24 ms
+11-11 01:26:46.735 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:46.736 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.736 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.748 I/keystore2(  157): system/security/keystore2/src/watchdog.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+11-11 01:26:46.759 D/Maestro (32745): View hierarchy received in 24 ms
+11-11 01:26:46.816 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:46.816 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.817 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.838 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:46.896 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:46.897 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.897 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.918 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:46.975 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:46.975 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.976 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:46.998 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:47.057 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:47.057 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:47.058 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:47.079 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:47.175 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:47.176 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:47.176 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:47.197 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:47.257 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:47.258 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:47.258 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:47.279 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:47.400 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1969485, downTime=1969485, deviceId=-1, source=0x1002, displayId=0, eventId=-194012275 }
+11-11 01:26:47.443 D/EGL_emulation( 7250): app_time_stats: avg=195.73ms min=32.18ms max=1057.15ms count=8
+11-11 01:26:47.618 D/StatusBarIconController(  843): ignoring old pipeline callback because the new wifi icon is enabled
+11-11 01:26:48.007 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1970091, downTime=1969485, deviceId=-1, source=0x1002, displayId=0, eventId=-222303779 }
+11-11 01:26:48.050 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.050 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.051 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.083 D/Maestro (32745): View hierarchy received in 34 ms
+11-11 01:26:48.142 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.143 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.143 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.164 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:48.260 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.261 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.261 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.282 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:48.301 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.302 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.302 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.321 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:48.421 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.422 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.422 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.441 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:48.501 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.502 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.502 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.527 D/Maestro (32745): View hierarchy received in 26 ms
+11-11 01:26:48.623 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.623 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.624 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.643 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:48.704 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.705 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.705 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.730 D/Maestro (32745): View hierarchy received in 26 ms
+11-11 01:26:48.827 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:48.828 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.828 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:48.848 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:48.928 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1971014, downTime=1971014, deviceId=-1, source=0x1002, displayId=0, eventId=-620413479 }
+11-11 01:26:48.978 D/EGL_emulation( 7250): app_time_stats: avg=188.31ms min=30.13ms max=1023.46ms count=8
+11-11 01:26:49.540 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1971625, downTime=1971014, deviceId=-1, source=0x1002, displayId=0, eventId=-173379626 }
+11-11 01:26:49.569 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:49.570 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.571 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.605 D/Maestro (32745): View hierarchy received in 36 ms
+11-11 01:26:49.706 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:49.707 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.707 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.731 D/Maestro (32745): View hierarchy received in 25 ms
+11-11 01:26:49.792 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:49.793 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.794 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.818 D/Maestro (32745): View hierarchy received in 26 ms
+11-11 01:26:49.875 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:49.875 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.876 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.896 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:49.956 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:49.957 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.957 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:49.978 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:50.077 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:50.077 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.078 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.097 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:50.116 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:50.117 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.117 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.141 D/Maestro (32745): View hierarchy received in 25 ms
+11-11 01:26:50.240 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:50.241 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.241 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.262 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:50.324 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:50.325 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.325 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:50.351 D/Maestro (32745): View hierarchy received in 27 ms
+11-11 01:26:50.433 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1972518, downTime=1972518, deviceId=-1, source=0x1002, displayId=0, eventId=-766528650 }
+11-11 01:26:50.485 D/EGL_emulation( 7250): app_time_stats: avg=186.24ms min=33.43ms max=998.63ms count=8
+11-11 01:26:51.036 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1973119, downTime=1972518, deviceId=-1, source=0x1002, displayId=0, eventId=-822369526 }
+11-11 01:26:51.118 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.120 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.126 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.149 D/Maestro (32745): View hierarchy received in 31 ms
+11-11 01:26:51.210 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.211 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.211 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.233 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:51.333 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.333 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.334 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.357 D/Maestro (32745): View hierarchy received in 24 ms
+11-11 01:26:51.418 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.418 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.419 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.447 D/Maestro (32745): View hierarchy received in 29 ms
+11-11 01:26:51.545 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.546 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.547 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.567 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:51.625 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.626 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.626 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.645 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:51.744 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.744 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.745 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.767 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:51.826 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:51.827 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.827 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:51.851 D/Maestro (32745): View hierarchy received in 25 ms
+11-11 01:26:51.972 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1974058, downTime=1974058, deviceId=-1, source=0x1002, displayId=0, eventId=-501805294 }
+11-11 01:26:52.030 D/EGL_emulation( 7250): app_time_stats: avg=189.11ms min=34.18ms max=1003.73ms count=8
+11-11 01:26:52.577 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1974662, downTime=1974058, deviceId=-1, source=0x1002, displayId=0, eventId=-745412885 }
+11-11 01:26:52.621 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:52.622 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.622 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.649 D/Maestro (32745): View hierarchy received in 28 ms
+11-11 01:26:52.711 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:52.712 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.712 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.735 D/Maestro (32745): View hierarchy received in 24 ms
+11-11 01:26:52.830 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:52.831 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.832 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.851 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:52.910 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:52.911 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.911 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:52.930 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:53.027 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:53.028 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.028 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.050 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:53.109 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:53.110 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.110 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.129 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:53.224 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:53.225 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.225 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.244 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:53.302 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:53.303 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.303 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:53.323 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:53.402 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1975488, downTime=1975488, deviceId=-1, source=0x1002, displayId=0, eventId=-873450664 }
+11-11 01:26:53.444 D/EGL_emulation( 7250): app_time_stats: avg=173.32ms min=32.79ms max=919.30ms count=8
+11-11 01:26:54.017 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1976094, downTime=1975488, deviceId=-1, source=0x1002, displayId=0, eventId=-811192124 }
+11-11 01:26:54.058 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.063 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.063 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.105 D/Maestro (32745): View hierarchy received in 47 ms
+11-11 01:26:54.163 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.163 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.164 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.183 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:54.281 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.282 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.282 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.302 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:54.352 I/netd    (  334): tetherGetStats() -> {[]} <0.44ms>
+11-11 01:26:54.355 I/netd    (  334): bandwidthSetGlobalAlert(2097152) <0.18ms>
+11-11 01:26:54.363 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.364 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.365 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.385 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:54.442 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.443 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.443 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.464 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:54.483 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.484 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.484 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.506 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:54.605 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.606 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.606 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.631 D/Maestro (32745): View hierarchy received in 26 ms
+11-11 01:26:54.690 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.691 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.691 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.710 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:54.810 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:54.810 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.811 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:54.830 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:54.911 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1976997, downTime=1976997, deviceId=-1, source=0x1002, displayId=0, eventId=-748837796 }
+11-11 01:26:54.960 D/EGL_emulation( 7250): app_time_stats: avg=184.07ms min=35.88ms max=974.40ms count=8
+11-11 01:26:55.368 D/CompatibilityChangeReporter(  522): Compat change id reported: 218533173; UID 10359; state: ENABLED
+11-11 01:26:55.368 D/CompatibilityChangeReporter(  522): Compat change id reported: 262645982; UID 10359; state: ENABLED
+11-11 01:26:55.529 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1977613, downTime=1976997, deviceId=-1, source=0x1002, displayId=0, eventId=-938118328 }
+11-11 01:26:55.563 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:55.564 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.564 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.584 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:55.682 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:55.683 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.683 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.702 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:55.765 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:55.766 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.766 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.786 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:55.884 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:55.885 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.885 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.905 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:55.965 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:55.966 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.966 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:55.990 D/Maestro (32745): View hierarchy received in 25 ms
+11-11 01:26:56.089 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:56.090 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.091 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.112 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:56.169 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:56.170 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.171 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.189 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:56.284 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:56.285 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.285 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.307 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:56.366 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:56.366 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.367 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:56.385 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:26:56.509 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1978594, downTime=1978594, deviceId=-1, source=0x1002, displayId=0, eventId=-916772797 }
+11-11 01:26:56.561 D/EGL_emulation( 7250): app_time_stats: avg=192.87ms min=28.90ms max=1102.54ms count=8
+11-11 01:26:57.115 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1979200, downTime=1978594, deviceId=-1, source=0x1002, displayId=0, eventId=-587006768 }
+11-11 01:26:57.150 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.151 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.156 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.163 I/ContentMaintenance(31757): Internal cache bytes used: 0; limit: 100000000; download size: 0
+11-11 01:26:57.168 I/RealtimeCacheCleanup(31757): Beginning Realtime garbage collection.
+11-11 01:26:57.168 I/RealtimeCacheCleanup(31757): Finished Realtime garbage collection.
+11-11 01:26:57.187 D/Maestro (32745): View hierarchy received in 37 ms
+11-11 01:26:57.247 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.248 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.248 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.267 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:26:57.366 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.366 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.367 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.390 D/Maestro (32745): View hierarchy received in 24 ms
+11-11 01:26:57.450 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.450 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.451 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.474 D/Maestro (32745): View hierarchy received in 23 ms
+11-11 01:26:57.570 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.571 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.571 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.591 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:57.691 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.692 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.692 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.710 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:26:57.765 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.766 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.766 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.790 D/Maestro (32745): View hierarchy received in 25 ms
+11-11 01:26:57.849 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:57.849 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.850 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:57.868 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:26:57.987 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1980072, downTime=1980072, deviceId=-1, source=0x1002, displayId=0, eventId=-223253906 }
+11-11 01:26:58.029 D/EGL_emulation( 7250): app_time_stats: avg=181.47ms min=42.36ms max=966.09ms count=8
+11-11 01:26:58.063 E/A       ( 1733): disposing SearchServiceClient after timeout []
+11-11 01:26:58.592 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1980678, downTime=1980072, deviceId=-1, source=0x1002, displayId=0, eventId=-206405933 }
+11-11 01:26:58.635 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:58.636 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.636 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.656 D/Maestro (32745): View hierarchy received in 21 ms
+11-11 01:26:58.713 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:58.714 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.715 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.735 D/Maestro (32745): View hierarchy received in 22 ms
+11-11 01:26:58.830 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:58.830 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.831 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.847 D/Maestro (32745): View hierarchy received in 17 ms
+11-11 01:26:58.947 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:58.948 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.948 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:58.965 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:26:59.060 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:59.060 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.061 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.077 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:26:59.135 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:59.136 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.137 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.152 D/Maestro (32745): View hierarchy received in 17 ms
+11-11 01:26:59.245 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:59.246 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.246 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.262 D/Maestro (32745): View hierarchy received in 17 ms
+11-11 01:26:59.323 D/Maestro (32745): Requesting view hierarchy
+11-11 01:26:59.324 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.324 W/QueryController(32745): Could not detect idle state.
+11-11 01:26:59.339 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:26:59.462 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1981547, downTime=1981547, deviceId=-1, source=0x1002, displayId=0, eventId=-519838469 }
+11-11 01:26:59.513 D/EGL_emulation( 7250): app_time_stats: avg=183.35ms min=30.24ms max=967.59ms count=8
+11-11 01:27:00.054 I/AiAiEcho( 1657): Predicting[0]: 
+11-11 01:27:00.054 I/AiAiEcho( 1657): EchoTargets: 
+11-11 01:27:00.054 I/AiAiEcho( 1657): Filtered by AiAi flag check: 
+11-11 01:27:00.054 I/AiAiEcho( 1657): Ranked targets strategy: SORT, count: 0, ranking metadata: 
+11-11 01:27:00.055 I/AiAiEcho( 1657): #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+11-11 01:27:00.059 W/PageIndicator(  843): Total number of pages invalid: 0. Assuming 1 page.
+11-11 01:27:00.076 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1982159, downTime=1981547, deviceId=-1, source=0x1002, displayId=0, eventId=-1002840556 }
+11-11 01:27:00.130 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.131 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.131 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.150 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:27:00.211 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.212 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.212 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.228 D/Maestro (32745): View hierarchy received in 17 ms
+11-11 01:27:00.323 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.324 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.324 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.343 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:27:00.445 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.445 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.446 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.461 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:00.556 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.556 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.557 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.572 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:00.672 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.673 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.673 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.691 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:00.785 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.786 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.786 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.803 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:00.865 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:00.865 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.866 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:00.880 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:00.997 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1983083, downTime=1983083, deviceId=-1, source=0x1002, displayId=0, eventId=-663167979 }
+11-11 01:27:01.043 D/EGL_emulation( 7250): app_time_stats: avg=188.39ms min=34.95ms max=1028.28ms count=8
+11-11 01:27:01.617 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1983698, downTime=1983083, deviceId=-1, source=0x1002, displayId=0, eventId=-432364719 }
+11-11 01:27:01.651 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:01.652 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.652 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.691 D/Maestro (32745): View hierarchy received in 40 ms
+11-11 01:27:01.748 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:01.749 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.749 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.765 D/Maestro (32745): View hierarchy received in 17 ms
+11-11 01:27:01.863 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:01.867 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.868 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.882 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:01.941 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:01.941 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.942 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:01.957 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:02.051 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:02.051 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.051 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.067 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:02.087 D/ActivityManager(  522): freezing 857 com.google.android.permissioncontroller
+11-11 01:27:02.124 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:02.125 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.125 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.140 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:02.236 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:02.237 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.238 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.267 D/Maestro (32745): View hierarchy received in 31 ms
+11-11 01:27:02.324 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:02.325 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.325 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:02.341 D/Maestro (32745): View hierarchy received in 17 ms
+11-11 01:27:02.459 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1984544, downTime=1984544, deviceId=-1, source=0x1002, displayId=0, eventId=-138907904 }
+11-11 01:27:02.509 D/EGL_emulation( 7250): app_time_stats: avg=181.14ms min=33.50ms max=943.82ms count=8
+11-11 01:27:03.061 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1985147, downTime=1984544, deviceId=-1, source=0x1002, displayId=0, eventId=-484460704 }
+11-11 01:27:03.085 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.086 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.087 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.094 I/netd    (  334): tetherGetStats() -> {[]} <2.41ms>
+11-11 01:27:03.096 I/netd    (  334): bandwidthSetGlobalAlert(2097152) <0.08ms>
+11-11 01:27:03.120 D/Maestro (32745): View hierarchy received in 35 ms
+11-11 01:27:03.142 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.143 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.143 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.160 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:03.255 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.255 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.256 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.276 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:27:03.334 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.335 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.335 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.350 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:03.448 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.448 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.449 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.464 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:03.519 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.520 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.520 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.535 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:03.629 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.630 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.630 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.643 D/Maestro (32745): View hierarchy received in 14 ms
+11-11 01:27:03.705 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.706 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.706 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.724 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:03.820 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:03.821 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.821 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:03.839 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:03.923 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1986009, downTime=1986009, deviceId=-1, source=0x1002, displayId=0, eventId=-661012759 }
+11-11 01:27:03.978 D/EGL_emulation( 7250): app_time_stats: avg=182.30ms min=35.10ms max=978.84ms count=8
+11-11 01:27:04.535 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1986621, downTime=1986009, deviceId=-1, source=0x1002, displayId=0, eventId=-1009554146 }
+11-11 01:27:04.613 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:04.614 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.615 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.676 D/Maestro (32745): View hierarchy received in 63 ms
+11-11 01:27:04.733 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:04.734 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.734 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.749 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:04.805 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:04.806 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.806 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.820 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:04.916 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:04.917 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.917 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:04.935 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:05.038 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:05.038 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.039 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.056 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:05.150 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:05.151 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.151 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.168 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:05.223 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:05.223 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.224 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.238 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:05.336 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:05.336 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.337 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.351 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:05.409 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:05.410 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.411 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:05.427 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:05.545 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1987630, downTime=1987630, deviceId=-1, source=0x1002, displayId=0, eventId=-453606438 }
+11-11 01:27:05.594 D/EGL_emulation( 7250): app_time_stats: avg=176.84ms min=32.94ms max=1030.63ms count=9
+11-11 01:27:06.161 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1988246, downTime=1987630, deviceId=-1, source=0x1002, displayId=0, eventId=-903350547 }
+11-11 01:27:06.211 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.212 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.212 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.227 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:06.284 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.285 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.285 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.303 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:06.400 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.401 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.401 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.416 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:06.474 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.475 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.475 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.492 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:06.588 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.588 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.589 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.607 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:06.666 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.667 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.667 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.685 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:06.779 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.779 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.780 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.793 D/Maestro (32745): View hierarchy received in 14 ms
+11-11 01:27:06.849 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.850 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.850 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.868 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:06.923 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:06.923 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.924 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:06.941 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:07.025 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1989110, downTime=1989110, deviceId=-1, source=0x1002, displayId=0, eventId=-1059229724 }
+11-11 01:27:07.075 D/EGL_emulation( 7250): app_time_stats: avg=182.57ms min=30.03ms max=989.36ms count=8
+11-11 01:27:07.642 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1989725, downTime=1989110, deviceId=-1, source=0x1002, displayId=0, eventId=-637974668 }
+11-11 01:27:07.665 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:07.665 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.666 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.691 D/Maestro (32745): View hierarchy received in 26 ms
+11-11 01:27:07.789 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:07.790 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.790 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.804 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:07.860 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:07.861 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.862 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.880 D/Maestro (32745): View hierarchy received in 20 ms
+11-11 01:27:07.974 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:07.975 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.975 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:07.989 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:08.050 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:08.051 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.051 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.066 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:08.122 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:08.123 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.123 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.138 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:08.197 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:08.198 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.199 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.215 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:08.311 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:08.312 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.312 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.326 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:08.383 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:08.384 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.384 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:08.399 D/ActivityManager(  522): freezing 1751 com.android.keychain
+11-11 01:27:08.399 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:08.519 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1990604, downTime=1990604, deviceId=-1, source=0x1002, displayId=0, eventId=-521536901 }
+11-11 01:27:08.559 D/EGL_emulation( 7250): app_time_stats: avg=181.04ms min=31.62ms max=973.48ms count=8
+11-11 01:27:09.130 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1991215, downTime=1990604, deviceId=-1, source=0x1002, displayId=0, eventId=-606020338 }
+11-11 01:27:09.169 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.170 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.171 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.214 D/Maestro (32745): View hierarchy received in 44 ms
+11-11 01:27:09.274 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.274 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.275 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.292 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:09.386 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.387 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.387 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.401 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:09.461 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.462 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.462 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.480 D/Maestro (32745): View hierarchy received in 19 ms
+11-11 01:27:09.574 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.575 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.575 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.590 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:09.646 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.647 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.647 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.661 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:09.754 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.755 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.756 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.772 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:09.829 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.829 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.830 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.844 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:09.939 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:09.940 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.940 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:09.957 D/Maestro (32745): View hierarchy received in 18 ms
+11-11 01:27:10.082 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1992168, downTime=1992168, deviceId=-1, source=0x1002, displayId=0, eventId=-37717815 }
+11-11 01:27:10.128 D/EGL_emulation( 7250): app_time_stats: avg=193.54ms min=32.12ms max=1037.23ms count=8
+11-11 01:27:10.688 D/TaplEvents( 1113): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1992774, downTime=1992168, deviceId=-1, source=0x1002, displayId=0, eventId=-1003472575 }
+11-11 01:27:10.702 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:10.702 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:10.703 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:10.731 D/Maestro (32745): View hierarchy received in 29 ms
+11-11 01:27:10.825 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:10.826 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:10.826 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:10.840 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:10.896 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:10.897 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:10.897 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:10.903 I/netd    (  334): tetherGetStats() -> {[]} <0.28ms>
+11-11 01:27:10.905 I/netd    (  334): bandwidthSetGlobalAlert(2097152) <0.06ms>
+11-11 01:27:10.912 D/Maestro (32745): View hierarchy received in 16 ms
+11-11 01:27:11.006 D/Maestro (32745): Requesting view hierarchy
+11-11 01:27:11.007 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:11.007 W/QueryController(32745): Could not detect idle state.
+11-11 01:27:11.021 D/Maestro (32745): View hierarchy received in 15 ms
+11-11 01:27:11.247 D/WindowManager(  522): captureDisplay
+11-11 01:27:12.388 I/logd    (    0): logdr: UID=2000 GID=2000 PID=1097 n tail=0 logMask=99 pid=0 start=0ns deadline=0ns

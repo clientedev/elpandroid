@@ -2,11 +2,11 @@ Running on test
  > Flow 329-relatorio-selecionar-obra
 Launch app "com.obraflow.app" without stopping app... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
-Tap on "Toque para selecionar a obra..."... FAILED
+Tap on "(Dropdown|Toque para selecionar a obra.*)", Index: 0... FAILED
 
-Element not found: Text matching regex: Toque para selecionar a obra...
+Element not found: Text matching regex: (Dropdown|Toque para selecionar a obra.*), Index: 0
 
-Element with Text matching regex: Toque para selecionar a obra... not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+Element with Text matching regex: (Dropdown|Toque para selecionar a obra.*), Index: 0 not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
 
 Possible causes:
 - Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
@@ -15,4 +15,4 @@ Possible causes:
 
 ==== Debug output (logs & screenshots) ====
 
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-329-relatorio-selecionar-obra/2026-11-10_235545
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-329-relatorio-selecionar-obra/2026-11-11_011659

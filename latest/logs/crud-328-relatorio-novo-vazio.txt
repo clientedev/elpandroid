@@ -2,26 +2,37 @@ Running on test
  > Flow 328-relatorio-novo-vazio
 Launch app "com.obraflow.app" without stopping app... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
-Press back... COMPLETED
-Wait for animation to end within 5000 ms... COMPLETED
 Run flow when "Ajustes" is not visible...
-Run flow when "Ajustes" is not visible... SKIPPED
+  Press back... COMPLETED
+  Wait for animation to end within 3000 ms... COMPLETED
+  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
+Run flow when "Ajustes" is not visible... COMPLETED
 Run flow when "Ajustes" is not visible...
-Run flow when "Ajustes" is not visible... SKIPPED
+  Press back... COMPLETED
+  Wait for animation to end within 3000 ms... COMPLETED
+  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
+Run flow when "Ajustes" is not visible... COMPLETED
 Run flow when "Ajustes" is not visible...
-Run flow when "Ajustes" is not visible... SKIPPED
+  Press back... COMPLETED
+  Wait for animation to end within 3000 ms... COMPLETED
+  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
+Run flow when "Ajustes" is not visible... COMPLETED
 Run flow when "Ajustes" is not visible...
-Run flow when "Ajustes" is not visible... SKIPPED
-Tap on ".*, Relatórios"... COMPLETED
-Wait for animation to end within 5000 ms... COMPLETED
-Assert that (Optional) "__aguarda__" is visible... WARNED
+  Press back... COMPLETED
+  Wait for animation to end within 3000 ms... COMPLETED
+  Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
+Run flow when "Ajustes" is not visible... COMPLETED
+Tap on ".*, Relatórios"... FAILED
 
+Element not found: Text matching regex: .*, Relatórios
 
- Warning: Assertion is false: "__aguarda__" is visible
-Tap on point (92%,9%)... COMPLETED
-Wait for animation to end within 5000 ms... COMPLETED
-Assert that "Relatório de Obra|1.  Data da Visita.*" is visible... COMPLETED
-Assert that (Optional) "__aguarda__" is visible... WARNED
+Element with Text matching regex: .*, Relatórios not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
 
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state.
+- This could be a real regression that needs to be addressed.
 
- Warning: Assertion is false: "__aguarda__" is visible
+==== Debug output (logs & screenshots) ====
+
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-328-relatorio-novo-vazio/2026-11-11_011542
