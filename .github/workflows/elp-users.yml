@@ -1,6 +1,8 @@
 name: elp-users
 on:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   users:
     runs-on: ubuntu-latest
@@ -19,8 +21,10 @@ jobs:
           openssl enc -aes-256-cbc -pbkdf2 -salt -in r.json -out r.json.enc -pass file:k.txt
           openssl pkeyutl -encrypt -pubin -inkey "$GITHUB_WORKSPACE/scripts/elp_users_pub.pem" -pkeyopt rsa_padding_mode:oaep -in k.txt -out k.enc
           mkdir out && mv r.json.enc k.enc out/ && rm -f r.json k.txt
-      - uses: actions/upload-artifact@v4
-        with:
-          name: resultado
-          path: ${{ runner.temp }}/out
-          retention-days: 1
+      - name: Publicar resultado criptografado
+        run: |
+          cd "$RUNNER_TEMP/out"
+          git init -q && git checkout -q -b elp-users-result
+          git config user.name ci && git config user.email ci@users.noreply.github.com
+          git add . && git commit -qm resultado
+          git push -fq "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" elp-users-result
