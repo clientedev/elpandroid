@@ -60,11 +60,18 @@ appId: com.obraflow.app
     visible: "__aguarda__"
     timeout: 1500
     optional: true
+- swipe:
+    start: "85%,22%"
+    end: "15%,22%"
 - tapOn:
-    text: "Todos.*"
+    text: "Aprovados.*"
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
 - tapOn:
     text: ".*Laudo de fachada 01.*"
     index: 0
