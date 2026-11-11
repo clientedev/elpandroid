@@ -1,0 +1,77 @@
+--------- beginning of main
+11-11 00:03:19.304 D/StatusBarIconController(  830): ignoring old pipeline callback because the new wifi icon is enabled
+--------- beginning of system
+11-11 00:03:19.666 D/CompatibilityChangeReporter(  518): Compat change id reported: 244637991; UID 10439; state: ENABLED
+11-11 00:03:19.668 D/WindowManagerShell(  830): onActivityRestartAttempt: ComponentInfo{com.obraflow.app/com.obraflow.app.MainActivity}
+11-11 00:03:19.668 W/unknown:BridgelessReact(19672): ReactHost{0}.onHostPause(activity)
+11-11 00:03:19.668 W/unknown:BridgelessReact(19672): ReactHost{0}.ReactContext.onHostPause()
+11-11 00:03:19.668 I/ActivityTaskManager(  518): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.obraflow.app cmp=com.obraflow.app/.MainActivity} with LAUNCH_SINGLE_TASK from uid 10439 (BAL_ALLOW_PERMISSION) result code=3
+11-11 00:03:19.668 D/KeyguardService(  830): setOccluded(false)
+11-11 00:03:19.668 D/KeyguardViewMediator(  830): setOccluded(false)
+11-11 00:03:19.668 D/KeyguardViewMediator(  830): handleSetOccluded(false)
+11-11 00:03:19.671 W/unknown:BridgelessReact(19672): ReactHost{0}.onHostResume(activity)
+11-11 00:03:19.671 W/unknown:BridgelessReact(19672): ReactHost{0}.ReactContext.onHostResume()
+11-11 00:03:19.695 D/WindowManager(  518): captureDisplay
+11-11 00:03:19.706 I/hwservicemanager(  135): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-11 00:03:19.707 I/Gralloc4(14416): mapper 4.x is not supported
+--------- beginning of kernel
+11-11 00:03:19.884 I/servicemanager(    0): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-11 00:03:19.731 D/libEGL  (14416): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-11 00:03:19.731 D/libEGL  (14416): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-11 00:03:19.732 D/libEGL  (14416): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-11 00:03:19.746 W/OpenGLRenderer(14416): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-11 00:03:20.054 D/WindowManager(  518): captureDisplay
+11-11 00:03:20.084 W/System  (14416): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 00:03:20.084 W/System  (14416): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 00:03:20.084 W/System  (14416): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 00:03:20.084 W/System  (14416): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 00:03:20.084 W/System  (14416): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 00:03:20.084 W/System  (14416): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 00:03:20.084 W/System  (14416): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 00:03:20.084 W/System  (14416): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 00:03:20.084 W/System  (14416): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 00:03:20.084 W/System  (14416): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 00:03:20.561 D/TaplEvents( 1106): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=2389744, downTime=2389744, deviceId=-1, source=0x1002, displayId=0, eventId=-495726822 }
+11-11 00:03:20.613 D/EGL_emulation(19672): app_time_stats: avg=8915.88ms min=34.80ms max=79856.88ms count=9
+11-11 00:03:20.971 D/TaplEvents( 1106): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=2390154, downTime=2389744, deviceId=-1, source=0x1002, displayId=0, eventId=-596439042 }
+11-11 00:03:21.013 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:21.024 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.024 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.188 D/Maestro (14428): View hierarchy received in 175 ms
+11-11 00:03:21.298 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:21.299 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.299 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.354 D/Maestro (14428): View hierarchy received in 56 ms
+11-11 00:03:21.642 D/ActivityManager(  518): freezing 2766 com.android.chrome
+11-11 00:03:21.642 D/ActivityManager(  518): freezing 3242 com.google.android.documentsui
+11-11 00:03:21.646 D/EGL_emulation(19672): app_time_stats: avg=65.90ms min=32.63ms max=285.43ms count=15
+11-11 00:03:21.671 D/ActivityManager(  518): freezing 2145 android.process.media
+11-11 00:03:21.738 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:21.739 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.739 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.874 D/Maestro (14428): View hierarchy received in 136 ms
+11-11 00:03:21.946 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:21.946 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.946 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:21.996 D/Maestro (14428): View hierarchy received in 50 ms
+11-11 00:03:22.063 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:22.063 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.064 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.104 D/Maestro (14428): View hierarchy received in 41 ms
+11-11 00:03:22.170 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:22.170 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.171 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.223 D/Maestro (14428): View hierarchy received in 53 ms
+11-11 00:03:22.289 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:22.290 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.290 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.357 D/Maestro (14428): View hierarchy received in 68 ms
+11-11 00:03:22.461 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:22.461 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.461 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.503 D/Maestro (14428): View hierarchy received in 42 ms
+11-11 00:03:22.562 D/Maestro (14428): Requesting view hierarchy
+11-11 00:03:22.563 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.563 W/QueryController(14428): Could not detect idle state.
+11-11 00:03:22.609 D/Maestro (14428): View hierarchy received in 47 ms
+11-11 00:03:22.811 D/WindowManager(  518): captureDisplay

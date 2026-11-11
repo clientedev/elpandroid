@@ -1,5 +1,7 @@
 Running on test
  > Flow 355-admin-sair
+Launch app "com.obraflow.app" without stopping app... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
 Run flow when "Ajustes" is not visible...
   Press back... COMPLETED
   Wait for animation to end within 3000 ms... COMPLETED
@@ -20,11 +22,11 @@ Run flow when "Ajustes" is not visible...
   Wait for animation to end within 3000 ms... COMPLETED
   Tap on (Optional) "(?i)(descartar|sair sem salvar|ok)"... WARNED
 Run flow when "Ajustes" is not visible... COMPLETED
-Tap on "Ajustes"... FAILED
+Tap on ".*, Ajustes"... FAILED
 
-Element not found: Text matching regex: Ajustes
+Element not found: Text matching regex: .*, Ajustes
 
-Element with Text matching regex: Ajustes not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+Element with Text matching regex: .*, Ajustes not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
 
 Possible causes:
 - Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
@@ -33,4 +35,4 @@ Possible causes:
 
 ==== Debug output (logs & screenshots) ====
 
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-355-admin-sair/2026-11-10_223617
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-355-admin-sair/2026-11-11_001336

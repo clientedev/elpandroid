@@ -1,0 +1,34 @@
+Running on test
+ > Flow 406-tecnico-relatorio-novo
+Launch app "com.obraflow.app" without stopping app... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Run flow when "Ajustes" is not visible...
+Run flow when "Ajustes" is not visible... SKIPPED
+Tap on ".*, Relatórios"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
+
+
+ Warning: Assertion is false: "__aguarda__" is visible
+Tap on point (92%,9%)... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that "1.  Data da Visita.*" is visible... FAILED
+
+Assertion is false: "1.  Data da Visita.*" is visible
+
+Assertion '"1.  Data da Visita.*" is visible' failed. Check the UI hierarchy in debug artifacts to verify the element state and properties.
+
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state
+- This could be a real regression that needs to be addressed
+
+==== Debug output (logs & screenshots) ====
+
+/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-406-tecnico-relatorio-novo/2026-11-11_001800
