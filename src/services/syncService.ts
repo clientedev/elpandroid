@@ -1046,7 +1046,10 @@ class SyncService {
           }
           try {
             const matchingPending = await db.getFirstAsync<any>(
-              `SELECT id FROM projetos WHERE id != ? AND (
+              // Só reconcilia obras PROVISÓRIAS (criadas offline, ID temporário e ainda não sincronizadas).
+              // Antes, qualquer obra local com o mesmo nome era fundida, fazendo obras homônimas sumirem do aparelho.
+              `SELECT id FROM projetos WHERE id != ? AND (id <= 0 OR id >= 2000000000)
+                AND (sync_status IS NULL OR sync_status != 'synced') AND (
                 (numero IS NOT NULL AND numero != '' AND numero = ?) OR 
                 (nome IS NOT NULL AND nome != '' AND LOWER(TRIM(nome)) = LOWER(TRIM(?)))
               ) LIMIT 1`,
