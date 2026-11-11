@@ -1,7 +1,15 @@
 Running on test
  > Flow 708-admin-visita-realizada
-Launch app "com.obraflow.app" without stopping app... COMPLETED
-Wait for animation to end within 5000 ms... COMPLETED
+Launch app "com.obraflow.app"... COMPLETED
+Assert that ".*, Ajustes" is visible... COMPLETED
+Tap on (Optional) "Mais tarde"... WARNED
+
+
+ Warning: Element not found: Text matching regex: Mais tarde
+Assert that (Optional) "__aguarda__" is visible... WARNED
+
+
+ Warning: Assertion is false: "__aguarda__" is visible
 Run flow when "Ajustes" is not visible...
 Run flow when "Ajustes" is not visible... SKIPPED
 Run flow when "Ajustes" is not visible...
@@ -17,17 +25,11 @@ Assert that (Optional) "__aguarda__" is visible... WARNED
 
  Warning: Assertion is false: "__aguarda__" is visible
 Tap on ".*MANUAL - TESTE.*", Index: 0... COMPLETED
-Assert that "Detalhes da Visita" is visible... FAILED
+Assert that "Dados do Agendamento" is visible... COMPLETED
+Scrolling DOWN until "Concluir e Marcar Como Realizada" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Tap on "Concluir e Marcar Como Realizada"... COMPLETED
+Assert that (Optional) "(Sucesso.*|.*Realizada.*)" is visible... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Assertion is false: "Detalhes da Visita" is visible
 
-Assertion '"Detalhes da Visita" is visible' failed. Check the UI hierarchy in debug artifacts to verify the element state and properties.
-
-Possible causes:
-- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
-- Element may be temporarily unavailable due to loading state
-- This could be a real regression that needs to be addressed
-
-==== Debug output (logs & screenshots) ====
-
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-708-admin-visita-realizada/2026-11-11_021412
+ Warning: Assertion is false: "__aguarda__" is visible

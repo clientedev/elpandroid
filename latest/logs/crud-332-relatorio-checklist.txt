@@ -2,17 +2,15 @@ Running on test
  > Flow 332-relatorio-checklist
 Launch app "com.obraflow.app" without stopping app... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
-Tap on "Salvar Informações da Obra"... FAILED
+Tap on "Salvar Informações da Obra"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Tap on (Optional) "(?i)ok"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Scrolling DOWN until "5. Checklist de Verificação.*" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Tap on "5. Checklist de Verificação.*", Index: 0... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Scrolling DOWN until "Progresso das Etapas Concluídas" is visible with speed 40, visibility percentage 100%, timeout 30000 ms, with centering disabled... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Element not found: Text matching regex: Salvar Informações da Obra
 
-Element with Text matching regex: Salvar Informações da Obra not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
-
-Possible causes:
-- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
-- Element may be temporarily unavailable due to loading state.
-- This could be a real regression that needs to be addressed.
-
-==== Debug output (logs & screenshots) ====
-
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-332-relatorio-checklist/2026-11-11_011913
+ Warning: Assertion is false: "__aguarda__" is visible

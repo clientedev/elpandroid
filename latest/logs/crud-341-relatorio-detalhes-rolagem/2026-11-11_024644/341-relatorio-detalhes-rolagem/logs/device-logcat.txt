@@ -1,0 +1,84 @@
+--------- beginning of system
+11-11 02:46:51.325 D/CompatibilityChangeReporter(  519): Compat change id reported: 244637991; UID 10355; state: ENABLED
+--------- beginning of main
+11-11 02:46:51.327 D/KeyguardService(  839): setOccluded(false)
+11-11 02:46:51.327 D/KeyguardViewMediator(  839): setOccluded(false)
+11-11 02:46:51.327 I/ActivityTaskManager(  519): START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10000000 pkg=com.obraflow.app cmp=com.obraflow.app/.MainActivity} with LAUNCH_SINGLE_TASK from uid 10355 (BAL_ALLOW_PERMISSION) result code=3
+11-11 02:46:51.328 W/unknown:BridgelessReact(24276): ReactHost{0}.onHostPause(activity)
+11-11 02:46:51.328 W/unknown:BridgelessReact(24276): ReactHost{0}.ReactContext.onHostPause()
+11-11 02:46:51.328 D/WindowManagerShell(  839): onActivityRestartAttempt: ComponentInfo{com.obraflow.app/com.obraflow.app.MainActivity}
+11-11 02:46:51.329 D/KeyguardViewMediator(  839): handleSetOccluded(false)
+11-11 02:46:51.330 W/unknown:BridgelessReact(24276): ReactHost{0}.onHostResume(activity)
+11-11 02:46:51.330 W/unknown:BridgelessReact(24276): ReactHost{0}.ReactContext.onHostResume()
+11-11 02:46:51.358 D/WindowManager(  519): captureDisplay
+11-11 02:46:51.368 W/ProcessStats(  519): Tracking association SourceState{2cc3852 com.google.android.gms.persistent/10131 BFgs #40614} whose proc state 4 is better than process ProcessState{dd4188 com.google.android.gms/10131 pkg=com.google.android.gms} proc state 14 (1395 skipped)
+11-11 02:46:51.370 I/hwservicemanager(  135): getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+11-11 02:46:51.372 I/Gralloc4(32270): mapper 4.x is not supported
+--------- beginning of kernel
+11-11 02:46:51.563 I/servicemanager(    0): Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+11-11 02:46:51.396 D/libEGL  (32270): loaded /vendor/lib64/egl/libEGL_emulation.so
+11-11 02:46:51.396 D/libEGL  (32270): loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+11-11 02:46:51.397 D/libEGL  (32270): loaded /vendor/lib64/egl/libGLESv2_emulation.so
+11-11 02:46:51.411 W/OpenGLRenderer(32270): Failed to initialize 101010-2 format, error = EGL_SUCCESS
+11-11 02:46:51.739 D/WindowManager(  519): captureDisplay
+11-11 02:46:51.760 W/System  (32270): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 02:46:51.760 W/System  (32270): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 02:46:51.760 W/System  (32270): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 02:46:51.760 W/System  (32270): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 02:46:51.760 W/System  (32270): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 02:46:51.760 W/System  (32270): A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+11-11 02:46:51.760 W/System  (32270): java.lang.Throwable: Explicit termination method 'HardwareBuffer.close' not called
+11-11 02:46:51.760 W/System  (32270): 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+11-11 02:46:51.760 W/System  (32270): 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+11-11 02:46:51.760 W/System  (32270): 	at android.hardware.HardwareBuffer.<init>(HardwareBuffer.java:266)
+11-11 02:46:51.932 D/StatusBarIconController(  839): ignoring old pipeline callback because the new wifi icon is enabled
+11-11 02:46:52.251 D/TaplEvents( 6453): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_DOWN, actionButton=0, id[0]=0, x[0]=540.0, y[0]=1200.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1474844, downTime=1474844, deviceId=-1, source=0x1002, displayId=0, eventId=-165166415 }
+11-11 02:46:52.302 D/EGL_emulation(24276): app_time_stats: avg=10186.35ms min=33.33ms max=81161.26ms count=8
+11-11 02:46:52.709 D/TaplEvents( 6453): TIS / TouchInteractionService.onInputEvent: MotionEvent { action=ACTION_UP, actionButton=0, id[0]=0, x[0]=540.0, y[0]=240.0, toolType[0]=TOOL_TYPE_FINGER, buttonState=0, classification=NONE, metaState=0, flags=0x0, edgeFlags=0x0, pointerCount=1, historySize=0, eventTime=1475292, downTime=1474844, deviceId=-1, source=0x1002, displayId=0, eventId=-986253750 }
+11-11 02:46:52.849 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:52.850 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:52.850 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:52.934 D/Maestro (32282): View hierarchy received in 85 ms
+11-11 02:46:53.038 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:53.038 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.039 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.091 D/Maestro (32282): View hierarchy received in 53 ms
+11-11 02:46:53.106 D/ActivityManager(  519): freezing 3410 com.google.android.documentsui
+11-11 02:46:53.107 D/ActivityManager(  519): freezing 2719 com.android.chrome
+11-11 02:46:53.177 D/ActivityManager(  519): freezing 2206 android.process.media
+11-11 02:46:53.323 D/EGL_emulation(24276): app_time_stats: avg=70.74ms min=32.69ms max=320.16ms count=14
+11-11 02:46:53.428 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:53.428 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.429 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.620 D/Maestro (32282): View hierarchy received in 192 ms
+11-11 02:46:53.683 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:53.684 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.684 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.729 D/Maestro (32282): View hierarchy received in 46 ms
+11-11 02:46:53.801 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:53.802 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.802 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.845 D/Maestro (32282): View hierarchy received in 44 ms
+11-11 02:46:53.914 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:53.914 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.915 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:53.968 D/Maestro (32282): View hierarchy received in 54 ms
+11-11 02:46:54.037 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:54.038 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:54.038 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:54.122 D/Maestro (32282): View hierarchy received in 85 ms
+11-11 02:46:54.181 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:54.182 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:54.182 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:54.225 D/Maestro (32282): View hierarchy received in 43 ms
+11-11 02:46:54.285 D/Maestro (32282): Requesting view hierarchy
+11-11 02:46:54.285 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:54.285 W/QueryController(32282): Could not detect idle state.
+11-11 02:46:54.327 D/Maestro (32282): View hierarchy received in 42 ms
+11-11 02:46:54.521 D/WindowManager(  519): captureDisplay
+11-11 02:46:54.795 I/netd    (  334): tetherGetStats() -> {[]} <5.06ms>
+11-11 02:46:54.797 I/netd    (  334): bandwidthSetGlobalAlert(2097152) <0.12ms>
+11-11 02:46:54.807 I/netd    (  334): bandwidthRemoveInterfaceQuota(eth0) <0.51ms>
+11-11 02:46:54.809 I/netd    (  334): bandwidthSetInterfaceQuota(eth0, 9223372036854775807) <2.22ms>
+11-11 02:46:54.923 D/CompatibilityChangeReporter(  519): Compat change id reported: 218533173; UID 10355; state: ENABLED
+11-11 02:46:54.923 D/CompatibilityChangeReporter(  519): Compat change id reported: 262645982; UID 10355; state: ENABLED

@@ -2,17 +2,19 @@ Running on test
  > Flow 346-express-preenchido
 Launch app "com.obraflow.app" without stopping app... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
-Tap on Below "1. Título do Relatório.*"... FAILED
+Tap on Below "1. Título do Relatório.*"... COMPLETED
+Erase 80 characters... COMPLETED
+Tap on Below "1. Título do Relatório.*"... COMPLETED
+Erase 80 characters... COMPLETED
+Input text MANUAL - TESTE Express fachada norte... COMPLETED
+Hide Keyboard... COMPLETED
+Tap on "Nome da construtora ou cliente"... COMPLETED
+Input text MANUAL - TESTE Construtora... COMPLETED
+Hide Keyboard... COMPLETED
+Tap on "Ex: Edifício Horizonte"... COMPLETED
+Input text MANUAL - TESTE Obra Residencial... COMPLETED
+Hide Keyboard... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Element not found: Below: "1. Título do Relatório.*"
 
-Element with Below: "1. Título do Relatório.*" not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
-
-Possible causes:
-- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
-- Element may be temporarily unavailable due to loading state.
-- This could be a real regression that needs to be addressed.
-
-==== Debug output (logs & screenshots) ====
-
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-346-express-preenchido/2026-11-11_013058
+ Warning: Assertion is false: "__aguarda__" is visible
