@@ -1,0 +1,29 @@
+Anonymous analytics enabled. To opt out, set MAESTRO_CLI_NO_ANALYTICS environment variable to any value before running Maestro.
+
+Running on test
+ > Flow 300-admin-login
+Launch app "com.obraflow.app" with clear state... COMPLETED
+Run flow when ".*(isn't responding|não está respondendo).*" is visible...
+Run flow when ".*(isn't responding|não está respondendo).*" is visible... SKIPPED
+Assert that "Entrar" is visible... COMPLETED
+Run flow when ".*(isn't responding|não está respondendo).*" is visible...
+Run flow when ".*(isn't responding|não está respondendo).*" is visible... SKIPPED
+Assert that (Optional) "Mais tarde" is visible... WARNED
+
+
+ Warning: Assertion is false: "Mais tarde" is visible
+Tap on (Optional) "Mais tarde"... WARNED
+
+
+ Warning: Element not found: Text matching regex: Mais tarde
+Tap on "seu.usuario ou email@empresa.com"... COMPLETED
+Input text ${USER}... COMPLETED
+Tap on "Sua senha"... COMPLETED
+Input text ${PASS}... COMPLETED
+Hide Keyboard... COMPLETED
+Tap on "Entrar"... COMPLETED
+Assert that "(Ajustes|Usuário ou senha incorretos.*|Usuário desativado.*)" is visible... COMPLETED
+Tap on (Optional) "Mais tarde"... WARNED
+
+
+ Warning: Element not found: Text matching regex: Mais tarde

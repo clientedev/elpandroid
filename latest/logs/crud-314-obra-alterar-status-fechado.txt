@@ -2,17 +2,14 @@ Running on test
  > Flow 314-obra-alterar-status-fechado
 Launch app "com.obraflow.app" without stopping app... COMPLETED
 Wait for animation to end within 5000 ms... COMPLETED
-Tap on "Ativo"... FAILED
+Tap on "Ativo"... COMPLETED
+Wait for animation to end within 5000 ms... COMPLETED
+Tap on (Optional) "(?i)ok"... WARNED
 
-Element not found: Text matching regex: Ativo
 
-Element with Text matching regex: Ativo not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+ Warning: Element not found: Text matching regex: (?i)ok
+Wait for animation to end within 5000 ms... COMPLETED
+Assert that (Optional) "__aguarda__" is visible... WARNED
 
-Possible causes:
-- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
-- Element may be temporarily unavailable due to loading state.
-- This could be a real regression that needs to be addressed.
 
-==== Debug output (logs & screenshots) ====
-
-/home/runner/work/elpandroid/elpandroid/manual-out/logs/crud-314-obra-alterar-status-fechado/2026-11-11_035340
+ Warning: Assertion is false: "__aguarda__" is visible
