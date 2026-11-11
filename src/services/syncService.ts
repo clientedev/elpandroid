@@ -1024,11 +1024,23 @@ class SyncService {
         const serverProjects = projectsRes.data;
         const serverProjectIds = new Set(serverProjects.map((p: any) => p.id));
 
-        if (serverProjects.length > 0) {
+        {
+          // A lista do servidor é a fonte da verdade: uma obra já sincronizada que não vem mais
+          // (excluída por outro aparelho, pelo site ou numa limpeza da base) sai do aparelho,
+          // desde que não haja relatório/visita local dessa obra aguardando envio.
           const localProjetos = await getLocalProjetos('Todos');
           for (const lp of localProjetos) {
-            if (lp.id < 2000000000 && lp.sync_status === 'synced' && !serverProjectIds.has(lp.id) && deletedProjects.has(lp.id)) {
-              console.log(`[SyncService] Obra ${lp.id} (${lp.nome}) confirmada excluída na nuvem. Apagando em cascata do aparelho.`);
+            if (lp.id <= 0 || lp.id >= 2000000000 || lp.sync_status !== 'synced' || serverProjectIds.has(lp.id)) continue;
+            let pendentes = 0;
+            try {
+              const r1 = await db.getFirstAsync<any>(
+                "SELECT COUNT(*) AS n FROM relatorios WHERE projeto_id = ? AND (sync_status IS NULL OR sync_status != 'synced')", [lp.id]);
+              const r2 = await db.getFirstAsync<any>(
+                "SELECT COUNT(*) AS n FROM visitas WHERE projeto_id = ? AND (sync_status IS NULL OR sync_status != 'synced')", [lp.id]);
+              pendentes = Number(r1?.n || 0) + Number(r2?.n || 0);
+            } catch { pendentes = 1; }
+            if (pendentes === 0 || deletedProjects.has(lp.id)) {
+              console.log(`[SyncService] Obra ${lp.id} (${lp.nome}) não existe mais na nuvem. Apagando em cascata do aparelho.`);
               await deleteLocalProjetoCascade(lp.id);
             }
           }
