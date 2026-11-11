@@ -1,0 +1,74 @@
+appId: com.obraflow.app
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: ".*, Ajustes"
+    timeout: 60000
+- tapOn:
+    text: "Mais tarde"
+    optional: true
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- runFlow:
+    when:
+      notVisible: "Ajustes"
+    commands:
+      - back
+      - waitForAnimationToEnd:
+          timeout: 3000
+      - tapOn:
+          text: "(?i)(descartar|sair sem salvar|ok)"
+          optional: true
+- tapOn:
+    text: ".*, Ajustes"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1500
+    optional: true
+- scrollUntilVisible:
+    element: "Notificações"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    text: "Notificações"
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 2000
+    optional: true

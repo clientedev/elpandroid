@@ -1,0 +1,20 @@
+appId: com.obraflow.app
+---
+- launchApp:
+    stopApp: false
+- waitForAnimationToEnd:
+    timeout: 5000
+- scroll
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true
+- scroll
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 800
+    optional: true

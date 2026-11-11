@@ -61,6 +61,15 @@ appId: com.obraflow.app
     timeout: 1500
     optional: true
 - tapOn:
+    text: "Agendada"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "__aguarda__"
+    timeout: 1200
+    optional: true
+- tapOn:
     text: ".*MANUAL - TESTE.*"
     index: 0
 - extendedWaitUntil:
